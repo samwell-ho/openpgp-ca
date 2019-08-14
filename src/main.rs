@@ -79,29 +79,25 @@ fn real_main() -> Result<()> {
             println!("{:?}", m);
             match m.subcommand() {
                 ("add", Some(m2)) => {
-                    let mut emails: Option<Vec<&str>>;
-
                     match m2.values_of("email") {
                         Some(email) => {
-                            let email = email.into_iter()
+                            let email_vec = email.into_iter()
                                 .collect::<Vec<_>>();
 
-                            emails = Some(email);
+                            let name = m2.value_of("name");
+
+                            // TODO
+                            // .arg(Arg::with_name("key-profile")
+                            //  .long("key-profile")
+                            //  .value_name("key-profile")
+                            //  .help("Key Profile"))
+
+                            let ca_name = m2.value_of("ca_name").unwrap();
+
+                            user_new(name, Some(email_vec.as_ref()), ca_name)?;
                         }
                         _ => unimplemented!(),
                     }
-
-                    let name = m2.value_of("name");
-                        // TODO
-                        // .arg(Arg::with_name("key-profile")
-                        //  .long("key-profile")
-                        //  .value_name("key-profile")
-                        //  .help("Key Profile"))
-
-
-                    let ca_name = m2.value_of("ca_name").unwrap();
-
-                    user_new(name, emails, ca_name)?;
                 }
                 ("list", Some(_m2)) => {
                     list_users()?;
@@ -192,14 +188,14 @@ pub fn list_cas() {
 
 // -------- users
 
-fn user_new(name: Option<&str>, emails: Option<Vec<&str>>, ca_name: &str)
+fn user_new(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str)
             -> Result<()> {
     let ca_key = get_ca_by_name(ca_name).unwrap();
 
     println!("new user: uids {:?}, ca_name {}", emails, ca_name);
 
     // make user key (signed by CA)
-    let (user, revoc) = Pgp::make_user(&emails)
+    let (user, revoc) = Pgp::make_user(emails)
         .context("make_user_key failed")?;
 
     // sign user key with CA key

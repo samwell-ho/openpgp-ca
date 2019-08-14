@@ -33,7 +33,7 @@ pub struct Pgp {}
 
 impl Pgp {
     /// Generate an encryption-capable key.
-    fn generate(emails: &Option<Vec<&str>>) -> Result<(TPK, Signature)> {
+    fn generate(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
         let (tpk, revocation) = tpk::TPKBuilder::new()
             .add_encryption_subkey()
             .add_signing_subkey()
@@ -112,7 +112,7 @@ impl Pgp {
     /// make a private CA key
     pub fn make_private_ca_key(ca_uids: &[&str]) ->
     Result<(TPK, openpgp::packet::Signature)> {
-        Pgp::generate(&Some(ca_uids.to_vec()))
+        Pgp::generate(Some(&ca_uids.to_vec()))
     }
 
     /// create trust for CA from user
@@ -172,8 +172,8 @@ impl Pgp {
     }
 
     /// make a user TPK with "emails" as UIDs (all UIDs get signed)
-    pub fn make_user(emails: &Option<Vec<&str>>) -> Result<(TPK,
-                                                             Signature)> {
+    pub fn make_user(emails: Option<&[&str]>) -> Result<(TPK,
+                                                          Signature)> {
         // make user key
         let (user_tpk, revocation) = Pgp::generate(emails).unwrap();
 
@@ -182,8 +182,8 @@ impl Pgp {
 
         let mut packets = Vec::new();
 
-        if let Some(emails) = emails {
-            for &uid in emails {
+        if let Some(e) = emails {
+            for &uid in e {
                 // Generate userid ..
                 let userid = UserID::from(uid);
                 packets.push(userid.clone().into());
