@@ -12,3 +12,5 @@ dotenv = "0.14.1"
 failure = "0.1.5"
 
 sequoia-openpgp = "0.9.0"
+#sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git" }
+
