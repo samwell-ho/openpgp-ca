@@ -48,7 +48,7 @@ subcommands:
       about: Manage Users
       subcommands:
         - add:
-            about: Add User
+            about: Add User (create new Key-Pair)
             args:
               - ca_name:
                   takes_value: true
@@ -69,7 +69,26 @@ subcommands:
                   long: key-profile
                   help: Key Profile
         - import:
-            about: Import User
+            about: Import User (use existing Public Key)
+            args:
+              - ca_name:
+                  takes_value: true
+                  help: CA Name
+              - email:
+                  takes_value: true
+                  short: e
+                  long: email
+                  multiple: true
+                  help: Email address
+              - name:
+                  takes_value: true
+                  short: n
+                  long: name
+                  help: Name
+              - key-file:
+                  takes_value: true
+                  long: key-file
+                  help: File that contains the User's Public Key
         - revoke:
             about: Revoke Key
         - list:
