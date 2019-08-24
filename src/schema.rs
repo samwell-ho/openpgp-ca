@@ -21,7 +21,7 @@ table! {
         id -> Integer,
         name -> Nullable<Text>,
         pub_key -> Text,
-        revoc_cert -> Text,
+        revoc_cert -> Nullable<Text>,
         cas_id -> Integer,
     }
 }

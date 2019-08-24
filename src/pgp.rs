@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
+use openpgp::Packet;
 use openpgp::TPK;
 use openpgp::armor;
 use openpgp::constants::{SignatureType, HashAlgorithm};
@@ -143,14 +144,14 @@ impl Pgp {
         Ok(trusted)
     }
 
-    /// sign user TPK with CA TPK
+    /// sign all userids of TPK with CA TPK
     pub fn sign_user(ca_key: &TPK, user: &TPK) -> Result<TPK> {
+
         // sign tpk with CA key
         let mut signer = ca_key.primary().clone().into_keypair()
             .context("filtered for unencrypted secret keys above")?;
 
-        let user_keypair = user.primary().clone().into_keypair()?;
-        let user_pubkey = user_keypair.public();
+        let user_pubkey = &user.primary().clone();
 
         let mut sigs = Vec::new();
 
@@ -171,9 +172,38 @@ impl Pgp {
         Ok(certified)
     }
 
+    pub fn sign_user_emails(ca_key: &TPK, user_key: &TPK, emails: &[&str]) -> Result<TPK> {
+        let mut ca_keypair = ca_key.primary().clone().into_keypair()?;
+
+        let mut packets: Vec<Packet> = Vec::new();
+
+        for uid in user_key.userids() {
+
+            let userid = uid.userid();
+            let uid_addr = userid.address_normalized()?.unwrap();
+
+            // Sign this userid if email has been given for this import call
+            if emails.contains(&uid_addr.as_str()) {
+                // certify this userid
+                let cert = userid.certify(&mut ca_keypair,
+                                          &user_key,
+                                          SignatureType::PositiveCertificate,
+                                          None, None)?;
+
+                packets.push(cert.into());
+            }
+
+            // FIXME: complain about emails that have been specified but
+            // haven't been found in the userids
+//            panic!("Email {} not found in the key", );
+        }
+
+        let result = user_key.clone().merge_packets(packets)?;
+        Ok(result)
+    }
+
     /// make a user TPK with "emails" as UIDs (all UIDs get signed)
-    pub fn make_user(emails: Option<&[&str]>) -> Result<(TPK,
-                                                          Signature)> {
+    pub fn make_user(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
         // make user key
         let (user_tpk, revocation) = Pgp::generate(emails).unwrap();
 

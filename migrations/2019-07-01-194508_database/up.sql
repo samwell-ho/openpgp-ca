@@ -18,7 +18,7 @@ CREATE TABLE users (
   id INTEGER NOT NULL PRIMARY KEY,
   name VARCHAR,
   pub_key VARCHAR NOT NULL,
-  revoc_cert VARCHAR NOT NULL,
+  revoc_cert VARCHAR,
 
   cas_id INTEGER NOT NULL,
 

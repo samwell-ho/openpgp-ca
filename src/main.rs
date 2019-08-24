@@ -22,6 +22,8 @@ extern crate clap;
 extern crate failure;
 extern crate sequoia_openpgp as openpgp;
 
+use openpgp::parse::Parse;
+
 use std::process::exit;
 
 use clap::App;
@@ -42,8 +44,12 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 /// initialize db ("diesel migration run"), then:
 ///
 /// cargo run ca new example_ca openpgp_ca@example.org
+///
 /// cargo run user add example_ca -e alice@example.org -e a@example.org -n Alicia
 /// cargo run user add example_ca -e bob@example.org
+///
+/// cargo run user import example_ca -e heiko@example.org -n Heiko --key-file ~/heiko.pubkey
+///
 fn real_main() -> Result<()> {
     let yaml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
@@ -96,7 +102,27 @@ fn real_main() -> Result<()> {
 
                             let ca_name = m2.value_of("ca_name").unwrap();
 
+
                             user_new(name, Some(email_vec.as_ref()), ca_name)?;
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                ("import", Some(m2)) => {
+                    match m2.values_of("email") {
+                        Some(email) => {
+                            let email_vec = email.into_iter()
+                                .collect::<Vec<_>>();
+
+                            let name = m2.value_of("name");
+
+                            let key_file = m2.value_of("key-file").unwrap();
+
+                            let ca_name = m2.value_of("ca_name").unwrap();
+
+                            // FIXME: optionally import revoc cert from file?
+                            user_import(name, Some(email_vec.as_ref()),
+                                        ca_name, key_file, None)?;
                         }
                         _ => unimplemented!(),
                     }
@@ -202,7 +228,7 @@ fn user_new(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str)
 
     // sign user key with CA key
     let certified = Pgp::sign_user(&ca_key, &user).
-        context("sign_user_key failed")?;
+        context("sign_user failed")?;
 
     println!("=== user_tpk certified {:#?}\n", certified);
 
@@ -216,35 +242,68 @@ fn user_new(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str)
     // now write new data to DB
     let db = Db::new();
 
-    match db.search_ca(ca_name).context("Error searching CA")? {
-        Some(mut ca) => {
+    let mut ca_db = db.search_ca(ca_name).context("Couldn't find CA")?.unwrap();
 
-            // store updated CA TPK in DB
-            ca.ca_key = trusted_ca_armored;
+    // store updated CA TPK in DB
+    ca_db.ca_key = trusted_ca_armored;
 
-            db.update_ca(&ca)?;
+    db.update_ca(&ca_db)?;
 
-            // FIXME: the private key needs to be handed over to
-            // the user -> print for now?
-            let priv_key = &Pgp::priv_tpk_to_armored(&certified)?;
-            println!("secret user key:\n{}", priv_key);
-            // --
+    // FIXME: the private key needs to be handed over to
+    // the user -> print for now?
+    let priv_key = &Pgp::priv_tpk_to_armored(&certified)?;
+    println!("secret user key:\n{}", priv_key);
+    // --
 
-            let pub_key = &Pgp::tpk_to_armored(&certified)?;
-            let revoc_cert = &Pgp::sig_to_armored(&revoc)?;
+    let pub_key = &Pgp::tpk_to_armored(&certified)?;
+    let revoc = &Pgp::sig_to_armored(&revoc)?;
 
-            let new_user = models::NewUser { name, pub_key, revoc_cert, cas_id: ca.id };
+    let new_user = models::NewUser {
+        name,
+        pub_key,
+        revoc_cert: Some(revoc),
+        cas_id:
+        ca_db.id,
+    };
 
-            let user_id = db.insert_user(new_user)?;
-            for email in emails.unwrap() {
-                let new_email = models::NewEmail { addr: email, user_id };
-                db.insert_email(new_email)?;
-            }
-
-            Ok(())
-        }
-        _ => Err(failure::err_msg("CA not found"))
+    let user_id = db.insert_user(new_user)?;
+    for email in emails.unwrap() {
+        let new_email = models::NewEmail { addr: email, user_id };
+        db.insert_email(new_email)?;
     }
+
+    Ok(())
+}
+
+fn user_import(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str,
+               key_file: &str, revoc_file: Option<&str>) -> Result<()> {
+    let ca_key = get_ca_by_name(ca_name).unwrap();
+
+    let user_key = openpgp::TPK::from_file(key_file)
+        .expect("Failed to read key");
+
+    // sign only the userids that have been specified
+    let certified =
+        match emails {
+            Some(e) => Pgp::sign_user_emails(&ca_key, &user_key, e)?,
+            None => user_key
+        };
+
+    // put in DB
+    let db = Db::new();
+    let ca_db = db.search_ca(ca_name).context("Couldn't find CA")?.unwrap();
+
+    let pub_key = &Pgp::tpk_to_armored(&certified)?;
+    let new_user =
+        models::NewUser { name, pub_key, revoc_cert: None, cas_id: ca_db.id };
+
+    let user_id = db.insert_user(new_user)?;
+    for email in emails.unwrap() {
+        let new_email = models::NewEmail { addr: email, user_id };
+        db.insert_email(new_email)?;
+    }
+
+    Ok(())
 }
 
 pub fn list_users() -> Result<()> {

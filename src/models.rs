@@ -44,7 +44,7 @@ pub struct User {
     pub id: i32,
     pub name: Option<String>,
     pub pub_key: String,
-    pub revoc_cert: String,
+    pub revoc_cert: Option<String>,
     // https://docs.diesel.rs/diesel/associations/index.html
     pub cas_id: i32,
 }
@@ -54,7 +54,7 @@ pub struct User {
 pub struct NewUser<'a> {
     pub name: Option<&'a str>,
     pub pub_key: &'a str,
-    pub revoc_cert: &'a str,
+    pub revoc_cert: Option<&'a str>,
     pub cas_id: i32,
 }
 
