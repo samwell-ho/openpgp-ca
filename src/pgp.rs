@@ -126,14 +126,12 @@ impl Pgp {
 
         let mut sigs = Vec::new();
 
-        for ca_idb in ca_key.userids() {
-            let uid = ca_idb.userid();
-
+        for ca_uidb in ca_key.userids() {
             let sig = Builder::new(SignatureType::GenericCertificate)
-                .set_trust_signature(1, 120)?
+                .set_trust_signature(255, 120)?
                 .sign_userid_binding(&mut signer,
                                      ca_pubkey,
-                                     uid,
+                                     ca_uidb.userid(),
                                      HashAlgorithm::SHA512)?;
 
             sigs.push(sig.into());
