@@ -64,9 +64,9 @@ subcommands:
                   short: n
                   long: name
                   help: Name
-              - key-profile:
+              - key_profile:
                   takes_value: true
-                  long: key-profile
+                  long: key_profile
                   help: Key Profile
         - import:
             about: Import User (use existing Public Key)
@@ -85,9 +85,9 @@ subcommands:
                   short: n
                   long: name
                   help: Name
-              - key-file:
+              - key_file:
                   takes_value: true
-                  long: key-file
+                  long: key_file
                   help: File that contains the User's Public Key
         - revoke:
             about: Revoke Key
@@ -97,7 +97,21 @@ subcommands:
       about: Manage Bridges
       subcommands:
         - new:
-            about: Add New Bridge
+            about: Add New Bridge (sign existing remote CA Public Key)
+            args:
+              - ca_name:
+                  takes_value: true
+                  help: CA Name
+              - regex:
+                  takes_value: true
+                  short: r
+                  long: regex
+                  multiple: true
+                  help: Regex
+              - remote_key_file:
+                  takes_value: true
+                  long: remote_key_file
+                  help: File that contains the remote CA's Public Key
         - revoke:
             about: Revoke Bridge
   - directory:

@@ -20,6 +20,7 @@ use failure::{self, ResultExt};
 use diesel::prelude::*;
 use diesel::r2d2;
 
+use crate::schema::bridges;
 use crate::schema::cas;
 use crate::schema::users;
 use crate::schema::emails;
@@ -171,6 +172,15 @@ impl Db {
             .values(&email)
             .execute(&self.conn)
             .context("Error saving new email")?;
+
+        Ok(())
+    }
+
+    pub fn insert_bridge(&self, bridge: models::NewBridge) -> Result<()> {
+        diesel::insert_into(bridges::table)
+            .values(&bridge)
+            .execute(&self.conn)
+            .context("Error saving new bridge")?;
 
         Ok(())
     }

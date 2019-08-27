@@ -1,4 +1,14 @@
 table! {
+    bridges (id) {
+        id -> Integer,
+        name -> Nullable<Text>,
+        pub_key -> Text,
+        revoc_cert -> Nullable<Text>,
+        cas_id -> Integer,
+    }
+}
+
+table! {
     cas (id) {
         id -> Integer,
         name -> Text,
@@ -26,10 +36,12 @@ table! {
     }
 }
 
+joinable!(bridges -> cas (cas_id));
 joinable!(emails -> users (user_id));
 joinable!(users -> cas (cas_id));
 
 allow_tables_to_appear_in_same_query!(
+    bridges,
     cas,
     emails,
     users,

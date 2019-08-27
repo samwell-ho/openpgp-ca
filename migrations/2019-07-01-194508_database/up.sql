@@ -34,4 +34,13 @@ CREATE TABLE emails (
   FOREIGN KEY(user_id) REFERENCES users(id),
 
   CONSTRAINT emails_addr_unique UNIQUE (addr)
-)
+);
+
+CREATE TABLE bridges (
+  id INTEGER NOT NULL PRIMARY KEY,
+  pub_key VARCHAR NOT NULL,
+
+  cas_id INTEGER NOT NULL,
+
+  FOREIGN KEY(cas_id) REFERENCES cas(id) ON DELETE RESTRICT
+);

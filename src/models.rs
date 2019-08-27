@@ -18,6 +18,7 @@
 use super::schema::cas;
 use super::schema::users;
 use super::schema::emails;
+use super::schema::bridges;
 
 
 #[derive(Queryable, Debug, Clone, AsChangeset)]
@@ -67,9 +68,22 @@ pub struct Email {
     pub user_id: i32,
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug)]
 #[table_name = "emails"]
 pub struct NewEmail<'a> {
     pub addr: &'a str,
     pub user_id: i32,
+}
+
+#[derive(Identifiable, Queryable, Debug)]
+pub struct Bridge<'a> {
+    pub id: i32,
+    pub pub_key: &'a str,
+    pub cas_id: i32,
+}
+#[derive(Insertable, Debug)]
+#[table_name = "bridges"]
+pub struct NewBridge<'a> {
+    pub pub_key: &'a str,
+    pub cas_id: i32,
 }

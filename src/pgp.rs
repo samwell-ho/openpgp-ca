@@ -126,20 +126,64 @@ impl Pgp {
 
         let mut sigs = Vec::new();
 
+        // FIXME: assert there is exactly one userid?
+
+        // create TSIG
         for ca_uidb in ca_key.userids() {
-            let sig = Builder::new(SignatureType::GenericCertificate)
+            let tsig = Builder::new(SignatureType::GenericCertificate)
                 .set_trust_signature(255, 120)?
                 .sign_userid_binding(&mut signer,
                                      ca_pubkey,
                                      ca_uidb.userid(),
                                      HashAlgorithm::SHA512)?;
 
-            sigs.push(sig.into());
+            sigs.push(tsig.into());
         }
 
         let trusted = ca_key.clone().merge_packets(sigs)?;
 
         Ok(trusted)
+    }
+
+    /// add trust signature to the public key of a remote CA
+    pub fn bridge_to_remote_ca(ca_key: &TPK,
+                               remote_ca_key: &TPK,
+                               regexes: Option<&[&str]>) -> Result<TPK> {
+
+        // there should be exactly one userid!
+        let userid = remote_ca_key.userids().next().unwrap().userid();
+
+        // set_trust_signature, set_regular_expression(s), expiration
+
+        let mut signer = ca_key.primary().clone().into_keypair()?;
+
+        let remote_keypair = remote_ca_key.primary().clone().into_keypair()?;
+        let remote_pubkey = remote_keypair.public();
+
+        let mut packets: Vec<Packet> = Vec::new();
+
+        // FIXME: do we want to support a tsig without any regex?
+
+        // create one TSIG for each regex
+        if let Some(regexes) = regexes {
+            for &regex in regexes {
+                let tsig = Builder::new(SignatureType::GenericCertificate)
+                    .set_trust_signature(255, 120)?
+                    .set_regular_expression(regex.as_bytes())?
+                    .sign_userid_binding(&mut signer,
+                                         remote_pubkey,
+                                         userid,
+                                         HashAlgorithm::SHA512)?;
+
+                packets.push(tsig.into());
+            }
+        }
+
+        // FIXME: expiration?
+
+        let result = remote_ca_key.clone().merge_packets(packets)?;
+
+        Ok(result)
     }
 
     /// sign all userids of TPK with CA TPK
@@ -176,7 +220,6 @@ impl Pgp {
         let mut packets: Vec<Packet> = Vec::new();
 
         for uid in user_key.userids() {
-
             let userid = uid.userid();
             let uid_addr = userid.address_normalized()?.unwrap();
 

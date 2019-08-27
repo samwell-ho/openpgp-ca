@@ -48,7 +48,7 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 /// cargo run user add example_ca -e alice@example.org -e a@example.org -n Alicia
 /// cargo run user add example_ca -e bob@example.org
 ///
-/// cargo run user import example_ca -e heiko@example.org -n Heiko --key-file ~/heiko.pubkey
+/// cargo run user import example_ca -e heiko@example.org -n Heiko --key_file ~/heiko.pubkey
 ///
 fn real_main() -> Result<()> {
     let yaml = load_yaml!("cli.yml");
@@ -83,8 +83,8 @@ fn real_main() -> Result<()> {
             }
         }
         ("user", Some(m)) => {
-            println!("user");
-            println!("{:?}", m);
+//            println!("user");
+//            println!("{:?}", m);
             match m.subcommand() {
                 ("add", Some(m2)) => {
                     match m2.values_of("email") {
@@ -95,9 +95,9 @@ fn real_main() -> Result<()> {
                             let name = m2.value_of("name");
 
                             // TODO
-                            // .arg(Arg::with_name("key-profile")
-                            //  .long("key-profile")
-                            //  .value_name("key-profile")
+                            // .arg(Arg::with_name("key_profile")
+                            //  .long("key_profile")
+                            //  .value_name("key_profile")
                             //  .help("Key Profile"))
 
                             let ca_name = m2.value_of("ca_name").unwrap();
@@ -116,7 +116,7 @@ fn real_main() -> Result<()> {
 
                             let name = m2.value_of("name");
 
-                            let key_file = m2.value_of("key-file").unwrap();
+                            let key_file = m2.value_of("key_file").unwrap();
 
                             let ca_name = m2.value_of("ca_name").unwrap();
 
@@ -129,6 +129,34 @@ fn real_main() -> Result<()> {
                 }
                 ("list", Some(_m2)) => {
                     list_users()?;
+                }
+
+                _ => unimplemented!(),
+            }
+        }
+        ("bridge", Some(m)) => {
+            println!("bridge");
+            println!("{:?}", m);
+            match m.subcommand() {
+                ("new", Some(m2)) => {
+                    match m2.values_of("regex") {
+                        Some(regex) => {
+                            let regex_vec = regex.into_iter()
+                                .collect::<Vec<_>>();
+
+                            let key_file =
+                                m2.value_of("remote_key_file").unwrap();
+
+                            let ca_name = m2.value_of("ca_name").unwrap();
+
+                            bridge_new(ca_name, key_file,
+                                       Some(regex_vec.as_ref()))?;
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                ("list", Some(_m2)) => {
+                    list_bridges()?;
                 }
 
                 _ => unimplemented!(),
@@ -282,6 +310,10 @@ fn user_import(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str,
     let user_key = openpgp::TPK::from_file(key_file)
         .expect("Failed to read key");
 
+    if let Some(_filename) = revoc_file {
+        // FIXME: handle optional revocation cert
+    }
+
     // sign only the userids that have been specified
     let certified =
         match emails {
@@ -323,8 +355,43 @@ pub fn list_users() -> Result<()> {
 
 // -------- bridges
 
-// TODO: add bridge, ...
-// for bridge: TSIG:  set_regular_expression + set_trust_signature + expiration
+fn bridge_new(ca_name: &str, key_file: &str,
+              regexes: Option<&[&str]>) -> Result<()> {
+    let ca_key = get_ca_by_name(ca_name).unwrap();
+
+    let remote_ca_key = openpgp::TPK::from_file(key_file)
+        .expect("Failed to read key");
+
+    // expect exactly one userid in remote CA key (otherwise fail)
+    assert_eq!(remote_ca_key.userids().len(), 1, "remote CA should have \
+    exactly one userid, but has {}", remote_ca_key.userids().len());
+
+    let bridged = Pgp::bridge_to_remote_ca(&ca_key, &remote_ca_key, regexes)?;
+
+    // store in DB
+    let db = Db::new();
+    let ca_db = db.search_ca(ca_name).context("Couldn't find CA")?.unwrap();
+
+    let pub_key = &Pgp::tpk_to_armored(&bridged)?;
+
+    let new_bridge = models::NewBridge {
+        pub_key,
+        cas_id:
+        ca_db.id,
+    };
+
+    db.insert_bridge(new_bridge)?;
+
+    Ok(())
+}
+
+
+// FIXME: revoke bridge sig
+
+
+pub fn list_bridges() -> Result<()> {
+    unimplemented!();
+}
 
 // -----------------
 
