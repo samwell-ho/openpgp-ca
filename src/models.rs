@@ -75,15 +75,18 @@ pub struct NewEmail<'a> {
     pub user_id: i32,
 }
 
-#[derive(Identifiable, Queryable, Debug)]
-pub struct Bridge<'a> {
+#[derive(Identifiable, Queryable, Clone, AsChangeset, Debug)]
+pub struct Bridge {
     pub id: i32,
-    pub pub_key: &'a str,
+    pub name: String,
+    pub pub_key: String,
     pub cas_id: i32,
 }
+
 #[derive(Insertable, Debug)]
 #[table_name = "bridges"]
 pub struct NewBridge<'a> {
+    pub name: &'a str,
     pub pub_key: &'a str,
     pub cas_id: i32,
 }

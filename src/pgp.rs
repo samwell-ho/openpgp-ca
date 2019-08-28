@@ -18,7 +18,7 @@
 use openpgp::Packet;
 use openpgp::TPK;
 use openpgp::armor;
-use openpgp::constants::{SignatureType, HashAlgorithm};
+use openpgp::constants::{SignatureType, HashAlgorithm, ReasonForRevocation};
 use openpgp::packet::Signature;
 use openpgp::packet::UserID;
 use openpgp::packet::signature::Builder;
@@ -184,6 +184,30 @@ impl Pgp {
         let result = remote_ca_key.clone().merge_packets(packets)?;
 
         Ok(result)
+    }
+
+    pub fn bridge_revoke(remote_ca_key: &TPK, ca_key: &TPK)
+                         -> Result<(Signature, TPK)> {
+        // there should be exactly one userid!
+        let userid = remote_ca_key.userids().next().unwrap().userid();
+
+        // set_trust_signature, set_regular_expression(s), expiration
+
+        let mut signer = ca_key.primary().clone().into_keypair()?;
+
+        let mut packets: Vec<Packet> = Vec::new();
+
+        // create revocation sig
+        let rev = userid
+            .revoke(&mut signer, &remote_ca_key,
+                    ReasonForRevocation::Unspecified,
+                    b"removing OpenPGP CA bridge", None, None)?;
+
+        packets.push(rev.clone().into());
+
+        let revoked = remote_ca_key.clone().merge_packets(packets)?;
+
+        Ok((rev,revoked))
     }
 
     /// sign all userids of TPK with CA TPK

@@ -25,7 +25,7 @@ use crate::schema::cas;
 use crate::schema::users;
 use crate::schema::emails;
 use crate::models;
-use crate::models::{Ca, User, Email};
+use crate::models::{Ca, User, Email, Bridge};
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -100,6 +100,19 @@ impl Db {
         Ok(())
     }
 
+    pub fn get_ca(&self, id: i32) -> Result<Option<Ca>> {
+        let res = cas::table.filter(cas::id.eq(id))
+            .load::<Ca>(&self.conn)
+            .context("Error loading ca")?;
+
+        match res.len() {
+            0 => Ok(None),
+            1 => Ok(Some(res[0].clone())),
+            _ => panic!("get_ca for {} found {} results, expected 0 or 1",
+                        id, res.len())
+        }
+    }
+
     pub fn search_ca(&self, name: &str) -> Result<Option<Ca>> {
         let res = cas::table.filter(cas::name.eq(name))
             .load::<Ca>(&self.conn)
@@ -108,8 +121,7 @@ impl Db {
         match res.len() {
             0 => Ok(None),
             1 => Ok(Some(res[0].clone())),
-            _ => panic!("search_ca for {} found {} results, expected 1. \
-            (Database constraints should make this impossible)",
+            _ => panic!("search_ca for {} found {} results, expected 0 or 1",
                         name, res.len())
         }
     }
@@ -183,5 +195,34 @@ impl Db {
             .context("Error saving new bridge")?;
 
         Ok(())
+    }
+
+    pub fn update_bridge(&self, bridge: &models::Bridge) -> Result<()> {
+        diesel::update(bridges::table)
+            .set(bridge)
+            .execute(&self.conn)
+            .context("Error updating Bridge")?;
+
+        Ok(())
+    }
+
+    pub fn search_bridge(&self, name: &str) -> Result<Option<Bridge>> {
+        let res = bridges::table.filter(bridges::name.eq(name))
+            .load::<Bridge>(&self.conn)
+            .context("Error loading bridge")?;
+
+        match res.len() {
+            0 => Ok(None),
+            1 => Ok(Some(res[0].clone())),
+            _ => panic!("search_bridge for {} found {} results, expected 1. \
+            (Database constraints should make this impossible)",
+                        name, res.len())
+        }
+    }
+
+    pub fn list_bridges(&self) -> Result<Vec<Bridge>> {
+        Ok(bridges::table
+            .load::<Bridge>(&self.conn)
+            .context("Error loading bridges")?)
     }
 }

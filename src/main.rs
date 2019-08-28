@@ -50,6 +50,9 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 ///
 /// cargo run user import example_ca -e heiko@example.org -n Heiko --key_file ~/heiko.pubkey
 ///
+/// cargo run bridge new -r "*@foo.de" --remote_key_file /tmp/bar.txt --name foobridge example_ca
+/// cargo run bridge revoke --name foobridge
+///
 fn real_main() -> Result<()> {
     let yaml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
@@ -83,8 +86,6 @@ fn real_main() -> Result<()> {
             }
         }
         ("user", Some(m)) => {
-//            println!("user");
-//            println!("{:?}", m);
             match m.subcommand() {
                 ("add", Some(m2)) => {
                     match m2.values_of("email") {
@@ -135,8 +136,6 @@ fn real_main() -> Result<()> {
             }
         }
         ("bridge", Some(m)) => {
-            println!("bridge");
-            println!("{:?}", m);
             match m.subcommand() {
                 ("new", Some(m2)) => {
                     match m2.values_of("regex") {
@@ -147,13 +146,20 @@ fn real_main() -> Result<()> {
                             let key_file =
                                 m2.value_of("remote_key_file").unwrap();
 
+                            let name = m2.value_of("name").unwrap();
+
                             let ca_name = m2.value_of("ca_name").unwrap();
 
-                            bridge_new(ca_name, key_file,
+                            bridge_new(name, ca_name, key_file,
                                        Some(regex_vec.as_ref()))?;
                         }
                         _ => unimplemented!(),
                     }
+                }
+                ("revoke", Some(m2)) => {
+                    let name = m2.value_of("name").unwrap();
+
+                    bridge_revoke(name)?;
                 }
                 ("list", Some(_m2)) => {
                     list_bridges()?;
@@ -207,7 +213,6 @@ fn ca_new(name: &str, emails: &[&str]) -> Result<()> {
 }
 
 fn ca_delete(name: &str) -> Result<()> {
-
     // FIXME: CA should't be deleted while users point to it.
     // -> limit with database constraints? (or by rust code?)
 
@@ -339,7 +344,7 @@ fn user_import(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str,
 }
 
 pub fn list_users() -> Result<()> {
-//    https://docs.diesel.rs/diesel/associations/index.html
+    //    https://docs.diesel.rs/diesel/associations/index.html
     let db = Db::new();
     let users = db.list_users()?;
     for user in users {
@@ -355,7 +360,7 @@ pub fn list_users() -> Result<()> {
 
 // -------- bridges
 
-fn bridge_new(ca_name: &str, key_file: &str,
+fn bridge_new(name: &str, ca_name: &str, key_file: &str,
               regexes: Option<&[&str]>) -> Result<()> {
     let ca_key = get_ca_by_name(ca_name).unwrap();
 
@@ -375,6 +380,7 @@ fn bridge_new(ca_name: &str, key_file: &str,
     let pub_key = &Pgp::tpk_to_armored(&bridged)?;
 
     let new_bridge = models::NewBridge {
+        name,
         pub_key,
         cas_id:
         ca_db.id,
@@ -385,16 +391,50 @@ fn bridge_new(ca_name: &str, key_file: &str,
     Ok(())
 }
 
+pub fn bridge_revoke(name: &str) -> Result<()> {
+    let db = Db::new();
 
-// FIXME: revoke bridge sig
+    let bridge = db.search_bridge(name)?;
+    assert!(bridge.is_some(), "bridge not found");
+
+    let mut bridge = bridge.unwrap();
+
+    println!("bridge {:?}", &bridge.clone());
+    let ca_id = bridge.clone().cas_id;
+
+    let ca = db.get_ca(ca_id)?.unwrap();
+    let ca_key = Pgp::armored_to_tpk(&ca.ca_key);
+
+    let bridge_pub = Pgp::armored_to_tpk(&bridge.pub_key);
+
+    // make sig to revoke bridge
+    let (rev_cert, rev_tpk) = Pgp::bridge_revoke(&bridge_pub, &ca_key)?;
+
+    let revoc_cert_arm = &Pgp::sig_to_armored(&rev_cert)?;
+    println!("revoc cert:\n{}", revoc_cert_arm);
+
+    // save updated key (with revocation) to DB
+    let revoked_arm = Pgp::tpk_to_armored(&rev_tpk)?;
+    println!("revoked remote key:\n{}", &revoked_arm);
+
+    bridge.pub_key = revoked_arm;
+    db.update_bridge(&bridge)?;
+
+    Ok(())
+}
 
 
 pub fn list_bridges() -> Result<()> {
-    unimplemented!();
+    let bridges = Db::new().list_bridges()?;
+
+    for bridge in bridges {
+        println!("Bridge '{}':\n\n{}", bridge.name, bridge.pub_key);
+    }
+
+    Ok(())
 }
 
 // -----------------
-
 
 fn main() {
     if let Err(e) = real_main() {

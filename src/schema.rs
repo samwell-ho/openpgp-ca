@@ -1,9 +1,8 @@
 table! {
     bridges (id) {
         id -> Integer,
-        name -> Nullable<Text>,
+        name -> Text,
         pub_key -> Text,
-        revoc_cert -> Nullable<Text>,
         cas_id -> Integer,
     }
 }

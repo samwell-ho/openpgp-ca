@@ -102,6 +102,11 @@ subcommands:
               - ca_name:
                   takes_value: true
                   help: CA Name
+              - name:
+                  takes_value: true
+                  short: n
+                  long: name
+                  help: Bridge Name
               - regex:
                   takes_value: true
                   short: r
@@ -114,6 +119,14 @@ subcommands:
                   help: File that contains the remote CA's Public Key
         - revoke:
             about: Revoke Bridge
+            args:
+              - name:
+                  takes_value: true
+                  short: n
+                  long: name
+                  help: Bridge Name
+        - list:
+            about: List Bridges
   - directory:
       about: Manage Directories
       subcommands:

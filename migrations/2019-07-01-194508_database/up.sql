@@ -38,9 +38,12 @@ CREATE TABLE emails (
 
 CREATE TABLE bridges (
   id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR NOT NULL,
   pub_key VARCHAR NOT NULL,
 
   cas_id INTEGER NOT NULL,
 
   FOREIGN KEY(cas_id) REFERENCES cas(id) ON DELETE RESTRICT
+
+  CONSTRAINT bridge_name_unique UNIQUE (name)
 );
