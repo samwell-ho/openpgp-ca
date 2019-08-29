@@ -18,7 +18,7 @@
 use std::env;
 use failure::{self, ResultExt};
 use diesel::prelude::*;
-use diesel::r2d2;
+use diesel::r2d2::{Pool, PooledConnection, ConnectionManager};
 
 use crate::schema::bridges;
 use crate::schema::cas;
@@ -30,8 +30,9 @@ use crate::models::{Ca, User, Email, Bridge};
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 // FIXME: or keep a Connection as lazy_static? or just make new Connections?!
-fn get_conn() -> Result<r2d2::PooledConnection<r2d2::ConnectionManager
-<SqliteConnection>>> {
+fn get_conn()
+    -> Result<PooledConnection<ConnectionManager<SqliteConnection>>> {
+
     // bulk insert doesn't currently work with sqlite and r2d2:
     // https://github.com/diesel-rs/diesel/issues/1822
 
@@ -42,26 +43,27 @@ fn get_conn() -> Result<r2d2::PooledConnection<r2d2::ConnectionManager
     let database_url = env::var("DATABASE_URL")
         .context("DATABASE_URL must be set")?;
 
-    let manager =
-        r2d2::ConnectionManager::<SqliteConnection>::new(database_url);
-
-    let pool = r2d2::Pool::builder()
-        .build(manager)
-        .unwrap();
+    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+    let pool = Pool::builder().build(manager).unwrap();
 
     // --
 
     let conn = pool.get()?;
 
-    // FIXME: handle/return error?!
-    let _enable_foreign_key_constraints =
+    // enable handling of foreign key constraints in sqlite
+    let enable_foreign_key_constraints =
         diesel::sql_query("PRAGMA foreign_keys=1;").execute(&conn);
+
+    // throw error if foreign keys are not supported
+    if enable_foreign_key_constraints.is_err() {
+        panic!("Couldn't set 'PRAGMA foreign_keys=1;'");
+    }
 
     Ok(conn)
 }
 
 pub struct Db {
-    conn: r2d2::PooledConnection<r2d2::ConnectionManager<SqliteConnection>>,
+    conn: PooledConnection<ConnectionManager<SqliteConnection>>,
 }
 
 impl Db {
