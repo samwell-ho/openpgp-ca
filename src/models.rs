@@ -55,7 +55,7 @@ pub struct User {
 pub struct NewUser<'a> {
     pub name: Option<&'a str>,
     pub pub_key: &'a str,
-    pub revoc_cert: Option<&'a str>,
+    pub revoc_cert: Option<String>,
     pub cas_id: i32,
 }
 

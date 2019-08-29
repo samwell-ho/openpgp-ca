@@ -89,6 +89,11 @@ subcommands:
                   takes_value: true
                   long: key_file
                   help: File that contains the User's Public Key
+              - revocation_file:
+                  takes_value: true
+                  short: r
+                  long: revocation_file
+                  help: File that contains the User's revocation cert
         - revoke:
             about: Revoke Key
         - list:
