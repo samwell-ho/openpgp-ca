@@ -33,7 +33,7 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 pub struct Pgp {}
 
 impl Pgp {
-    /// Generate an encryption-capable key.
+    /// Generate an encryption- and signing-capable key.
     fn generate(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
         let (tpk, revocation) = tpk::TPKBuilder::new()
             .add_encryption_subkey()
@@ -42,8 +42,7 @@ impl Pgp {
 
         if let Some(emails) = emails {
             let mut packets = Vec::new();
-
-            let mut keypair = tpk.primary().clone().into_keypair()?;
+            let mut signer = tpk.primary().clone().into_keypair()?;
 
             for &email in emails {
                 let userid = UserID::from(email);
@@ -51,14 +50,12 @@ impl Pgp {
 
                 let builder = Builder::new(SignatureType::PositiveCertificate);
                 let binding =
-                    userid.bind(&mut keypair, &tpk, builder, None, None)?;
+                    userid.bind(&mut signer, &tpk, builder, None, None)?;
 
                 packets.push(binding.into());
             }
 
-            let merged = tpk.merge_packets(packets)?;
-
-            Ok((merged, revocation))
+            Ok((tpk.merge_packets(packets)?, revocation))
         } else {
             Ok((tpk, revocation))
         }
@@ -111,8 +108,8 @@ impl Pgp {
     }
 
     /// make a private CA key
-    pub fn make_private_ca_key(ca_uids: &[&str]) ->
-    Result<(TPK, openpgp::packet::Signature)> {
+    pub fn make_private_ca_key(ca_uids: &[&str])
+                               -> Result<(TPK, Signature)> {
         Pgp::generate(Some(&ca_uids.to_vec()))
     }
 
@@ -150,10 +147,13 @@ impl Pgp {
                                remote_ca_key: &TPK,
                                regexes: Option<&[&str]>) -> Result<TPK> {
 
+        // FIXME: do we want to support a tsig without any regex?
+        // -> or force users to explicitly set a catchall regex, then.
+
         // there should be exactly one userid!
         let userid = remote_ca_key.userids().next().unwrap().userid();
 
-        // set_trust_signature, set_regular_expression(s), expiration
+        // set_trust_signature + set_regular_expression(s)
 
         let mut signer = ca_key.primary().clone().into_keypair()?;
 
@@ -162,7 +162,6 @@ impl Pgp {
 
         let mut packets: Vec<Packet> = Vec::new();
 
-        // FIXME: do we want to support a tsig without any regex?
 
         // create one TSIG for each regex
         if let Some(regexes) = regexes {
@@ -198,16 +197,16 @@ impl Pgp {
         let mut packets: Vec<Packet> = Vec::new();
 
         // create revocation sig
-        let rev = userid
+        let revocation_sig = userid
             .revoke(&mut signer, &remote_ca_key,
                     ReasonForRevocation::Unspecified,
                     b"removing OpenPGP CA bridge", None, None)?;
 
-        packets.push(rev.clone().into());
+        packets.push(revocation_sig.clone().into());
 
         let revoked = remote_ca_key.clone().merge_packets(packets)?;
 
-        Ok((rev,revoked))
+        Ok((revocation_sig, revoked))
     }
 
     /// sign all userids of TPK with CA TPK
