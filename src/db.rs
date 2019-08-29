@@ -105,7 +105,7 @@ impl Db {
     pub fn get_ca(&self, id: i32) -> Result<Option<Ca>> {
         let res = cas::table.filter(cas::id.eq(id))
             .load::<Ca>(&self.conn)
-            .context("Error loading ca")?;
+            .context("Error loading CA")?;
 
         match res.len() {
             0 => Ok(None),
@@ -135,7 +135,7 @@ impl Db {
     }
 
     pub fn check_ca_exists(&self, ca_name: &str) -> Result<bool> {
-        Ok(self.search_ca(ca_name)?.is_some())
+        Ok(self.search_ca(ca_name).context("Error finding CA")?.is_some())
     }
 
     pub fn insert_user(&self, user: models::NewUser) -> Result<i32> {
