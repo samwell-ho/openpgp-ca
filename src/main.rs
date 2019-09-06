@@ -18,6 +18,9 @@
 #[macro_use]
 extern crate diesel;
 #[macro_use]
+extern crate diesel_migrations;
+
+#[macro_use]
 extern crate clap;
 extern crate failure;
 extern crate sequoia_openpgp as openpgp;
@@ -41,6 +44,9 @@ pub mod pgp;
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 fn real_main() -> Result<()> {
+
+    Db::new().migrations();
+
     let yaml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
 

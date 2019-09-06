@@ -227,4 +227,12 @@ impl Db {
             .load::<Bridge>(&self.conn)
             .context("Error loading bridges")?)
     }
+
+    pub fn migrations(&self) {
+        embed_migrations!();
+
+        embedded_migrations::run(&self.conn).unwrap_or_else(|e| {
+            panic!("failed to configure database, error {}", e);
+        });
+    }
 }

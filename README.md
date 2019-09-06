@@ -10,8 +10,6 @@ OpenPGP CA is built using https://gitlab.com/sequoia-pgp/sequoia
 
 ## Usage examples:
 
-initialize db ("diesel migration run"), then:
-
 ```
 cargo run ca new example_ca openpgp_ca@example.org
 
@@ -24,3 +22,6 @@ cargo run user import example_ca -e heiko@example.org -n Heiko --key_file _test_
 cargo run bridge new -r "*@foo.de" --remote_key_file /tmp/bar.txt --name foobridge example_ca
 cargo run bridge revoke --name foobridge
 ```
+
+A sqlite database gets created implicitely (by default in /tmp/openpgpca
+.sqlite, as configured in the ".env" file in this project)
