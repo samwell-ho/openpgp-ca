@@ -40,21 +40,6 @@ pub mod pgp;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
-/// Usage example:
-///
-/// initialize db ("diesel migration run"), then:
-///
-/// cargo run ca new example_ca openpgp_ca@example.org
-///
-/// cargo run user add example_ca -e alice@example.org -e a@example.org -n Alicia
-/// cargo run user add example_ca -e bob@example.org
-///
-/// cargo run user import example_ca -e heiko@example.org -n Heiko --key_file ~/heiko.pubkey
-/// cargo run user import example_ca -e heiko@example.org -n Heiko --key_file _test_data/pubkey.asc --revocation_file _test_data/revoke.asc
-///
-/// cargo run bridge new -r "*@foo.de" --remote_key_file /tmp/bar.txt --name foobridge example_ca
-/// cargo run bridge revoke --name foobridge
-///
 fn real_main() -> Result<()> {
     let yaml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
