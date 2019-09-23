@@ -21,6 +21,13 @@ author: Heiko Schäfer <heiko@schaefer.name>
 about: openpgp-ca is a tool to manage OpenPGP setups
 settings:
   - ArgRequiredElseHelp
+args:
+  - database:
+      short: d
+      long: database
+      value_name: FILE
+      help: Sets a custom sqlite file
+      takes_value: true
 subcommands:
   - init:
       about: Initialize OpenPGP CA

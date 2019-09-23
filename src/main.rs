@@ -44,11 +44,16 @@ pub mod pgp;
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 fn real_main() -> Result<()> {
-
-    Db::new().migrations();
-
     let yaml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
+
+    println!("matches {:?}", matches);
+
+    let db = matches.value_of("database");
+
+    Db::new(db).migrations();
+
+    println!("db {:?}", db);
 
     match matches.subcommand() {
         ("init", Some(_m)) => {
@@ -60,19 +65,19 @@ fn real_main() -> Result<()> {
                     match (m2.value_of("name"), m2.values_of("email")) {
                         (Some(name), Some(email)) => {
                             let emails = email.into_iter().collect::<Vec<_>>();
-                            ca_new(name, &emails)?;
+                            ca_new(name, &emails, db)?;
                         }
                         _ => unimplemented!(),
                     }
                 }
                 ("delete", Some(m2)) => {
                     match m2.value_of("name") {
-                        Some(name) => ca_delete(name)?,
+                        Some(name) => ca_delete(name, db)?,
                         _ => unimplemented!(),
                     }
                 }
                 ("list", Some(_m2)) => {
-                    list_cas();
+                    list_cas(db);
                 }
 
                 _ => unimplemented!(),
@@ -97,7 +102,8 @@ fn real_main() -> Result<()> {
                             let ca_name = m2.value_of("ca_name").unwrap();
 
 
-                            user_new(name, Some(email_vec.as_ref()), ca_name)?;
+                            user_new(name, Some(email_vec.as_ref()),
+                                     ca_name, db)?;
                         }
                         _ => unimplemented!(),
                     }
@@ -116,13 +122,14 @@ fn real_main() -> Result<()> {
                             let ca_name = m2.value_of("ca_name").unwrap();
 
                             user_import(name, Some(email_vec.as_ref()),
-                                        ca_name, key_file, revocation_file)?;
+                                        ca_name, key_file, revocation_file,
+                                        db)?;
                         }
                         _ => unimplemented!(),
                     }
                 }
                 ("list", Some(_m2)) => {
-                    list_users()?;
+                    list_users(db)?;
                 }
 
                 _ => unimplemented!(),
@@ -144,7 +151,7 @@ fn real_main() -> Result<()> {
                             let ca_name = m2.value_of("ca_name").unwrap();
 
                             bridge_new(name, ca_name, key_file,
-                                       Some(regex_vec.as_ref()))?;
+                                       Some(regex_vec.as_ref()), db)?;
                         }
                         _ => unimplemented!(),
                     }
@@ -152,10 +159,10 @@ fn real_main() -> Result<()> {
                 ("revoke", Some(m2)) => {
                     let name = m2.value_of("name").unwrap();
 
-                    bridge_revoke(name)?;
+                    bridge_revoke(name, db)?;
                 }
                 ("list", Some(_m2)) => {
-                    list_bridges()?;
+                    list_bridges(db)?;
                 }
 
                 _ => unimplemented!(),
@@ -178,7 +185,7 @@ fn init() {
 
 // -------- CAs
 
-fn ca_new(name: &str, emails: &[&str]) -> Result<()> {
+fn ca_new(name: &str, emails: &[&str], database: Option<&str>) -> Result<()> {
     println!("make ca '{}'", name);
 
     assert_eq!(emails.len(), 1,
@@ -190,27 +197,32 @@ fn ca_new(name: &str, emails: &[&str]) -> Result<()> {
     let ca_key = &Pgp::priv_tpk_to_armored(&tpk)?;
     let revoc_cert = &Pgp::sig_to_armored(&revoc)?;
 
-    Db::new().insert_ca(models::NewCa { name, email, ca_key, revoc_cert })?;
+    Db::new(database).insert_ca(models::NewCa {
+        name,
+        email,
+        ca_key,
+        revoc_cert,
+    })?;
 
     println!("new CA: {}\n{:#?}", name, tpk);
 
     Ok(())
 }
 
-fn ca_delete(name: &str) -> Result<()> {
+fn ca_delete(name: &str, database: Option<&str>) -> Result<()> {
     // FIXME: CA should't be deleted while users point to it.
     // -> limit with database constraints? (or by rust code?)
 
     println!("delete ca '{}'", name);
 
-    Db::new().delete_ca(name)?;
+    Db::new(database).delete_ca(name)?;
 
     Ok(())
 }
 
 
-fn get_ca_by_name(name: &str) -> Result<openpgp::TPK> {
-    let search = Db::new().search_ca(name)?;
+fn get_ca_by_name(name: &str, database: Option<&str>) -> Result<openpgp::TPK> {
+    let search = Db::new(database).search_ca(name)?;
 
     match search {
         Some(ca) => {
@@ -222,8 +234,8 @@ fn get_ca_by_name(name: &str) -> Result<openpgp::TPK> {
     }
 }
 
-pub fn list_cas() {
-    let db = Db::new();
+pub fn list_cas(database: Option<&str>) {
+    let db = Db::new(database);
     let cas = db.list_cas();
     for ca in cas {
         println!("{:#?}", ca);
@@ -233,9 +245,9 @@ pub fn list_cas() {
 
 // -------- users
 
-fn user_new(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str)
+fn user_new(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str, database: Option<&str>)
             -> Result<()> {
-    let ca_key = get_ca_by_name(ca_name).unwrap();
+    let ca_key = get_ca_by_name(ca_name, database).unwrap();
 
     println!("new user: uids {:?}, ca_name {}", emails, ca_name);
 
@@ -257,7 +269,7 @@ fn user_new(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str)
     println!("updated armored CA key: {}", trusted_ca_armored);
 
     // now write new data to DB
-    let db = Db::new();
+    let db = Db::new(database);
 
     let mut ca_db = db.search_ca(ca_name).context("Couldn't find CA")?.unwrap();
 
@@ -291,8 +303,8 @@ fn user_new(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str)
 }
 
 fn user_import(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str,
-               key_file: &str, revoc_file: Option<&str>) -> Result<()> {
-    let ca_key = get_ca_by_name(ca_name).unwrap();
+               key_file: &str, revoc_file: Option<&str>, database: Option<&str>) -> Result<()> {
+    let ca_key = get_ca_by_name(ca_name, database).unwrap();
 
     let user_key = openpgp::TPK::from_file(key_file)
         .expect("Failed to read key");
@@ -324,7 +336,7 @@ fn user_import(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str,
     };
 
     // put in DB
-    let db = Db::new();
+    let db = Db::new(database);
     let ca_db = db.search_ca(ca_name).context("Couldn't find CA")?.unwrap();
 
     let pub_key = &Pgp::tpk_to_armored(&certified)?;
@@ -340,9 +352,9 @@ fn user_import(name: Option<&str>, emails: Option<&[&str]>, ca_name: &str,
     Ok(())
 }
 
-pub fn list_users() -> Result<()> {
+pub fn list_users(database: Option<&str>) -> Result<()> {
     //    https://docs.diesel.rs/diesel/associations/index.html
-    let db = Db::new();
+    let db = Db::new(database);
     let users = db.list_users()?;
     for user in users {
         println!("#{} - Name: {:?}", user.id, user.name);
@@ -358,8 +370,8 @@ pub fn list_users() -> Result<()> {
 // -------- bridges
 
 fn bridge_new(name: &str, ca_name: &str, key_file: &str,
-              regexes: Option<&[&str]>) -> Result<()> {
-    let ca_key = get_ca_by_name(ca_name).unwrap();
+              regexes: Option<&[&str]>, database: Option<&str>) -> Result<()> {
+    let ca_key = get_ca_by_name(ca_name, database).unwrap();
 
     let remote_ca_key = openpgp::TPK::from_file(key_file)
         .expect("Failed to read key");
@@ -371,7 +383,7 @@ fn bridge_new(name: &str, ca_name: &str, key_file: &str,
     let bridged = Pgp::bridge_to_remote_ca(&ca_key, &remote_ca_key, regexes)?;
 
     // store in DB
-    let db = Db::new();
+    let db = Db::new(database);
     let ca_db = db.search_ca(ca_name).context("Couldn't find CA")?.unwrap();
 
     let pub_key = &Pgp::tpk_to_armored(&bridged)?;
@@ -388,8 +400,8 @@ fn bridge_new(name: &str, ca_name: &str, key_file: &str,
     Ok(())
 }
 
-pub fn bridge_revoke(name: &str) -> Result<()> {
-    let db = Db::new();
+pub fn bridge_revoke(name: &str, database: Option<&str>) -> Result<()> {
+    let db = Db::new(database);
 
     let bridge = db.search_bridge(name)?;
     assert!(bridge.is_some(), "bridge not found");
@@ -421,8 +433,8 @@ pub fn bridge_revoke(name: &str) -> Result<()> {
 }
 
 
-pub fn list_bridges() -> Result<()> {
-    let bridges = Db::new().list_bridges()?;
+pub fn list_bridges(database: Option<&str>) -> Result<()> {
+    let bridges = Db::new(database).list_bridges()?;
 
     for bridge in bridges {
         println!("Bridge '{}':\n\n{}", bridge.name, bridge.pub_key);

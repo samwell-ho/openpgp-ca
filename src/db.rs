@@ -29,19 +29,27 @@ use crate::models::{Ca, User, Email, Bridge};
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
+fn get_db_url(database: Option<&str>) -> Result<String> {
+    match database {
+        None => {
+            // load config from .env
+            dotenv::dotenv().ok();
+
+            Ok(env::var("DATABASE_URL").context("DATABASE_URL must be set")?)
+        }
+        Some(db) => Ok(db.to_string())
+    }
+}
+
 // FIXME: or keep a Connection as lazy_static? or just make new Connections?!
-fn get_conn()
-    -> Result<PooledConnection<ConnectionManager<SqliteConnection>>> {
+fn get_conn(database: Option<&str>)
+            -> Result<PooledConnection<ConnectionManager<SqliteConnection>>> {
 
     // bulk insert doesn't currently work with sqlite and r2d2:
     // https://github.com/diesel-rs/diesel/issues/1822
 
-    // load config from .env
-    dotenv::dotenv().ok();
-
     // setup DB
-    let database_url = env::var("DATABASE_URL")
-        .context("DATABASE_URL must be set")?;
+    let database_url = get_db_url(database)?;
 
     let manager = ConnectionManager::<SqliteConnection>::new(database_url);
     let pool = Pool::builder().build(manager).unwrap();
@@ -67,8 +75,8 @@ pub struct Db {
 }
 
 impl Db {
-    pub fn new() -> Self {
-        match get_conn() {
+    pub fn new(database: Option<&str>) -> Self {
+        match get_conn(database) {
             Ok(conn) => Db { conn },
             _ => panic!("couldn't get database connection") // FIXME; ?!
         }
