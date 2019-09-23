@@ -23,5 +23,5 @@ cargo run bridge new -r "*@foo.de" --remote_key_file /tmp/bar.txt --name foobrid
 cargo run bridge revoke --name foobridge
 ```
 
-A sqlite database gets created implicitely (by default in /tmp/openpgpca
+A sqlite database gets created implicitly (by default in /tmp/openpgpca
 .sqlite, as configured in the ".env" file in this project)
