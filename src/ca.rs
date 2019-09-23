@@ -31,7 +31,7 @@ impl Ca {
     }
 
 
-// -------- CAs
+    // -------- CAs
 
     pub fn ca_new(&self, name: &str, emails: &[&str]) -> Result<()> {
         println!("make ca '{}'", name);
@@ -89,7 +89,7 @@ impl Ca {
     }
 
 
-// -------- users
+    // -------- users
 
     pub fn user_new(&mut self, name: Option<&str>, emails: Option<&[&str]>,
                     ca_name: &str) -> Result<()> {
@@ -211,7 +211,7 @@ impl Ca {
     }
 
 
-// -------- bridges
+    // -------- bridges
 
     pub fn bridge_new(&self, name: &str, ca_name: &str, key_file: &str,
                       regexes: Option<&[&str]>) -> Result<()> {
@@ -221,8 +221,9 @@ impl Ca {
             .expect("Failed to read key");
 
         // expect exactly one userid in remote CA key (otherwise fail)
-        assert_eq!(remote_ca_key.userids().len(), 1, "remote CA should have \
-    exactly one userid, but has {}", remote_ca_key.userids().len());
+        assert_eq!(remote_ca_key.userids().len(), 1,
+                   "remote CA should have exactly one userid, but has {}",
+                   remote_ca_key.userids().len());
 
         let bridged = Pgp::bridge_to_remote_ca(&ca_key, &remote_ca_key, regexes)?;
 
