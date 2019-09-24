@@ -157,11 +157,9 @@ impl Pgp {
 
         let mut signer = ca_key.primary().clone().into_keypair()?;
 
-        let remote_keypair = remote_ca_key.primary().clone().into_keypair()?;
-        let remote_pubkey = remote_keypair.public();
+        let remote_pubkey = remote_ca_key.primary();
 
         let mut packets: Vec<Packet> = Vec::new();
-
 
         // create one TSIG for each regex
         if let Some(regexes) = regexes {

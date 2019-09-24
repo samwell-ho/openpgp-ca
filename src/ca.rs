@@ -33,8 +33,8 @@ impl Ca {
 
     // -------- CAs
 
-    pub fn ca_new(&self, name: &str, emails: &[&str]) -> Result<()> {
-        println!("make ca '{}'", name);
+    pub fn ca_new(&self, emails: &[&str]) -> Result<()> {
+        println!("make ca for email '{:?}'", emails);
 
         assert_eq!(emails.len(), 1,
                    "'ca new' expects exactly one email address");
@@ -45,33 +45,17 @@ impl Ca {
         let ca_key = &Pgp::priv_tpk_to_armored(&tpk)?;
         let revoc_cert = &Pgp::sig_to_armored(&revoc)?;
 
-        self.db.insert_ca(models::NewCa {
-            name,
-            email,
-            ca_key,
-            revoc_cert,
-        })?;
+        let name = "FIXME"; // FIXME: remove
 
-        println!("new CA: {}\n{:#?}", name, tpk);
+        self.db.insert_ca(models::NewCa { name, email, ca_key, revoc_cert })?;
+
+        println!("new CA key:\n{:#?}", tpk);
 
         Ok(())
     }
 
-    pub fn ca_delete(&self, name: &str) -> Result<()> {
-        // FIXME: CA should't be deleted while users point to it.
-        // -> limit with database constraints? (or by rust code?)
-
-        println!("delete ca '{}'", name);
-
-        self.db.delete_ca(name)?;
-
-        Ok(())
-    }
-
-    pub fn get_ca_by_name(&self, name: &str) -> Result<openpgp::TPK> {
-        let search = self.db.search_ca(name)?;
-
-        match search {
+    pub fn get_ca_key(&self) -> Result<openpgp::TPK> {
+        match self.db.get_ca()? {
             Some(ca) => {
                 let ca_tpk = Pgp::armored_to_tpk(&ca.ca_key);
                 println!("CA: {:#?}", ca_tpk);
@@ -81,21 +65,19 @@ impl Ca {
         }
     }
 
-    pub fn list_cas(&self) {
-        let cas = self.db.list_cas();
+    pub fn show_cas(&self) {
+        let cas = self.db.get_ca();
         for ca in cas {
             println!("{:#?}", ca);
         }
     }
 
-
     // -------- users
 
-    pub fn user_new(&mut self, name: Option<&str>, emails: Option<&[&str]>,
-                    ca_name: &str) -> Result<()> {
-        let ca_key = self.get_ca_by_name(ca_name).unwrap();
+    pub fn user_new(&mut self, name: Option<&str>, emails: Option<&[&str]>) -> Result<()> {
+        let ca_key = self.get_ca_key().unwrap();
 
-        println!("new user: uids {:?}, ca_name {}", emails, ca_name);
+        println!("new user: uids {:?}", emails);
 
         // make user key (signed by CA)
         let (user, revoc) =
@@ -115,7 +97,7 @@ impl Ca {
         println!("updated armored CA key: {}", trusted_ca_armored);
 
         // now write new data to DB
-        let mut ca_db = self.db.search_ca(ca_name).context("Couldn't \
+        let mut ca_db = self.db.get_ca().context("Couldn't \
                 find CA")?.unwrap();
 
         // store updated CA TPK in DB
@@ -148,8 +130,8 @@ impl Ca {
     }
 
     pub fn user_import(&self, name: Option<&str>, emails: Option<&[&str]>,
-                       ca_name: &str, key_file: &str, revoc_file: Option<&str>) -> Result<()> {
-        let ca_key = self.get_ca_by_name(ca_name).unwrap();
+                       key_file: &str, revoc_file: Option<&str>) -> Result<()> {
+        let ca_key = self.get_ca_key().unwrap();
 
         let user_key = TPK::from_file(key_file)
             .expect("Failed to read key");
@@ -181,7 +163,7 @@ impl Ca {
         };
 
         // put in DB
-        let ca_db = self.db.search_ca(ca_name).context("Couldn't find CA")?
+        let ca_db = self.db.get_ca().context("Couldn't find CA")?
             .unwrap();
 
         let pub_key = &Pgp::tpk_to_armored(&certified)?;
@@ -213,9 +195,9 @@ impl Ca {
 
     // -------- bridges
 
-    pub fn bridge_new(&self, name: &str, ca_name: &str, key_file: &str,
+    pub fn bridge_new(&self, name: &str, key_file: &str,
                       regexes: Option<&[&str]>) -> Result<()> {
-        let ca_key = self.get_ca_by_name(ca_name).unwrap();
+        let ca_key = self.get_ca_key().unwrap();
 
         let remote_ca_key = openpgp::TPK::from_file(key_file)
             .expect("Failed to read key");
@@ -228,7 +210,7 @@ impl Ca {
         let bridged = Pgp::bridge_to_remote_ca(&ca_key, &remote_ca_key, regexes)?;
 
         // store in DB
-        let ca_db = self.db.search_ca(ca_name).context("Couldn't find CA")?
+        let ca_db = self.db.get_ca().context("Couldn't find CA")?
             .unwrap();
 
         let pub_key = &Pgp::tpk_to_armored(&bridged)?;
@@ -251,10 +233,10 @@ impl Ca {
 
         let mut bridge = bridge.unwrap();
 
-        println!("bridge {:?}", &bridge.clone());
-        let ca_id = bridge.clone().cas_id;
+//        println!("bridge {:?}", &bridge.clone());
+//        let ca_id = bridge.clone().cas_id;
 
-        let ca = self.db.get_ca(ca_id)?.unwrap();
+        let ca = self.db.get_ca()?.unwrap();
         let ca_key = Pgp::armored_to_tpk(&ca.ca_key);
 
         let bridge_pub = Pgp::armored_to_tpk(&bridge.pub_key);

@@ -100,50 +100,20 @@ impl Db {
         Ok(())
     }
 
-    pub fn delete_ca(&self, name: &str) -> Result<()> {
-        // FIXME: check if domain exists?
-
-        diesel::delete(cas::dsl::cas.filter(cas::name.eq(name)))
-            .execute(&self.conn)
-            .context("Error deleting CA")?;
-
-        Ok(())
-    }
-
-    pub fn get_ca(&self, id: i32) -> Result<Option<Ca>> {
-        let res = cas::table.filter(cas::id.eq(id))
+    pub fn get_ca(&self) -> Result<Option<Ca>> {
+        let cas = cas::table
             .load::<Ca>(&self.conn)
-            .context("Error loading CA")?;
+            .context("Error loading CAs")?;
 
-        match res.len() {
+        println!("cas {:?}", cas);
+        println!("#cas {:?}", cas.len());
+
+        match cas.len() {
             0 => Ok(None),
-            1 => Ok(Some(res[0].clone())),
-            _ => panic!("get_ca for {} found {} results, expected 0 or 1",
-                        id, res.len())
+            1 => Ok(Some(cas[0].clone())),
+            _ => panic!("found more than 1 CA in database. this should \
+            never happen")
         }
-    }
-
-    pub fn search_ca(&self, name: &str) -> Result<Option<Ca>> {
-        let res = cas::table.filter(cas::name.eq(name))
-            .load::<Ca>(&self.conn)
-            .context("Error loading ca")?;
-
-        match res.len() {
-            0 => Ok(None),
-            1 => Ok(Some(res[0].clone())),
-            _ => panic!("search_ca for {} found {} results, expected 0 or 1",
-                        name, res.len())
-        }
-    }
-
-    pub fn list_cas(&self) -> Result<Vec<Ca>> {
-        Ok(cas::table
-            .load::<Ca>(&self.conn)
-            .context("Error loading CAs")?)
-    }
-
-    pub fn check_ca_exists(&self, ca_name: &str) -> Result<bool> {
-        Ok(self.search_ca(ca_name).context("Error finding CA")?.is_some())
     }
 
     pub fn insert_user(&self, user: models::NewUser) -> Result<i32> {

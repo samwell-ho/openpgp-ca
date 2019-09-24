@@ -45,6 +45,8 @@ fn real_main() -> Result<()> {
 
     let mut ca = ca::Ca::new(db);
 
+    println!("matches {:?}", matches);
+
     match matches.subcommand() {
         ("init", Some(_m)) => {
             ca.init();
@@ -52,22 +54,16 @@ fn real_main() -> Result<()> {
         ("ca", Some(m)) => {
             match m.subcommand() {
                 ("new", Some(m2)) => {
-                    match (m2.value_of("name"), m2.values_of("email")) {
-                        (Some(name), Some(email)) => {
+                    match m2.values_of("email") {
+                        Some(email) => {
                             let emails = email.into_iter().collect::<Vec<_>>();
-                            ca.ca_new(name, &emails)?;
+                            ca.ca_new(&emails)?;
                         }
                         _ => unimplemented!(),
                     }
                 }
-                ("delete", Some(m2)) => {
-                    match m2.value_of("name") {
-                        Some(name) => ca.ca_delete(name)?,
-                        _ => unimplemented!(),
-                    }
-                }
-                ("list", Some(_m2)) => {
-                    ca.list_cas();
+                ("show", Some(_m2)) => {
+                    ca.show_cas();
                 }
 
                 _ => unimplemented!(),
@@ -89,11 +85,7 @@ fn real_main() -> Result<()> {
                             //  .value_name("key_profile")
                             //  .help("Key Profile"))
 
-                            let ca_name = m2.value_of("ca_name").unwrap();
-
-
-                            ca.user_new(name, Some(email_vec.as_ref()),
-                                        ca_name)?;
+                            ca.user_new(name, Some(email_vec.as_ref()))?;
                         }
                         _ => unimplemented!(),
                     }
@@ -109,10 +101,8 @@ fn real_main() -> Result<()> {
                             let key_file = m2.value_of("key_file").unwrap();
                             let revocation_file = m2.value_of("revocation_file");
 
-                            let ca_name = m2.value_of("ca_name").unwrap();
-
                             ca.user_import(name, Some(email_vec.as_ref()),
-                                           ca_name, key_file, revocation_file,
+                                           key_file, revocation_file,
                             )?;
                         }
                         _ => unimplemented!(),
@@ -138,9 +128,7 @@ fn real_main() -> Result<()> {
 
                             let name = m2.value_of("name").unwrap();
 
-                            let ca_name = m2.value_of("ca_name").unwrap();
-
-                            ca.bridge_new(name, ca_name, key_file,
+                            ca.bridge_new(name, key_file,
                                           Some(regex_vec.as_ref()))?;
                         }
                         _ => unimplemented!(),

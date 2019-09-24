@@ -32,34 +32,22 @@ subcommands:
   - init:
       about: Initialize OpenPGP CA
   - ca:
-      about: Manage CAs
+      about: Manage CA
       subcommands:
         - new:
-            about: Add New Domain to CA
+            about: Create CA
             args:
-              - name:
-                  takes_value: true
-                  help: CA Name
               - email:
                   takes_value: true
                   help: CA email
-        - delete:
-            about: Delete CA
-            args:
-              - name:
-                  takes_value: true
-                  help: CA Name
-        - list:
-            about: List CAs
+        - show:
+            about: Show CA
   - user:
       about: Manage Users
       subcommands:
         - add:
             about: Add User (create new Key-Pair)
             args:
-              - ca_name:
-                  takes_value: true
-                  help: CA Name
               - email:
                   takes_value: true
                   short: e
@@ -78,9 +66,6 @@ subcommands:
         - import:
             about: Import User (use existing Public Key)
             args:
-              - ca_name:
-                  takes_value: true
-                  help: CA Name
               - email:
                   takes_value: true
                   short: e
@@ -111,9 +96,6 @@ subcommands:
         - new:
             about: Add New Bridge (sign existing remote CA Public Key)
             args:
-              - ca_name:
-                  takes_value: true
-                  help: CA Name
               - name:
                   takes_value: true
                   short: n
