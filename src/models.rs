@@ -24,7 +24,6 @@ use super::schema::bridges;
 #[derive(Queryable, Debug, Clone, AsChangeset)]
 pub struct Ca {
     pub id: i32,
-    pub name: String,
     pub email: String,
     pub ca_key: String,
     pub revoc_cert: String,
@@ -33,7 +32,6 @@ pub struct Ca {
 #[derive(Insertable)]
 #[table_name = "cas"]
 pub struct NewCa<'a> {
-    pub name: &'a str,
     pub email: String,
     pub ca_key: &'a str,
     pub revoc_cert: &'a str,

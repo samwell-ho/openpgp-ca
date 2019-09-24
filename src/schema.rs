@@ -10,7 +10,6 @@ table! {
 table! {
     cas (id) {
         id -> Integer,
-        name -> Text,
         email -> Text,
         ca_key -> Text,
         revoc_cert -> Text,

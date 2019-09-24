@@ -3,15 +3,13 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE cas (
   id INTEGER NOT NULL PRIMARY KEY,
   -- bridges [foreign key]
-  name VARCHAR NOT NULL,
   email VARCHAR NOT NULL,
   ca_key VARCHAR NOT NULL,
-  revoc_cert VARCHAR NOT NULL,
+  revoc_cert VARCHAR NOT NULL
   -- upload to keyserver [bool]
   -- upload to wkd [bool]
   -- wkd address (?)
 
-  CONSTRAINT ca_name_unique UNIQUE (name)
 );
 
 CREATE TABLE users (

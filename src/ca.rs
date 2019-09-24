@@ -45,9 +45,7 @@ impl Ca {
         let ca_key = &Pgp::priv_tpk_to_armored(&tpk)?;
         let revoc_cert = &Pgp::sig_to_armored(&revoc)?;
 
-        let name = "FIXME"; // FIXME: remove
-
-        self.db.insert_ca(models::NewCa { name, email, ca_key, revoc_cert })?;
+        self.db.insert_ca(models::NewCa { email, ca_key, revoc_cert })?;
 
         println!("new CA key:\n{:#?}", tpk);
 
