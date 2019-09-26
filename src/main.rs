@@ -17,17 +17,16 @@
 
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate diesel_migrations;
 
 #[macro_use]
-extern crate clap;
-extern crate failure;
-extern crate sequoia_openpgp as openpgp;
+extern crate diesel_migrations;
 
 use std::process::exit;
 
 use clap::App;
+use clap::load_yaml;
+
+use failure;
 
 pub mod ca;
 pub mod models;
@@ -44,8 +43,6 @@ fn real_main() -> Result<()> {
     let db = matches.value_of("database");
 
     let mut ca = ca::Ca::new(db);
-
-    println!("matches {:?}", matches);
 
     match matches.subcommand() {
         ("init", Some(_m)) => {

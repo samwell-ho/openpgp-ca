@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
+use sequoia_openpgp as openpgp;
+
 use openpgp::Packet;
 use openpgp::TPK;
 use openpgp::armor;

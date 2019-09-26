@@ -105,9 +105,6 @@ impl Db {
             .load::<Ca>(&self.conn)
             .context("Error loading CAs")?;
 
-        println!("cas {:?}", cas);
-        println!("#cas {:?}", cas.len());
-
         match cas.len() {
             0 => Ok(None),
             1 => Ok(Some(cas[0].clone())),

@@ -1,5 +1,7 @@
 use failure::{self, ResultExt};
 
+use sequoia_openpgp as openpgp;
+
 use openpgp::TPK;
 use openpgp::Packet;
 use openpgp::parse::Parse;
