@@ -15,12 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate diesel;
-
-#[macro_use]
-extern crate diesel_migrations;
-
 use std::process::exit;
 
 use clap::App;
@@ -28,11 +22,7 @@ use clap::load_yaml;
 
 use failure;
 
-pub mod ca;
-pub mod models;
-pub mod schema;
-pub mod db;
-pub mod pgp;
+use openpgp_ca_lib::ca;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
