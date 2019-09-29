@@ -129,12 +129,13 @@ impl Pgp {
 
         // create TSIG
         for ca_uidb in ca_key.userids() {
-            let tsig = Builder::new(SignatureType::GenericCertificate)
-                .set_trust_signature(255, 120)?
-                .sign_userid_binding(&mut signer,
-                                     ca_pubkey,
-                                     ca_uidb.userid(),
-                                     HashAlgorithm::SHA512)?;
+            let builder = Builder::new(SignatureType::GenericCertificate)
+                .set_trust_signature(255, 120)?;
+
+            let tsig = ca_uidb.userid().bind(&mut signer,
+                                             user,
+                                             builder,
+                                             None, None)?;
 
             sigs.push(tsig.into());
         }
@@ -223,11 +224,7 @@ impl Pgp {
         for uidb in user.userids() {
             let uid = uidb.userid();
 
-            let sig = Builder::new(SignatureType::GenericCertificate)
-                .sign_userid_binding(&mut signer,
-                                     user_pubkey,
-                                     uid,
-                                     HashAlgorithm::SHA512)?;
+            let sig = uid.certify(&mut signer, &ca_key, None, None, None)?;
 
             sigs.push(sig.into());
         }
