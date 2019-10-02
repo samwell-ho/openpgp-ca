@@ -69,6 +69,17 @@ impl Context {
         Self::make(None, Some(tempfile::tempdir()?))
     }
 
+    /// don't delete home directory.
+    /// this is intended for manually debugging data that was created in a
+    /// test-run.
+    pub fn leak_tempdir(&mut self) -> Option<PathBuf> {
+        if self.ephemeral.is_some() {
+            self.stop_all();
+            self.remove_socket_dir();
+        }
+        self.ephemeral.take().map(tempfile::TempDir::into_path)
+    }
+
     fn make(homedir: Option<&Path>, ephemeral: Option<tempfile::TempDir>)
             -> Result<Self> {
         let mut components: BTreeMap<String, PathBuf> = Default::default();
