@@ -115,13 +115,10 @@ impl Pgp {
         Pgp::generate(Some(&ca_uids.to_vec()))
     }
 
-    /// create trust for CA from user
-    pub fn trust_ca(ca_key: &TPK, user: &TPK) -> Result<TPK> {
+    /// user tsigns CA key
+    pub fn tsign_ca(ca_key: &TPK, user: &TPK) -> Result<TPK> {
         let mut signer = user.primary().clone().into_keypair()
             .context("filtered for unencrypted secret keys above")?;
-
-        let ca_keypair = ca_key.primary().clone().into_keypair()?;
-        let ca_pubkey = ca_keypair.public();
 
         let mut sigs = Vec::new();
 
@@ -140,9 +137,9 @@ impl Pgp {
             sigs.push(tsig.into());
         }
 
-        let trusted = ca_key.clone().merge_packets(sigs)?;
+        let signed = ca_key.clone().merge_packets(sigs)?;
 
-        Ok(trusted)
+        Ok(signed)
     }
 
     /// add trust signature to the public key of a remote CA
@@ -181,9 +178,9 @@ impl Pgp {
 
         // FIXME: expiration?
 
-        let result = remote_ca_key.clone().merge_packets(packets)?;
+        let signed = remote_ca_key.clone().merge_packets(packets)?;
 
-        Ok(result)
+        Ok(signed)
     }
 
     pub fn bridge_revoke(remote_ca_key: &TPK, ca_key: &TPK)
@@ -216,8 +213,6 @@ impl Pgp {
         // sign tpk with CA key
         let mut signer = ca_key.primary().clone().into_keypair()
             .context("filtered for unencrypted secret keys above")?;
-
-        let user_pubkey = &user.primary().clone();
 
         let mut sigs = Vec::new();
 

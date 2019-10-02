@@ -89,19 +89,19 @@ impl Ca {
 
         println!("=== user_tpk certified {:#?}\n", certified);
 
-        // user trusts CA key
-        let trusted_ca =
-            Pgp::trust_ca(&ca_key, &user).context("failed: user trusts CA")?;
+        // user tsigns CA key
+        let tsigned_ca =
+            Pgp::tsign_ca(&ca_key, &user).context("failed: user tsigns CA")?;
 
-        let trusted_ca_armored = Pgp::priv_tpk_to_armored(&trusted_ca)?;
-        println!("updated armored CA key: {}", trusted_ca_armored);
+        let tsigned_ca_armored = Pgp::priv_tpk_to_armored(&tsigned_ca)?;
+        println!("updated armored CA key: {}", tsigned_ca_armored);
 
         // now write new data to DB
         let mut ca_db = self.db.get_ca().context("Couldn't \
                 find CA")?.unwrap();
 
         // store updated CA TPK in DB
-        ca_db.ca_key = trusted_ca_armored;
+        ca_db.ca_key = tsigned_ca_armored;
 
         self.db.update_ca(&ca_db)?;
 
@@ -179,9 +179,12 @@ impl Ca {
         Ok(())
     }
 
+    pub fn get_users(&self) -> Result<Vec<models::User>> {
+        self.db.list_users()
+    }
+
     pub fn list_users(&self) -> Result<()> {
-        //    https://docs.diesel.rs/diesel/associations/index.html
-        let users = self.db.list_users()?;
+        let users = self.get_users()?;
         for user in users {
             println!("#{} - Name: {:?}", user.id, user.name);
 
