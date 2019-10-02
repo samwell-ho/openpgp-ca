@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::process::Stdio;
 
 use failure::Fail;
 use rexpect;
@@ -55,7 +56,6 @@ impl Context {
 
     /// get the homedir Path
     pub fn get_homedir(&self) -> &Path {
-//        String::from(self.homedir.as_ref().unwrap().to_str().unwrap())
         self.homedir.as_ref().unwrap().as_path()
     }
 
@@ -257,18 +257,17 @@ pub enum Error {
     /// Errors related to `gpgconf`.
     #[fail(display = "gpgconf: {}", _0)]
     GPGConf(String),
+
     /// The remote operation failed.
     #[fail(display = "Operation failed: {}", _0)]
     OperationFailed(String),
+
     /// The remote party violated the protocol.
     #[fail(display = "Protocol violation: {}", _0)]
     ProtocolError(String),
-
 }
 
 pub fn import(ctx: &Context, what: &[u8]) {
-    use std::process::Stdio;
-
     let mut gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir").arg(ctx.directory("homedir").unwrap())
@@ -283,22 +282,17 @@ pub fn import(ctx: &Context, what: &[u8]) {
 pub fn list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
     let res = list_keys_raw(&ctx).unwrap();
 
+    // filter: keep only the "uid" lines
     let uids = res.iter().filter(|&line| line.get(0) == Some("uid"))
         .map(|r| r.clone()).collect::<Vec<_>>();
 
-    let mut gpg_trust = HashMap::new();
-
-    for uid in uids {
-        // map: uid -> trust
-        gpg_trust.insert(uid.get(9).unwrap().to_owned(),
-                         uid.get(1).unwrap().to_owned());
-    }
-    Ok(gpg_trust)
+    // map: uid -> trust
+    Ok(uids.iter()
+        .map(|u| (u.get(9).unwrap().to_owned(), u.get(1).unwrap().to_owned()))
+        .collect())
 }
 
 fn list_keys_raw(ctx: &Context) -> Result<Vec<StringRecord>> {
-    use std::process::Stdio;
-
     let gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir").arg(ctx.directory("homedir").unwrap())
