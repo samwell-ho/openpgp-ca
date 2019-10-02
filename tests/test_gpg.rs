@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use sequoia_openpgp as openpgp;
 use openpgp::serialize::Serialize;
 
@@ -6,7 +8,9 @@ use openpgp_ca_lib::ca;
 mod tools;
 
 use tools::Context;
+use tools::gpg_edit_trust;
 use tools::gpg_import;
+use tools::gpg_list_keys;
 
 
 #[test]
@@ -86,11 +90,29 @@ fn test_alice_trusts_bob() {
         gpg_import(&ctx, key.as_bytes());
     }
 
-    // don't delete home dir (for manual inspection)
-    if false {
-        ctx.leak_tempdir();
+    // set "ultimate" ownertrust for alice
+    gpg_edit_trust(&ctx, "alice", 5);
+
+    // read key/uid properties from GnuPG
+    let res = gpg_list_keys(&ctx).unwrap();
+
+    let uids = res.iter().filter(|&line| line.get(0) == Some("uid"))
+        .map(|r| r.clone()).collect::<Vec<_>>();
+
+    assert_eq!(uids.len(), 3);
+
+    let mut gpg_trust = HashMap::new();
+
+    for uid in uids {
+        // map: uid -> trust
+        gpg_trust.insert(uid.get(9).unwrap().to_owned(),
+                         uid.get(1).unwrap().to_owned());
     }
 
-    assert!(true);
-}
+    assert_eq!(gpg_trust.get("alice@example.org"), Some(&"u".to_string()));
+    assert_eq!(gpg_trust.get("ca@example.org"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("bob@example.org"), Some(&"f".to_string()));
 
+    // don't delete home dir (for manual inspection)
+    //    ctx.leak_tempdir();
+}

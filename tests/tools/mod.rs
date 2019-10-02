@@ -4,7 +4,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use failure::Fail;
+use rexpect;
 use tempfile;
+use csv;
+use csv::StringRecord;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -264,8 +267,6 @@ pub enum Error {
 pub fn gpg_import(ctx: &Context, what: &[u8]) {
     use std::process::Stdio;
 
-    println!("homedir {:?}", ctx.directory("homedir").unwrap());
-
     let mut gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir").arg(ctx.directory("homedir").unwrap())
@@ -275,4 +276,48 @@ pub fn gpg_import(ctx: &Context, what: &[u8]) {
     gpg.stdin.as_mut().unwrap().write_all(what).unwrap();
     let status = gpg.wait().unwrap();
     assert!(status.success());
+}
+
+pub fn gpg_list_keys(ctx: &Context) -> Result<Vec<StringRecord>> {
+    use std::process::Stdio;
+
+    let mut gpg = Command::new("gpg")
+        .stdin(Stdio::piped())
+        .arg("--homedir").arg(ctx.directory("homedir").unwrap())
+        .arg("--list-keys")
+        .arg("--with-colons")
+        .output()
+        .expect("failed to start gpg");
+
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .delimiter(b':')
+        .flexible(true)
+        .from_reader(gpg.stdout.as_slice());
+
+    let status = gpg.status;
+    assert!(status.success());
+
+    Ok(rdr.records().map(|rec| rec.unwrap()).collect())
+}
+
+pub fn gpg_edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Result<()> {
+    use rexpect::spawn;
+
+    let homedir = String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
+
+    let cmd = format!("gpg --homedir {} --edit-key {}", homedir, user_id);
+
+    let mut p = spawn(&cmd, Some(10_000)).unwrap();
+    p.exp_string("gpg>").unwrap();
+    p.send_line("trust").unwrap();
+    p.exp_string("Your decision?").unwrap();
+    p.send_line(&format!("{}", trust)).unwrap();
+    p.exp_string("Do you really want to set this key to ultimate trust? (y/N)").unwrap();
+    p.send_line("y").unwrap();
+    p.exp_string("gpg>").unwrap();
+    p.send_line("quit").unwrap();
+    p.exp_eof().unwrap();
+
+    Ok(())
 }
