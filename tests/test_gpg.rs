@@ -3,9 +3,7 @@ use openpgp::serialize::Serialize;
 
 use openpgp_ca_lib::ca;
 
-mod tools;
-
-use tools::*;
+mod gnupg;
 
 #[test]
 fn run_gpg() {
@@ -23,30 +21,24 @@ fn run_gpg() {
     let ca_tpk = ca.get_ca_key();
     assert!(ca_tpk.is_ok());
 
-    // import CA key into gnupg
+    // import CA key into GnuPG
     let mut buf = Vec::new();
     let tpk = ca_tpk.unwrap();
     tpk.as_tsk().serialize(&mut buf).unwrap();
-    gpg_import(&ctx, &buf);
+    gnupg::import(&ctx, &buf);
 
+    // FIXME - what to assert?
     assert!(true);
 }
 
 #[test]
 fn test_alice_trusts_bob() {
-
-    //  gpg --homedir /tmp/.tmphMFRbO/ --list-keys
-    //  gpg --homedir /tmp/.tmphMFRbO/ --list-signatures
-
-    //  gpg --homedir /tmp/.tmphMFRbO/ --edit-key alice
-    //    -> trust -> 5
-
     let mut ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    // ---- use OpenPGP CA to make keys ----
+    // ---- use OpenPGP CA to make a set of keys ----
 
     let mut ca = ca::Ca::new(Some(&db));
 
@@ -61,33 +53,33 @@ fn test_alice_trusts_bob() {
     let res = ca.user_new(Some(&"Bob"), Some(&["bob@example.org"]));
     assert!(res.is_ok());
 
-    // ---- import keys into gnupg ----
+    // ---- import keys from OpenPGP CA into GnuPG ----
 
     // get TPK for CA
     let ca_tpk = ca.get_ca_key();
     assert!(ca_tpk.is_ok());
 
-    // import CA key into gnupg
+    // import CA key into GnuPG
     let mut buf = Vec::new();
     ca_tpk.unwrap().as_tsk().serialize(&mut buf).unwrap();
-    gpg_import(&ctx, &buf);
+    gnupg::import(&ctx, &buf);
 
 
-    // get Users
+    // import CA users into GnuPG
     let users = ca.get_users();
 
     assert!(users.is_ok());
     assert_eq!(users.as_ref().ok().unwrap().len(), 2);
 
     users.unwrap().iter()
-        .for_each(|u| gpg_import(&ctx, u.pub_key.as_bytes()));
+        .for_each(|u| gnupg::import(&ctx, u.pub_key.as_bytes()));
 
 
     // ---- set "ultimate" ownertrust for alice ----
-    gpg_edit_trust(&ctx, "alice", 5);
+    gnupg::edit_trust(&ctx, "alice", 5);
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gpg_list_keys(&ctx).unwrap();
+    let gpg_trust = gnupg::list_keys(&ctx).unwrap();
 
     assert_eq!(gpg_trust.len(), 3);
 

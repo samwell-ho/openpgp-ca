@@ -16,7 +16,7 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 #[macro_export]
 macro_rules! make_context {
     () => {{
-        let ctx = match Context::ephemeral() {
+        let ctx = match gnupg::Context::ephemeral() {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("SKIP: Failed to create GnuPG context: {}\n\
@@ -266,7 +266,7 @@ pub enum Error {
 
 }
 
-pub fn gpg_import(ctx: &Context, what: &[u8]) {
+pub fn import(ctx: &Context, what: &[u8]) {
     use std::process::Stdio;
 
     let mut gpg = Command::new("gpg")
@@ -280,8 +280,8 @@ pub fn gpg_import(ctx: &Context, what: &[u8]) {
     assert!(status.success());
 }
 
-pub fn gpg_list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
-    let res = gpg_list_keys_raw(&ctx).unwrap();
+pub fn list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
+    let res = list_keys_raw(&ctx).unwrap();
 
     let uids = res.iter().filter(|&line| line.get(0) == Some("uid"))
         .map(|r| r.clone()).collect::<Vec<_>>();
@@ -296,7 +296,7 @@ pub fn gpg_list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
     Ok(gpg_trust)
 }
 
-fn gpg_list_keys_raw(ctx: &Context) -> Result<Vec<StringRecord>> {
+fn list_keys_raw(ctx: &Context) -> Result<Vec<StringRecord>> {
     use std::process::Stdio;
 
     let gpg = Command::new("gpg")
@@ -319,14 +319,12 @@ fn gpg_list_keys_raw(ctx: &Context) -> Result<Vec<StringRecord>> {
     Ok(rdr.records().map(|rec| rec.unwrap()).collect())
 }
 
-pub fn gpg_edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Result<()> {
-    use rexpect::spawn;
-
+pub fn edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Result<()> {
     let homedir = String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
     let cmd = format!("gpg --homedir {} --edit-key {}", homedir, user_id);
 
-    let mut p = spawn(&cmd, Some(10_000)).unwrap();
+    let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
     p.exp_string("gpg>").unwrap();
     p.send_line("trust").unwrap();
     p.exp_string("Your decision?").unwrap();
