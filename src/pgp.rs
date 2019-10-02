@@ -130,7 +130,7 @@ impl Pgp {
                 .set_trust_signature(255, 120)?;
 
             let tsig = ca_uidb.userid().bind(&mut signer,
-                                             user,
+                                             ca_key,
                                              builder,
                                              None, None)?;
 
@@ -219,7 +219,7 @@ impl Pgp {
         for uidb in user.userids() {
             let uid = uidb.userid();
 
-            let sig = uid.certify(&mut signer, &ca_key, None, None, None)?;
+            let sig = uid.certify(&mut signer, &user, None, None, None)?;
 
             sigs.push(sig.into());
         }
