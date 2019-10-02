@@ -33,7 +33,7 @@ fn run_gpg() {
 
 #[test]
 fn test_alice_trusts_bob() {
-    let mut ctx = make_context!();
+    let ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -76,7 +76,9 @@ fn test_alice_trusts_bob() {
 
 
     // ---- set "ultimate" ownertrust for alice ----
-    gnupg::edit_trust(&ctx, "alice", 5);
+    let res = gnupg::edit_trust(&ctx, "alice", 5);
+
+    assert!(res.is_ok());
 
     // ---- read calculated "trust" per uid from GnuPG ----
     let gpg_trust = gnupg::list_keys(&ctx).unwrap();
