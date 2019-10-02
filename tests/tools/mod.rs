@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::collections::HashMap;
+
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -278,10 +280,28 @@ pub fn gpg_import(ctx: &Context, what: &[u8]) {
     assert!(status.success());
 }
 
-pub fn gpg_list_keys(ctx: &Context) -> Result<Vec<StringRecord>> {
+pub fn gpg_list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
+    let res = gpg_list_keys_raw(&ctx).unwrap();
+
+    let uids = res.iter().filter(|&line| line.get(0) == Some("uid"))
+        .map(|r| r.clone()).collect::<Vec<_>>();
+
+    assert_eq!(uids.len(), 3);
+
+    let mut gpg_trust = HashMap::new();
+
+    for uid in uids {
+        // map: uid -> trust
+        gpg_trust.insert(uid.get(9).unwrap().to_owned(),
+                         uid.get(1).unwrap().to_owned());
+    }
+    Ok(gpg_trust)
+}
+
+fn gpg_list_keys_raw(ctx: &Context) -> Result<Vec<StringRecord>> {
     use std::process::Stdio;
 
-    let mut gpg = Command::new("gpg")
+    let gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir").arg(ctx.directory("homedir").unwrap())
         .arg("--list-keys")
