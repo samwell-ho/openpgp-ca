@@ -286,8 +286,6 @@ pub fn gpg_list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
     let uids = res.iter().filter(|&line| line.get(0) == Some("uid"))
         .map(|r| r.clone()).collect::<Vec<_>>();
 
-    assert_eq!(uids.len(), 3);
-
     let mut gpg_trust = HashMap::new();
 
     for uid in uids {

@@ -4,6 +4,7 @@ use openpgp::serialize::Serialize;
 use openpgp_ca_lib::ca;
 
 mod tools;
+
 use tools::*;
 
 #[test]
@@ -76,15 +77,19 @@ fn test_alice_trusts_bob() {
     let users = ca.get_users();
 
     assert!(users.is_ok());
+    assert_eq!(users.as_ref().ok().unwrap().len(), 2);
 
     users.unwrap().iter()
         .for_each(|u| gpg_import(&ctx, u.pub_key.as_bytes()));
 
-    // set "ultimate" ownertrust for alice
+
+    // ---- set "ultimate" ownertrust for alice ----
     gpg_edit_trust(&ctx, "alice", 5);
 
-    // read key/uid properties from GnuPG
+    // ---- read calculated "trust" per uid from GnuPG ----
     let gpg_trust = gpg_list_keys(&ctx).unwrap();
+
+    assert_eq!(gpg_trust.len(), 3);
 
     assert_eq!(gpg_trust.get("alice@example.org"), Some(&"u".to_string()));
     assert_eq!(gpg_trust.get("ca@example.org"), Some(&"f".to_string()));
