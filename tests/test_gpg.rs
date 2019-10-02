@@ -7,8 +7,6 @@ mod tools;
 
 use tools::Context;
 use tools::gpg_import;
-use std::thread::sleep;
-use failure::_core::time::Duration;
 
 
 #[test]
@@ -45,7 +43,7 @@ fn test_alice_trusts_bob() {
     //  gpg --homedir /tmp/.tmphMFRbO/ --edit-key alice
     //    -> trust -> 5
 
-    let ctx = make_context!();
+    let mut ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -88,7 +86,10 @@ fn test_alice_trusts_bob() {
         gpg_import(&ctx, key.as_bytes());
     }
 
-    sleep(Duration::from_secs(10000));
+    // don't delete home dir (for manual inspection)
+    if false {
+        ctx.leak_tempdir();
+    }
 
     assert!(true);
 }
