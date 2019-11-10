@@ -29,6 +29,7 @@ use openpgp::serialize::Serialize;
 use openpgp::tpk;
 
 use failure::{self, ResultExt};
+use sequoia_openpgp::tpk::UserIDRevocationBuilder;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -44,7 +45,7 @@ impl Pgp {
 
         if let Some(emails) = emails {
             let mut packets = Vec::new();
-            let mut signer = tpk.primary().clone().into_keypair()?;
+            let mut signer = tpk.primary().clone().mark_parts_secret().into_keypair()?;
 
             for &email in emails {
                 let userid = UserID::from(email);
@@ -66,7 +67,7 @@ impl Pgp {
     /// make a "public key" ascii-armored representation of a TPK
     pub fn tpk_to_armored(certified: &TPK) -> Result<String> {
         let mut v = Vec::new();
-        tpk::armor::Encoder::new(&certified).serialize(&mut v)
+        certified.armored().serialize(&mut v)
             .context("tpk serialize failed")?;
 
         Ok(String::from_utf8(v)?.to_string())
@@ -117,7 +118,7 @@ impl Pgp {
 
     /// user tsigns CA key
     pub fn tsign_ca(ca_key: &TPK, user: &TPK) -> Result<TPK> {
-        let mut signer = user.primary().clone().into_keypair()
+        let mut signer = user.primary().clone().mark_parts_secret().into_keypair()
             .context("filtered for unencrypted secret keys above")?;
 
         let mut sigs = Vec::new();
@@ -155,7 +156,7 @@ impl Pgp {
 
         // set_trust_signature + set_regular_expression(s)
 
-        let mut signer = ca_key.primary().clone().into_keypair()?;
+        let mut signer = ca_key.primary().clone().mark_parts_secret().into_keypair()?;
 
         let remote_pubkey = remote_ca_key.primary();
 
@@ -190,15 +191,17 @@ impl Pgp {
 
         // set_trust_signature, set_regular_expression(s), expiration
 
-        let mut signer = ca_key.primary().clone().into_keypair()?;
+        let mut signer = ca_key.primary().clone().mark_parts_secret().into_keypair()?;
 
         let mut packets: Vec<Packet> = Vec::new();
 
-        // create revocation sig
-        let revocation_sig = userid
-            .revoke(&mut signer, &remote_ca_key,
+        let revocation_sig =
+            UserIDRevocationBuilder::new()
+                .set_reason_for_revocation(
                     ReasonForRevocation::Unspecified,
-                    b"removing OpenPGP CA bridge", None, None)?;
+                    b"removing OpenPGP CA bridge").unwrap()
+                .build(&mut signer, &remote_ca_key, userid, None)?;
+
 
         packets.push(revocation_sig.clone().into());
 
@@ -211,7 +214,7 @@ impl Pgp {
     pub fn sign_user(ca_key: &TPK, user: &TPK) -> Result<TPK> {
 
         // sign tpk with CA key
-        let mut signer = ca_key.primary().clone().into_keypair()
+        let mut signer = ca_key.primary().clone().mark_parts_secret().into_keypair()
             .context("filtered for unencrypted secret keys above")?;
 
         let mut sigs = Vec::new();
@@ -230,13 +233,14 @@ impl Pgp {
     }
 
     pub fn sign_user_emails(ca_key: &TPK, user_key: &TPK, emails: &[&str]) -> Result<TPK> {
-        let mut ca_keypair = ca_key.primary().clone().into_keypair()?;
+        let mut ca_keypair = ca_key.primary().clone().mark_parts_secret().into_keypair()?;
 
         let mut packets: Vec<Packet> = Vec::new();
 
         for uid in user_key.userids() {
             let userid = uid.userid();
-            let uid_addr = userid.address_normalized()?.unwrap();
+
+            let uid_addr = userid.email_normalized()?.unwrap();
 
             // Sign this userid if email has been given for this import call
             if emails.contains(&uid_addr.as_str()) {
@@ -263,7 +267,7 @@ impl Pgp {
         // make user key
         let (user_tpk, revocation) = Pgp::generate(emails).unwrap();
 
-        let mut keypair = user_tpk.primary().clone().into_keypair()?;
+        let mut keypair = user_tpk.primary().clone().mark_parts_secret().into_keypair()?;
         assert_eq!(user_tpk.userids().len(), emails.clone().unwrap().len());
 
         let mut packets = Vec::new();
