@@ -28,7 +28,6 @@ use openpgp::packet::signature::Builder;
 use openpgp::parse::Parse;
 use openpgp::serialize::Serialize;
 use openpgp::tpk;
-use openpgp::tpk::UserIDRevocationBuilder;
 
 use failure::{self, ResultExt};
 
@@ -160,7 +159,7 @@ impl Pgp {
 
         // set_trust_signature + set_regular_expression(s)
 
-        let mut signer = ca_key.primary().clone().mark_parts_secret().into_keypair()?;
+        let mut cert_keys = Self::get_cert_keys(&ca_key)?;
 
         let remote_pubkey = remote_ca_key.primary();
 
@@ -169,15 +168,17 @@ impl Pgp {
         // create one TSIG for each regex
         if let Some(regexes) = regexes {
             for &regex in regexes {
-                let tsig = Builder::new(SignatureType::GenericCertificate)
-                    .set_trust_signature(255, 120)?
-                    .set_regular_expression(regex.as_bytes())?
-                    .sign_userid_binding(&mut signer,
-                                         remote_pubkey,
-                                         userid,
-                                         HashAlgorithm::SHA512)?;
+                for signer in &mut cert_keys {
+                    let tsig = Builder::new(SignatureType::GenericCertificate)
+                        .set_trust_signature(255, 120)?
+                        .set_regular_expression(regex.as_bytes())?
+                        .sign_userid_binding(signer,
+                                             remote_pubkey,
+                                             userid,
+                                             HashAlgorithm::SHA512)?;
 
-                packets.push(tsig.into());
+                    packets.push(tsig.into());
+                }
             }
         }
 
@@ -195,19 +196,24 @@ impl Pgp {
 
         // set_trust_signature, set_regular_expression(s), expiration
 
-        let mut signer = ca_key.primary().clone().mark_parts_secret().into_keypair()?;
+        let mut cert_keys = Self::get_cert_keys(&ca_key)?;
+
+        // the CA should have exactly one key that can certify
+        assert_eq!(cert_keys.len(), 1);
+
+        let signer = &mut cert_keys[0];
 
         let mut packets: Vec<Packet> = Vec::new();
 
         let revocation_sig =
-            UserIDRevocationBuilder::new()
+            tpk::UserIDRevocationBuilder::new()
                 .set_reason_for_revocation(
                     ReasonForRevocation::Unspecified,
                     b"removing OpenPGP CA bridge").unwrap()
-                .build(&mut signer, &remote_ca_key, userid, None)?;
-
+                .build(signer, &remote_ca_key, userid, None)?;
 
         packets.push(revocation_sig.clone().into());
+
 
         let revoked = remote_ca_key.clone().merge_packets(packets)?;
 
@@ -239,8 +245,6 @@ impl Pgp {
     }
 
     pub fn sign_user_emails(ca_key: &TPK, user_key: &TPK, emails: &[&str]) -> Result<TPK> {
-//        let mut ca_keypair = ca_key.primary().clone().mark_parts_secret().into_keypair()?;
-
         let mut cert_keys = Self::get_cert_keys(&ca_key)?;
 
 
@@ -266,7 +270,8 @@ impl Pgp {
                 // FIXME: complain about emails that have been specified but
                 // haven't been found in the userids
 //            panic!("Email {} not found in the key", );
-            }        }
+            }
+        }
 
         let result = user_key.clone().merge_packets(packets)?;
         Ok(result)
