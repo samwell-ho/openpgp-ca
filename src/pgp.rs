@@ -21,15 +21,16 @@ use openpgp::Packet;
 use openpgp::TPK;
 use openpgp::armor;
 use openpgp::constants::{SignatureType, HashAlgorithm, ReasonForRevocation};
-use openpgp::packet::Signature;
-use openpgp::packet::UserID;
+use openpgp::crypto::KeyPair;
+use openpgp::packet::{Signature, UserID};
+use openpgp::packet::key::UnspecifiedRole;
 use openpgp::packet::signature::Builder;
 use openpgp::parse::Parse;
 use openpgp::serialize::Serialize;
 use openpgp::tpk;
+use openpgp::tpk::UserIDRevocationBuilder;
 
 use failure::{self, ResultExt};
-use sequoia_openpgp::tpk::UserIDRevocationBuilder;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -267,26 +268,28 @@ impl Pgp {
         // make user key
         let (user_tpk, revocation) = Pgp::generate(emails).unwrap();
 
-        let mut keypair = user_tpk.primary().clone().mark_parts_secret().into_keypair()?;
-        assert_eq!(user_tpk.userids().len(), emails.clone().unwrap().len());
+        let mut cert_keys = Self::get_cert_keys(&user_tpk)?;
+        assert_eq!(user_tpk.userids().len(), emails.unwrap().len());
 
         let mut packets = Vec::new();
 
-        if let Some(e) = emails {
-            for &uid in e {
+        if let Some(emails) = emails {
+            for &uid in emails {
                 // Generate userid ..
                 let userid = UserID::from(uid);
                 packets.push(userid.clone().into());
 
-                // .. and a binding signature.
-                let builder =
-                    Builder::new(SignatureType::PositiveCertificate);
-                let binding = userid.bind(&mut keypair,
-                                          &user_tpk,
-                                          builder,
-                                          None, None)?;
+                for signer in &mut cert_keys {
+                    // .. and a binding signature.
+                    let builder = Builder::new(SignatureType::PositiveCertificate);
 
-                packets.push(binding.into());
+                    let binding = userid.bind(signer,
+                                              &user_tpk,
+                                              builder,
+                                              None, None)?;
+
+                    packets.push(binding.into());
+                }
             }
         }
 
@@ -295,5 +298,15 @@ impl Pgp {
 
         // done
         Ok((user_tpk, revocation))
+    }
+
+    /// get all valid, certification capable keys with secret key material
+    fn get_cert_keys(tpk: &TPK) -> Result<Vec<KeyPair<UnspecifiedRole>>> {
+        let iter = tpk.keys_valid().certification_capable().secret(true);
+
+        Ok(iter.filter_map(|(_, _, key)|
+            key.clone().mark_parts_secret()
+                .into_keypair().ok())
+            .collect())
     }
 }
