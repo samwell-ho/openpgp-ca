@@ -38,31 +38,36 @@ pub struct Pgp {}
 
 impl Pgp {
     /// Generate an encryption- and signing-capable key.
-    fn generate(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
-        let (tpk, revocation) = tpk::TPKBuilder::new()
-            .add_encryption_subkey()
-            .add_signing_subkey()
-            .generate()?;
+    fn make_key(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
+
+        // FIXME: ca key should not be encryption capable
+
+        let mut builder = tpk::TPKBuilder::new();
+
+        // FIXME: users should have subkeys, but that hits
+        // https://gitlab.com/sequoia-pgp/sequoia/issues/344
+
+//            .add_encryption_subkey()
+//            .add_signing_subkey();
+
 
         if let Some(emails) = emails {
-            let mut packets = Vec::new();
-            let mut signer = tpk.primary().clone().mark_parts_secret().into_keypair()?;
-
             for &email in emails {
-                let userid = UserID::from(email);
-                packets.push(userid.clone().into());
-
-                let builder = Builder::new(SignatureType::PositiveCertificate);
-                let binding =
-                    userid.bind(&mut signer, &tpk, builder, None, None)?;
-
-                packets.push(binding.into());
+                builder = builder.add_userid(UserID::from(email));
             }
-
-            Ok((tpk.merge_packets(packets)?, revocation))
-        } else {
-            Ok((tpk, revocation))
         }
+
+        Ok(builder.generate()?)
+    }
+
+    /// make a private CA key
+    pub fn make_private_ca_key(ca_uids: &[&str]) -> Result<(TPK, Signature)> {
+        Pgp::make_key(Some(&ca_uids.to_vec()))
+    }
+
+    /// make a user TPK with "emails" as UIDs (all UIDs get signed)
+    pub fn make_user(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
+        Pgp::make_key(emails)
     }
 
     /// make a "public key" ascii-armored representation of a TPK
@@ -111,15 +116,10 @@ impl Pgp {
         Ok(String::from_utf8(buf.get_ref().to_vec())?.to_string())
     }
 
-    /// make a private CA key
-    pub fn make_private_ca_key(ca_uids: &[&str])
-                               -> Result<(TPK, Signature)> {
-        Pgp::generate(Some(&ca_uids.to_vec()))
-    }
-
     /// user tsigns CA key
     pub fn tsign_ca(ca_key: &TPK, user: &TPK) -> Result<TPK> {
-        let mut signer = user.primary().clone().mark_parts_secret().into_keypair()
+        // FIXME
+        let mut cert_keys = Self::get_cert_keys(&user)
             .context("filtered for unencrypted secret keys above")?;
 
         let mut sigs = Vec::new();
@@ -128,15 +128,18 @@ impl Pgp {
 
         // create TSIG
         for ca_uidb in ca_key.userids() {
-            let builder = Builder::new(SignatureType::GenericCertificate)
-                .set_trust_signature(255, 120)?;
+            for signer in &mut cert_keys {
+                let builder = Builder::new(SignatureType::GenericCertificate)
+                    .set_trust_signature(255, 120)?;
 
-            let tsig = ca_uidb.userid().bind(&mut signer,
-                                             ca_key,
-                                             builder,
-                                             None, None)?;
 
-            sigs.push(tsig.into());
+                let tsig = ca_uidb.userid().bind(signer,
+                                                 ca_key,
+                                                 builder,
+                                                 None, None)?;
+
+                sigs.push(tsig.into());
+            }
         }
 
         let signed = ca_key.clone().merge_packets(sigs)?;
@@ -213,19 +216,21 @@ impl Pgp {
 
     /// sign all userids of TPK with CA TPK
     pub fn sign_user(ca_key: &TPK, user: &TPK) -> Result<TPK> {
-
         // sign tpk with CA key
-        let mut signer = ca_key.primary().clone().mark_parts_secret().into_keypair()
+
+        let mut cert_keys = Self::get_cert_keys(&ca_key)
             .context("filtered for unencrypted secret keys above")?;
 
         let mut sigs = Vec::new();
 
         for uidb in user.userids() {
-            let uid = uidb.userid();
+            for signer in &mut cert_keys {
+                let uid = uidb.userid();
 
-            let sig = uid.certify(&mut signer, &user, None, None, None)?;
+                let sig = uid.certify(signer, &user, None, None, None)?;
 
-            sigs.push(sig.into());
+                sigs.push(sig.into());
+            }
         }
 
         let certified = user.clone().merge_packets(sigs)?;
@@ -234,70 +239,37 @@ impl Pgp {
     }
 
     pub fn sign_user_emails(ca_key: &TPK, user_key: &TPK, emails: &[&str]) -> Result<TPK> {
-        let mut ca_keypair = ca_key.primary().clone().mark_parts_secret().into_keypair()?;
+//        let mut ca_keypair = ca_key.primary().clone().mark_parts_secret().into_keypair()?;
+
+        let mut cert_keys = Self::get_cert_keys(&ca_key)?;
+
 
         let mut packets: Vec<Packet> = Vec::new();
 
         for uid in user_key.userids() {
-            let userid = uid.userid();
+            for signer in &mut cert_keys {
+                let userid = uid.userid();
 
-            let uid_addr = userid.email_normalized()?.unwrap();
+                let uid_addr = userid.email_normalized()?.unwrap();
 
-            // Sign this userid if email has been given for this import call
-            if emails.contains(&uid_addr.as_str()) {
-                // certify this userid
-                let cert = userid.certify(&mut ca_keypair,
-                                          &user_key,
-                                          SignatureType::PositiveCertificate,
-                                          None, None)?;
+                // Sign this userid if email has been given for this import call
+                if emails.contains(&uid_addr.as_str()) {
+                    // certify this userid
+                    let cert = userid.certify(signer,
+                                              &user_key,
+                                              SignatureType::PositiveCertificate,
+                                              None, None)?;
 
-                packets.push(cert.into());
-            }
+                    packets.push(cert.into());
+                }
 
-            // FIXME: complain about emails that have been specified but
-            // haven't been found in the userids
+                // FIXME: complain about emails that have been specified but
+                // haven't been found in the userids
 //            panic!("Email {} not found in the key", );
-        }
+            }        }
 
         let result = user_key.clone().merge_packets(packets)?;
         Ok(result)
-    }
-
-    /// make a user TPK with "emails" as UIDs (all UIDs get signed)
-    pub fn make_user(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
-        // make user key
-        let (user_tpk, revocation) = Pgp::generate(emails).unwrap();
-
-        let mut cert_keys = Self::get_cert_keys(&user_tpk)?;
-        assert_eq!(user_tpk.userids().len(), emails.unwrap().len());
-
-        let mut packets = Vec::new();
-
-        if let Some(emails) = emails {
-            for &uid in emails {
-                // Generate userid ..
-                let userid = UserID::from(uid);
-                packets.push(userid.clone().into());
-
-                for signer in &mut cert_keys {
-                    // .. and a binding signature.
-                    let builder = Builder::new(SignatureType::PositiveCertificate);
-
-                    let binding = userid.bind(signer,
-                                              &user_tpk,
-                                              builder,
-                                              None, None)?;
-
-                    packets.push(binding.into());
-                }
-            }
-        }
-
-        // Now merge the userid and binding signature into the TPK.
-        let user_tpk = user_tpk.merge_packets(packets)?;
-
-        // done
-        Ok((user_tpk, revocation))
     }
 
     /// get all valid, certification capable keys with secret key material
@@ -305,8 +277,7 @@ impl Pgp {
         let iter = tpk.keys_valid().certification_capable().secret(true);
 
         Ok(iter.filter_map(|(_, _, key)|
-            key.clone().mark_parts_secret()
-                .into_keypair().ok())
+            key.clone().mark_parts_secret().into_keypair().ok())
             .collect())
     }
 }
