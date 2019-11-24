@@ -87,7 +87,7 @@ subcommands:
                   long: revocation_file
                   help: File that contains the User's revocation cert
         - export:
-            about: Emport User's Public Key
+            about: Export User Public Key (bulk, if no email address is given)
             args:
               - email:
                   takes_value: true

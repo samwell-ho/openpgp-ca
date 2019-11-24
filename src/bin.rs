@@ -107,7 +107,11 @@ fn real_main() -> Result<()> {
                                 println!("{}", u.pub_key);
                             }
                         }
-                        _ => unimplemented!(),
+                        None => {
+                            // bulk export
+                            ca.get_users()?.iter()
+                                .for_each(|u| println!("{}", u.pub_key));
+                        }
                     }
                 }
                 ("list", Some(_m2)) => {
