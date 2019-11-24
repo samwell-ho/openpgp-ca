@@ -38,7 +38,7 @@ pub struct NewCa<'a> {
 }
 
 
-#[derive(Identifiable, Queryable, Debug)]
+#[derive(Identifiable, Queryable, Debug, Clone)]
 pub struct User {
     pub id: i32,
     pub name: Option<String>,

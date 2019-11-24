@@ -59,7 +59,7 @@ subcommands:
                   short: n
                   long: name
                   help: Name
-              - key_profile:
+              - key-profile:
                   takes_value: true
                   long: key_profile
                   help: Key Profile
@@ -77,15 +77,23 @@ subcommands:
                   short: n
                   long: name
                   help: Name
-              - key_file:
+              - key-file:
                   takes_value: true
                   long: key_file
                   help: File that contains the User's Public Key
-              - revocation_file:
+              - revocation-file:
                   takes_value: true
                   short: r
                   long: revocation_file
                   help: File that contains the User's revocation cert
+        - export:
+            about: Emport User's Public Key
+            args:
+              - email:
+                  takes_value: true
+                  short: e
+                  long: email
+                  help: Email address
         - revoke:
             about: Revoke Key
         - list:
@@ -107,7 +115,7 @@ subcommands:
                   long: regex
                   multiple: true
                   help: Regex
-              - remote_key_file:
+              - remote-key-file:
                   takes_value: true
                   long: remote_key_file
                   help: File that contains the remote CA's Public Key

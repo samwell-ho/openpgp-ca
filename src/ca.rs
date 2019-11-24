@@ -53,7 +53,7 @@ impl Ca {
     // -------- CAs
 
     pub fn ca_new(&self, emails: &[&str]) -> Result<()> {
-        println!("make ca for email '{:?}'", emails);
+//        println!("make ca for email '{:?}'", emails);
 
         assert_eq!(emails.len(), 1,
                    "'ca new' expects exactly one email address");
@@ -66,7 +66,7 @@ impl Ca {
 
         self.db.insert_ca(models::NewCa { email, ca_key, revoc_cert })?;
 
-        println!("new CA key:\n{:#?}", tpk);
+//        println!("new CA key:\n{:#?}", tpk);
 
         Ok(())
     }
@@ -212,6 +212,9 @@ impl Ca {
         Ok(())
     }
 
+    pub fn get_user(&self, email: &str) -> Result<Option<models::User>> {
+        self.db.get_user(email)
+    }
 
     // -------- bridges
 

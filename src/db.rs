@@ -150,6 +150,34 @@ impl Db {
             .context("Error loading users")?)
     }
 
+    pub fn get_user(&self, email: &str) -> Result<Option<User>> {
+        let e: Vec<Email> = emails::table.filter(emails::addr.eq(email))
+            .load::<Email>(&self.conn)
+            .context("Error loading email")?;
+
+        let e =
+            match e.len() {
+                0 => return Ok(None),
+                1 => &e[0],
+                _ => panic!("searching for email {} found {} results,\
+             expected 0 or 1. \
+            (Database constraints should make this impossible)",
+                            email, e.len())
+            };
+
+        let u: Vec<User> = users::table.filter(users::id.eq(e.user_id))
+            .load::<User>(&self.conn)
+            .context("Error loading user")?;
+
+        match u.len() {
+            0 => Ok(None),
+            1 => Ok(Some(u[0].clone())),
+            _ => panic!("get_user for {} found {} results, expected 1. \
+            (Database constraints should make this impossible)",
+                        email, u.len())
+        }
+    }
+
     pub fn get_emails(&self, user: User) -> Result<Vec<Email>> {
         Ok(Email::belonging_to(&user)
             .load::<Email>(&self.conn)

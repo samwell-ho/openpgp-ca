@@ -67,9 +67,9 @@ fn real_main() -> Result<()> {
                             let name = m2.value_of("name");
 
                             // TODO
-                            // .arg(Arg::with_name("key_profile")
-                            //  .long("key_profile")
-                            //  .value_name("key_profile")
+                            // .arg(Arg::with_name("key-profile")
+                            //  .long("key-profile")
+                            //  .value_name("key-profile")
                             //  .help("Key Profile"))
 
                             ca.user_new(name, Some(email_vec.as_ref()))?;
@@ -85,12 +85,27 @@ fn real_main() -> Result<()> {
 
                             let name = m2.value_of("name");
 
-                            let key_file = m2.value_of("key_file").unwrap();
-                            let revocation_file = m2.value_of("revocation_file");
+                            let key_file = m2.value_of("key-file").unwrap();
+                            let revocation_file = m2.value_of
+                            ("revocation-file");
 
                             ca.user_import(name, Some(email_vec.as_ref()),
                                            key_file, revocation_file,
                             )?;
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                ("export", Some(m2)) => {
+                    match m2.values_of("email") {
+                        Some(email) => {
+                            let email_vec = email.into_iter()
+                                .collect::<Vec<_>>();
+
+                            let u = ca.get_user(email_vec[0])?;
+                            if let Some(u) = u {
+                                println!("{}", u.pub_key);
+                            }
                         }
                         _ => unimplemented!(),
                     }
@@ -111,7 +126,7 @@ fn real_main() -> Result<()> {
                                 .collect::<Vec<_>>();
 
                             let key_file =
-                                m2.value_of("remote_key_file").unwrap();
+                                m2.value_of("remote-key-file").unwrap();
 
                             let name = m2.value_of("name").unwrap();
 
