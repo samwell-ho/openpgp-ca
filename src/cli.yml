@@ -42,6 +42,8 @@ subcommands:
                   help: CA email
         - show:
             about: Show CA
+        - export:
+            about: Export CA public key
   - user:
       about: Manage Users
       subcommands:

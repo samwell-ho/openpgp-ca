@@ -52,6 +52,9 @@ fn real_main() -> Result<()> {
                 ("show", Some(_m2)) => {
                     ca.show_cas();
                 }
+                ("export", Some(_m2)) => {
+                    ca.export_pubkey();
+                }
 
                 _ => unimplemented!(),
             }

@@ -83,10 +83,20 @@ impl Ca {
     }
 
     pub fn show_cas(&self) {
-        let cas = self.db.get_ca();
-        for ca in cas {
-            println!("{:#?}", ca);
-        }
+        let ca = self.db.get_ca()
+            .expect("failed to load CA from database");
+        println!("{:#?}", ca);
+    }
+
+    pub fn export_pubkey(&self) {
+        let ca = self.db.get_ca()
+            .expect("failed to load CA from database");
+
+        let tpk = Pgp::armored_to_tpk(&ca.unwrap().ca_key);
+        let ca_pub = Pgp::tpk_to_armored(&tpk)
+            .expect("failed to transform CA key to armored pubkey");
+
+        println!("{}", ca_pub);
     }
 
     // -------- users
