@@ -20,7 +20,7 @@ use sequoia_openpgp as openpgp;
 use openpgp::Packet;
 use openpgp::TPK;
 use openpgp::armor;
-use openpgp::constants::{SignatureType, HashAlgorithm, ReasonForRevocation};
+use openpgp::types::{SignatureType, ReasonForRevocation};
 use openpgp::crypto::KeyPair;
 use openpgp::packet::{Signature, UserID};
 use openpgp::packet::key::UnspecifiedRole;
@@ -135,7 +135,7 @@ impl Pgp {
                 let tsig = ca_uidb.userid().bind(signer,
                                                  ca_key,
                                                  builder,
-                                                 None, None)?;
+                                                 None)?;
 
                 sigs.push(tsig.into());
             }
@@ -174,8 +174,7 @@ impl Pgp {
                         .set_regular_expression(regex.as_bytes())?
                         .sign_userid_binding(signer,
                                              remote_pubkey,
-                                             userid,
-                                             HashAlgorithm::SHA512)?;
+                                             userid)?;
 
                     packets.push(tsig.into());
                 }
@@ -279,10 +278,12 @@ impl Pgp {
 
     /// get all valid, certification capable keys with secret key material
     fn get_cert_keys(tpk: &TPK) -> Result<Vec<KeyPair<UnspecifiedRole>>> {
-        let iter = tpk.keys_valid().certification_capable().secret(true);
+        let iter = tpk.keys_valid().certification_capable().secret();
 
         Ok(iter.filter_map(|(_, _, key)|
-            key.clone().mark_parts_secret().into_keypair().ok())
-            .collect())
+            key.clone().mark_parts_secret()
+                .expect("mark_parts_secret failed")
+                .into_keypair().ok()
+        ).collect())
     }
 }
