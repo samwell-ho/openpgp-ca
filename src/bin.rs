@@ -57,7 +57,7 @@ fn real_main() -> Result<()> {
                 }
                 ("import-tsig", Some(m2)) => {
                     let key_file = m2.value_of("key-file").unwrap();
-                    ca.import_tsig(key_file);
+                    ca.import_tsig(key_file)?;
                 }
 
                 _ => unimplemented!(),
