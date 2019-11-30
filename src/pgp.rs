@@ -37,7 +37,7 @@ pub struct Pgp {}
 
 impl Pgp {
     /// Generate an encryption- and signing-capable key.
-    fn make_key(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
+    fn make_cert(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
 
         // FIXME: ca key should not be encryption capable
 
@@ -60,13 +60,13 @@ impl Pgp {
     }
 
     /// make a private CA key
-    pub fn make_private_ca_key(ca_uids: &[&str]) -> Result<(Cert, Signature)> {
-        Pgp::make_key(Some(&ca_uids.to_vec()))
+    pub fn make_private_ca_cert(ca_uids: &[&str]) -> Result<(Cert, Signature)> {
+        Pgp::make_cert(Some(&ca_uids.to_vec()))
     }
 
     /// make a user Cert with "emails" as UIDs (all UIDs get signed)
     pub fn make_user(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
-        Pgp::make_key(emails)
+        Pgp::make_cert(emails)
     }
 
     /// make a "public key" ascii-armored representation of a Cert
@@ -116,7 +116,7 @@ impl Pgp {
     }
 
     /// user tsigns CA key
-    pub fn tsign_ca(ca_key: &Cert, user: &Cert) -> Result<Cert> {
+    pub fn tsign_ca(ca_cert: &Cert, user: &Cert) -> Result<Cert> {
         // FIXME
         let mut cert_keys = Self::get_cert_keys(&user)
             .context("filtered for unencrypted secret keys above")?;
@@ -126,14 +126,14 @@ impl Pgp {
         // FIXME: assert there is exactly one userid?
 
         // create TSIG
-        for ca_uidb in ca_key.userids() {
+        for ca_uidb in ca_cert.userids() {
             for signer in &mut cert_keys {
                 let builder = Builder::new(SignatureType::GenericCertificate)
                     .set_trust_signature(255, 120)?;
 
 
                 let tsig = ca_uidb.userid().bind(signer,
-                                                 ca_key,
+                                                 ca_cert,
                                                  builder,
                                                  None)?;
 
@@ -141,27 +141,27 @@ impl Pgp {
             }
         }
 
-        let signed = ca_key.clone().merge_packets(sigs)?;
+        let signed = ca_cert.clone().merge_packets(sigs)?;
 
         Ok(signed)
     }
 
     /// add trust signature to the public key of a remote CA
-    pub fn bridge_to_remote_ca(ca_key: &Cert,
-                               remote_ca_key: &Cert,
+    pub fn bridge_to_remote_ca(ca_cert: &Cert,
+                               remote_ca_cert: &Cert,
                                regexes: Option<&[&str]>) -> Result<Cert> {
 
         // FIXME: do we want to support a tsig without any regex?
         // -> or force users to explicitly set a catchall regex, then.
 
         // there should be exactly one userid!
-        let userid = remote_ca_key.userids().next().unwrap().userid();
+        let userid = remote_ca_cert.userids().next().unwrap().userid();
 
         // set_trust_signature + set_regular_expression(s)
 
-        let mut cert_keys = Self::get_cert_keys(&ca_key)?;
+        let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
 
-        let remote_pubkey = remote_ca_key.primary();
+        let remote_pubkey = remote_ca_cert.primary();
 
         let mut packets: Vec<Packet> = Vec::new();
 
@@ -183,19 +183,19 @@ impl Pgp {
 
         // FIXME: expiration?
 
-        let signed = remote_ca_key.clone().merge_packets(packets)?;
+        let signed = remote_ca_cert.clone().merge_packets(packets)?;
 
         Ok(signed)
     }
 
-    pub fn bridge_revoke(remote_ca_key: &Cert, ca_key: &Cert)
+    pub fn bridge_revoke(remote_ca_cert: &Cert, ca_cert: &Cert)
                          -> Result<(Signature, Cert)> {
         // there should be exactly one userid!
-        let userid = remote_ca_key.userids().next().unwrap().userid();
+        let userid = remote_ca_cert.userids().next().unwrap().userid();
 
         // set_trust_signature, set_regular_expression(s), expiration
 
-        let mut cert_keys = Self::get_cert_keys(&ca_key)?;
+        let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
 
         // the CA should have exactly one key that can certify
         assert_eq!(cert_keys.len(), 1);
@@ -209,21 +209,21 @@ impl Pgp {
                 .set_reason_for_revocation(
                     ReasonForRevocation::Unspecified,
                     b"removing OpenPGP CA bridge").unwrap()
-                .build(signer, &remote_ca_key, userid, None)?;
+                .build(signer, &remote_ca_cert, userid, None)?;
 
         packets.push(revocation_sig.clone().into());
 
 
-        let revoked = remote_ca_key.clone().merge_packets(packets)?;
+        let revoked = remote_ca_cert.clone().merge_packets(packets)?;
 
         Ok((revocation_sig, revoked))
     }
 
     /// sign all userids of Cert with CA Cert
-    pub fn sign_user(ca_key: &Cert, user: &Cert) -> Result<Cert> {
+    pub fn sign_user(ca_cert: &Cert, user: &Cert) -> Result<Cert> {
         // sign Cert with CA key
 
-        let mut cert_keys = Self::get_cert_keys(&ca_key)
+        let mut cert_keys = Self::get_cert_keys(&ca_cert)
             .context("filtered for unencrypted secret keys above")?;
 
         let mut sigs = Vec::new();
@@ -243,13 +243,13 @@ impl Pgp {
         Ok(certified)
     }
 
-    pub fn sign_user_emails(ca_key: &Cert, user_key: &Cert, emails: &[&str]) -> Result<Cert> {
-        let mut cert_keys = Self::get_cert_keys(&ca_key)?;
+    pub fn sign_user_emails(ca_cert: &Cert, user_cert: &Cert, emails: &[&str]) -> Result<Cert> {
+        let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
 
 
         let mut packets: Vec<Packet> = Vec::new();
 
-        for uid in user_key.userids() {
+        for uid in user_cert.userids() {
             for signer in &mut cert_keys {
                 let userid = uid.userid();
 
@@ -259,7 +259,7 @@ impl Pgp {
                 if emails.contains(&uid_addr.as_str()) {
                     // certify this userid
                     let cert = userid.certify(signer,
-                                              &user_key,
+                                              &user_cert,
                                               SignatureType::PositiveCertificate,
                                               None, None)?;
 
@@ -272,7 +272,7 @@ impl Pgp {
             }
         }
 
-        let result = user_key.clone().merge_packets(packets)?;
+        let result = user_cert.clone().merge_packets(packets)?;
         Ok(result)
     }
 

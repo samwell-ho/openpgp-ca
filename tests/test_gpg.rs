@@ -18,7 +18,7 @@ fn run_gpg() {
     assert!(ca.ca_new(&["ca@example.org"]).is_ok());
 
     // get Cert for CA
-    let ca_cert = ca.get_ca_key();
+    let ca_cert = ca.get_ca_cert();
     assert!(ca_cert.is_ok());
 
     // import CA key into GnuPG
@@ -56,7 +56,7 @@ fn test_alice_trusts_bob() {
     // ---- import keys from OpenPGP CA into GnuPG ----
 
     // get Cert for CA
-    let ca_cert = ca.get_ca_key();
+    let ca_cert = ca.get_ca_cert();
     assert!(ca_cert.is_ok());
 
     // import CA key into GnuPG

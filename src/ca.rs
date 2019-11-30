@@ -58,7 +58,7 @@ impl Ca {
         assert_eq!(emails.len(), 1,
                    "'ca new' expects exactly one email address");
 
-        let (cert, revoc) = Pgp::make_private_ca_key(emails)?;
+        let (cert, revoc) = Pgp::make_private_ca_cert(emails)?;
 
         let email = emails[0].to_owned();
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
@@ -71,7 +71,7 @@ impl Ca {
         Ok(())
     }
 
-    pub fn get_ca_key(&self) -> Result<Cert> {
+    pub fn get_ca_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some(ca) => {
                 let ca_cert = Pgp::armored_to_cert(&ca.ca_key);
@@ -99,19 +99,19 @@ impl Ca {
     }
 
     pub fn import_tsig(&self, key_file: &str) -> Result<()> {
-        let ca_key = self.get_ca_key().unwrap();
+        let ca_cert = self.get_ca_cert().unwrap();
 
-        let ca_key_imported = Cert::from_file(key_file)
+        let ca_cert_imported = Cert::from_file(key_file)
             .expect("Failed to read key");
 
         // make sure the keys have the same KeyID
-        if ca_key.keyid() != ca_key_imported.keyid() {
+        if ca_cert.keyid() != ca_cert_imported.keyid() {
             return Err(failure::err_msg("The imported key has an \
             unexpected keyid"));
         }
 
         // get the tsig(s) from import
-        let tsigs: Vec<_> = ca_key_imported
+        let tsigs: Vec<_> = ca_cert_imported
             .userids()
             .flat_map(|b| b.certifications())
             .filter(|&s| s.trust_signature().is_some())
@@ -121,7 +121,7 @@ impl Ca {
         let mut packets: Vec<Packet> = Vec::new();
         tsigs.iter().for_each(|&s| packets.push(s.clone().into()));
 
-        let signed = ca_key.merge_packets(packets)
+        let signed = ca_cert.merge_packets(packets)
             .expect("merging tsigs into CA Key failed");
 
         // update in DB
@@ -140,23 +140,23 @@ impl Ca {
     // -------- users
 
     pub fn user_new(&mut self, name: Option<&str>, emails: Option<&[&str]>) -> Result<()> {
-        let ca_key = self.get_ca_key().unwrap();
+        let ca_cert = self.get_ca_cert().unwrap();
 
         println!("new user: uids {:?}", emails);
 
         // make user key (signed by CA)
         let (user, revoc) =
-            Pgp::make_user(emails).context("make_user_key failed")?;
+            Pgp::make_user(emails).context("make_user failed")?;
 
         // sign user key with CA key
         let certified =
-            Pgp::sign_user(&ca_key, &user).context("sign_user failed")?;
+            Pgp::sign_user(&ca_cert, &user).context("sign_user failed")?;
 
         println!("=== user_cert certified {:#?}\n", certified);
 
         // user tsigns CA key
         let tsigned_ca =
-            Pgp::tsign_ca(&ca_key, &user).context("failed: user tsigns CA")?;
+            Pgp::tsign_ca(&ca_cert, &user).context("failed: user tsigns CA")?;
 
         let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
         println!("updated armored CA key: {}", tsigned_ca_armored);
@@ -196,16 +196,16 @@ impl Ca {
 
     pub fn user_import(&self, name: Option<&str>, emails: Option<&[&str]>,
                        key_file: &str, revoc_file: Option<&str>) -> Result<()> {
-        let ca_key = self.get_ca_key().unwrap();
+        let ca_cert = self.get_ca_cert().unwrap();
 
-        let user_key = Cert::from_file(key_file)
+        let user_cert = Cert::from_file(key_file)
             .expect("Failed to read key");
 
         // sign only the userids that have been specified
         let certified =
             match emails {
-                Some(e) => Pgp::sign_user_emails(&ca_key, &user_key, e)?,
-                None => user_key
+                Some(e) => Pgp::sign_user_emails(&ca_cert, &user_cert, e)?,
+                None => user_cert
             };
 
         // load revocation certificate
@@ -268,17 +268,17 @@ impl Ca {
 
     pub fn bridge_new(&self, name: &str, key_file: &str,
                       regexes: Option<&[&str]>) -> Result<()> {
-        let ca_key = self.get_ca_key().unwrap();
+        let ca_cert = self.get_ca_cert().unwrap();
 
-        let remote_ca_key = Cert::from_file(key_file)
+        let remote_ca_cert = Cert::from_file(key_file)
             .expect("Failed to read key");
 
         // expect exactly one userid in remote CA key (otherwise fail)
-        assert_eq!(remote_ca_key.userids().len(), 1,
+        assert_eq!(remote_ca_cert.userids().len(), 1,
                    "remote CA should have exactly one userid, but has {}",
-                   remote_ca_key.userids().len());
+                   remote_ca_cert.userids().len());
 
-        let bridged = Pgp::bridge_to_remote_ca(&ca_key, &remote_ca_key, regexes)?;
+        let bridged = Pgp::bridge_to_remote_ca(&ca_cert, &remote_ca_cert, regexes)?;
 
         // store in DB
         let ca_db = self.db.get_ca().context("Couldn't find CA")?
@@ -308,12 +308,12 @@ impl Ca {
 //        let ca_id = bridge.clone().cas_id;
 
         let ca = self.db.get_ca()?.unwrap();
-        let ca_key = Pgp::armored_to_cert(&ca.ca_key);
+        let ca_cert = Pgp::armored_to_cert(&ca.ca_key);
 
         let bridge_pub = Pgp::armored_to_cert(&bridge.pub_key);
 
         // make sig to revoke bridge
-        let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_key)?;
+        let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_cert)?;
 
         let revoc_cert_arm = &Pgp::sig_to_armored(&rev_cert)?;
         println!("revoc cert:\n{}", revoc_cert_arm);
