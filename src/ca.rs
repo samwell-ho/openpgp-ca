@@ -19,7 +19,7 @@ use failure::{self, ResultExt};
 
 use sequoia_openpgp as openpgp;
 
-use openpgp::TPK;
+use openpgp::Cert;
 use openpgp::Packet;
 use openpgp::parse::Parse;
 
@@ -58,24 +58,24 @@ impl Ca {
         assert_eq!(emails.len(), 1,
                    "'ca new' expects exactly one email address");
 
-        let (tpk, revoc) = Pgp::make_private_ca_key(emails)?;
+        let (cert, revoc) = Pgp::make_private_ca_key(emails)?;
 
         let email = emails[0].to_owned();
-        let ca_key = &Pgp::priv_tpk_to_armored(&tpk)?;
+        let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
         let revoc_cert = &Pgp::sig_to_armored(&revoc)?;
 
         self.db.insert_ca(models::NewCa { email, ca_key, revoc_cert })?;
 
-//        println!("new CA key:\n{:#?}", tpk);
+//        println!("new CA key:\n{:#?}", cert);
 
         Ok(())
     }
 
-    pub fn get_ca_key(&self) -> Result<openpgp::TPK> {
+    pub fn get_ca_key(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some(ca) => {
-                let ca_tpk = Pgp::armored_to_tpk(&ca.ca_key);
-                Ok(ca_tpk)
+                let ca_cert = Pgp::armored_to_cert(&ca.ca_key);
+                Ok(ca_cert)
             }
             None => panic!("get_domain_ca() failed")
         }
@@ -91,8 +91,8 @@ impl Ca {
         let ca = self.db.get_ca()
             .expect("failed to load CA from database");
 
-        let tpk = Pgp::armored_to_tpk(&ca.unwrap().ca_key);
-        let ca_pub = Pgp::tpk_to_armored(&tpk)
+        let cert = Pgp::armored_to_cert(&ca.unwrap().ca_key);
+        let ca_pub = Pgp::cert_to_armored(&cert)
             .expect("failed to transform CA key to armored pubkey");
 
         println!("{}", ca_pub);
@@ -101,7 +101,7 @@ impl Ca {
     pub fn import_tsig(&self, key_file: &str) -> Result<()> {
         let ca_key = self.get_ca_key().unwrap();
 
-        let ca_key_imported = TPK::from_file(key_file)
+        let ca_key_imported = Cert::from_file(key_file)
             .expect("Failed to read key");
 
         // make sure the keys have the same KeyID
@@ -128,8 +128,8 @@ impl Ca {
         let mut ca = self.db.get_ca()?
             .expect("failed to load CA from database");
 
-        ca.ca_key = Pgp::priv_tpk_to_armored(&signed)
-            .expect("failed to armor CA TPK");
+        ca.ca_key = Pgp::priv_cert_to_armored(&signed)
+            .expect("failed to armor CA Cert");
 
         self.db.update_ca(&ca)
             .expect("Update of CA Key in DB failed");
@@ -152,31 +152,31 @@ impl Ca {
         let certified =
             Pgp::sign_user(&ca_key, &user).context("sign_user failed")?;
 
-        println!("=== user_tpk certified {:#?}\n", certified);
+        println!("=== user_cert certified {:#?}\n", certified);
 
         // user tsigns CA key
         let tsigned_ca =
             Pgp::tsign_ca(&ca_key, &user).context("failed: user tsigns CA")?;
 
-        let tsigned_ca_armored = Pgp::priv_tpk_to_armored(&tsigned_ca)?;
+        let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
         println!("updated armored CA key: {}", tsigned_ca_armored);
 
         // now write new data to DB
         let mut ca_db = self.db.get_ca().context("Couldn't \
                 find CA")?.unwrap();
 
-        // store updated CA TPK in DB
+        // store updated CA Cert in DB
         ca_db.ca_key = tsigned_ca_armored;
 
         self.db.update_ca(&ca_db)?;
 
         // FIXME: the private key needs to be handed over to
         // the user -> print for now?
-        let priv_key = &Pgp::priv_tpk_to_armored(&certified)?;
+        let priv_key = &Pgp::priv_cert_to_armored(&certified)?;
         println!("secret user key:\n{}", priv_key);
         // --
 
-        let pub_key = &Pgp::tpk_to_armored(&certified)?;
+        let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
         let new_user = models::NewUser {
@@ -198,7 +198,7 @@ impl Ca {
                        key_file: &str, revoc_file: Option<&str>) -> Result<()> {
         let ca_key = self.get_ca_key().unwrap();
 
-        let user_key = TPK::from_file(key_file)
+        let user_key = Cert::from_file(key_file)
             .expect("Failed to read key");
 
         // sign only the userids that have been specified
@@ -221,7 +221,7 @@ impl Ca {
                        "expected exactly one packet in revocation cert");
 
             if let Packet::Signature(s) = pile.into_children().next().unwrap() {
-                // FIXME: check if this Signature fits with the tpk?
+                // FIXME: check if this Signature fits with the cert?
 
                 revoc_cert = Some(Pgp::sig_to_armored(&s)?);
             }
@@ -231,7 +231,7 @@ impl Ca {
         let ca_db = self.db.get_ca().context("Couldn't find CA")?
             .unwrap();
 
-        let pub_key = &Pgp::tpk_to_armored(&certified)?;
+        let pub_key = &Pgp::cert_to_armored(&certified)?;
         let new_user =
             models::NewUser { name, pub_key, revoc_cert, cas_id: ca_db.id };
 
@@ -270,7 +270,7 @@ impl Ca {
                       regexes: Option<&[&str]>) -> Result<()> {
         let ca_key = self.get_ca_key().unwrap();
 
-        let remote_ca_key = openpgp::TPK::from_file(key_file)
+        let remote_ca_key = Cert::from_file(key_file)
             .expect("Failed to read key");
 
         // expect exactly one userid in remote CA key (otherwise fail)
@@ -284,7 +284,7 @@ impl Ca {
         let ca_db = self.db.get_ca().context("Couldn't find CA")?
             .unwrap();
 
-        let pub_key = &Pgp::tpk_to_armored(&bridged)?;
+        let pub_key = &Pgp::cert_to_armored(&bridged)?;
 
         let new_bridge = models::NewBridge {
             name,
@@ -308,18 +308,18 @@ impl Ca {
 //        let ca_id = bridge.clone().cas_id;
 
         let ca = self.db.get_ca()?.unwrap();
-        let ca_key = Pgp::armored_to_tpk(&ca.ca_key);
+        let ca_key = Pgp::armored_to_cert(&ca.ca_key);
 
-        let bridge_pub = Pgp::armored_to_tpk(&bridge.pub_key);
+        let bridge_pub = Pgp::armored_to_cert(&bridge.pub_key);
 
         // make sig to revoke bridge
-        let (rev_cert, rev_tpk) = Pgp::bridge_revoke(&bridge_pub, &ca_key)?;
+        let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_key)?;
 
         let revoc_cert_arm = &Pgp::sig_to_armored(&rev_cert)?;
         println!("revoc cert:\n{}", revoc_cert_arm);
 
         // save updated key (with revocation) to DB
-        let revoked_arm = Pgp::tpk_to_armored(&rev_tpk)?;
+        let revoked_arm = Pgp::cert_to_armored(&cert)?;
         println!("revoked remote key:\n{}", &revoked_arm);
 
         bridge.pub_key = revoked_arm;

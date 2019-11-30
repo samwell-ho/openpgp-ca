@@ -18,7 +18,7 @@
 use sequoia_openpgp as openpgp;
 
 use openpgp::Packet;
-use openpgp::TPK;
+use openpgp::Cert;
 use openpgp::armor;
 use openpgp::types::{SignatureType, ReasonForRevocation};
 use openpgp::crypto::KeyPair;
@@ -27,7 +27,7 @@ use openpgp::packet::key::UnspecifiedRole;
 use openpgp::packet::signature::Builder;
 use openpgp::parse::Parse;
 use openpgp::serialize::Serialize;
-use openpgp::tpk;
+use openpgp::cert;
 
 use failure::{self, ResultExt};
 
@@ -37,11 +37,11 @@ pub struct Pgp {}
 
 impl Pgp {
     /// Generate an encryption- and signing-capable key.
-    fn make_key(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
+    fn make_key(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
 
         // FIXME: ca key should not be encryption capable
 
-        let mut builder = tpk::TPKBuilder::new();
+        let mut builder = cert::CertBuilder::new();
 
         // FIXME: users should have subkeys, but that hits
         // https://gitlab.com/sequoia-pgp/sequoia/issues/344
@@ -60,26 +60,26 @@ impl Pgp {
     }
 
     /// make a private CA key
-    pub fn make_private_ca_key(ca_uids: &[&str]) -> Result<(TPK, Signature)> {
+    pub fn make_private_ca_key(ca_uids: &[&str]) -> Result<(Cert, Signature)> {
         Pgp::make_key(Some(&ca_uids.to_vec()))
     }
 
-    /// make a user TPK with "emails" as UIDs (all UIDs get signed)
-    pub fn make_user(emails: Option<&[&str]>) -> Result<(TPK, Signature)> {
+    /// make a user Cert with "emails" as UIDs (all UIDs get signed)
+    pub fn make_user(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
         Pgp::make_key(emails)
     }
 
-    /// make a "public key" ascii-armored representation of a TPK
-    pub fn tpk_to_armored(certified: &TPK) -> Result<String> {
+    /// make a "public key" ascii-armored representation of a Cert
+    pub fn cert_to_armored(certified: &Cert) -> Result<String> {
         let mut v = Vec::new();
         certified.armored().serialize(&mut v)
-            .context("tpk serialize failed")?;
+            .context("Cert serialize failed")?;
 
         Ok(String::from_utf8(v)?.to_string())
     }
 
-    /// make a "private key" ascii-armored representation of a TPK
-    pub fn priv_tpk_to_armored(tpk: &TPK) -> Result<String> {
+    /// make a "private key" ascii-armored representation of a Cert
+    pub fn priv_cert_to_armored(cert: &Cert) -> Result<String> {
         let mut buffer = std::io::Cursor::new(vec![]);
         {
             let mut writer =
@@ -87,15 +87,15 @@ impl Pgp {
                                    armor::Kind::SecretKey,
                                    &[][..]).unwrap();
 
-            tpk.as_tsk().serialize(&mut writer)?;
+            cert.as_tsk().serialize(&mut writer)?;
         }
 
         Ok(String::from_utf8(buffer.get_ref().to_vec())?.to_string())
     }
 
-    /// make a TPK from an ascii armored key
-    pub fn armored_to_tpk(armored: &str) -> TPK {
-        TPK::from_bytes(armored.as_bytes()).unwrap()
+    /// make a Cert from an ascii armored key
+    pub fn armored_to_cert(armored: &str) -> Cert {
+        Cert::from_bytes(armored.as_bytes()).unwrap()
     }
 
     /// make an ascii-armored representation of a Signature
@@ -116,7 +116,7 @@ impl Pgp {
     }
 
     /// user tsigns CA key
-    pub fn tsign_ca(ca_key: &TPK, user: &TPK) -> Result<TPK> {
+    pub fn tsign_ca(ca_key: &Cert, user: &Cert) -> Result<Cert> {
         // FIXME
         let mut cert_keys = Self::get_cert_keys(&user)
             .context("filtered for unencrypted secret keys above")?;
@@ -147,9 +147,9 @@ impl Pgp {
     }
 
     /// add trust signature to the public key of a remote CA
-    pub fn bridge_to_remote_ca(ca_key: &TPK,
-                               remote_ca_key: &TPK,
-                               regexes: Option<&[&str]>) -> Result<TPK> {
+    pub fn bridge_to_remote_ca(ca_key: &Cert,
+                               remote_ca_key: &Cert,
+                               regexes: Option<&[&str]>) -> Result<Cert> {
 
         // FIXME: do we want to support a tsig without any regex?
         // -> or force users to explicitly set a catchall regex, then.
@@ -188,8 +188,8 @@ impl Pgp {
         Ok(signed)
     }
 
-    pub fn bridge_revoke(remote_ca_key: &TPK, ca_key: &TPK)
-                         -> Result<(Signature, TPK)> {
+    pub fn bridge_revoke(remote_ca_key: &Cert, ca_key: &Cert)
+                         -> Result<(Signature, Cert)> {
         // there should be exactly one userid!
         let userid = remote_ca_key.userids().next().unwrap().userid();
 
@@ -205,7 +205,7 @@ impl Pgp {
         let mut packets: Vec<Packet> = Vec::new();
 
         let revocation_sig =
-            tpk::UserIDRevocationBuilder::new()
+            cert::UserIDRevocationBuilder::new()
                 .set_reason_for_revocation(
                     ReasonForRevocation::Unspecified,
                     b"removing OpenPGP CA bridge").unwrap()
@@ -219,9 +219,9 @@ impl Pgp {
         Ok((revocation_sig, revoked))
     }
 
-    /// sign all userids of TPK with CA TPK
-    pub fn sign_user(ca_key: &TPK, user: &TPK) -> Result<TPK> {
-        // sign tpk with CA key
+    /// sign all userids of Cert with CA Cert
+    pub fn sign_user(ca_key: &Cert, user: &Cert) -> Result<Cert> {
+        // sign Cert with CA key
 
         let mut cert_keys = Self::get_cert_keys(&ca_key)
             .context("filtered for unencrypted secret keys above")?;
@@ -243,7 +243,7 @@ impl Pgp {
         Ok(certified)
     }
 
-    pub fn sign_user_emails(ca_key: &TPK, user_key: &TPK, emails: &[&str]) -> Result<TPK> {
+    pub fn sign_user_emails(ca_key: &Cert, user_key: &Cert, emails: &[&str]) -> Result<Cert> {
         let mut cert_keys = Self::get_cert_keys(&ca_key)?;
 
 
@@ -277,8 +277,8 @@ impl Pgp {
     }
 
     /// get all valid, certification capable keys with secret key material
-    fn get_cert_keys(tpk: &TPK) -> Result<Vec<KeyPair<UnspecifiedRole>>> {
-        let iter = tpk.keys_valid().certification_capable().secret();
+    fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair<UnspecifiedRole>>> {
+        let iter = cert.keys_valid().certification_capable().secret();
 
         Ok(iter.filter_map(|(_, _, key)|
             key.clone().mark_parts_secret()

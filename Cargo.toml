@@ -21,8 +21,8 @@ lazy_static = "1.3"
 dotenv = "0.15"
 failure = "0.1"
 
-sequoia-openpgp = "0.12.0"
-#sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git" }
+#sequoia-openpgp = "0.12.0"
+sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git" }
 
 # tests
 tempfile = "3.0"

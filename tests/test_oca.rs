@@ -12,7 +12,7 @@ fn test_pgp_wrapper() {
     let (tpk, revoc) = pgp::Pgp::make_user(Some(&["foo@example.org"]))
         .unwrap();
 
-    let x = pgp::Pgp::priv_tpk_to_armored(&tpk);
+    let x = pgp::Pgp::priv_cert_to_armored(&tpk);
     eprintln!("test tpk \n{}", x.unwrap());
 
 //    let certkeys = pgp::Pgp::get_cert_keys(&tpk);
