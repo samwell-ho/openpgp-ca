@@ -17,14 +17,14 @@ fn run_gpg() {
     // make new CA key
     assert!(ca.ca_new(&["ca@example.org"]).is_ok());
 
-    // get TPK for CA
-    let ca_tpk = ca.get_ca_key();
-    assert!(ca_tpk.is_ok());
+    // get Cert for CA
+    let ca_cert = ca.get_ca_key();
+    assert!(ca_cert.is_ok());
 
     // import CA key into GnuPG
     let mut buf = Vec::new();
-    let tpk = ca_tpk.unwrap();
-    tpk.as_tsk().serialize(&mut buf).unwrap();
+    let cert = ca_cert.unwrap();
+    cert.as_tsk().serialize(&mut buf).unwrap();
     gnupg::import(&ctx, &buf);
 
     // FIXME - what to assert?
@@ -55,13 +55,13 @@ fn test_alice_trusts_bob() {
 
     // ---- import keys from OpenPGP CA into GnuPG ----
 
-    // get TPK for CA
-    let ca_tpk = ca.get_ca_key();
-    assert!(ca_tpk.is_ok());
+    // get Cert for CA
+    let ca_cert = ca.get_ca_key();
+    assert!(ca_cert.is_ok());
 
     // import CA key into GnuPG
     let mut buf = Vec::new();
-    ca_tpk.unwrap().as_tsk().serialize(&mut buf).unwrap();
+    ca_cert.unwrap().as_tsk().serialize(&mut buf).unwrap();
     gnupg::import(&ctx, &buf);
 
 
