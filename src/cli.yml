@@ -44,6 +44,16 @@ subcommands:
             about: Show CA
         - export:
             about: Export CA public key
+        - import-tsig:
+            about: Import trust signature for CA Key
+            args:
+              - key-file:
+                  takes_value: true
+                  required: true
+                  short: f
+                  long: file
+                  help: File that contains the tsigned CA Key
+
   - user:
       about: Manage Users
       subcommands:

@@ -75,7 +75,6 @@ impl Ca {
         match self.db.get_ca()? {
             Some(ca) => {
                 let ca_tpk = Pgp::armored_to_tpk(&ca.ca_key);
-                println!("CA: {:#?}", ca_tpk);
                 Ok(ca_tpk)
             }
             None => panic!("get_domain_ca() failed")
@@ -97,6 +96,45 @@ impl Ca {
             .expect("failed to transform CA key to armored pubkey");
 
         println!("{}", ca_pub);
+    }
+
+    pub fn import_tsig(&self, key_file: &str) -> Result<()> {
+        let ca_key = self.get_ca_key().unwrap();
+
+        let ca_key_imported = TPK::from_file(key_file)
+            .expect("Failed to read key");
+
+        // make sure the keys have the same KeyID
+        if ca_key.keyid() != ca_key_imported.keyid() {
+            return Err(failure::err_msg("The imported key has an \
+            unexpected keyid"));
+        }
+
+        // get the tsig(s) from import
+        let tsigs: Vec<_> = ca_key_imported
+            .userids()
+            .flat_map(|b| b.certifications())
+            .filter(|&s| s.trust_signature().is_some())
+            .collect();
+
+        // add tsig(s) to our "own" version of the CA key
+        let mut packets: Vec<Packet> = Vec::new();
+        tsigs.iter().for_each(|&s| packets.push(s.clone().into()));
+
+        let signed = ca_key.merge_packets(packets)
+            .expect("merging tsigs into CA Key failed");
+
+        // update in DB
+        let mut ca = self.db.get_ca()?
+            .expect("failed to load CA from database");
+
+        ca.ca_key = Pgp::priv_tpk_to_armored(&signed)
+            .expect("failed to armor CA TPK");
+
+        self.db.update_ca(&ca)
+            .expect("Update of CA Key in DB failed");
+
+        Ok(())
     }
 
     // -------- users

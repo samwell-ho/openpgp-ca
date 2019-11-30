@@ -55,6 +55,10 @@ fn real_main() -> Result<()> {
                 ("export", Some(_m2)) => {
                     ca.export_pubkey();
                 }
+                ("import-tsig", Some(m2)) => {
+                    let key_file = m2.value_of("key-file").unwrap();
+                    ca.import_tsig(key_file);
+                }
 
                 _ => unimplemented!(),
             }
