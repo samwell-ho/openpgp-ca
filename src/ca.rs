@@ -53,7 +53,9 @@ impl Ca {
     // -------- CAs
 
     pub fn ca_new(&self, emails: &[&str]) -> Result<()> {
-//        println!("make ca for email '{:?}'", emails);
+        if let Some(_) = self.db.get_ca()? {
+            return Err(failure::err_msg("ERROR: CA has already been created"));
+        }
 
         assert_eq!(emails.len(), 1,
                    "'ca new' expects exactly one email address");
@@ -65,8 +67,6 @@ impl Ca {
         let revoc_cert = &Pgp::sig_to_armored(&revoc)?;
 
         self.db.insert_ca(models::NewCa { email, ca_key, revoc_cert })?;
-
-//        println!("new CA key:\n{:#?}", cert);
 
         Ok(())
     }
