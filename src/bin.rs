@@ -53,7 +53,8 @@ fn real_main() -> Result<()> {
                     ca.show_cas();
                 }
                 ("export", Some(_m2)) => {
-                    ca.export_pubkey();
+                    let ca_key = ca.export_pubkey()?;
+                    println!("{}", ca_key);
                 }
                 ("import-tsig", Some(m2)) => {
                     let key_file = m2.value_of("key-file").unwrap();

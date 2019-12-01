@@ -87,7 +87,7 @@ impl Ca {
         println!("{:#?}", ca);
     }
 
-    pub fn export_pubkey(&self) {
+    pub fn export_pubkey(&self) -> Result<String> {
         let ca = self.db.get_ca()
             .expect("failed to load CA from database");
 
@@ -95,7 +95,7 @@ impl Ca {
         let ca_pub = Pgp::cert_to_armored(&cert)
             .expect("failed to transform CA key to armored pubkey");
 
-        println!("{}", ca_pub);
+        Ok(ca_pub)
     }
 
     pub fn import_tsig(&self, key_file: &str) -> Result<()> {
