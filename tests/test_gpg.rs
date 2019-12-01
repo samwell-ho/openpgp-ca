@@ -1,5 +1,10 @@
-use sequoia_openpgp as openpgp;
+use std::fs::File;
+use std::io::BufWriter;
+use std::thread::sleep;
+
+use failure::_core::time::Duration;
 use openpgp::serialize::Serialize;
+use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca;
 
@@ -32,7 +37,7 @@ fn run_gpg() {
 }
 
 #[test]
-fn test_alice_trusts_bob() {
+fn test_alice_authenticates_bob() {
     let ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
@@ -82,6 +87,120 @@ fn test_alice_trusts_bob() {
 
     // ---- read calculated "trust" per uid from GnuPG ----
     let gpg_trust = gnupg::list_keys(&ctx).unwrap();
+
+    assert_eq!(gpg_trust.len(), 3);
+
+    assert_eq!(gpg_trust.get("alice@example.org"), Some(&"u".to_string()));
+    assert_eq!(gpg_trust.get("ca@example.org"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("bob@example.org"), Some(&"f".to_string()));
+
+    // don't delete home dir (for manual inspection)
+    //    ctx.leak_tempdir();
+}
+
+
+#[test]
+fn test_alice_authenticates_bob_key_imports() {
+    let ctx_alice = make_context!();
+    let ctx_bob = make_context!();
+
+    let home_path_alice = String::from(ctx_alice.get_homedir().to_str().unwrap());
+    let home_path_bob = String::from(ctx_bob.get_homedir().to_str().unwrap());
+
+
+    let ctx_ca = make_context!();
+
+    let home_path_ca = String::from(ctx_ca.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path_ca);
+
+    // ---- init OpenPGP CA key ----
+    let ca = ca::Ca::new(Some(&db));
+
+    // make new CA key
+    let res = ca.ca_new(&["ca@example.org"]);
+    assert!(res.is_ok());
+
+    let ca_key = ca.export_pubkey().unwrap();
+
+    // ---- import CA key from OpenPGP CA into GnuPG instances ----
+    gnupg::import(&ctx_alice, ca_key.as_bytes());
+    gnupg::import(&ctx_bob, ca_key.as_bytes());
+
+    // get Cert for CA
+    let ca_cert = ca.get_ca_cert();
+    assert!(ca_cert.is_ok());
+    let ca_cert = ca_cert.unwrap();
+
+    let ca_keyid = ca_cert.clone().keyid().to_hex();
+    println!("keyid {}", ca_keyid);
+
+
+    // create users in their respective GnuPG contexts
+    gnupg::create_user(&ctx_alice, "alice@example.org");
+    gnupg::create_user(&ctx_bob, "bob@example.org");
+
+
+    // create tsig for ca key in user GnuPG contexts
+    gnupg::tsign(&ctx_alice, &ca_keyid, 1, 2)
+        .expect("tsign alice failed");
+    gnupg::tsign(&ctx_bob, &ca_keyid, 1, 2)
+        .expect("tsign bob failed");
+
+
+    // export CA key from both contexts, import to CA
+    let alice_ca_key = gnupg::export(&ctx_alice, &"ca@example.org");
+    let bob_ca_key = gnupg::export(&ctx_bob, &"ca@example.org");
+
+    let alice_ca_file = format!("{}/ca.key.alice", home_path_alice);
+    let bob_ca_file = format!("{}/ca.key.bob", home_path_bob);
+
+    std::fs::write(&alice_ca_file, alice_ca_key).expect("Unable to write file");
+    std::fs::write(&bob_ca_file, bob_ca_key).expect("Unable to write file");
+
+    ca.import_tsig(&alice_ca_file)
+        .expect("import CA tsig from Alice failed");
+    ca.import_tsig(&bob_ca_file)
+        .expect("import CA tsig from Bob failed");
+
+
+    // export alice + bob from their contexts
+    let alice_file = format!("{}/alice.key", home_path_alice);
+
+    let alice_key = gnupg::export(&ctx_alice, &"alice@example.org");
+    std::fs::write(&alice_file, alice_key).expect("Unable to write file");
+
+    // - bob
+    let bob_file = format!("{}/bob.key", home_path_bob);
+
+    let bob_key = gnupg::export(&ctx_bob, &"bob@example.org");
+    std::fs::write(&bob_file, bob_key).expect("Unable to write file");
+
+
+    // import alice + bob keys into CA
+    ca.user_import(Some("Alice"), Some(&vec!["alice@example.org"]),
+                   &alice_file, None)
+        .expect("import Alice to CA failed");
+
+    ca.user_import(Some("Bob"), Some(&vec!["bob@example.org"]),
+                   &bob_file, None)
+        .expect("import Bob to CA failed");
+
+
+    // export bob, CA-key from CA
+    let ca_key = ca.export_pubkey().unwrap();
+    let bob = ca.get_user(&"bob@example.org").unwrap().unwrap();
+
+    // import bob+CA key into alice's GnuPG context
+    gnupg::import(&ctx_alice, ca_key.as_bytes());
+    gnupg::import(&ctx_alice, bob.pub_key.as_bytes());
+
+    // ---- set "ultimate" ownertrust for alice ----
+    let res = gnupg::edit_trust(&ctx_alice, "alice", 5);
+
+    assert!(res.is_ok());
+
+    // ---- read calculated "trust" per uid from GnuPG ----
+    let gpg_trust = gnupg::list_keys(&ctx_alice).unwrap();
 
     assert_eq!(gpg_trust.len(), 3);
 

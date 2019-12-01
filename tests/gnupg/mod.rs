@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
+use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;
+use std::process::ChildStdout;
 
 use failure::Fail;
 use rexpect;
@@ -279,6 +281,24 @@ pub fn import(ctx: &Context, what: &[u8]) {
     assert!(status.success());
 }
 
+pub fn export(ctx: &Context, search: &str) -> String {
+    let mut out = String::new();
+
+    let mut gpg = Command::new("gpg")
+        .stdout(Stdio::piped())
+        .arg("--homedir").arg(ctx.directory("homedir").unwrap())
+        .arg("--armor")
+        .arg("--export")
+        .arg(search)
+        .spawn()
+        .expect("failed to start gpg");
+    let status = gpg.wait().unwrap();
+    gpg.stdout.as_mut().unwrap().read_to_string(&mut out).unwrap();
+    assert!(status.success());
+
+    out
+}
+
 pub fn list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
     let res = list_keys_raw(&ctx).unwrap();
 
@@ -327,6 +347,48 @@ pub fn edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Result<()> {
     p.send_line("y").unwrap();
     p.exp_string("gpg>").unwrap();
     p.send_line("quit").unwrap();
+    p.exp_eof().unwrap();
+
+    Ok(())
+}
+
+
+pub fn create_user(ctx: &Context, user_id: &str) {
+    let mut gpg = Command::new("gpg")
+        .stdin(Stdio::piped())
+        .arg("--homedir").arg(ctx.directory("homedir").unwrap())
+        .arg("--quick-generate-key")
+        .arg("--batch")
+        .arg("--passphrase").arg("")
+        .arg(user_id.to_string())
+        .spawn()
+        .expect("failed to start gpg");
+    let status = gpg.wait().unwrap();
+    assert!(status.success());
+}
+
+pub fn tsign(ctx: &Context, user_id: &str, level: u8, trust: u8) -> Result<()> {
+    let homedir = String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
+
+    let cmd = format!("gpg --homedir {} --edit-key {}",
+                      homedir,
+                      user_id);
+
+    let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
+    p.exp_string("gpg>").unwrap();
+    p.send_line("tsign").unwrap();
+    p.exp_string("Your selection?").unwrap();
+    p.send_line(&format!("{}", trust)).unwrap();
+    p.exp_string("Your selection?").unwrap();
+    p.send_line(&format!("{}", level)).unwrap();
+    p.exp_string("Your selection?").unwrap();
+    p.send_line(("")).unwrap(); // domain
+    p.exp_string("Really sign? (y/N)").unwrap();
+    p.send_line(("y")).unwrap();
+    p.exp_string("gpg>").unwrap();
+    p.send_line("quit").unwrap();
+    p.exp_string("Save changes? (y/N)").unwrap();
+    p.send_line(("y")).unwrap();
     p.exp_eof().unwrap();
 
     Ok(())
