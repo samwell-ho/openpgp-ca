@@ -36,11 +36,8 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 pub struct Pgp {}
 
 impl Pgp {
-    /// Generate an encryption- and signing-capable key.
-    fn make_cert(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
-
-        // FIXME: ca key should not be encryption capable
-
+    /// Generate an encryption- and signing-capable key for a user.
+    fn make_user_cert(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
         let mut builder = cert::CertBuilder::new();
 
         // FIXME: users should have subkeys, but that hits
@@ -59,14 +56,31 @@ impl Pgp {
         Ok(builder.generate()?)
     }
 
+    /// Generate a key for the CA.
+    fn make_ca_cert(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
+
+        // FIXME: ca key should not be encryption capable
+
+        let mut builder = cert::CertBuilder::new();
+
+        if let Some(emails) = emails {
+            for &email in emails {
+                builder = builder.add_userid(UserID::from(email));
+            }
+        }
+
+        Ok(builder.generate()?)
+    }
+
+
     /// make a private CA key
     pub fn make_private_ca_cert(ca_uids: &[&str]) -> Result<(Cert, Signature)> {
-        Pgp::make_cert(Some(&ca_uids.to_vec()))
+        Pgp::make_ca_cert(Some(&ca_uids.to_vec()))
     }
 
     /// make a user Cert with "emails" as UIDs (all UIDs get signed)
     pub fn make_user(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
-        Pgp::make_cert(emails)
+        Pgp::make_user_cert(emails)
     }
 
     /// make a "public key" ascii-armored representation of a Cert
