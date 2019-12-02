@@ -6,7 +6,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;
-use std::process::ChildStdout;
 
 use failure::Fail;
 use rexpect;
@@ -382,13 +381,13 @@ pub fn tsign(ctx: &Context, user_id: &str, level: u8, trust: u8) -> Result<()> {
     p.exp_string("Your selection?").unwrap();
     p.send_line(&format!("{}", level)).unwrap();
     p.exp_string("Your selection?").unwrap();
-    p.send_line(("")).unwrap(); // domain
+    p.send_line("").unwrap(); // domain
     p.exp_string("Really sign? (y/N)").unwrap();
-    p.send_line(("y")).unwrap();
+    p.send_line("y").unwrap();
     p.exp_string("gpg>").unwrap();
     p.send_line("quit").unwrap();
     p.exp_string("Save changes? (y/N)").unwrap();
-    p.send_line(("y")).unwrap();
+    p.send_line("y").unwrap();
     p.exp_eof().unwrap();
 
     Ok(())

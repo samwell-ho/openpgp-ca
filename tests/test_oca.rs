@@ -1,6 +1,3 @@
-use openpgp::serialize::Serialize;
-use sequoia_openpgp as openpgp;
-
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp;
 
