@@ -105,11 +105,13 @@ impl Pgp {
 
         let mut buf = std::io::Cursor::new(vec![]);
         {
+            let rev = Packet::Signature(sig.clone());
+
             let mut writer =
                 armor::Writer::new(&mut buf,
                                    armor::Kind::Signature,
                                    &[][..]).unwrap();
-            sig.serialize(&mut writer)?;
+            rev.serialize(&mut writer)?;
         }
 
         Ok(String::from_utf8(buf.get_ref().to_vec())?.to_string())
