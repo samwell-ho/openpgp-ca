@@ -142,8 +142,6 @@ impl Ca {
     pub fn user_new(&mut self, name: Option<&str>, emails: Option<&[&str]>) -> Result<()> {
         let ca_cert = self.get_ca_cert().unwrap();
 
-        println!("new user: uids {:?}", emails);
-
         // make user key (signed by CA)
         let (user, revoc) =
             Pgp::make_user(emails).context("make_user failed")?;
@@ -152,14 +150,11 @@ impl Ca {
         let certified =
             Pgp::sign_user(&ca_cert, &user).context("sign_user failed")?;
 
-        println!("=== user_cert certified {:#?}\n", certified);
-
         // user tsigns CA key
         let tsigned_ca =
             Pgp::tsign_ca(&ca_cert, &user).context("failed: user tsigns CA")?;
 
         let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
-        println!("updated armored CA key: {}", tsigned_ca_armored);
 
         // now write new data to DB
         let mut ca_db = self.db.get_ca().context("Couldn't \
@@ -173,7 +168,7 @@ impl Ca {
         // FIXME: the private key needs to be handed over to
         // the user -> print for now?
         let priv_key = &Pgp::priv_cert_to_armored(&certified)?;
-        println!("secret user key:\n{}", priv_key);
+        println!("new user key:\n{}", priv_key);
         // --
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
