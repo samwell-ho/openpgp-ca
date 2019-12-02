@@ -204,23 +204,7 @@ impl Ca {
             };
 
         // load revocation certificate
-        let mut revoc_cert = None;
-
-        if let Some(filename) = revoc_file {
-            // handle optional revocation cert
-
-            let pile = openpgp::PacketPile::from_file(filename)
-                .expect("Failed to read revocation cert");
-
-            assert_eq!(pile.clone().into_children().len(), 1,
-                       "expected exactly one packet in revocation cert");
-
-            if let Packet::Signature(s) = pile.into_children().next().unwrap() {
-                // FIXME: check if this Signature fits with the cert?
-
-                revoc_cert = Some(Pgp::sig_to_armored(&s)?);
-            }
-        };
+        let revoc_cert = Self::load_revocation_cert(revoc_file)?;
 
         // put in DB
         let ca_db = self.db.get_ca().context("Couldn't find CA")?
@@ -234,6 +218,41 @@ impl Ca {
         for email in emails.unwrap() {
             let new_email = models::NewEmail { addr: email, user_id };
             self.db.insert_email(new_email)?;
+        }
+
+        Ok(())
+    }
+
+    fn load_revocation_cert(revoc_file: Option<&str>)
+                            -> Result<Option<String>> {
+        if let Some(filename) = revoc_file {
+            // handle optional revocation cert
+
+            let pile = openpgp::PacketPile::from_file(filename)
+                .expect("Failed to read revocation cert");
+
+            assert_eq!(pile.clone().into_children().len(), 1,
+                       "expected exactly one packet in revocation cert");
+
+            if let Packet::Signature(s) = pile.into_children().next().unwrap() {
+                // FIXME: check if this Signature fits with the cert?
+
+                return Ok(Some(Pgp::sig_to_armored(&s)?));
+            }
+        };
+        Ok(None)
+    }
+
+    pub fn update_revocation(&self, email: &str, revoc_file: &str)
+                             -> Result<()> {
+        let revoc_cert = Self::load_revocation_cert(Some(revoc_file))?;
+        if revoc_cert.is_some() {
+            if let Some(mut user) = self.get_user(email)? {
+                // FIXME: check if revoc cert fits to user
+                user.revoc_cert = revoc_cert;
+
+                self.db.update_user(&user)?;
+            }
         }
 
         Ok(())

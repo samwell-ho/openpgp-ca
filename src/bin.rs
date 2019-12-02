@@ -104,6 +104,16 @@ fn real_main() -> Result<()> {
                         _ => unimplemented!(),
                     }
                 }
+                ("update-revocation", Some(m2)) => {
+                    if let Some(email) = m2.values_of("email") {
+                        let email = email.into_iter().next().unwrap();
+
+                        let revocation_file =
+                            m2.value_of("revocation-file").unwrap();
+
+                        ca.update_revocation(email, revocation_file)?;
+                    }
+                }
                 ("export", Some(m2)) => {
                     match m2.values_of("email") {
                         Some(email) => {

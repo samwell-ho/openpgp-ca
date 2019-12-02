@@ -144,6 +144,15 @@ impl Db {
         }
     }
 
+    pub fn update_user(&self, user: &models::User) -> Result<()> {
+        diesel::update(users::table)
+            .set(user)
+            .execute(&self.conn)
+            .context("Error updating User")?;
+
+        Ok(())
+    }
+
     pub fn list_users(&self) -> Result<Vec<User>> {
         Ok(users::table
             .load::<User>(&self.conn)

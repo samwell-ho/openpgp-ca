@@ -116,6 +116,23 @@ subcommands:
                   multiple: false
                   long: email
                   help: Email address
+        - update-revocation:
+            about: Update Revocation Key
+            args:
+              - email:
+                  takes_value: true
+                  short: e
+                  long: email
+                  required: true
+                  multiple: false
+                  help: Email address
+              - revocation-file:
+                  takes_value: true
+                  short: r
+                  long: revocation_file
+                  required: true
+                  multiple: false
+                  help: File that contains the User's revocation cert
         - list:
             about: List Users
   - bridge:
