@@ -106,8 +106,16 @@ subcommands:
                   short: e
                   long: email
                   help: Email address
-        - revoke:
-            about: Revoke Key
+        - revocation:
+            about: Show Revocation Key (if available)
+            args:
+              - email:
+                  takes_value: true
+                  short: e
+                  required: true
+                  multiple: false
+                  long: email
+                  help: Email address
         - list:
             about: List Users
   - bridge:

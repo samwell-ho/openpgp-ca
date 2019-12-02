@@ -122,6 +122,15 @@ fn real_main() -> Result<()> {
                         }
                     }
                 }
+                ("revocation", Some(m2)) => {
+                    if let Some(email) = m2.values_of("email") {
+                        let email = email.into_iter().next().unwrap();
+
+                        if let Some(user) = ca.get_user(email)? {
+                            println!("{}", user.revoc_cert.unwrap());
+                        }
+                    }
+                }
                 ("list", Some(_m2)) => {
                     ca.list_users()?;
                 }
