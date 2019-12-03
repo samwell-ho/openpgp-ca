@@ -16,16 +16,14 @@
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
 use failure::{self, ResultExt};
-
-use sequoia_openpgp as openpgp;
-
 use openpgp::Cert;
 use openpgp::Packet;
 use openpgp::parse::Parse;
+use sequoia_openpgp as openpgp;
 
 use crate::db::Db;
-use crate::pgp::Pgp;
 use crate::models;
+use crate::pgp::Pgp;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -204,7 +202,11 @@ impl Ca {
             };
 
         // load revocation certificate
-        let revoc_cert = Self::load_revocation_cert(revoc_file)?;
+        let revoc_cert = match Pgp::load_revocation_cert(revoc_file) {
+            Ok(rev) => Some(Pgp::sig_to_armored(&rev)?),
+            _ => None
+        };
+
 
         // put in DB
         let ca_db = self.db.get_ca().context("Couldn't find CA")?
@@ -223,33 +225,16 @@ impl Ca {
         Ok(())
     }
 
-    fn load_revocation_cert(revoc_file: Option<&str>)
-                            -> Result<Option<String>> {
-        if let Some(filename) = revoc_file {
-            // handle optional revocation cert
-
-            let pile = openpgp::PacketPile::from_file(filename)
-                .expect("Failed to read revocation cert");
-
-            assert_eq!(pile.clone().into_children().len(), 1,
-                       "expected exactly one packet in revocation cert");
-
-            if let Packet::Signature(s) = pile.into_children().next().unwrap() {
-                // FIXME: check if this Signature fits with the cert?
-
-                return Ok(Some(Pgp::sig_to_armored(&s)?));
-            }
-        };
-        Ok(None)
-    }
-
     pub fn update_revocation(&self, email: &str, revoc_file: &str)
                              -> Result<()> {
-        let revoc_cert = Self::load_revocation_cert(Some(revoc_file))?;
-        if revoc_cert.is_some() {
+        let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file));
+        if revoc_cert.is_ok() {
             if let Some(mut user) = self.get_user(email)? {
-                // FIXME: check if revoc cert fits to user
-                user.revoc_cert = revoc_cert;
+                // FIXME: check if revoc cert fits to user / key
+                let armored = Pgp::sig_to_armored(&revoc_cert.unwrap());
+                if armored.is_ok() {
+                    user.revoc_cert = armored.ok();
+                }
 
                 self.db.update_user(&user)?;
             }

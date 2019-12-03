@@ -112,6 +112,27 @@ impl Pgp {
         Cert::from_bytes(armored.as_bytes()).unwrap()
     }
 
+
+    /// Load Revocation Cert from file
+    pub fn load_revocation_cert(revoc_file: Option<&str>) -> Result<Signature> {
+        if let Some(filename) = revoc_file {
+            // handle optional revocation cert
+
+            let pile = openpgp::PacketPile::from_file(filename)
+                .expect("Failed to read revocation cert");
+
+            assert_eq!(pile.clone().into_children().len(), 1,
+                       "expected exactly one packet in revocation cert");
+
+            if let Packet::Signature(s) = pile.into_children().next().unwrap() {
+                // FIXME: check if this Signature fits with the cert?
+
+                return Ok(s);
+            }
+        };
+        Err(failure::err_msg("Couldn't load Signature from file"))
+    }
+
     /// make an ascii-armored representation of a Signature
     pub fn sig_to_armored(sig: &Signature) -> Result<String> {
         // maybe use:
