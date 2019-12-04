@@ -30,6 +30,7 @@ use openpgp::serialize::Serialize;
 use openpgp::cert;
 
 use failure::{self, ResultExt};
+use sequoia_openpgp::{KeyHandle, Fingerprint};
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -125,12 +126,28 @@ impl Pgp {
                        "expected exactly one packet in revocation cert");
 
             if let Packet::Signature(s) = pile.into_children().next().unwrap() {
-                // FIXME: check if this Signature fits with the cert?
-
                 return Ok(s);
             }
         };
         Err(failure::err_msg("Couldn't load Signature from file"))
+    }
+
+    pub fn get_revoc_fingerprint(revoc_cert: &Signature) -> Fingerprint {
+        let keyhandles = revoc_cert.get_issuers();
+        let sig_fingerprints: Vec<_> = keyhandles.iter()
+            .map(|keyhandle|
+                if let KeyHandle::Fingerprint(fp) = keyhandle {
+                    Some(fp)
+                } else {
+                    None
+                })
+            .filter(|fp| fp.is_some())
+            .map(|fp| fp.unwrap())
+            .collect();
+
+        assert_eq!(sig_fingerprints.len(), 1,
+                   "expected exactly one Fingerprint in revocation cert");
+        sig_fingerprints[0].clone()
     }
 
     /// make an ascii-armored representation of a Signature

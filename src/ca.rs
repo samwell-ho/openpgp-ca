@@ -228,16 +228,30 @@ impl Ca {
     pub fn update_revocation(&self, email: &str, revoc_file: &str)
                              -> Result<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file));
-        if revoc_cert.is_ok() {
+        if let Ok(revoc_cert) = revoc_cert {
             if let Some(mut user) = self.get_user(email)? {
-                // FIXME: check if revoc cert fits to user / key
-                let armored = Pgp::sig_to_armored(&revoc_cert.unwrap());
+                let user_cert = Pgp::armored_to_cert(&user.pub_key);
+
+                // check if revoc fingerprint matches cert fingerprint
+                let cert_fingerprint = user_cert.fingerprint();
+
+                let sig_fingerprint = Pgp::get_revoc_fingerprint(&revoc_cert);
+
+                if sig_fingerprint != cert_fingerprint {
+                    return Err(failure::err_msg(
+                        "revocation cert fingerprint doesn't match user key"));
+                }
+
+                // update sig in DB
+                let armored = Pgp::sig_to_armored(&revoc_cert);
                 if armored.is_ok() {
                     user.revoc_cert = armored.ok();
                 }
 
                 self.db.update_user(&user)?;
             }
+        } else {
+            return Err(failure::err_msg("Couldn't load revoc cert"));
         }
 
         Ok(())
