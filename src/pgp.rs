@@ -59,9 +59,6 @@ impl Pgp {
 
     /// Generate a key for the CA.
     fn make_ca_cert(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
-
-        // FIXME: ca key should not be encryption capable
-
         let mut builder = cert::CertBuilder::new();
 
         if let Some(emails) = emails {
@@ -332,9 +329,9 @@ impl Pgp {
 
     /// get all valid, certification capable keys with secret key material
     fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair<UnspecifiedRole>>> {
-        let iter = cert.keys_valid().certification_capable().secret();
+        let keys = cert.keys_valid().certification_capable().secret();
 
-        Ok(iter.filter_map(|(_, _, key)|
+        Ok(keys.filter_map(|(_, _, key)|
             key.clone().mark_parts_secret()
                 .expect("mark_parts_secret failed")
                 .into_keypair().ok()
