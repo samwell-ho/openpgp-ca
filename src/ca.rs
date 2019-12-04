@@ -87,11 +87,11 @@ impl Ca {
 
     pub fn export_pubkey(&self) -> Result<String> {
         let ca = self.db.get_ca()
-            .expect("failed to load CA from database");
+            .context("failed to load CA from database")?;
 
         let cert = Pgp::armored_to_cert(&ca.unwrap().ca_key);
         let ca_pub = Pgp::cert_to_armored(&cert)
-            .expect("failed to transform CA key to armored pubkey");
+            .context("failed to transform CA key to armored pubkey")?;
 
         Ok(ca_pub)
     }
@@ -100,7 +100,7 @@ impl Ca {
         let ca_cert = self.get_ca_cert().unwrap();
 
         let ca_cert_imported = Cert::from_file(key_file)
-            .expect("Failed to read key");
+            .context("Failed to read key")?;
 
         // make sure the keys have the same KeyID
         if ca_cert.keyid() != ca_cert_imported.keyid() {
@@ -120,17 +120,18 @@ impl Ca {
         tsigs.iter().for_each(|&s| packets.push(s.clone().into()));
 
         let signed = ca_cert.merge_packets(packets)
-            .expect("merging tsigs into CA Key failed");
+            .context("merging tsigs into CA Key failed")?;
 
         // update in DB
-        let mut ca = self.db.get_ca()?
-            .expect("failed to load CA from database");
+        let mut ca = self.db.get_ca()
+            .context("failed to load CA from database")?
+            .unwrap();
 
         ca.ca_key = Pgp::priv_cert_to_armored(&signed)
-            .expect("failed to armor CA Cert");
+            .context("failed to armor CA Cert")?;
 
         self.db.update_ca(&ca)
-            .expect("Update of CA Key in DB failed");
+            .context("Update of CA Key in DB failed")?;
 
         Ok(())
     }
@@ -155,8 +156,8 @@ impl Ca {
         let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
 
         // now write new data to DB
-        let mut ca_db = self.db.get_ca().context("Couldn't \
-                find CA")?.unwrap();
+        let mut ca_db = self.db.get_ca()
+            .context("Couldn't find CA")?.unwrap();
 
         // store updated CA Cert in DB
         ca_db.ca_key = tsigned_ca_armored;
@@ -192,7 +193,7 @@ impl Ca {
         let ca_cert = self.get_ca_cert().unwrap();
 
         let user_cert = Cert::from_file(key_file)
-            .expect("Failed to read key");
+            .context("Failed to read key")?;
 
         // sign only the userids that have been specified
         let certified =
@@ -245,10 +246,9 @@ impl Ca {
             }
 
             // update sig in DB
-            let armored = Pgp::sig_to_armored(&revoc_cert);
-            if armored.is_ok() {
-                user.revoc_cert = armored.ok();
-            }
+            let armored = Pgp::sig_to_armored(&revoc_cert)
+                .context("couldn't armor revocation cert")?;
+            user.revoc_cert = Some(armored);
 
             self.db.update_user(&user)
                 .context("Failed to update User in DB")?;
@@ -284,7 +284,7 @@ impl Ca {
         let ca_cert = self.get_ca_cert().unwrap();
 
         let remote_ca_cert = Cert::from_file(key_file)
-            .expect("Failed to read key");
+            .context("Failed to read key")?;
 
         // expect exactly one userid in remote CA key (otherwise fail)
         assert_eq!(remote_ca_cert.userids().len(), 1,
