@@ -79,10 +79,11 @@ impl Ca {
         }
     }
 
-    pub fn show_cas(&self) {
+    pub fn show_cas(&self) -> Result<()> {
         let ca = self.db.get_ca()
-            .expect("failed to load CA from database");
+            .context("failed to load CA from database")?;
         println!("{:#?}", ca);
+        Ok(())
     }
 
     pub fn export_pubkey(&self) -> Result<String> {

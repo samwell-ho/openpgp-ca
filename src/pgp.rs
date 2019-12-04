@@ -120,7 +120,7 @@ impl Pgp {
             // handle optional revocation cert
 
             let pile = openpgp::PacketPile::from_file(filename)
-                .expect("Failed to read revocation cert");
+                .context("Failed to read revocation cert")?;
 
             assert_eq!(pile.clone().into_children().len(), 1,
                        "expected exactly one packet in revocation cert");

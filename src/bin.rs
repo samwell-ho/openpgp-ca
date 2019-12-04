@@ -50,7 +50,7 @@ fn real_main() -> Result<()> {
                     }
                 }
                 ("show", Some(_m2)) => {
-                    ca.show_cas();
+                    ca.show_cas()?;
                 }
                 ("export", Some(_m2)) => {
                     let ca_key = ca.export_pubkey()?;
