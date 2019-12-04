@@ -190,7 +190,7 @@ fn real_main() -> Result<()> {
 fn main() {
     if let Err(e) = real_main() {
         let mut cause = e.as_fail();
-        eprint!("{}", cause);
+        eprint!("ERROR: {}", cause);
         while let Some(c) = cause.cause() {
             eprint!(":\n  {}", c);
             cause = c;
