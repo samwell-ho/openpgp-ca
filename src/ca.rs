@@ -227,31 +227,31 @@ impl Ca {
 
     pub fn update_revocation(&self, email: &str, revoc_file: &str)
                              -> Result<()> {
-        let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file));
-        if let Ok(revoc_cert) = revoc_cert {
-            if let Some(mut user) = self.get_user(email)? {
-                let user_cert = Pgp::armored_to_cert(&user.pub_key);
+        let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
+            .context("Couldn't load revocation cert")?;
 
-                // check if revoc fingerprint matches cert fingerprint
-                let cert_fingerprint = user_cert.fingerprint();
+        if let Some(mut user) = self.get_user(email).
+            context("couldn't load User from DB")? {
+            let user_cert = Pgp::armored_to_cert(&user.pub_key);
 
-                let sig_fingerprint = Pgp::get_revoc_fingerprint(&revoc_cert);
+            // check if revoc fingerprint matches cert fingerprint
+            let cert_fingerprint = user_cert.fingerprint();
 
-                if sig_fingerprint != cert_fingerprint {
-                    return Err(failure::err_msg(
-                        "revocation cert fingerprint doesn't match user key"));
-                }
+            let sig_fingerprint = Pgp::get_revoc_fingerprint(&revoc_cert);
 
-                // update sig in DB
-                let armored = Pgp::sig_to_armored(&revoc_cert);
-                if armored.is_ok() {
-                    user.revoc_cert = armored.ok();
-                }
-
-                self.db.update_user(&user)?;
+            if sig_fingerprint != cert_fingerprint {
+                return Err(failure::err_msg(
+                    "revocation cert fingerprint doesn't match user key"));
             }
-        } else {
-            return Err(failure::err_msg("Couldn't load revoc cert"));
+
+            // update sig in DB
+            let armored = Pgp::sig_to_armored(&revoc_cert);
+            if armored.is_ok() {
+                user.revoc_cert = armored.ok();
+            }
+
+            self.db.update_user(&user)
+                .context("Failed to update User in DB")?;
         }
 
         Ok(())
