@@ -81,8 +81,9 @@ impl Ca {
 
     pub fn show_cas(&self) -> Result<()> {
         let ca = self.db.get_ca()
-            .context("failed to load CA from database")?;
-        println!("{:#?}", ca);
+            .context("failed to load CA from database")?.unwrap();
+        println!("\n{}\n\n{}\n\n{}",
+                 ca.email, ca.ca_key, ca.revoc_cert);
         Ok(())
     }
 
