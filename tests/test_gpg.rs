@@ -1,8 +1,3 @@
-use std::fs::File;
-use std::io::BufWriter;
-use std::thread::sleep;
-
-use failure::_core::time::Duration;
 use openpgp::serialize::Serialize;
 use sequoia_openpgp as openpgp;
 
