@@ -263,22 +263,14 @@ impl Ca {
         self.db.list_users()
     }
 
-    pub fn list_users(&self) -> Result<()> {
-        let users = self.get_users()?;
-        for user in users {
-            println!("#{} - Name: {:?}", user.id, user.name);
-
-            let emails = self.db.get_emails(user)?;
-            println!("  -> emails {:?}", emails);
-        }
-
-        Ok(())
-    }
-
     pub fn get_user(&self, email: &str) -> Result<Option<models::User>> {
         self.db.get_user(email)
     }
 
+    pub fn get_emails(&self, user: models::User)
+                      -> Result<Vec<models::Email>> {
+        self.db.get_emails(user)
+    }
     // -------- bridges
 
     pub fn bridge_new(&self, name: &str, key_file: &str,

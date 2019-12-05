@@ -23,6 +23,7 @@ use clap::load_yaml;
 use failure;
 
 use openpgp_ca_lib::ca;
+use openpgp_ca_lib::pgp::Pgp;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -142,7 +143,24 @@ fn real_main() -> Result<()> {
                     }
                 }
                 ("list", Some(_m2)) => {
-                    ca.list_users()?;
+                    let users = ca.get_users()?;
+
+                    for user in users {
+                        println!("{} (id {})",
+                                 user.name.clone()
+                                     .unwrap_or("<no name>".to_string()),
+                                 user.id);
+
+                        let cert = Pgp::armored_to_cert(&user.pub_key);
+
+                        for email in ca.get_emails(user)? {
+                            println!("- {}", email.addr);
+                        }
+
+                        let expiry = cert.primary_key_signature(None).unwrap()
+                            .key_expiration_time();
+                        println!("[expires: {:?}]\n", expiry);
+                    }
                 }
 
                 _ => unimplemented!(),
