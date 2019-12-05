@@ -168,15 +168,12 @@ impl Pgp {
 
     /// user tsigns CA key
     pub fn tsign_ca(ca_cert: &Cert, user: &Cert) -> Result<Cert> {
-        // FIXME
         let mut cert_keys = Self::get_cert_keys(&user)
             .context("filtered for unencrypted secret keys above")?;
 
         let mut sigs = Vec::new();
 
-        // FIXME: assert there is exactly one userid?
-
-        // create TSIG
+        // create a TSIG for each UserID
         for ca_uidb in ca_cert.userids() {
             for signer in &mut cert_keys {
                 let builder = Builder::new(SignatureType::GenericCertificate)
