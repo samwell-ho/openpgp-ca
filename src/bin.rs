@@ -159,8 +159,11 @@ fn real_main() -> Result<()> {
 
                         println!(" expires: {:?}", Pgp::get_expiry(&cert));
 
-                        let ca_sig = ca.check_ca_sig(user).unwrap();
-                        println!(" signed by CA: {}", ca_sig);
+                        let ca_sig = ca.check_ca_sig(&user).unwrap();
+                        println!(" user signed by CA: {}", ca_sig);
+
+                        let tsig_on_ca = ca.check_ca_has_tsig(&user).unwrap();
+                        println!(" user has tsigned CA: {}", tsig_on_ca);
 
                         println!();
                     }

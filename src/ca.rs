@@ -284,7 +284,7 @@ impl Ca {
         self.db.get_emails(user)
     }
 
-    pub fn check_ca_sig(&self, user: models::User) -> Result<bool> {
+    pub fn check_ca_sig(&self, user: &models::User) -> Result<bool> {
         let user_cert = Pgp::armored_to_cert(&user.pub_key);
         let sigs = Self::get_sigs(&user_cert);
 
@@ -294,6 +294,16 @@ impl Ca {
             .any(|&s| s.issuer_fingerprint().unwrap() == ca.fingerprint()))
     }
 
+    pub fn check_ca_has_tsig(&self, user: &models::User) -> Result<bool> {
+        let ca = self.get_ca_cert()?;
+        let tsigs = Self::get_tsigs(&ca);
+
+        let user_cert = Pgp::armored_to_cert(&user.pub_key);
+
+        Ok(tsigs.iter()
+            .any(|&t| t.issuer_fingerprint().unwrap()
+                == user_cert.fingerprint()))
+    }
 
     // -------- bridges
 
