@@ -31,6 +31,7 @@ use openpgp::cert;
 
 use failure::{self, ResultExt};
 use sequoia_openpgp::{KeyHandle, Fingerprint};
+use std::time::Duration;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -88,6 +89,10 @@ impl Pgp {
             .context("Cert serialize failed")?;
 
         Ok(String::from_utf8(v)?.to_string())
+    }
+
+    pub fn get_expiry(cert: &Cert) -> Option<Duration> {
+        cert.primary_key_signature(None).unwrap().key_expiration_time()
     }
 
     /// make a "private key" ascii-armored representation of a Cert

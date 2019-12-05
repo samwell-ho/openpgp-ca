@@ -24,6 +24,7 @@ use sequoia_openpgp as openpgp;
 use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
+use sequoia_openpgp::packet::Signature;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -98,6 +99,21 @@ impl Ca {
         Ok(ca_pub)
     }
 
+    /// get all tsig(s) in this Cert
+    fn get_tsigs(c: &Cert) -> Vec<&Signature> {
+        c.userids()
+            .flat_map(|b| b.certifications())
+            .filter(|&s| s.trust_signature().is_some())
+            .collect()
+    }
+
+    /// get all sig(s) in this Cert
+    fn get_sigs(c: &Cert) -> Vec<&Signature> {
+        c.userids()
+            .flat_map(|b| b.certifications())
+            .collect()
+    }
+
     pub fn import_tsig(&self, key_file: &str) -> Result<()> {
         let ca_cert = self.get_ca_cert().unwrap();
 
@@ -111,11 +127,7 @@ impl Ca {
         }
 
         // get the tsig(s) from import
-        let tsigs: Vec<_> = ca_cert_imported
-            .userids()
-            .flat_map(|b| b.certifications())
-            .filter(|&s| s.trust_signature().is_some())
-            .collect();
+        let tsigs = Self::get_tsigs(&ca_cert_imported);
 
         // add tsig(s) to our "own" version of the CA key
         let mut packets: Vec<Packet> = Vec::new();
@@ -267,10 +279,22 @@ impl Ca {
         self.db.get_user(email)
     }
 
-    pub fn get_emails(&self, user: models::User)
+    pub fn get_emails(&self, user: &models::User)
                       -> Result<Vec<models::Email>> {
         self.db.get_emails(user)
     }
+
+    pub fn check_ca_sig(&self, user: models::User) -> Result<bool> {
+        let user_cert = Pgp::armored_to_cert(&user.pub_key);
+        let sigs = Self::get_sigs(&user_cert);
+
+        let ca = self.get_ca_cert()?;
+
+        Ok(sigs.iter()
+            .any(|&s| s.issuer_fingerprint().unwrap() == ca.fingerprint()))
+    }
+
+
     // -------- bridges
 
     pub fn bridge_new(&self, name: &str, key_file: &str,

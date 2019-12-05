@@ -153,13 +153,16 @@ fn real_main() -> Result<()> {
 
                         let cert = Pgp::armored_to_cert(&user.pub_key);
 
-                        for email in ca.get_emails(user)? {
+                        for email in ca.get_emails(&user)? {
                             println!("- {}", email.addr);
                         }
 
-                        let expiry = cert.primary_key_signature(None).unwrap()
-                            .key_expiration_time();
-                        println!("[expires: {:?}]\n", expiry);
+                        println!(" expires: {:?}", Pgp::get_expiry(&cert));
+
+                        let ca_sig = ca.check_ca_sig(user).unwrap();
+                        println!(" signed by CA: {}", ca_sig);
+
+                        println!();
                     }
                 }
 

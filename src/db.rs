@@ -187,8 +187,8 @@ impl Db {
         }
     }
 
-    pub fn get_emails(&self, user: User) -> Result<Vec<Email>> {
-        Ok(Email::belonging_to(&user)
+    pub fn get_emails(&self, user: &User) -> Result<Vec<Email>> {
+        Ok(Email::belonging_to(user)
             .load::<Email>(&self.conn)
             .context("Error loading emails")?)
     }
