@@ -133,6 +133,13 @@ subcommands:
                   required: true
                   multiple: false
                   help: File that contains the User's revocation cert
+        - check:
+            about: Bulk checks on Users
+            subcommands:
+              - sigs:
+                  about: Check signatures and trust signatures on CA key
+              - expiry:
+                  about: Check user key expiry
         - list:
             about: List Users
   - bridge:

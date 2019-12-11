@@ -20,7 +20,7 @@ use std::process::exit;
 use clap::App;
 use clap::load_yaml;
 
-use failure;
+use failure::{self, ResultExt};
 
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
@@ -142,6 +142,33 @@ fn real_main() -> Result<()> {
                         }
                     }
                 }
+                ("check", Some(m)) => {
+                    match m.subcommand() {
+                        ("sigs", Some(_m2)) => {
+                            panic!("sigs");
+                            for user in ca.get_users()
+                                .context("couldn't load users")? {
+                                let ca_sig = ca.check_ca_sig(&user).
+                                    context("Failed while checking CA sig")?;
+                                if !ca_sig {
+                                    println!("missing signature by CA for \
+                                    user {:?}", user.name);
+                                }
+
+                                let tsig_on_ca = ca.check_ca_has_tsig(&user).
+                                    context("Failed while checking tsig on CA")?;
+                                if !tsig_on_ca {
+                                    println!("CA Cert has not been tsigned \
+                                    by user {:?}", user.name);
+                                }
+                            }
+                        }
+                        ("expiry", Some(_m2)) => {
+                            panic!("expiry");
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
                 ("list", Some(_m2)) => {
                     let users = ca.get_users()?;
 
@@ -159,10 +186,12 @@ fn real_main() -> Result<()> {
 
                         println!(" expires: {:?}", Pgp::get_expiry(&cert));
 
-                        let ca_sig = ca.check_ca_sig(&user).unwrap();
+                        let ca_sig = ca.check_ca_sig(&user).
+                            context("Failed while checking CA sig")?;
                         println!(" user signed by CA: {}", ca_sig);
 
-                        let tsig_on_ca = ca.check_ca_has_tsig(&user).unwrap();
+                        let tsig_on_ca = ca.check_ca_has_tsig(&user).
+                            context("Failed while checking tsig on CA")?;
                         println!(" user has tsigned CA: {}", tsig_on_ca);
 
                         println!();
