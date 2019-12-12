@@ -8,6 +8,35 @@ OpenPGP keys for users in their organization or in adjacent organizations.
 OpenPGP CA is built using https://gitlab.com/sequoia-pgp/sequoia
 
 
+## General operation
+
+### Database
+
+OpenPGP CA uses an sqlite database to keep all of its state.
+
+There are 3 ways of configuring while database file is user:
+
+1) the most common way is to set the ```OPENPGP_CA_DB``` environment variable
+2) the optional parameter "-d" overrides all other settings and sets the
+   database file
+3) a ```.env``` file can set the environment variable ```OPENPGP_CA_DB```
+   "in the style of the ruby dotenv gem"
+
+### Help
+
+The parameter "--help" will give information on any command level, e.g.
+
+```openpgp_ca --help```
+
+or 
+
+```openpgp_ca user --help```
+
+or
+
+```openpgp_ca user import --help```
+
+
 ## Usage examples:
 
 ```
