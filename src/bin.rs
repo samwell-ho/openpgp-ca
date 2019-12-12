@@ -145,7 +145,6 @@ fn real_main() -> Result<()> {
                 ("check", Some(m)) => {
                     match m.subcommand() {
                         ("sigs", Some(_m2)) => {
-                            panic!("sigs");
                             for user in ca.get_users()
                                 .context("couldn't load users")? {
                                 let ca_sig = ca.check_ca_sig(&user).
