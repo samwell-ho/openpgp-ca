@@ -71,10 +71,10 @@ subcommands:
                   short: n
                   long: name
                   help: Name
-              - key-profile:
-                  takes_value: true
-                  long: key_profile
-                  help: Key Profile
+#              - key-profile:
+#                  takes_value: true
+#                  long: key_profile
+#                  help: Key Profile
         - import:
             about: Import User (use existing Public Key)
             args:
