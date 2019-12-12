@@ -92,6 +92,7 @@ enter ```tsign```, ```2```, ```250```, no domain, ```y```
  trust signature on the CA key:
 
 ```openpgp_ca user import -n "Alice User" -e alice@example.org --key_file alice.pubkey -r alice-revocation.asc```
+
 ```openpgp_ca ca import-tsig --file ca-tsigned.pubkey```
 
 *  Check OpenPGP CA's user list:
