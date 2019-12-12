@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::env;
 use failure::{self, ResultExt};
 use diesel::prelude::*;
 use diesel::r2d2::{Pool, PooledConnection, ConnectionManager};
@@ -29,18 +28,6 @@ use crate::models::{Ca, User, Email, Bridge};
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
-fn get_db_url(database: Option<String>) -> Result<String> {
-    match database {
-        None => {
-            // load config from .env
-            dotenv::dotenv().ok();
-
-            Ok(env::var("OPENPGP_CA_DB")
-                .context("OPENPGP_CA_DB must be set either in environment or .env")?)
-        }
-        Some(db) => Ok(db.to_string())
-    }
-}
 
 // FIXME: or keep a Connection as lazy_static? or just make new Connections?!
 fn get_conn(database: Option<String>)
@@ -50,7 +37,7 @@ fn get_conn(database: Option<String>)
     // https://github.com/diesel-rs/diesel/issues/1822
 
     // setup DB
-    let database_url = get_db_url(database)?;
+    let database_url = database.expect("no database has been set");
 
     let manager = ConnectionManager::<SqliteConnection>::new(database_url);
     let pool = Pool::builder().build(manager).unwrap();

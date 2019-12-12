@@ -37,12 +37,20 @@ pub struct Ca {
 
 impl Ca {
     pub fn new(database: Option<&str>) -> Self {
-        let database = env::var("OPENPGP_CA_DB");
-        let database =
-            if database.is_ok() { Some(database.unwrap()) } else { None };
+        let db =
+            if database.is_some() {
+                Some(database.unwrap().to_string())
+            } else {
+                let database = env::var("OPENPGP_CA_DB");
+                if database.is_ok() { Some(database.unwrap()) } else {
+                    // load config from .env
+                    dotenv::dotenv().ok();
 
-        let db = Db::new(database);
+                    Some(env::var("OPENPGP_CA_DB").unwrap())
+                }
+            };
 
+        let db = Db::new(db);
         db.migrations();
 
         Ca { db }
