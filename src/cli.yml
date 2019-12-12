@@ -69,7 +69,7 @@ subcommands:
                   takes_value: true
                   short: n
                   long: name
-                  help: Name
+                  help: User Name
 #              - key-profile:
 #                  takes_value: true
 #                  long: key_profile
@@ -87,7 +87,7 @@ subcommands:
                   takes_value: true
                   short: n
                   long: name
-                  help: Name
+                  help: User Name
               - key-file:
                   takes_value: true
                   long: key_file
