@@ -59,7 +59,9 @@ or
 *  Set up a gpg test environment and import the CA public key:
 
 ```mkdir /tmp/test/```
+
 ```export GNUPGHOME=/tmp/test/```
+
 ```gpg --import ca.pubkey```
 
 *  create and export a keypair (and optionally a revocation certificate) for
