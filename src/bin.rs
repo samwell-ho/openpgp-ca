@@ -196,7 +196,8 @@ fn real_main() -> Result<()> {
 
                         let ca_sig = ca.check_ca_sig(&user).
                             context("Failed while checking CA sig")?;
-                        println!(" user signed by CA: {}", ca_sig);
+                        println!(" user key (or subkey) signed by CA: {}",
+                                 ca_sig);
 
                         let tsig_on_ca = ca.check_ca_has_tsig(&user).
                             context("Failed while checking tsig on CA")?;
