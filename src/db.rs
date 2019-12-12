@@ -29,20 +29,21 @@ use crate::models::{Ca, User, Email, Bridge};
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
-fn get_db_url(database: Option<&str>) -> Result<String> {
+fn get_db_url(database: Option<String>) -> Result<String> {
     match database {
         None => {
             // load config from .env
             dotenv::dotenv().ok();
 
-            Ok(env::var("DATABASE_URL").context("DATABASE_URL must be set")?)
+            Ok(env::var("OPENPGP_CA_DB")
+                .context("OPENPGP_CA_DB must be set either in environment or .env")?)
         }
         Some(db) => Ok(db.to_string())
     }
 }
 
 // FIXME: or keep a Connection as lazy_static? or just make new Connections?!
-fn get_conn(database: Option<&str>)
+fn get_conn(database: Option<String>)
             -> Result<PooledConnection<ConnectionManager<SqliteConnection>>> {
 
     // bulk insert doesn't currently work with sqlite and r2d2:
@@ -75,7 +76,7 @@ pub struct Db {
 }
 
 impl Db {
-    pub fn new(database: Option<&str>) -> Self {
+    pub fn new(database: Option<String>) -> Self {
         match get_conn(database) {
             Ok(conn) => Db { conn },
             _ => panic!("couldn't get database connection") // FIXME; ?!

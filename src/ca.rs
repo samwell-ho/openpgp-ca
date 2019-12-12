@@ -16,6 +16,9 @@
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
 use failure::{self, ResultExt};
+
+use std::env;
+
 use openpgp::Cert;
 use openpgp::Packet;
 use openpgp::parse::Parse;
@@ -34,6 +37,10 @@ pub struct Ca {
 
 impl Ca {
     pub fn new(database: Option<&str>) -> Self {
+        let database = env::var("OPENPGP_CA_DB");
+        let database =
+            if database.is_ok() { Some(database.unwrap()) } else { None };
+
         let db = Db::new(database);
 
         db.migrations();
