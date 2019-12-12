@@ -16,7 +16,6 @@
 # along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
 name: openpgp-ca
-version: "0.0.1"
 author: Heiko Schäfer <heiko@schaefer.name>
 about: openpgp-ca is a tool to manage OpenPGP setups
 settings:

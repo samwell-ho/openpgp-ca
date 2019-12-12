@@ -19,6 +19,7 @@ use std::process::exit;
 
 use clap::App;
 use clap::load_yaml;
+use clap::crate_version;
 
 use failure::{self, ResultExt};
 
@@ -29,7 +30,9 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 fn real_main() -> Result<()> {
     let yaml = load_yaml!("cli.yml");
-    let matches = App::from_yaml(yaml).get_matches();
+    let app = App::from_yaml(yaml).version(crate_version!());
+
+    let matches = app.get_matches();
 
     let db = matches.value_of("database");
 
