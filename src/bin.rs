@@ -47,7 +47,7 @@ fn real_main() -> Result<()> {
                             let emails = email.into_iter().collect::<Vec<_>>();
                             ca.ca_new(&emails)?;
                         }
-                        _ => unimplemented!(),
+                        _ => unimplemented!("missing email"),
                     }
                 }
                 ("show", Some(_m2)) => {
@@ -164,7 +164,13 @@ fn real_main() -> Result<()> {
                             }
                         }
                         ("expiry", Some(_m2)) => {
-                            panic!("expiry");
+                            // FIXME: use "days" argument
+
+                            for user in ca.get_users()
+                                .context("couldn't load users")? {
+                                let cert = Pgp::armored_to_cert(&user.pub_key);
+                                println!(" expires: {:?}", Pgp::get_expiry(&cert));
+                            }
                         }
                         _ => unimplemented!(),
                     }
@@ -198,7 +204,7 @@ fn real_main() -> Result<()> {
                     }
                 }
 
-                _ => unimplemented!(),
+                _ => unimplemented!("unexpected/missing subcommand"),
             }
         }
         ("bridge", Some(m)) => {

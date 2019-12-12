@@ -140,6 +140,14 @@ subcommands:
                   about: Check signatures and trust signatures on CA key
               - expiry:
                   about: Check user key expiry
+                  args:
+                    - days:
+                        takes_value: true
+                        short: d
+                        long: days
+                        required: false
+                        multiple: false
+                        help: Check for keys that expire within "days" days
         - list:
             about: List Users
   - bridge:
