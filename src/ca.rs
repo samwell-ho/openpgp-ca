@@ -122,10 +122,12 @@ impl Ca {
             .collect()
     }
 
-    /// get all sig(s) in this Cert
+    /// get all sig(s) in this Cert (including subkeys)
+    /// FIXME: is this what we want?
     fn get_sigs(c: &Cert) -> Vec<&Signature> {
         c.userids()
             .flat_map(|b| b.certifications())
+            .chain(c.subkeys().flat_map(|s| s.certifications()))
             .collect()
     }
 
