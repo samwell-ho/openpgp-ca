@@ -48,7 +48,7 @@ or
 
 *  Set up a new CA instance and generate a new keypair for the CA:
 
-```openpgp_ca ca new ca@example.org``` 
+```openpgp_ca ca new openpgp-ca@example.org``` 
 
 *  Export the CA public key, for use on client machines:
 
@@ -75,13 +75,13 @@ or
 
 *  tsign the CA public key with this key:
 
-```gpg --edit-key ca@example.org```
+```gpg --edit-key openpgp-ca@example.org```
 
 enter ```tsign```, ```2```, ```250```, no domain, ```y```
 
 *  export the signed CA public key:
 
-```gpg --export --armor ca@example.org > ca-tsigned.pubkey```
+```gpg --export --armor openpgp-ca@example.org > ca-tsigned.pubkey```
 
 ### (3) OpenPGP CA: import newly created user
 
@@ -117,7 +117,7 @@ This should show that Alice's key has been signed by the CA and that Alice
 
 *  Set up a new CA instance and generate a new keypair for the CA:
 
-```openpgp_ca ca new ca@example.org``` 
+```openpgp_ca ca new openpgp-ca@example.org``` 
 
 ### (2) OpenPGP CA: Create new user
 
@@ -165,8 +165,8 @@ Then ```trust```, ```5```, ```quit```.
 ## Some random usage examples:
 
 ```
-cargo run ca new openpgp_ca@example.org
-cargo run -- -d /tmp/foo.sqlite ca new openpgp_ca@example.org
+cargo run ca new openpgp-ca@example.org
+cargo run -- -d /tmp/foo.sqlite ca new openpgp-ca@example.org
 
 cargo run user add -e alice@example.org -e a@example.org -n Alicia
 cargo run user add -e bob@example.org
