@@ -102,7 +102,7 @@ enter `tsign`, `2`, `250`, no domain, `y`
 *  In OpenPGP CA, import Alice's key and revocation certificate - and Alice's
  trust signature on the CA key:
 
-`openpgp_ca user import -n "Alice User" -e alice@example.org --key_file alice.pubkey --revocation_file alice-revocation.asc`
+`openpgp_ca user import -n "Alice User" -e alice@example.org --key-file alice.pubkey --revocation-file alice-revocation.asc`
 
 `openpgp_ca ca import-tsig --file ca-tsigned.pubkey`
 
@@ -182,9 +182,9 @@ cargo run -- -d /tmp/foo.sqlite ca new openpgp-ca@example.org
 cargo run user add -e alice@example.org -e a@example.org -n Alicia
 cargo run user add -e bob@example.org
 
-cargo run user import -e heiko@example.org -n Heiko --key_file ~/heiko.pubkey
-cargo run user import -e heiko@example.org -n Heiko --key_file _test_data/pubkey.asc --revocation_file _test_data/revoke.asc
+cargo run user import -e heiko@example.org -n Heiko --key-file ~/heiko.pubkey
+cargo run user import -e heiko@example.org -n Heiko --key-file _test_data/pubkey.asc --revocation-file _test_data/revoke.asc
 
-cargo run bridge new -r "*@foo.de" --remote_key_file /tmp/bar.txt --name foobridge
+cargo run bridge new -r "*@foo.de" --remote-key-file /tmp/bar.txt --name foobridge
 cargo run bridge revoke --name foobridge
 ```

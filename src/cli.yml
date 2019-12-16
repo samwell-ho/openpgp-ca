@@ -72,7 +72,7 @@ subcommands:
                   help: User Name
 #              - key-profile:
 #                  takes_value: true
-#                  long: key_profile
+#                  long: key-profile
 #                  help: Key Profile
         - import:
             about: Import User (use existing Public Key)
@@ -90,12 +90,12 @@ subcommands:
                   help: User Name
               - key-file:
                   takes_value: true
-                  long: key_file
+                  long: key-file
                   help: File that contains the User's Public Key
               - revocation-file:
                   takes_value: true
                   short: r
-                  long: revocation_file
+                  long: revocation-file
                   help: File that contains the User's revocation cert
         - export:
             about: Export User Public Key (bulk, if no email address is given)
@@ -128,7 +128,7 @@ subcommands:
               - revocation-file:
                   takes_value: true
                   short: r
-                  long: revocation_file
+                  long: revocation-file
                   required: true
                   multiple: false
                   help: File that contains the User's revocation cert
@@ -168,7 +168,7 @@ subcommands:
                   help: Regex
               - remote-key-file:
                   takes_value: true
-                  long: remote_key_file
+                  long: remote-key-file
                   help: File that contains the remote CA's Public Key
         - revoke:
             about: Revoke Bridge
