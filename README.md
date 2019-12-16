@@ -84,11 +84,13 @@ or
 
 `gpg --gen-revoke alice@example.org > alice-revocation.asc`
 
+Alternatively, if your `gpg` generated a revocation certificate automagically (usually in `$GNUPGHOME/openpgp-revocs.d/<key_fingerprint>.rev`), you can use that, but remember to edit the file and remove the "`:`" at the beginning of the "`BEGIN PGP PUBLIC KEY BLOCK`" line.
+
 *  tsign the CA public key with this key:
 
 `gpg --edit-key openpgp-ca@example.org`
 
-enter `tsign`, `2`, `250`, no domain, `y`
+enter `tsign`, `2`, `250`, no domain (so just hit `Enter`), `y`, `save`.
 
 *  export the signed CA public key:
 
@@ -96,7 +98,7 @@ enter `tsign`, `2`, `250`, no domain, `y`
 
 ### (3) OpenPGP CA: import newly created user
 
-*  copy the files `ca-signed.pubkey`, `alice.pubkey` and
+*  copy the files `ca-tsigned.pubkey`, `alice.pubkey` and
  `alice-revocation.asc` so they are accessible for OpenPGP CA 
 
 *  In OpenPGP CA, import Alice's key and revocation certificate - and Alice's
