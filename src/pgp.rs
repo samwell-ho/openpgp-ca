@@ -181,7 +181,7 @@ impl Pgp {
         // create a TSIG for each UserID
         for ca_uidb in ca_cert.userids() {
             for signer in &mut cert_keys {
-                let builder = Builder::new(SignatureType::GenericCertificate)
+                let builder = Builder::new(SignatureType::GenericCertification)
                     .set_trust_signature(255, 120)?;
 
 
@@ -222,7 +222,7 @@ impl Pgp {
         if let Some(regexes) = regexes {
             for &regex in regexes {
                 for signer in &mut cert_keys {
-                    let tsig = Builder::new(SignatureType::GenericCertificate)
+                    let tsig = Builder::new(SignatureType::GenericCertification)
                         .set_trust_signature(255, 120)?
                         .set_regular_expression(regex.as_bytes())?
                         .sign_userid_binding(signer,
@@ -313,7 +313,7 @@ impl Pgp {
                     // certify this userid
                     let cert = userid.certify(signer,
                                               &user_cert,
-                                              SignatureType::PositiveCertificate,
+                                              SignatureType::PositiveCertification,
                                               None, None)?;
 
                     packets.push(cert.into());
@@ -330,8 +330,8 @@ impl Pgp {
     }
 
     /// get all valid, certification capable keys with secret key material
-    fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair<UnspecifiedRole>>> {
-        let keys = cert.keys_valid().certification_capable().secret();
+    fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair>> {
+        let keys = cert.keys_valid().for_certification().secret();
 
         Ok(keys.filter_map(|(_, _, key)|
             key.clone().mark_parts_secret()
