@@ -23,7 +23,6 @@ use openpgp::armor;
 use openpgp::types::{SignatureType, ReasonForRevocation};
 use openpgp::crypto::KeyPair;
 use openpgp::packet::{Signature, UserID};
-use openpgp::packet::key::UnspecifiedRole;
 use openpgp::packet::signature::Builder;
 use openpgp::parse::Parse;
 use openpgp::serialize::Serialize;
