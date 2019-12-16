@@ -61,6 +61,9 @@ impl Pgp {
     fn make_ca_cert(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
         let mut builder = cert::CertBuilder::new();
 
+        // FIXME: should not be encryption capable
+        // FIXME: should not have subkeys
+
         if let Some(emails) = emails {
             for &email in emails {
                 builder = builder.add_userid(UserID::from(email));
