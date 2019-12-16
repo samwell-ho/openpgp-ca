@@ -141,7 +141,13 @@ fn real_main() -> Result<()> {
                         let email = email.into_iter().next().unwrap();
 
                         if let Some(user) = ca.get_user(email)? {
-                            println!("{}", user.revoc_cert.unwrap());
+                            if user.revoc_cert.is_some() {
+                                println!("{}", user.revoc_cert.unwrap());
+                            } else {
+                                println!("no revocation cert available");
+                            }
+                        } else {
+                            println!("User not found");
                         }
                     }
                 }
