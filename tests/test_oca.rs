@@ -32,13 +32,9 @@ fn test_ca() {
     assert!(res.is_ok());
 
     let users = ca.get_users();
+    let users = users.unwrap();
 
-    println!("===================================================");
-
-    for user in users.unwrap() {
-        println!("user: {:?}", user.name);
-        println!("{}", user.pub_key);
-    }
+    assert_eq!(users.len(), 1);
 }
 
 
@@ -67,11 +63,4 @@ fn test_ca_insert_duplicate_email() {
     let users = users.unwrap();
 
     assert_eq!(users.len(), 1);
-
-    println!("===================================================");
-
-    for user in users {
-        println!("user: {:?}", user.name);
-        println!("{}", user.pub_key);
-    }
 }
