@@ -39,14 +39,10 @@ pub struct Pgp {}
 impl Pgp {
     /// Generate an encryption- and signing-capable key for a user.
     fn make_user_cert(emails: Option<&[&str]>) -> Result<(Cert, Signature)> {
-        let mut builder = cert::CertBuilder::new();
-
-        // FIXME: users should have subkeys, but that hits
-        // https://gitlab.com/sequoia-pgp/sequoia/issues/344
-
-//            .add_encryption_subkey()
-//            .add_signing_subkey();
-
+        let mut builder = cert::CertBuilder::new()
+            .add_storage_encryption_subkey()
+            .add_transport_encryption_subkey()
+            .add_signing_subkey();
 
         if let Some(emails) = emails {
             for &email in emails {
