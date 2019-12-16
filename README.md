@@ -8,6 +8,17 @@ OpenPGP keys for users in their organization or in adjacent organizations.
 OpenPGP CA is built using https://gitlab.com/sequoia-pgp/sequoia
 
 
+## Building
+
+OpenPGP CA requires:
+
+- Rust and Cargo, see https://www.rust-lang.org/tools/install
+
+- the C-dependencies of Sequoia PGP, see "Building Sequoia at" https://gitlab.com/sequoia-pgp/sequoia
+
+Then run ```cargo build --release``` - the resulting binary is at ```target/release/openpgp_ca```  
+
+
 ## General operation
 
 ### Database
@@ -91,7 +102,7 @@ enter ```tsign```, ```2```, ```250```, no domain, ```y```
 *  In OpenPGP CA, import Alice's key and revocation certificate - and Alice's
  trust signature on the CA key:
 
-```openpgp_ca user import -n "Alice User" -e alice@example.org --key_file alice.pubkey -r alice-revocation.asc```
+```openpgp_ca user import -n "Alice User" -e alice@example.org --key_file alice.pubkey --revocation_file alice-revocation.asc```
 
 ```openpgp_ca ca import-tsig --file ca-tsigned.pubkey```
 
