@@ -18,6 +18,7 @@ OpenPGP CA requires:
 
 Then run `cargo build --release` - the resulting binary is at `target/release/openpgp_ca`  
 
+It's possible to run OpenPGP CA in Docker, [see below](#running-in-docker).
 
 ## General operation
 
@@ -191,3 +192,40 @@ cargo run user import -e heiko@example.org -n Heiko --key-file _test_data/pubkey
 cargo run bridge new -r "*@foo.de" --remote-key-file /tmp/bar.txt --name foobridge
 cargo run bridge revoke --name foobridge
 ```
+
+## Running in Docker
+
+You can also use `openpgp_ca` in [Docker](https://www.docker.com/). Building boils down to:
+
+```
+docker build --tag openpgp-ca ./
+```
+
+This will build the image and tag it as `openpgp-ca`. Once built, you can run it as:
+
+```
+docker run openpgp-ca
+```
+
+You should see the help output. Running any `openpgp_ca` command is easy, just add it at the end, like so:
+
+```
+docker run openpgp-ca ca new openpgp-ca@example.org
+```
+
+However, since it's running in Docker, the database does not persist. The database is kept in `/var/run/openpgp-ca/` inside the container. Therefore, you might want to do a volume-mount:
+
+```
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca new openpgp-ca@example.org
+```
+
+An example centralized workflow of creating a CA and a user would thus be:
+
+```
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca new openpgp-ca@example.org
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user add -e alice@example.org -e a@example.org -n Alicia
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user add -e bob@example.org
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user list
+```
+
+Obviously for regular use you might use more automated toos like [`docker-compose`](https://docs.docker.com/compose/).
