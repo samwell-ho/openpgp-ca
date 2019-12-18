@@ -1,6 +1,6 @@
 [package]
 name = "openpgp-ca"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Heiko Schaefer <heiko.schaefer@posteo.de>"]
 edition = "2018"
 
