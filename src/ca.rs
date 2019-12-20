@@ -308,7 +308,7 @@ impl Ca {
         let ca = self.get_ca_cert()?;
 
         Ok(sigs.iter()
-            .any(|&s| s.issuer_fingerprint().unwrap() == ca.fingerprint()))
+            .any(|&s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
     }
 
     pub fn check_ca_has_tsig(&self, user: &models::User) -> Result<bool> {
@@ -319,7 +319,7 @@ impl Ca {
 
         Ok(tsigs.iter()
             .any(|&t| t.issuer_fingerprint().unwrap()
-                == user_cert.fingerprint()))
+                == &user_cert.fingerprint()))
     }
 
     // -------- bridges

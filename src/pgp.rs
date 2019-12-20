@@ -329,10 +329,10 @@ impl Pgp {
 
     /// get all valid, certification capable keys with secret key material
     fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair>> {
-        let keys = cert.keys_valid().for_certification().secret();
+        let keys = cert.keys().alive().revoked(false).for_certification().secret();
 
-        Ok(keys.filter_map(|(_, _, key)|
-            key.clone().mark_parts_secret()
+        Ok(keys.filter_map(|ka|
+            ka.key().clone().mark_parts_secret()
                 .expect("mark_parts_secret failed")
                 .into_keypair().ok()
         ).collect())
