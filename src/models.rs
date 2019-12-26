@@ -15,62 +15,115 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::schema::cas;
-use super::schema::users;
-use super::schema::emails;
-use super::schema::bridges;
+use super::schema::*;
 
 
 #[derive(Queryable, Debug, Clone, AsChangeset)]
 pub struct Ca {
     pub id: i32,
     pub email: String,
-    pub ca_key: String,
-    pub revoc_cert: String,
 }
 
 #[derive(Insertable)]
 #[table_name = "cas"]
-pub struct NewCa<'a> {
+pub struct NewCa {
     pub email: String,
-    pub ca_key: &'a str,
-    pub revoc_cert: &'a str,
 }
 
+#[derive(Queryable, Debug, Associations, Clone, AsChangeset)]
+#[belongs_to(Ca)]
+pub struct CaCert {
+    pub id: i32,
+    pub cert: String,
+    // https://docs.diesel.rs/diesel/associations/index.html
+    pub ca_id: i32,
+}
 
-#[derive(Identifiable, Queryable, Debug, Clone, AsChangeset)]
+#[derive(Insertable)]
+#[table_name = "ca_certs"]
+pub struct NewCaCert {
+    pub cert: String,
+    pub ca_id: i32,
+}
+
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
+#[belongs_to(Ca)]
 pub struct User {
     pub id: i32,
     pub name: Option<String>,
-    pub pub_key: String,
-    pub revoc_cert: Option<String>,
     // https://docs.diesel.rs/diesel/associations/index.html
-    pub cas_id: i32,
+    pub ca_id: i32,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "users"]
 pub struct NewUser<'a> {
     pub name: Option<&'a str>,
-    pub pub_key: &'a str,
-    pub revoc_cert: Option<String>,
-    pub cas_id: i32,
+    pub ca_id: i32,
 }
 
-
-#[derive(Identifiable, Queryable, Associations, Debug)]
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
 #[belongs_to(User)]
+pub struct UserCert {
+    pub id: i32,
+    pub pub_cert: String,
+    pub fingerprint: String,
+    // https://docs.diesel.rs/diesel/associations/index.html
+    pub user_id: i32,
+}
+
+#[derive(Insertable, Debug)]
+#[table_name = "user_certs"]
+pub struct NewUserCert<'a> {
+    pub pub_cert: &'a str,
+    pub fingerprint: &'a str,
+    pub user_id: i32,
+}
+
+#[derive(Identifiable, Queryable, Debug)]
 pub struct Email {
     pub id: i32,
     pub addr: String,
-    pub user_id: i32,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "emails"]
 pub struct NewEmail<'a> {
     pub addr: &'a str,
-    pub user_id: i32,
+}
+
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
+#[belongs_to(UserCert)]
+#[belongs_to(Email)]
+#[table_name = "certs_emails"]
+pub struct CertEmail {
+    pub id: i32,
+    // https://docs.diesel.rs/diesel/associations/index.html
+    pub user_cert_id: i32,
+    pub email_id: i32,
+}
+
+#[derive(Insertable, Debug)]
+#[table_name = "certs_emails"]
+pub struct NewCertEmail {
+    pub user_cert_id: i32,
+    pub email_id: i32,
+}
+
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
+#[belongs_to(UserCert)]
+pub struct CertRevocation {
+    pub id: i32,
+    pub revocation: String,
+    // FIXME - https://docs.diesel.rs/diesel/associations/index.html
+    pub user_cert_id: i32,
+}
+
+#[derive(Insertable, Debug)]
+#[table_name = "cert_revocations"]
+pub struct NewCertRevocation<'a> {
+    pub revocation: &'a str,
+    pub user_cert_id: i32,
 }
 
 #[derive(Identifiable, Queryable, Clone, AsChangeset, Debug)]
@@ -88,3 +141,5 @@ pub struct NewBridge<'a> {
     pub pub_key: &'a str,
     pub cas_id: i32,
 }
+
+// FIXME: prefs table
