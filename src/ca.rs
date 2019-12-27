@@ -74,7 +74,7 @@ impl Ca {
         assert_eq!(emails.len(), 1,
                    "'ca new' expects exactly one email address");
 
-        let (cert, revoc) = Pgp::make_private_ca_cert(emails)?;
+        let (cert, _) = Pgp::make_private_ca_cert(emails)?;
 
         let email = emails[0].to_owned();
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
@@ -87,9 +87,8 @@ impl Ca {
 
     pub fn get_ca_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
-            Some((ca, cert)) => {
-                let ca_cert = Pgp::armored_to_cert(&cert.cert);
-                Ok(ca_cert)
+            Some((_, cert)) => {
+                Ok(Pgp::armored_to_cert(&cert.cert))
             }
             None => panic!("get_domain_ca() failed")
         }
@@ -154,7 +153,7 @@ impl Ca {
             .context("merging tsigs into CA Key failed")?;
 
         // update in DB
-        let (mut ca, mut ca_cert) = self.db.get_ca()
+        let (_, mut ca_cert) = self.db.get_ca()
             .context("failed to load CA from database")?
             .unwrap();
 
@@ -231,7 +230,7 @@ impl Ca {
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         self.db.new_user(name, pub_key,
                          &certified.fingerprint().to_string(),
-                         emails, &revoc, None);
+                         emails, &revoc, None)?;
 
         Ok(())
     }
@@ -348,7 +347,7 @@ impl Ca {
         let bridged = Pgp::bridge_to_remote_ca(&ca_cert, &remote_ca_cert, regexes)?;
 
         // store in DB
-        let (ca_db, ca_cert_db) =
+        let (ca_db, _) =
             self.db.get_ca().context("Couldn't find CA")?
                 .unwrap();
 
@@ -375,7 +374,7 @@ impl Ca {
 //        println!("bridge {:?}", &bridge.clone());
 //        let ca_id = bridge.clone().cas_id;
 
-        let (ca, ca_cert) = self.db.get_ca()?.unwrap();
+        let (_, ca_cert) = self.db.get_ca()?.unwrap();
         let ca_cert = Pgp::armored_to_cert(&ca_cert.cert);
 
         let bridge_pub = Pgp::armored_to_cert(&bridge.pub_key);

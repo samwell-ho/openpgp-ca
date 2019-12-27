@@ -181,8 +181,7 @@ impl Db {
                 .context("Error saving new CA Cert")?;
 
             Ok(())
-        });
-        Ok(())
+        })
     }
 
     pub fn update_ca(&self, ca: &Ca) -> Result<()> {
@@ -257,7 +256,8 @@ impl Db {
 
             // Revocations
             for revocation in revocs {
-                self.insert_revocation(NewRevocation { revocation, user_cert_id: c.id });
+                self.insert_revocation(
+                    NewRevocation { revocation, user_cert_id: c.id })?;
             }
 
             // Emails
