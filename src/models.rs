@@ -80,7 +80,7 @@ pub struct NewUserCert<'a> {
     pub user_id: i32,
 }
 
-#[derive(Identifiable, Queryable, Debug)]
+#[derive(Identifiable, Queryable, Debug, Clone)]
 pub struct Email {
     pub id: i32,
     pub addr: String,

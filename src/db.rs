@@ -19,15 +19,8 @@ use failure::{self, ResultExt};
 use diesel::prelude::*;
 use diesel::r2d2::{Pool, PooledConnection, ConnectionManager};
 
-use crate::schema::bridges;
-use crate::schema::cas;
-use crate::schema::ca_certs;
-use crate::schema::certs_emails;
-use crate::schema::users;
-use crate::schema::user_certs;
-use crate::schema::emails;
-use crate::models;
-use crate::models::{Ca, User, Email, Bridge, CaCert, UserCert, CertEmail, Revocation, NewCaCert, NewUserCert, NewCertEmail};
+use crate::schema::*;
+use crate::models::*;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -75,12 +68,12 @@ impl Db {
 
     // --- private ---
 
-    fn insert_user(&self, user: models::NewUser) -> Result<User> {
+    fn insert_user(&self, user: NewUser) -> Result<User> {
         let inserted_count = diesel::insert_into(users::table)
             .values(&user)
             .execute(&self.conn)?;
 
-        assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert user");
+        assert_eq!(inserted_count, 1, "insert_user: couldn't insert user");
 
         let u: Vec<User> = users::table
             .order(users::id.desc())
@@ -95,12 +88,12 @@ impl Db {
         Ok(u[0].clone())
     }
 
-    fn insert_usercert(&self, cert: models::NewUserCert) -> Result<UserCert> {
+    fn insert_usercert(&self, cert: NewUserCert) -> Result<UserCert> {
         let inserted_count = diesel::insert_into(user_certs::table)
             .values(&cert)
             .execute(&self.conn)?;
 
-        assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert usercert");
+        assert_eq!(inserted_count, 1, "insert_usercert: couldn't insert usercert");
 
         let c: Vec<UserCert> = user_certs::table
             .order(user_certs::id.desc())
@@ -115,14 +108,33 @@ impl Db {
         Ok(c[0].clone())
     }
 
-    fn insert_email(&self, email: models::NewEmail, user_cert_id: i32)
-                    -> Result<()> {
+    fn insert_revocation(&self, revoc: NewRevocation) -> Result<Revocation> {
+        let inserted_count = diesel::insert_into(revocations::table)
+            .values(&revoc)
+            .execute(&self.conn)?;
+
+        assert_eq!(inserted_count, 1, "insert_revocation: couldn't insert revocation");
+
+        let r: Vec<Revocation> = revocations::table
+            .order(revocations::id.desc())
+            .limit(inserted_count as i64)
+            .load(&self.conn)?
+            .into_iter()
+            .rev()
+            .collect();
+
+        assert_eq!(r.len(), 1);
+
+        Ok(r[0].clone())
+    }
+
+    fn insert_email(&self, email: NewEmail, user_cert_id: i32) -> Result<Email> {
         let inserted_count = diesel::insert_into(emails::table)
             .values(&email)
             .execute(&self.conn)
             .context("Error saving new email")?;
 
-        assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert email");
+        assert_eq!(inserted_count, 1, "insert_email: couldn't insert email");
 
         let e: Vec<Email> = emails::table
             .order(emails::id.desc())
@@ -134,7 +146,7 @@ impl Db {
 
         assert_eq!(e.len(), 1);
 
-        let e = &e[0];
+        let e = e[0].clone();
 
         let ce = NewCertEmail { user_cert_id, email_id: e.id };
         let inserted_count = diesel::insert_into(certs_emails::table)
@@ -142,14 +154,14 @@ impl Db {
             .execute(&self.conn)
             .context("Error saving new certs_emails")?;
 
-        assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert certs_emails");
+        assert_eq!(inserted_count, 1, "insert_email: couldn't insert certs_emails");
 
-        Ok(())
+        Ok(e)
     }
 
     // --- public ---
 
-    pub fn insert_ca(&self, ca: models::NewCa, ca_key: &str) -> Result<()> {
+    pub fn insert_ca(&self, ca: NewCa, ca_key: &str) -> Result<()> {
         self.conn.transaction::<_, failure::Error, _>(|| {
             diesel::insert_into(cas::table)
                 .values(&ca)
@@ -173,7 +185,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn update_ca(&self, ca: &models::Ca) -> Result<()> {
+    pub fn update_ca(&self, ca: &Ca) -> Result<()> {
         diesel::update(cas::table)
             .set(ca)
             .execute(&self.conn)
@@ -182,7 +194,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn update_ca_cert(&self, ca_cert: &models::CaCert) -> Result<()> {
+    pub fn update_ca_cert(&self, ca_cert: &CaCert) -> Result<()> {
         diesel::update(ca_certs::table)
             .set(ca_cert)
             .execute(&self.conn)
@@ -223,7 +235,7 @@ impl Db {
 
     pub fn new_user(&self, name: Option<&str>,
                     pub_cert: &str, fingerprint: &str, emails: &[&str],
-                    revoc: &Vec<String>,
+                    revocs: &Vec<String>,
                     ca_cert_tsigned: Option<&str>) -> Result<()> {
         self.conn.transaction::<_, failure::Error, _>(|| {
             let (ca, mut ca_cert_db) = self.get_ca()
@@ -237,25 +249,26 @@ impl Db {
             }
 
             // User
-            let u = self.insert_user(models::NewUser { name, ca_id: ca.id })?;
+            let u = self.insert_user(NewUser { name, ca_id: ca.id })?;
 
             // UserCert
             let newcert = NewUserCert { pub_cert, fingerprint, user_id: u.id };
             let c = self.insert_usercert(newcert)?;
 
             // Revocations
-            // FIXME
-//            revoc_cert: Some(revoc),
+            for revocation in revocs {
+                self.insert_revocation(NewRevocation { revocation, user_cert_id: c.id });
+            }
 
             // Emails
             for addr in emails {
-                self.insert_email(models::NewEmail { addr }, c.id)?;
+                self.insert_email(NewEmail { addr }, c.id)?;
             }
             Ok(())
         })
     }
 
-    pub fn update_user(&self, user: &models::User) -> Result<()> {
+    pub fn update_user(&self, user: &User) -> Result<()> {
         diesel::update(users::table)
             .set(user)
             .execute(&self.conn)
@@ -370,7 +383,7 @@ impl Db {
         Ok(emails)
     }
 
-    pub fn insert_bridge(&self, bridge: models::NewBridge) -> Result<()> {
+    pub fn insert_bridge(&self, bridge: NewBridge) -> Result<()> {
         diesel::insert_into(bridges::table)
             .values(&bridge)
             .execute(&self.conn)
@@ -379,7 +392,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn update_bridge(&self, bridge: &models::Bridge) -> Result<()> {
+    pub fn update_bridge(&self, bridge: &Bridge) -> Result<()> {
         diesel::update(bridges::table)
             .set(bridge)
             .execute(&self.conn)
