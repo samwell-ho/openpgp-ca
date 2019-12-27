@@ -40,7 +40,7 @@ fn test_ca() {
 
 #[test]
 fn test_ca_insert_duplicate_email() {
-    let mut ctx = make_context!();
+    let ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -63,6 +63,4 @@ fn test_ca_insert_duplicate_email() {
     let users = users.unwrap();
 
     assert_eq!(users.len(), 1);
-
-    ctx.leak_tempdir();
 }
