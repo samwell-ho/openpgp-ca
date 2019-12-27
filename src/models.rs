@@ -24,7 +24,7 @@ pub struct Ca {
     pub email: String,
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug)]
 #[table_name = "cas"]
 pub struct NewCa {
     pub email: String,
@@ -112,7 +112,7 @@ pub struct NewCertEmail {
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
 #[belongs_to(UserCert)]
-pub struct CertRevocation {
+pub struct Revocation {
     pub id: i32,
     pub revocation: String,
     // FIXME - https://docs.diesel.rs/diesel/associations/index.html
@@ -120,8 +120,8 @@ pub struct CertRevocation {
 }
 
 #[derive(Insertable, Debug)]
-#[table_name = "cert_revocations"]
-pub struct NewCertRevocation<'a> {
+#[table_name = "revocations"]
+pub struct NewRevocation<'a> {
     pub revocation: &'a str,
     pub user_cert_id: i32,
 }

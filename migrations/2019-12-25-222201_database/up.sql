@@ -53,8 +53,8 @@ CREATE TABLE certs_emails (
   FOREIGN KEY(email_id) REFERENCES emails(id)
 );
 
--- revocations for user certs
-CREATE TABLE cert_revocations (
+-- revocations for user certs, user_ids, ...
+CREATE TABLE revocations (
   id INTEGER NOT NULL PRIMARY KEY,
   revocation VARCHAR NOT NULL,
   -- uid/keyid? -- FIXME

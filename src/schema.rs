@@ -23,14 +23,6 @@ table! {
 }
 
 table! {
-    cert_revocations (id) {
-        id -> Integer,
-        revocation -> Text,
-        user_cert_id -> Integer,
-    }
-}
-
-table! {
     certs_emails (id) {
         id -> Integer,
         user_cert_id -> Integer,
@@ -48,6 +40,14 @@ table! {
 table! {
     prefs (id) {
         id -> Integer,
+    }
+}
+
+table! {
+    revocations (id) {
+        id -> Integer,
+        revocation -> Text,
+        user_cert_id -> Integer,
     }
 }
 
@@ -70,9 +70,9 @@ table! {
 
 joinable!(bridges -> cas (cas_id));
 joinable!(ca_certs -> cas (ca_id));
-joinable!(cert_revocations -> user_certs (user_cert_id));
 joinable!(certs_emails -> emails (email_id));
 joinable!(certs_emails -> user_certs (user_cert_id));
+joinable!(revocations -> user_certs (user_cert_id));
 joinable!(user_certs -> users (user_id));
 joinable!(users -> cas (ca_id));
 
@@ -80,10 +80,10 @@ allow_tables_to_appear_in_same_query!(
     bridges,
     ca_certs,
     cas,
-    cert_revocations,
     certs_emails,
     emails,
     prefs,
+    revocations,
     user_certs,
     users,
 );
