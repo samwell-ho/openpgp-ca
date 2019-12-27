@@ -73,6 +73,82 @@ impl Db {
         }
     }
 
+    // --- private ---
+
+    fn insert_user(&self, user: models::NewUser) -> Result<User> {
+        let inserted_count = diesel::insert_into(users::table)
+            .values(&user)
+            .execute(&self.conn)?;
+
+        assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert user");
+
+        let u: Vec<User> = users::table
+            .order(users::id.desc())
+            .limit(inserted_count as i64)
+            .load(&self.conn)?
+            .into_iter()
+            .rev()
+            .collect();
+
+        assert_eq!(u.len(), 1);
+
+        Ok(u[0].clone())
+    }
+
+    fn insert_usercert(&self, cert: models::NewUserCert) -> Result<UserCert> {
+        let inserted_count = diesel::insert_into(user_certs::table)
+            .values(&cert)
+            .execute(&self.conn)?;
+
+        assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert usercert");
+
+        let c: Vec<UserCert> = user_certs::table
+            .order(user_certs::id.desc())
+            .limit(inserted_count as i64)
+            .load(&self.conn)?
+            .into_iter()
+            .rev()
+            .collect();
+
+        assert_eq!(c.len(), 1);
+
+        Ok(c[0].clone())
+    }
+
+    fn insert_email(&self, email: models::NewEmail, user_cert_id: i32)
+                    -> Result<()> {
+        let inserted_count = diesel::insert_into(emails::table)
+            .values(&email)
+            .execute(&self.conn)
+            .context("Error saving new email")?;
+
+        assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert email");
+
+        let e: Vec<Email> = emails::table
+            .order(emails::id.desc())
+            .limit(inserted_count as i64)
+            .load(&self.conn)?
+            .into_iter()
+            .rev()
+            .collect();
+
+        assert_eq!(e.len(), 1);
+
+        let e = &e[0];
+
+        let ce = NewCertEmail { user_cert_id, email_id: e.id };
+        let inserted_count = diesel::insert_into(certs_emails::table)
+            .values(&ce)
+            .execute(&self.conn)
+            .context("Error saving new certs_emails")?;
+
+        assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert certs_emails");
+
+        Ok(())
+    }
+
+    // --- public ---
+
     pub fn insert_ca(&self, ca: models::NewCa, ca_key: &str) -> Result<()> {
         self.conn.transaction::<_, failure::Error, _>(|| {
             diesel::insert_into(cas::table)
@@ -132,7 +208,9 @@ impl Db {
                     .load::<CaCert>(&self.conn)
                     .context("Error loading CA Certs")?;
 
-                // FIXME return which cert(s)?
+                // FIXME: which cert(s) should be returned?
+                // -> there can be more than one "active" cert,
+                // as well as even more "inactive" certs.
                 assert_eq!(ca_certs.len(), 1);
                 let ca_cert: CaCert = ca_certs[0].clone();
 
@@ -143,11 +221,10 @@ impl Db {
         }
     }
 
-    // FIXME: fn name
-    pub fn new_user_foo(&self, name: Option<&str>,
-                        pub_cert: &str, fingerprint: &str, emails: &[&str],
-                        revoc: &Vec<String>,
-                        ca_cert_tsigned: Option<&str>) -> Result<()> {
+    pub fn new_user(&self, name: Option<&str>,
+                    pub_cert: &str, fingerprint: &str, emails: &[&str],
+                    revoc: &Vec<String>,
+                    ca_cert_tsigned: Option<&str>) -> Result<()> {
         self.conn.transaction::<_, failure::Error, _>(|| {
             let (ca, mut ca_cert_db) = self.get_ca()
                 .context("Couldn't find CA")?.unwrap();
@@ -160,49 +237,11 @@ impl Db {
             }
 
             // User
-            let user = models::NewUser {
-                name,
-                ca_id: ca.id,
-            };
-
-            let inserted_count = diesel::insert_into(users::table)
-                .values(&user)
-                .execute(&self.conn)?;
-
-            assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert user");
-
-            let u: Vec<User> = users::table
-                .order(users::id.desc())
-                .limit(inserted_count as i64)
-                .load(&self.conn)?
-                .into_iter()
-                .rev()
-                .collect();
-
-            assert_eq!(u.len(), 1);
-
-            let u = &u[0];
+            let u = self.insert_user(models::NewUser { name, ca_id: ca.id })?;
 
             // UserCert
-            let cert = NewUserCert { pub_cert, fingerprint, user_id: u.id };
-
-            let inserted_count = diesel::insert_into(user_certs::table)
-                .values(&cert)
-                .execute(&self.conn)?;
-
-            assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert usercert");
-
-            let c: Vec<UserCert> = user_certs::table
-                .order(user_certs::id.desc())
-                .limit(inserted_count as i64)
-                .load(&self.conn)?
-                .into_iter()
-                .rev()
-                .collect();
-
-            assert_eq!(c.len(), 1);
-
-            let c = &c[0];
+            let newcert = NewUserCert { pub_cert, fingerprint, user_id: u.id };
+            let c = self.insert_usercert(newcert)?;
 
             // Revocations
             // FIXME
@@ -210,68 +249,10 @@ impl Db {
 
             // Emails
             for addr in emails {
-                let email = models::NewEmail { addr };
-
-                let inserted_count = diesel::insert_into(emails::table)
-                    .values(&email)
-                    .execute(&self.conn)
-                    .context("Error saving new email")?;
-
-                assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert email");
-
-                let e: Vec<Email> = emails::table
-                    .order(emails::id.desc())
-                    .limit(inserted_count as i64)
-                    .load(&self.conn)?
-                    .into_iter()
-                    .rev()
-                    .collect();
-
-                assert_eq!(e.len(), 1);
-
-                let e = &e[0];
-
-                let ce = NewCertEmail { user_cert_id: c.id, email_id: e.id };
-                let inserted_count = diesel::insert_into(certs_emails::table)
-                    .values(&ce)
-                    .execute(&self.conn)
-                    .context("Error saving new certs_emails")?;
-
-                assert_eq!(inserted_count, 1, "new_user_foo: couldn't insert certs_emails");
+                self.insert_email(models::NewEmail { addr }, c.id)?;
             }
             Ok(())
         })
-    }
-
-    pub fn insert_user(&self, user: models::NewUser) -> Result<i32> {
-        use diesel::result::Error;
-        // there seems to be no nice way to get the ID of a newly inserted
-        // row in sqlite:
-        // https://github.com/diesel-rs/diesel/blob/master/examples/sqlite/all_about_inserts/src/lib.rs#L278
-
-        // FIXME: https://sqlite.org/c3ref/last_insert_rowid.html
-        let inserted_users: std::result::Result<Vec<User>, Error> =
-            self.conn.transaction::<_, Error, _>(|| {
-                let inserted_count = diesel::insert_into(users::table)
-                    .values(&user)
-                    .execute(&self.conn)?; // FIXME
-
-                assert_eq!(inserted_count, 1, "insert_user: couldn't insert user");
-
-                Ok(users::table
-                    .order(users::id.desc())
-                    .limit(inserted_count as i64)
-                    .load(&self.conn)?
-                    .into_iter()
-                    .rev()
-                    .collect::<Vec<_>>())
-            });
-
-        if let Ok(users) = inserted_users {
-            Ok(users[0].id)
-        } else {
-            Err(failure::err_msg("insert_user() get inserted id failed"))
-        }
     }
 
     pub fn update_user(&self, user: &models::User) -> Result<()> {
@@ -387,15 +368,6 @@ impl Db {
         }
 
         Ok(emails)
-    }
-
-    pub fn insert_email(&self, email: models::NewEmail) -> Result<()> {
-        diesel::insert_into(emails::table)
-            .values(&email)
-            .execute(&self.conn)
-            .context("Error saving new email")?;
-
-        Ok(())
     }
 
     pub fn insert_bridge(&self, bridge: models::NewBridge) -> Result<()> {

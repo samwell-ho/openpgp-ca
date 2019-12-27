@@ -190,10 +190,10 @@ impl Ca {
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
-        let res = self.db.new_user_foo(name, pub_key,
-                                       &user.fingerprint().to_string(),
-                                       emails, &vec![revoc],
-                                       Some(&tsigned_ca_armored));
+        let res = self.db.new_user(name, pub_key,
+                                   &user.fingerprint().to_string(),
+                                   emails, &vec![revoc],
+                                   Some(&tsigned_ca_armored));
 
         if res.is_err() {
             eprint!("{:?}", res);
@@ -229,9 +229,9 @@ impl Ca {
         }
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
-        self.db.new_user_foo(name, pub_key,
-                             &certified.fingerprint().to_string(),
-                             emails, &revoc, None);
+        self.db.new_user(name, pub_key,
+                         &certified.fingerprint().to_string(),
+                         emails, &revoc, None);
 
         Ok(())
     }
