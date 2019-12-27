@@ -6,7 +6,7 @@ mod gnupg;
 #[test]
 fn test_pgp_wrapper() {
     let (cert, revoc) =
-        pgp::Pgp::make_user(Some(&["foo@example.org"])).unwrap();
+        pgp::Pgp::make_user(&["foo@example.org"]).unwrap();
 
     let armored = pgp::Pgp::priv_cert_to_armored(&cert);
 
@@ -28,10 +28,10 @@ fn test_ca() {
 
 
     // make CA user
-    let res = ca.user_new(Some(&"Alice"), Some(&["alice@example.org"]));
+    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
-    let users = ca.get_users();
+    let users = ca.get_all_users();
     let users = users.unwrap();
 
     assert_eq!(users.len(), 1);
@@ -40,7 +40,7 @@ fn test_ca() {
 
 #[test]
 fn test_ca_insert_duplicate_email() {
-    let ctx = make_context!();
+    let mut ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -52,15 +52,17 @@ fn test_ca_insert_duplicate_email() {
 
 
     // make CA user
-    let res = ca.user_new(Some(&"Alice"), Some(&["alice@example.org"]));
+    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
     // make CA user with the same email address
-    let res = ca.user_new(Some(&"Alice"), Some(&["alice@example.org"]));
+    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(!res.is_ok());
 
-    let users = ca.get_users();
+    let users = ca.get_all_users();
     let users = users.unwrap();
 
     assert_eq!(users.len(), 1);
+
+    ctx.leak_tempdir();
 }

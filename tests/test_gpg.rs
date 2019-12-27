@@ -47,10 +47,10 @@ fn test_alice_authenticates_bob() {
     assert!(res.is_ok());
 
     // make CA users
-    let res = ca.user_new(Some(&"Alice"), Some(&["alice@example.org"]));
+    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
-    let res = ca.user_new(Some(&"Bob"), Some(&["bob@example.org"]));
+    let res = ca.user_new(Some(&"Bob"), &["bob@example.org"]);
     assert!(res.is_ok());
 
     // ---- import keys from OpenPGP CA into GnuPG ----
@@ -66,13 +66,20 @@ fn test_alice_authenticates_bob() {
 
 
     // import CA users into GnuPG
-    let users = ca.get_users();
+    let users = ca.get_all_users();
 
     assert!(users.is_ok());
     assert_eq!(users.as_ref().ok().unwrap().len(), 2);
 
-    users.unwrap().iter()
-        .for_each(|u| gnupg::import(&ctx, u.pub_key.as_bytes()));
+    let users = users.unwrap();
+    for user in users {
+        let certs = ca.get_user_certs(&user);
+        assert!(certs.is_ok());
+
+        for cert in certs.unwrap() {
+            gnupg::import(&ctx, cert.pub_cert.as_bytes());
+        }
+    }
 
 
     // ---- set "ultimate" ownertrust for alice ----
@@ -177,22 +184,24 @@ fn test_alice_authenticates_bob_key_imports() {
 
 
     // import alice + bob keys into CA
-    ca.user_import(Some("Alice"), Some(&vec!["alice@example.org"]),
+    ca.user_import(Some("Alice"), &vec!["alice@example.org"],
                    &alice_file, None)
         .expect("import Alice to CA failed");
 
-    ca.user_import(Some("Bob"), Some(&vec!["bob@example.org"]),
+    ca.user_import(Some("Bob"), &vec!["bob@example.org"],
                    &bob_file, None)
         .expect("import Bob to CA failed");
 
 
     // export bob, CA-key from CA
     let ca_key = ca.export_pubkey().unwrap();
-    let bob = ca.get_user(&"bob@example.org").unwrap().unwrap();
+    let foo = ca.get_users(&"bob@example.org").unwrap();
+    let bob = foo.first().unwrap();
+    let bob_certs = ca.get_user_certs(bob).unwrap();
 
     // import bob+CA key into alice's GnuPG context
     gnupg::import(&ctx_alice, ca_key.as_bytes());
-    gnupg::import(&ctx_alice, bob.pub_key.as_bytes());
+    gnupg::import(&ctx_alice, bob_certs.first().unwrap().pub_cert.as_bytes());
 
     // ---- set "ultimate" ownertrust for alice ----
     let res = gnupg::edit_trust(&ctx_alice, "alice", 5);

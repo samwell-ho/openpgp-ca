@@ -84,7 +84,7 @@ fn real_main() -> Result<()> {
                             //  .value_name("key-profile")
                             //  .help("Key Profile"))
 
-                            ca.user_new(name, Some(email_vec.as_ref()))?;
+                            ca.user_new(name, &email_vec[..])?;
                         }
                         _ => unimplemented!(),
                     }
@@ -101,7 +101,7 @@ fn real_main() -> Result<()> {
                             let revocation_file = m2.value_of
                             ("revocation-file");
 
-                            ca.user_import(name, Some(email_vec.as_ref()),
+                            ca.user_import(name, &email_vec[..],
                                            key_file, revocation_file,
                             )?;
                         }
@@ -115,7 +115,8 @@ fn real_main() -> Result<()> {
                         let revocation_file =
                             m2.value_of("revocation-file").unwrap();
 
-                        ca.update_revocation(email, revocation_file)?;
+                        // FIXME
+//                        ca.update_revocation(email, revocation_file)?;
                     }
                 }
                 ("export", Some(m2)) => {
@@ -124,15 +125,22 @@ fn real_main() -> Result<()> {
                             let email_vec = email.into_iter()
                                 .collect::<Vec<_>>();
 
-                            let u = ca.get_user(email_vec[0])?;
-                            if let Some(u) = u {
-                                println!("{}", u.pub_key);
+                            let users = ca.get_users(email_vec[0])?;
+                            for u in users {
+                                let certs = ca.get_user_certs(&u)?;
+                                for cert in certs {
+                                    println!("{}", cert.pub_cert);
+                                }
                             }
                         }
                         None => {
                             // bulk export
-                            ca.get_users()?.iter()
-                                .for_each(|u| println!("{}", u.pub_key));
+                            for u in ca.get_all_users()? {
+                                let certs = ca.get_user_certs(&u)?;
+                                for cert in certs {
+                                    println!("{}", cert.pub_cert);
+                                }
+                            }
                         }
                     }
                 }
@@ -140,21 +148,24 @@ fn real_main() -> Result<()> {
                     if let Some(email) = m2.values_of("email") {
                         let email = email.into_iter().next().unwrap();
 
-                        if let Some(user) = ca.get_user(email)? {
-                            if user.revoc_cert.is_some() {
-                                println!("{}", user.revoc_cert.unwrap());
-                            } else {
-                                println!("no revocation cert available");
-                            }
-                        } else {
+                        let users = ca.get_users(email)?;
+                        if users.is_empty() {
                             println!("User not found");
+                        } else {
+                            for user in users {
+                                let certs = ca.get_user_certs(&user)?;
+                                for cert in certs {
+                                    let revoc = ca.get_revocations(&cert)?;
+                                    println!("{:?}", revoc);
+                                }
+                            }
                         }
                     }
                 }
                 ("check", Some(m)) => {
                     match m.subcommand() {
                         ("sigs", Some(_m2)) => {
-                            for user in ca.get_users()
+                            for user in ca.get_all_users()
                                 .context("couldn't load users")? {
                                 let ca_sig = ca.check_ca_sig(&user).
                                     context("Failed while checking CA sig")?;
@@ -174,17 +185,20 @@ fn real_main() -> Result<()> {
                         ("expiry", Some(_m2)) => {
                             // FIXME: use "days" argument
 
-                            for user in ca.get_users()
+                            for user in ca.get_all_users()
                                 .context("couldn't load users")? {
-                                let cert = Pgp::armored_to_cert(&user.pub_key);
-                                println!(" expires: {:?}", Pgp::get_expiry(&cert));
+                                let certs = ca.get_user_certs(&user)?;
+                                for cert in certs {
+                                    let cert = Pgp::armored_to_cert(&cert.pub_cert);
+                                    println!(" expires: {:?}", Pgp::get_expiry(&cert));
+                                }
                             }
                         }
                         _ => unimplemented!(),
                     }
                 }
                 ("list", Some(_m2)) => {
-                    let users = ca.get_users()?;
+                    let users = ca.get_all_users()?;
 
                     for user in users {
                         println!("{} (id {})",
@@ -192,24 +206,27 @@ fn real_main() -> Result<()> {
                                      .unwrap_or("<no name>".to_string()),
                                  user.id);
 
-                        let cert = Pgp::armored_to_cert(&user.pub_key);
+                        let certs = ca.get_user_certs(&user)?;
+                        for usercert in certs {
+                            let cert = Pgp::armored_to_cert(&usercert.pub_cert);
 
-                        for email in ca.get_emails(&user)? {
-                            println!("- {}", email.addr);
+                            for email in ca.get_emails(&user)? {
+                                println!("- {}", email.addr);
+                            }
+
+                            println!(" expires: {:?}", Pgp::get_expiry(&cert));
+
+                            let ca_sig = ca.check_ca_sig(&user).
+                                context("Failed while checking CA sig")?;
+                            println!(" user key (or subkey) signed by CA: {}",
+                                     ca_sig);
+
+                            let tsig_on_ca = ca.check_ca_has_tsig(&user).
+                                context("Failed while checking tsig on CA")?;
+                            println!(" user has tsigned CA: {}", tsig_on_ca);
+
+                            println!();
                         }
-
-                        println!(" expires: {:?}", Pgp::get_expiry(&cert));
-
-                        let ca_sig = ca.check_ca_sig(&user).
-                            context("Failed while checking CA sig")?;
-                        println!(" user key (or subkey) signed by CA: {}",
-                                 ca_sig);
-
-                        let tsig_on_ca = ca.check_ca_has_tsig(&user).
-                            context("Failed while checking tsig on CA")?;
-                        println!(" user has tsigned CA: {}", tsig_on_ca);
-
-                        println!();
                     }
                 }
 
