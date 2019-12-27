@@ -32,7 +32,9 @@ CREATE TABLE user_certs (
   fingerprint VARCHAR NOT NULL,
 
   user_id INTEGER NOT NULL,
-  FOREIGN KEY(user_id) REFERENCES users(id)
+  FOREIGN KEY(user_id) REFERENCES users(id),
+
+  CONSTRAINT cert_fingerprint_unique UNIQUE (fingerprint)
 );
 
 CREATE TABLE emails (
