@@ -66,7 +66,7 @@ impl Db {
         }
     }
 
-    // --- private ---
+    // --- building block functions ---
 
     fn insert_user(&self, user: NewUser) -> Result<User> {
         let inserted_count = diesel::insert_into(users::table)
@@ -108,7 +108,8 @@ impl Db {
         Ok(c[0].clone())
     }
 
-    fn insert_revocation(&self, revoc: NewRevocation) -> Result<Revocation> {
+    fn insert_revocation(&self, revoc: NewRevocation)
+                         -> Result<Revocation> {
         let inserted_count = diesel::insert_into(revocations::table)
             .values(&revoc)
             .execute(&self.conn)?;
@@ -322,6 +323,21 @@ impl Db {
         Ok(users)
     }
 
+    pub fn get_user_cert(&self, fingerprint: &str)
+                         -> Result<Option<UserCert>> {
+        let u = user_certs::table
+            .filter(user_certs::fingerprint.eq(fingerprint))
+            .load::<UserCert>(&self.conn)
+            .context("Error loading UserCert by fingerprint")?;
+
+        assert!(u.len() <= 1);
+        if u.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(u[0].clone()))
+        }
+    }
+
     pub fn get_user_certs(&self, user: &User) -> Result<Vec<UserCert>> {
         let res = UserCert::belonging_to(user).load::<UserCert>(&self.conn);
 
@@ -338,6 +354,15 @@ impl Db {
 
         Ok(res?)
     }
+
+    pub fn add_revocation(&self, revocation: &str, cert: &UserCert)
+                          -> Result<Revocation> {
+        self.insert_revocation(NewRevocation {
+            revocation,
+            user_cert_id: cert.id,
+        })
+    }
+
 
     pub fn get_emails_by_user(&self, user: &User) -> Result<Vec<Email>> {
         let certs = self.get_user_certs(user)?;

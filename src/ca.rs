@@ -235,36 +235,31 @@ impl Ca {
         Ok(())
     }
 
-//    pub fn update_revocation(&self, email: &str, revoc_file: &str)
-//                             -> Result<()> {
-//        let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
-//            .context("Couldn't load revocation cert")?;
-//
-//        if let Some(mut user) = self.get_user(email).
-//            context("couldn't load User from DB")? {
-//            let user_cert = Pgp::armored_to_cert(&user.pub_key);
-//
-//            // check if revoc fingerprint matches cert fingerprint
-//            let cert_fingerprint = user_cert.fingerprint();
-//
-//            let sig_fingerprint = Pgp::get_revoc_fingerprint(&revoc_cert);
-//
-//            if sig_fingerprint != cert_fingerprint {
-//                return Err(failure::err_msg(
-//                    "revocation cert fingerprint doesn't match user key"));
-//            }
-//
-//            // update sig in DB
-//            let armored = Pgp::sig_to_armored(&revoc_cert)
-//                .context("couldn't armor revocation cert")?;
-//            user.revoc_cert = Some(armored);
-//
-//            self.db.update_user(&user)
-//                .context("Failed to update User in DB")?;
-//        }
-//
-//        Ok(())
-//    }
+    pub fn add_revocation(&self, revoc_file: &str) -> Result<()> {
+        let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
+            .context("Couldn't load revocation cert")?;
+
+        let sig_fingerprint =
+            &Pgp::get_revoc_fingerprint(&revoc_cert).to_string();
+
+        let cert = self.db.get_user_cert(sig_fingerprint)?;
+
+        match cert {
+            None => Err(failure::err_msg("couldn't find cert for this fingerprint")),
+            Some(c) => {
+                let cert_fingerprint = &c.fingerprint;
+                assert_eq!(sig_fingerprint, cert_fingerprint);
+
+                // update sig in DB
+                let armored = Pgp::sig_to_armored(&revoc_cert)
+                    .context("couldn't armor revocation cert")?;
+
+                self.db.add_revocation(&armored, &c)?;
+
+                Ok(())
+            }
+        }
+    }
 
     pub fn get_all_users(&self) -> Result<Vec<models::User>> {
         self.db.list_users()
