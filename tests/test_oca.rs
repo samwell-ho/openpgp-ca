@@ -5,7 +5,7 @@ mod gnupg;
 
 #[test]
 fn test_pgp_wrapper() {
-    let (cert, revoc) =
+    let (cert, _) =
         pgp::Pgp::make_user(&["foo@example.org"]).unwrap();
 
     let armored = pgp::Pgp::priv_cert_to_armored(&cert);
