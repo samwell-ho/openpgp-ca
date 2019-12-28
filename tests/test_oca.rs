@@ -35,6 +35,25 @@ fn test_ca() {
     let users = users.unwrap();
 
     assert_eq!(users.len(), 1);
+
+    let user = &users[0];
+    let emails = ca.get_emails(user);
+
+    assert!(emails.is_ok());
+    let emails = emails.unwrap();
+    assert_eq!(emails.len(), 1);
+
+    let certs = ca.get_user_certs(user);
+    assert!(certs.is_ok());
+    let certs = certs.unwrap();
+    assert_eq!(certs.len(), 1);
+
+    let cert = &certs[0];
+
+    let revocs = ca.get_revocations(cert);
+    assert!(revocs.is_ok());
+    let revocs = revocs.unwrap();
+    assert_eq!(revocs.len(), 1);
 }
 
 
