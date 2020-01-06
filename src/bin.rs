@@ -203,10 +203,12 @@ fn real_main() -> Result<()> {
 
                         let certs = ca.get_user_certs(&user)?;
                         for usercert in certs {
+                            println!(" cert {}", usercert.id);
+
                             let cert = Pgp::armored_to_cert(&usercert.pub_cert);
 
                             for email in ca.get_emails(&user)? {
-                                println!("- {}", email.addr);
+                                println!("- email {}", email.addr);
                             }
 
                             println!(" expires: {:?}", Pgp::get_expiry(&cert));
