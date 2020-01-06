@@ -59,10 +59,7 @@ fn test_ca() {
 
 #[test]
 fn test_update_user_cert() {
-    let mut ctx = make_context!();
-
-    ctx.leak_tempdir();
-
+    let ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
