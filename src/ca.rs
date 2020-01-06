@@ -46,7 +46,8 @@ impl Ca {
                     // load config from .env
                     dotenv::dotenv().ok();
 
-                    Some(env::var("OPENPGP_CA_DB").unwrap())
+                    // diesel naming convention for .env
+                    Some(env::var("DATABASE_URL").unwrap())
                 }
             };
 
