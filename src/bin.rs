@@ -203,7 +203,8 @@ fn real_main() -> Result<()> {
 
                         let certs = ca.get_user_certs(&user)?;
                         for usercert in certs {
-                            println!(" cert {}", usercert.id);
+                            println!(" cert {}, fingerprint {}",
+                                     usercert.id, usercert.fingerprint);
 
                             let cert = Pgp::armored_to_cert(&usercert.pub_cert);
 
