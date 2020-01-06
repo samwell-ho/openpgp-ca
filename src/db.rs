@@ -129,6 +129,37 @@ impl Db {
         Ok(r[0].clone())
     }
 
+    fn insert_or_link_email(&self, addr: &str, user_cert_id: i32) -> Result<Email> {
+        if let Some(e) = self.get_email(addr)? {
+            let ce = NewCertEmail { user_cert_id, email_id: e.id };
+            let inserted_count = diesel::insert_into(certs_emails::table)
+                .values(&ce)
+                .execute(&self.conn)
+                .context("Error saving new certs_emails")?;
+
+            assert_eq!(inserted_count, 1, "insert_email: couldn't insert certs_emails");
+
+            Ok(e)
+        } else {
+            self.insert_email(NewEmail { addr }, user_cert_id)
+        }
+    }
+
+
+    fn get_email(&self, addr: &str) -> Result<Option<Email>> {
+        let emails: Vec<Email> = emails::table
+            .filter(emails::addr.eq(addr))
+            .load::<Email>(&self.conn)
+            .context("Error loading Emails")?;
+
+        match emails.len() {
+            0 => Ok(None),
+            1 => Ok(Some(emails[0].clone())),
+            _ => Err(failure::err_msg("found more than one email for addr, \
+            this should not happen"))
+        }
+    }
+
     fn insert_email(&self, email: NewEmail, user_cert_id: i32) -> Result<Email> {
         let inserted_count = diesel::insert_into(emails::table)
             .values(&email)
@@ -278,6 +309,21 @@ impl Db {
         Ok(())
     }
 
+    pub fn add_user_cert(&self, newcert: NewUserCert, emails: &[String])
+                         -> Result<()> {
+        self.conn.transaction::<_, failure::Error, _>(|| {
+            // UserCert
+            let c = self.insert_usercert(newcert)?;
+
+            // Emails
+            for addr in emails {
+                self.insert_or_link_email(addr, c.id)?;
+            }
+
+            Ok(())
+        })
+    }
+
     pub fn list_users(&self) -> Result<Vec<User>> {
         Ok(users::table
             .load::<User>(&self.conn)
@@ -376,12 +422,14 @@ impl Db {
                 .context("Error loading CertEmails")?;
 
             for ce in ces {
-                let mut e = emails::table
+                for e in emails::table
                     .filter(emails::id.eq(ce.email_id))
                     .load::<Email>(&self.conn)
-                    .context("Error loading Email")?;
-
-                emails.append(&mut e);
+                    .context("Error loading Email")? {
+                    if !emails.contains(&e) {
+                        emails.push(e);
+                    }
+                }
             }
         }
 

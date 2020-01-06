@@ -236,6 +236,28 @@ impl Ca {
         Ok(())
     }
 
+
+    pub fn user_add_cert(&self, user_id: i32, key_file: &str) -> Result<()> {
+        let user_cert = Cert::from_file(key_file)
+            .context("Failed to read key")?;
+
+        let fingerprint = &user_cert.fingerprint().to_string();
+        let pub_cert = &Pgp::cert_to_armored(&user_cert)?;
+
+        let newcert = models::NewUserCert { user_id, fingerprint, pub_cert };
+
+        let mut emails = Vec::new();
+
+        for uid in user_cert.userids() {
+            let email = uid.userid().email()?;
+            if let Some(email) = email {
+                emails.push(email);
+            }
+        }
+
+        self.db.add_user_cert(newcert, &emails[..])
+    }
+
     pub fn add_revocation(&self, revoc_file: &str) -> Result<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
             .context("Couldn't load revocation cert")?;
