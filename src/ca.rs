@@ -356,8 +356,31 @@ impl Ca {
 
     // -------- bridges
 
-    pub fn bridge_new(&self, name: &str, key_file: &str,
-                      regexes: &[&str]) -> Result<()> {
+    // "other.org" => "<[^>]+[@.]other\\.org>$"
+    fn domain_to_regex(domain: &str) -> Result<String> {
+
+        // FIXME: check if domain String has the expected format
+        // ...
+
+        // transform domain to regex
+        let mut regex = "<[^>]+[@.]".to_string();
+
+        regex.push_str(&domain
+            .split(".")
+            .collect::<Vec<_>>()
+            .join("\\."));
+
+        regex.push_str(">$");
+
+        Ok(regex)
+    }
+
+    pub fn bridge_new(&self, name: &str, key_file: &str, scope: &str)
+                      -> Result<()> {
+        let regex = Self::domain_to_regex(scope)?;
+
+        let regexes = vec![regex];
+
         let ca_cert = self.get_ca_cert().unwrap();
 
         let remote_ca_cert = Cert::from_file(key_file)
@@ -368,7 +391,8 @@ impl Ca {
                    "remote CA should have exactly one userid, but has {}",
                    remote_ca_cert.userids().len());
 
-        let bridged = Pgp::bridge_to_remote_ca(&ca_cert, &remote_ca_cert, regexes)?;
+        let bridged = Pgp::bridge_to_remote_ca(&ca_cert, &remote_ca_cert,
+                                               regexes)?;
 
         // store in DB
         let (ca_db, _) =

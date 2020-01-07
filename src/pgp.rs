@@ -204,7 +204,7 @@ impl Pgp {
     /// add trust signature to the public key of a remote CA
     pub fn bridge_to_remote_ca(ca_cert: &Cert,
                                remote_ca_cert: &Cert,
-                               scope_regexes: &[&str]) -> Result<Cert> {
+                               scope_regexes: Vec<String>) -> Result<Cert> {
 
         // FIXME: do we want to support a tsig without any scope regex?
         // -> or force users to explicitly set a catchall regex, then.
@@ -218,7 +218,7 @@ impl Pgp {
         let mut packets: Vec<Packet> = Vec::new();
 
         // create one TSIG for each regex
-        for &regex in scope_regexes {
+        for regex in scope_regexes {
             for signer in &mut cert_keys {
                 let builder = Builder::new(SignatureType::GenericCertification)
                     .set_trust_signature(255, 120)?
