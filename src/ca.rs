@@ -204,7 +204,7 @@ impl Ca {
         // FIXME: the private key needs to be handed over to
         // the user -> print for now?
         let priv_key = &Pgp::priv_cert_to_armored(&certified)?;
-        println!("new user key:\n{}", priv_key);
+        println!("new user key for {}:\n{}", name.unwrap_or(""), priv_key);
         // --
 
         Ok(())
