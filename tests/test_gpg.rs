@@ -220,10 +220,10 @@ fn test_alice_authenticates_bob_key_imports() {
 
 #[test]
 fn test_bridge() {
-    let mut ctx = make_context!();
+    let ctx = make_context!();
 
     // don't delete home dir (for manual inspection)
-    ctx.leak_tempdir();
+//    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     println!("home {}", home_path);
