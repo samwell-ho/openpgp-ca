@@ -244,8 +244,7 @@ fn real_main() -> Result<()> {
 
                             let name = m2.value_of("name").unwrap();
 
-                            ca.bridge_new(name, key_file,
-                                          Some(regex_vec.as_ref()))?;
+                            ca.bridge_new(name, key_file, regex_vec.as_ref())?;
                         }
                         _ => unimplemented!(),
                     }

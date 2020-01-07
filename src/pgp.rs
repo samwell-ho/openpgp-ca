@@ -199,15 +199,14 @@ impl Pgp {
     /// add trust signature to the public key of a remote CA
     pub fn bridge_to_remote_ca(ca_cert: &Cert,
                                remote_ca_cert: &Cert,
-                               regexes: Option<&[&str]>) -> Result<Cert> {
+                               scope_regexes: &[&str]) -> Result<Cert> {
 
-        // FIXME: do we want to support a tsig without any regex?
+        // FIXME: do we want to support a tsig without any scope regex?
         // -> or force users to explicitly set a catchall regex, then.
 
         // there should be exactly one userid!
         let userid = remote_ca_cert.userids().next().unwrap().userid();
 
-        // set_trust_signature + set_regular_expression(s)
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
 
@@ -216,18 +215,17 @@ impl Pgp {
         let mut packets: Vec<Packet> = Vec::new();
 
         // create one TSIG for each regex
-        if let Some(regexes) = regexes {
-            for &regex in regexes {
-                for signer in &mut cert_keys {
-                    let tsig = Builder::new(SignatureType::GenericCertification)
-                        .set_trust_signature(255, 120)?
-                        .set_regular_expression(regex.as_bytes())?
-                        .sign_userid_binding(signer,
-                                             remote_pubkey,
-                                             userid)?;
+        for &regex in scope_regexes {
+            for signer in &mut cert_keys {
+                let builder = Builder::new(SignatureType::GenericCertification)
+                    .set_trust_signature(255, 120)?
+                    .set_regular_expression(regex.as_bytes())?;
 
-                    packets.push(tsig.into());
-                }
+                let tsig = userid.bind(signer,
+                                       remote_ca_cert,
+                                       builder, None)?;
+
+                packets.push(tsig.into());
             }
         }
 

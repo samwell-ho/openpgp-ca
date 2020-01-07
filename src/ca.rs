@@ -351,7 +351,7 @@ impl Ca {
     // -------- bridges
 
     pub fn bridge_new(&self, name: &str, key_file: &str,
-                      regexes: Option<&[&str]>) -> Result<()> {
+                      regexes: &[&str]) -> Result<()> {
         let ca_cert = self.get_ca_cert().unwrap();
 
         let remote_ca_cert = Cert::from_file(key_file)
