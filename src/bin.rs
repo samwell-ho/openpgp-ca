@@ -25,6 +25,7 @@ use failure::{self, ResultExt};
 
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
+use std::path::Path;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -41,6 +42,15 @@ fn real_main() -> Result<()> {
     match matches.subcommand() {
         ("init", Some(_m)) => {
             ca.init();
+        }
+        ("wkd-export", Some(m)) => {
+            match m.value_of("path") {
+                Some(path) => {
+                    let (foo, _) = ca.get_ca()?.unwrap();
+                    ca.export_wkd(&foo.domainname, Path::new(path))?;
+                }
+                _ => unimplemented!("missing domain name"),
+            }
         }
         ("ca", Some(m)) => {
             match m.subcommand() {

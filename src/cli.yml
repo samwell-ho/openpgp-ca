@@ -180,6 +180,12 @@ subcommands:
             about: Add Directory
         - delete:
             about: Delete Directory from CA
+  - wkd-export:
+      about: Export all Certs to WKD
+      args:
+        - path:
+            takes_value: true
+            help: Filesystem directory for WKD export
   - key-profile:
       about: Manage key-profiles
       subcommands:

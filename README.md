@@ -191,6 +191,8 @@ cargo run user import -e heiko@example.org -n Heiko --key-file _test_data/pubkey
 
 cargo run bridge new -r "*@foo.de" --remote-key-file /tmp/bar.txt --name foobridge
 cargo run bridge revoke --name foobridge
+
+cargo run wkd-export /tmp/wkdtest/
 ```
 
 ## Running in Docker

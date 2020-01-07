@@ -83,6 +83,10 @@ impl Ca {
         Ok(())
     }
 
+    pub fn get_ca(&self) -> Result<Option<(models::Ca, models::CaCert)>> {
+        self.db.get_ca()
+    }
+
     pub fn get_ca_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => {
