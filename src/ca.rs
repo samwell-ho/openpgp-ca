@@ -413,13 +413,7 @@ impl Ca {
         Ok(())
     }
 
-    pub fn list_bridges(&self) -> Result<()> {
-        let bridges = self.db.list_bridges()?;
-
-        for bridge in bridges {
-            println!("Bridge '{}':\n\n{}", bridge.name, bridge.pub_key);
-        }
-
-        Ok(())
+    pub fn get_bridges(&self) -> Result<Vec<models::Bridge>> {
+        self.db.list_bridges()
     }
 }

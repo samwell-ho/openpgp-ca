@@ -256,7 +256,11 @@ fn real_main() -> Result<()> {
                     ca.bridge_revoke(name)?;
                 }
                 ("list", Some(_m2)) => {
-                    ca.list_bridges()?;
+                    let bridges = ca.get_bridges()?;
+
+                    for bridge in bridges {
+                        println!("Bridge '{}':\n\n{}", bridge.name, bridge.pub_key);
+                    }
                 }
 
                 _ => unimplemented!(),
