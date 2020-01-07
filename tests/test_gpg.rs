@@ -270,8 +270,8 @@ fn test_bridge() {
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
     // FIXME?!
-    let scope1 = "<[^>]+[@.]other\\.org>$";
-    let scope2 = "<[^>]+[@.]some\\.org>$";
+    let scope1 = "<[^>]+[@.]other\\.org>$\x00";
+    let scope2 = "<[^>]+[@.]some\\.org>$\x00";
 
     ca1.bridge_new("Bridge to other.org", &ca_other_file, &vec![scope1]);
     ca2.bridge_new("Bridge to some.org", &ca_some_file, &vec![scope2]);
