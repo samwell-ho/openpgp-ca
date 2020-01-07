@@ -92,9 +92,9 @@ fn test_alice_authenticates_bob() {
 
     assert_eq!(gpg_trust.len(), 3);
 
-    assert_eq!(gpg_trust.get("alice@example.org"), Some(&"u".to_string()));
-    assert_eq!(gpg_trust.get("openpgp-ca@example.org"), Some(&"f".to_string()));
-    assert_eq!(gpg_trust.get("bob@example.org"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("<alice@example.org>"), Some(&"u".to_string()));
+    assert_eq!(gpg_trust.get("<openpgp-ca@example.org>"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("<bob@example.org>"), Some(&"f".to_string()));
 
     // don't delete home dir (for manual inspection)
     //    ctx.leak_tempdir();
@@ -143,8 +143,8 @@ fn test_alice_authenticates_bob_key_imports() {
 
 
     // create users in their respective GnuPG contexts
-    gnupg::create_user(&ctx_alice, "alice@example.org");
-    gnupg::create_user(&ctx_bob, "bob@example.org");
+    gnupg::create_user(&ctx_alice, "<alice@example.org>");
+    gnupg::create_user(&ctx_bob, "<bob@example.org>");
 
 
     // create tsig for ca key in user GnuPG contexts
@@ -213,9 +213,9 @@ fn test_alice_authenticates_bob_key_imports() {
 
     assert_eq!(gpg_trust.len(), 3);
 
-    assert_eq!(gpg_trust.get("alice@example.org"), Some(&"u".to_string()));
-    assert_eq!(gpg_trust.get("openpgp-ca@example.org"), Some(&"f".to_string()));
-    assert_eq!(gpg_trust.get("bob@example.org"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("<alice@example.org>"), Some(&"u".to_string()));
+    assert_eq!(gpg_trust.get("<openpgp-ca@example.org>"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("<bob@example.org>"), Some(&"f".to_string()));
 }
 
 #[test]
@@ -269,9 +269,8 @@ fn test_bridge() {
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    // FIXME?!
-    let scope1 = "<[^>]+[@.]other\\.org>$\x00";
-    let scope2 = "<[^>]+[@.]some\\.org>$\x00";
+    let scope1 = "<[^>]+[@.]other\\.org>$";
+    let scope2 = "<[^>]+[@.]some\\.org>$";
 
     ca1.bridge_new("Bridge to other.org", &ca_other_file, &vec![scope1]);
     ca2.bridge_new("Bridge to some.org", &ca_some_file, &vec![scope2]);
@@ -350,19 +349,19 @@ fn test_bridge() {
 
     println!("gpg_trust {:?}", gpg_trust);
 
-    assert_eq!(gpg_trust.get("alice@some.org"),
+    assert_eq!(gpg_trust.get("<alice@some.org>"),
                Some(&"u".to_string()),
                "alice@some.org");
-    assert_eq!(gpg_trust.get("openpgp-ca@some.org"),
+    assert_eq!(gpg_trust.get("<openpgp-ca@some.org>"),
                Some(&"f".to_string()),
                "openpgp-ca@some.org");
-    assert_eq!(gpg_trust.get("openpgp-ca@other.org"),
+    assert_eq!(gpg_trust.get("<openpgp-ca@other.org>"),
                Some(&"f".to_string()),
                "openpgp-ca@other.org");
-    assert_eq!(gpg_trust.get("bob@other.org"),
+    assert_eq!(gpg_trust.get("<bob@other.org>"),
                Some(&"f".to_string()),
                "bob@other.org");
-    assert_eq!(gpg_trust.get("carol@third.org"),
+    assert_eq!(gpg_trust.get("<carol@third.org>"),
                Some(&"-".to_string()),
                "carol@third.org");
 }

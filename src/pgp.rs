@@ -45,7 +45,7 @@ impl Pgp {
             .add_signing_subkey();
 
         for &email in emails {
-            builder = builder.add_userid(UserID::from(email));
+            builder = builder.add_userid(UserID::from("<".to_owned() + email + ">"));
         }
 
 
@@ -61,7 +61,8 @@ impl Pgp {
 
         if let Some(emails) = emails {
             for &email in emails {
-                builder = builder.add_userid(UserID::from(email));
+                builder = builder.add_userid(
+                    UserID::from("<".to_owned() + email + ">"));
             }
         }
 
