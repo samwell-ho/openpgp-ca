@@ -75,7 +75,8 @@ impl Ca {
         assert_eq!(emails.len(), 1,
                    "'ca new' expects exactly one email address");
 
-        let (cert, _) = Pgp::make_private_ca_cert(emails)?;
+        let (cert, _) = Pgp::make_private_ca_cert(emails,
+                                                  Some("OpenPGP CA"))?;
 
         let email = emails[0].to_owned();
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
@@ -174,7 +175,7 @@ impl Ca {
 
         // make user key (signed by CA)
         let (user, revoc) =
-            Pgp::make_user(emails).context("make_user failed")?;
+            Pgp::make_user(emails, name).context("make_user failed")?;
 
         // sign user key with CA key
         let certified =

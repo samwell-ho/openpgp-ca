@@ -92,9 +92,12 @@ fn test_alice_authenticates_bob() {
 
     assert_eq!(gpg_trust.len(), 3);
 
-    assert_eq!(gpg_trust.get("<alice@example.org>"), Some(&"u".to_string()));
-    assert_eq!(gpg_trust.get("<openpgp-ca@example.org>"), Some(&"f".to_string()));
-    assert_eq!(gpg_trust.get("<bob@example.org>"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("Alice <alice@example.org>"),
+               Some(&"u".to_string()));
+    assert_eq!(gpg_trust.get("OpenPGP CA <openpgp-ca@example.org>"),
+               Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("Bob <bob@example.org>"),
+               Some(&"f".to_string()));
 
     // don't delete home dir (for manual inspection)
     //    ctx.leak_tempdir();
@@ -139,12 +142,10 @@ fn test_alice_authenticates_bob_key_imports() {
     let ca_cert = ca_cert.unwrap();
 
     let ca_keyid = ca_cert.clone().keyid().to_hex();
-    println!("keyid {}", ca_keyid);
-
 
     // create users in their respective GnuPG contexts
-    gnupg::create_user(&ctx_alice, "<alice@example.org>");
-    gnupg::create_user(&ctx_bob, "<bob@example.org>");
+    gnupg::create_user(&ctx_alice, "Alice <alice@example.org>");
+    gnupg::create_user(&ctx_bob, "Bob <bob@example.org>");
 
 
     // create tsig for ca key in user GnuPG contexts
@@ -213,9 +214,12 @@ fn test_alice_authenticates_bob_key_imports() {
 
     assert_eq!(gpg_trust.len(), 3);
 
-    assert_eq!(gpg_trust.get("<alice@example.org>"), Some(&"u".to_string()));
-    assert_eq!(gpg_trust.get("<openpgp-ca@example.org>"), Some(&"f".to_string()));
-    assert_eq!(gpg_trust.get("<bob@example.org>"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("Alice <alice@example.org>"),
+               Some(&"u".to_string()));
+    assert_eq!(gpg_trust.get("OpenPGP CA <openpgp-ca@example.org>"),
+               Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("Bob <bob@example.org>"),
+               Some(&"f".to_string()));
 }
 
 #[test]
@@ -226,7 +230,6 @@ fn test_bridge() {
 //    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
-    println!("home {}", home_path);
 
     let db1 = format!("{}/ca1.sqlite", home_path);
     let db2 = format!("{}/ca2.sqlite", home_path);
@@ -347,21 +350,19 @@ fn test_bridge() {
 
     assert_eq!(gpg_trust.len(), 5);
 
-    println!("gpg_trust {:?}", gpg_trust);
-
-    assert_eq!(gpg_trust.get("<alice@some.org>"),
+    assert_eq!(gpg_trust.get("Alice <alice@some.org>"),
                Some(&"u".to_string()),
                "alice@some.org");
-    assert_eq!(gpg_trust.get("<openpgp-ca@some.org>"),
+    assert_eq!(gpg_trust.get("OpenPGP CA <openpgp-ca@some.org>"),
                Some(&"f".to_string()),
                "openpgp-ca@some.org");
-    assert_eq!(gpg_trust.get("<openpgp-ca@other.org>"),
+    assert_eq!(gpg_trust.get("OpenPGP CA <openpgp-ca@other.org>"),
                Some(&"f".to_string()),
                "openpgp-ca@other.org");
-    assert_eq!(gpg_trust.get("<bob@other.org>"),
+    assert_eq!(gpg_trust.get("Bob <bob@other.org>"),
                Some(&"f".to_string()),
                "bob@other.org");
-    assert_eq!(gpg_trust.get("<carol@third.org>"),
+    assert_eq!(gpg_trust.get("Carol <carol@third.org>"),
                Some(&"-".to_string()),
                "carol@third.org");
 }
