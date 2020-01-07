@@ -32,7 +32,7 @@ pub struct NewCa<'a> {
 
 #[derive(Queryable, Debug, Associations, Clone, AsChangeset)]
 #[belongs_to(Ca)]
-pub struct CaCert {
+pub struct Cacert {
     pub id: i32,
     pub cert: String,
     // https://docs.diesel.rs/diesel/associations/index.html
@@ -40,8 +40,8 @@ pub struct CaCert {
 }
 
 #[derive(Insertable)]
-#[table_name = "ca_certs"]
-pub struct NewCaCert {
+#[table_name = "cacerts"]
+pub struct NewCacert {
     pub cert: String,
     pub ca_id: i32,
 }
@@ -64,7 +64,7 @@ pub struct NewUser<'a> {
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
 #[belongs_to(User)]
-pub struct UserCert {
+pub struct Usercert {
     pub id: i32,
     pub pub_cert: String,
     pub fingerprint: String,
@@ -73,8 +73,8 @@ pub struct UserCert {
 }
 
 #[derive(Insertable, Debug)]
-#[table_name = "user_certs"]
-pub struct NewUserCert<'a> {
+#[table_name = "usercerts"]
+pub struct NewUsercert<'a> {
     pub pub_cert: &'a str,
     pub fingerprint: &'a str,
     pub user_id: i32,
@@ -93,37 +93,37 @@ pub struct NewEmail<'a> {
 }
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(UserCert)]
+#[belongs_to(Usercert)]
 #[belongs_to(Email)]
 #[table_name = "certs_emails"]
 pub struct CertEmail {
     pub id: i32,
     // https://docs.diesel.rs/diesel/associations/index.html
-    pub user_cert_id: i32,
+    pub usercert_id: i32,
     pub email_id: i32,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "certs_emails"]
 pub struct NewCertEmail {
-    pub user_cert_id: i32,
+    pub usercert_id: i32,
     pub email_id: i32,
 }
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(UserCert)]
+#[belongs_to(Usercert)]
 pub struct Revocation {
     pub id: i32,
     pub revocation: String,
     // FIXME - https://docs.diesel.rs/diesel/associations/index.html
-    pub user_cert_id: i32,
+    pub usercert_id: i32,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "revocations"]
 pub struct NewRevocation<'a> {
     pub revocation: &'a str,
-    pub user_cert_id: i32,
+    pub usercert_id: i32,
 }
 
 #[derive(Identifiable, Queryable, Clone, AsChangeset, Debug)]

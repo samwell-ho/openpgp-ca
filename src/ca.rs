@@ -83,7 +83,7 @@ impl Ca {
         Ok(())
     }
 
-    pub fn get_ca(&self) -> Result<Option<(models::Ca, models::CaCert)>> {
+    pub fn get_ca(&self) -> Result<Option<(models::Ca, models::Cacert)>> {
         self.db.get_ca()
     }
 
@@ -161,7 +161,7 @@ impl Ca {
         ca_cert.cert = Pgp::priv_cert_to_armored(&signed)
             .context("failed to armor CA Cert")?;
 
-        self.db.update_ca_cert(&ca_cert)
+        self.db.update_cacert(&ca_cert)
             .context("Update of CA Cert in DB failed")?;
 
         Ok(())
@@ -244,7 +244,7 @@ impl Ca {
         let fingerprint = &user_cert.fingerprint().to_string();
         let pub_cert = &Pgp::cert_to_armored(&user_cert)?;
 
-        let newcert = models::NewUserCert { user_id, fingerprint, pub_cert };
+        let newcert = models::NewUsercert { user_id, fingerprint, pub_cert };
 
         let mut emails = Vec::new();
 
@@ -255,7 +255,7 @@ impl Ca {
             }
         }
 
-        self.db.add_user_cert(newcert, &emails[..])
+        self.db.add_usercert(newcert, &emails[..])
     }
 
     pub fn add_revocation(&self, revoc_file: &str) -> Result<()> {
@@ -265,7 +265,7 @@ impl Ca {
         let sig_fingerprint =
             &Pgp::get_revoc_fingerprint(&revoc_cert).to_string();
 
-        let cert = self.db.get_user_cert(sig_fingerprint)?;
+        let cert = self.db.get_usercert(sig_fingerprint)?;
 
         match cert {
             None => Err(failure::err_msg("couldn't find cert for this fingerprint")),
@@ -293,11 +293,11 @@ impl Ca {
     }
 
     pub fn get_user_certs(&self, user: &models::User)
-                          -> Result<Vec<models::UserCert>> {
-        self.db.get_user_certs(user)
+                          -> Result<Vec<models::Usercert>> {
+        self.db.get_usercerts(user)
     }
 
-    pub fn get_revocations(&self, cert: &models::UserCert)
+    pub fn get_revocations(&self, cert: &models::Usercert)
                            -> Result<Vec<models::Revocation>> {
         self.db.get_revocations(cert)
     }
@@ -309,7 +309,7 @@ impl Ca {
 
     // FIXME: check by Cert, not by User?
     pub fn check_ca_sig(&self, user: &models::User) -> Result<bool> {
-        let certs = self.db.get_user_certs(user)?;
+        let certs = self.db.get_usercerts(user)?;
 
         let mut signed = true;
 
@@ -335,7 +335,7 @@ impl Ca {
 
         let mut check = true;
 
-        let certs = self.db.get_user_certs(user)?;
+        let certs = self.db.get_usercerts(user)?;
         for cert in certs {
             let user_cert = Pgp::armored_to_cert(&cert.pub_cert);
 

@@ -6,7 +6,7 @@ CREATE TABLE cas (
 );
 
 
-CREATE TABLE ca_certs (
+CREATE TABLE cacerts (
   id INTEGER NOT NULL PRIMARY KEY,
   cert VARCHAR NOT NULL,
 
@@ -26,7 +26,7 @@ CREATE TABLE users (
   FOREIGN KEY(ca_id) REFERENCES cas(id) ON DELETE RESTRICT
 );
 
-CREATE TABLE user_certs (
+CREATE TABLE usercerts (
   id INTEGER NOT NULL PRIMARY KEY,
   pub_cert VARCHAR NOT NULL,
   fingerprint VARCHAR NOT NULL,
@@ -41,17 +41,17 @@ CREATE TABLE emails (
   id INTEGER NOT NULL PRIMARY KEY,
   addr VARCHAR NOT NULL,
 
--- FIXME: n:m mapping to user_certs
+-- FIXME: n:m mapping to usercerts
 
   CONSTRAINT emails_addr_unique UNIQUE (addr)
 );
 
--- n:m mapping  user_certs <-> emails
+-- n:m mapping  usercerts <-> emails
 CREATE TABLE certs_emails (
   id INTEGER NOT NULL PRIMARY KEY,
-  user_cert_id INTEGER NOT NULL,
+  usercert_id INTEGER NOT NULL,
   email_id INTEGER NOT NULL,
-  FOREIGN KEY(user_cert_id) REFERENCES user_certs(id),
+  FOREIGN KEY(usercert_id) REFERENCES usercerts(id),
   FOREIGN KEY(email_id) REFERENCES emails(id)
 );
 
@@ -64,8 +64,8 @@ CREATE TABLE revocations (
   -- reason -- FIXME
   -- expiration_time -- FIXME
 
-  user_cert_id INTEGER NOT NULL,
-  FOREIGN KEY(user_cert_id) REFERENCES user_certs(id)
+  usercert_id INTEGER NOT NULL,
+  FOREIGN KEY(usercert_id) REFERENCES usercerts(id)
 );
 
 CREATE TABLE bridges (
