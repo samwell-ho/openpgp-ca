@@ -73,6 +73,12 @@ impl Ca {
             return Err(failure::err_msg("ERROR: CA has already been created"));
         }
 
+        // FIXME: use a better syntax check for domainname
+        if domainname.contains("@") {
+            return Err(failure::err_msg(
+                "Parameter should be a domainname, not an email address"));
+        }
+
         let (cert, _) = Pgp::make_private_ca_cert(domainname,
                                                   Some("OpenPGP CA"))?;
 
