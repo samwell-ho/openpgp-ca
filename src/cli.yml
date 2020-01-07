@@ -36,9 +36,9 @@ subcommands:
         - new:
             about: Create CA
             args:
-              - email:
+              - domain:
                   takes_value: true
-                  help: CA email
+                  help: CA domain name
         - show:
             about: Show CA
         - export:

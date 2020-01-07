@@ -53,16 +53,15 @@ impl Pgp {
     }
 
     /// Generate a key for the CA.
-    fn make_ca_cert(emails: &[&str], name: Option<&str>) -> Result<(Cert, Signature)> {
-        let mut builder = cert::CertBuilder::new();
+    fn make_ca_cert(domainname: &str, name: Option<&str>)
+                    -> Result<(Cert, Signature)> {
 
         // FIXME: should not be encryption capable
         // FIXME: should not have subkeys
 
-        for &email in emails {
-            builder = builder.add_userid(Self::user_id(email, name));
-        }
-
+        let email = "openpgp-ca@".to_owned() + domainname;
+        let builder = cert::CertBuilder::new()
+            .add_userid(Self::user_id(&email, name));
 
         Ok(builder.generate()?)
     }
@@ -75,8 +74,9 @@ impl Pgp {
     }
 
     /// make a private CA key
-    pub fn make_private_ca_cert(ca_uids: &[&str], name: Option<&str>) -> Result<(Cert, Signature)> {
-        Pgp::make_ca_cert(ca_uids, name)
+    pub fn make_private_ca_cert(domainname: &str, name: Option<&str>)
+                                -> Result<(Cert, Signature)> {
+        Pgp::make_ca_cert(domainname, name)
     }
 
     /// make a user Cert with "emails" as UIDs (all UIDs get signed)

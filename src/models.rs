@@ -21,13 +21,13 @@ use super::schema::*;
 #[derive(Queryable, Debug, Clone, AsChangeset)]
 pub struct Ca {
     pub id: i32,
-    pub email: String,
+    pub domainname: String,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "cas"]
-pub struct NewCa {
-    pub email: String,
+pub struct NewCa<'a> {
+    pub domainname: &'a str,
 }
 
 #[derive(Queryable, Debug, Associations, Clone, AsChangeset)]

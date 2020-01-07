@@ -2,7 +2,7 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE cas (
   id INTEGER NOT NULL PRIMARY KEY,
-  email VARCHAR NOT NULL
+  domainname VARCHAR NOT NULL
 );
 
 

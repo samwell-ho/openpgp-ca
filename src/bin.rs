@@ -45,12 +45,11 @@ fn real_main() -> Result<()> {
         ("ca", Some(m)) => {
             match m.subcommand() {
                 ("new", Some(m2)) => {
-                    match m2.values_of("email") {
-                        Some(email) => {
-                            let emails = email.into_iter().collect::<Vec<_>>();
-                            ca.ca_new(&emails)?;
+                    match m2.value_of("domain") {
+                        Some(domain) => {
+                            ca.ca_new(&domain)?;
                         }
-                        _ => unimplemented!("missing email"),
+                        _ => unimplemented!("missing domain name"),
                     }
                 }
                 ("show", Some(_m2)) => {

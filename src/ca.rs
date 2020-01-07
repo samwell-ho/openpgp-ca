@@ -19,15 +19,16 @@ use failure::{self, ResultExt};
 
 use std::env;
 
+use sequoia_openpgp as openpgp;
 use openpgp::Cert;
 use openpgp::Packet;
 use openpgp::parse::Parse;
-use sequoia_openpgp as openpgp;
+use openpgp::packet::Signature;
 
 use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
-use sequoia_openpgp::packet::Signature;
+use std::path::Path;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -67,22 +68,17 @@ impl Ca {
 
     // -------- CAs
 
-    pub fn ca_new(&self, emails: &[&str]) -> Result<()> {
+    pub fn ca_new(&self, domainname: &str) -> Result<()> {
         if let Some(_) = self.db.get_ca()? {
             return Err(failure::err_msg("ERROR: CA has already been created"));
         }
 
-        assert_eq!(emails.len(), 1,
-                   "'ca new' expects exactly one email address");
-
-        let (cert, _) = Pgp::make_private_ca_cert(emails,
+        let (cert, _) = Pgp::make_private_ca_cert(domainname,
                                                   Some("OpenPGP CA"))?;
 
-        let email = emails[0].to_owned();
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
-//        let revoc_cert = &Pgp::sig_to_armored(&revoc)?;
 
-        self.db.insert_ca(models::NewCa { email }, ca_key)?;
+        self.db.insert_ca(models::NewCa { domainname }, ca_key)?;
 
         Ok(())
     }
@@ -99,8 +95,7 @@ impl Ca {
     pub fn show_cas(&self) -> Result<()> {
         let (ca, ca_cert) = self.db.get_ca()
             .context("failed to load CA from database")?.unwrap();
-        println!("\n{}\n\n{}",
-                 ca.email, ca_cert.cert);
+        println!("\n{}\n\n{}", ca.domainname, ca_cert.cert);
         Ok(())
     }
 
@@ -416,5 +411,27 @@ impl Ca {
 
     pub fn get_bridges(&self) -> Result<Vec<models::Bridge>> {
         self.db.list_bridges()
+    }
+
+    /// export all user keys + CA key into a wkd directory structure
+    /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
+    pub fn export_wkd(&self, domain: &str, path: &Path) -> Result<()> {
+        extern crate sequoia_net;
+        use sequoia_net::wkd;
+
+        let ca_cert = self.get_ca_cert()?;
+        wkd::insert(&path, domain, None, &ca_cert)?;
+
+        let users = self.get_all_users()?;
+        for user in users {
+            let certs = self.get_user_certs(&user)?;
+
+            for uc in certs {
+                let c = Pgp::armored_to_cert(&uc.pub_cert);
+                wkd::insert(&path, domain, None, &c)?;
+            }
+        }
+
+        Ok(())
     }
 }

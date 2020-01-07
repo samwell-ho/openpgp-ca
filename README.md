@@ -60,7 +60,7 @@ or
 
 *  Set up a new CA instance and generate a new keypair for the CA:
 
-`openpgp_ca ca new openpgp-ca@example.org` 
+`openpgp_ca ca new example.org` 
 
 *  Export the CA public key, for use on client machines:
 
@@ -132,7 +132,7 @@ This should show that Alice's key has been signed by the CA and that Alice
 
 *  Set up a new CA instance and generate a new keypair for the CA:
 
-`openpgp_ca ca new openpgp-ca@example.org` 
+`openpgp_ca ca new example.org` 
 
 #### create new user
 
@@ -180,8 +180,8 @@ Then `trust`, `5`, `quit`.
 ## Some random usage examples:
 
 ```
-cargo run ca new openpgp-ca@example.org
-cargo run -- -d /tmp/foo.sqlite ca new openpgp-ca@example.org
+cargo run ca new example.org
+cargo run -- -d /tmp/foo.sqlite ca new example.org
 
 cargo run user add -e alice@example.org -e a@example.org -n Alicia
 cargo run user add -e bob@example.org
@@ -210,19 +210,19 @@ docker run openpgp-ca
 You should see the help output. Running any `openpgp_ca` command is easy, just add it at the end, like so:
 
 ```
-docker run openpgp-ca ca new openpgp-ca@example.org
+docker run openpgp-ca ca new example.org
 ```
 
 However, since it's running in Docker, the database does not persist. The database is kept in `/var/run/openpgp-ca/` inside the container. Therefore, you might want to do a volume-mount:
 
 ```
-docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca new openpgp-ca@example.org
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca new example.org
 ```
 
 An example centralized workflow of creating a CA and a user would thus be:
 
 ```
-docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca new openpgp-ca@example.org
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca new example.org
 docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user add -e alice@example.org -e a@example.org -n Alicia
 docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user add -e bob@example.org
 docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user list

@@ -18,7 +18,7 @@ table! {
 table! {
     cas (id) {
         id -> Integer,
-        email -> Text,
+        domainname -> Text,
     }
 }
 

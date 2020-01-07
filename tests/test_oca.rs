@@ -1,5 +1,6 @@
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp;
+use std::path::Path;
 
 mod gnupg;
 
@@ -24,7 +25,7 @@ fn test_ca() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new(&["ca@example.org"]).is_ok());
+    assert!(ca.ca_new("example.org").is_ok());
 
 
     // make CA user
@@ -67,7 +68,7 @@ fn test_update_user_cert() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new(&["ca@example.org"]).is_ok());
+    assert!(ca.ca_new("example.org").is_ok());
 
     // import key as new user
     let ctx_alice1 = make_context!();
@@ -131,7 +132,7 @@ fn test_ca_insert_duplicate_email() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new(&["ca@example.org"]).is_ok());
+    assert!(ca.ca_new("example.org").is_ok());
 
 
     // make CA user
@@ -146,4 +147,45 @@ fn test_ca_insert_duplicate_email() {
     let users = users.unwrap();
 
     assert_eq!(users.len(), 1);
+}
+
+
+#[test]
+fn test_ca_export_wkd() {
+    let ctx = make_context!();
+//    ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let mut ca = ca::Ca::new(Some(&db));
+
+    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.user_new(Some(&"Alice"), &["alice@example.org"]).is_ok());
+    assert!(ca.user_new(Some(&"Bob"), &["bob@example.org"]).is_ok());
+
+    let wkd_dir = home_path + "/wkd/";
+    let wkd_path = Path::new(&wkd_dir);
+
+    let res = ca.export_wkd("example.org", &wkd_path);
+    assert!(res.is_ok());
+
+
+    // check that both user keys have been written to files
+    let test_path = wkd_path.join(
+        "openpgpkey.example.org/.well-known/openpgpkey/example.org\
+         /hu/jycbiujnsxs47xrkethgtj69xuunurok");
+    assert!(test_path.is_file());
+
+    let test_path = wkd_path.join(
+        "openpgpkey.example.org/.well-known/openpgpkey/example.org\
+         /hu/kei1q4tipxxu1yj79k9kfukdhfy631xe");
+    assert!(test_path.is_file());
+
+
+    // check that CA key has been written to file
+    let test_path = wkd_path.join(
+        "openpgpkey.example.org/.well-known/openpgpkey/example.org\
+         /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t");
+    assert!(test_path.is_file());
 }

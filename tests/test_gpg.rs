@@ -15,7 +15,7 @@ fn run_gpg() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new(&["openpgp-ca@example.org"]).is_ok());
+    assert!(ca.ca_new("example.org").is_ok());
 
     // get Cert for CA
     let ca_cert = ca.get_ca_cert();
@@ -43,7 +43,7 @@ fn test_alice_authenticates_bob() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    let res = ca.ca_new(&["openpgp-ca@example.org"]);
+    let res = ca.ca_new("example.org");
     assert!(res.is_ok());
 
     // make CA users
@@ -127,7 +127,7 @@ fn test_alice_authenticates_bob_key_imports() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    let res = ca.ca_new(&["openpgp-ca@example.org"]);
+    let res = ca.ca_new("example.org");
     assert!(res.is_ok());
 
     let ca_key = ca.export_pubkey().unwrap();
@@ -240,7 +240,7 @@ fn test_bridge() {
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    let res = ca1.ca_new(&["openpgp-ca@some.org"]);
+    let res = ca1.ca_new("some.org");
     assert!(res.is_ok());
 
     // make CA user
@@ -250,7 +250,7 @@ fn test_bridge() {
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    let res = ca2.ca_new(&["openpgp-ca@other.org"]);
+    let res = ca2.ca_new("other.org");
     assert!(res.is_ok());
 
     // make CA user
