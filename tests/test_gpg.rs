@@ -15,7 +15,7 @@ fn run_gpg() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new(&["ca@example.org"]).is_ok());
+    assert!(ca.ca_new(&["openpgp-ca@example.org"]).is_ok());
 
     // get Cert for CA
     let ca_cert = ca.get_ca_cert();
@@ -43,7 +43,7 @@ fn test_alice_authenticates_bob() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    let res = ca.ca_new(&["ca@example.org"]);
+    let res = ca.ca_new(&["openpgp-ca@example.org"]);
     assert!(res.is_ok());
 
     // make CA users
@@ -93,7 +93,7 @@ fn test_alice_authenticates_bob() {
     assert_eq!(gpg_trust.len(), 3);
 
     assert_eq!(gpg_trust.get("alice@example.org"), Some(&"u".to_string()));
-    assert_eq!(gpg_trust.get("ca@example.org"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("openpgp-ca@example.org"), Some(&"f".to_string()));
     assert_eq!(gpg_trust.get("bob@example.org"), Some(&"f".to_string()));
 
     // don't delete home dir (for manual inspection)
@@ -124,7 +124,7 @@ fn test_alice_authenticates_bob_key_imports() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    let res = ca.ca_new(&["ca@example.org"]);
+    let res = ca.ca_new(&["openpgp-ca@example.org"]);
     assert!(res.is_ok());
 
     let ca_key = ca.export_pubkey().unwrap();
@@ -155,8 +155,8 @@ fn test_alice_authenticates_bob_key_imports() {
 
 
     // export CA key from both contexts, import to CA
-    let alice_ca_key = gnupg::export(&ctx_alice, &"ca@example.org");
-    let bob_ca_key = gnupg::export(&ctx_bob, &"ca@example.org");
+    let alice_ca_key = gnupg::export(&ctx_alice, &"openpgp-ca@example.org");
+    let bob_ca_key = gnupg::export(&ctx_bob, &"openpgp-ca@example.org");
 
     let alice_ca_file = format!("{}/ca.key.alice", home_path_alice);
     let bob_ca_file = format!("{}/ca.key.bob", home_path_bob);
@@ -214,9 +214,6 @@ fn test_alice_authenticates_bob_key_imports() {
     assert_eq!(gpg_trust.len(), 3);
 
     assert_eq!(gpg_trust.get("alice@example.org"), Some(&"u".to_string()));
-    assert_eq!(gpg_trust.get("ca@example.org"), Some(&"f".to_string()));
+    assert_eq!(gpg_trust.get("openpgp-ca@example.org"), Some(&"f".to_string()));
     assert_eq!(gpg_trust.get("bob@example.org"), Some(&"f".to_string()));
-
-    // don't delete home dir (for manual inspection)
-    //    ctx.leak_tempdir();
 }
