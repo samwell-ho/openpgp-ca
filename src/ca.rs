@@ -419,7 +419,7 @@ impl Ca {
         extern crate sequoia_net;
         use sequoia_net::wkd;
 
-        let ca_cert = self.get_ca_cert()?;
+        let ca_cert = Pgp::armored_to_cert(&self.export_pubkey()?);
         wkd::insert(&path, domain, None, &ca_cert)?;
 
         let users = self.get_all_users()?;
