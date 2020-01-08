@@ -243,20 +243,14 @@ fn real_main() -> Result<()> {
         ("bridge", Some(m)) => {
             match m.subcommand() {
                 ("new", Some(m2)) => {
-                    match m2.values_of("regex") {
-                        Some(regex) => {
-                            let regex_vec = regex.into_iter()
-                                .collect::<Vec<_>>();
+                    let scope = m2.value_of("scope");
 
-                            let key_file =
-                                m2.value_of("remote-key-file").unwrap();
+                    let key_file =
+                        m2.value_of("remote-key-file").unwrap();
 
-                            let name = m2.value_of("name").unwrap();
+                    let name = m2.value_of("name").unwrap();
 
-                            ca.bridge_new(name, key_file, regex_vec.as_ref())?;
-                        }
-                        _ => unimplemented!(),
-                    }
+                    ca.bridge_new(name, key_file, scope.unwrap())?;
                 }
                 ("revoke", Some(m2)) => {
                     let name = m2.value_of("name").unwrap();

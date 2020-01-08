@@ -153,15 +153,16 @@ subcommands:
                   short: n
                   long: name
                   help: Bridge Name
-              - regex:
+              - scope:
+                  required: true
                   takes_value: true
-                  short: r
-                  long: regex
-                  multiple: true
-                  help: Regex
+                  short: s
+                  long: scope
+                  help: Scope for trust of this bridge (domainname)
               - remote-key-file:
-                  takes_value: true
                   long: remote-key-file
+                  takes_value: true
+                  required: true
                   help: File that contains the remote CA's Public Key
         - revoke:
             about: Revoke Bridge
