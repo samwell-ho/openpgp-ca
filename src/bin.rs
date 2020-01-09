@@ -248,9 +248,9 @@ fn real_main() -> Result<()> {
                     let key_file =
                         m2.value_of("remote-key-file").unwrap();
 
-                    let name = m2.value_of("name").unwrap();
+                    let name = m2.value_of("name");
 
-                    ca.bridge_new(name, key_file, scope.unwrap())?;
+                    ca.bridge_new(key_file, name, scope)?;
                 }
                 ("revoke", Some(m2)) => {
                     let name = m2.value_of("name").unwrap();

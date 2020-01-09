@@ -272,8 +272,8 @@ fn test_bridge() {
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    ca1.bridge_new("Bridge to other.org", &ca_other_file, "other.org");
-    ca2.bridge_new("Bridge to some.org", &ca_some_file, "some.org");
+    ca1.bridge_new(&ca_other_file, None, None);
+    ca2.bridge_new(&ca_some_file, None, None);
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 

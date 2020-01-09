@@ -375,16 +375,46 @@ impl Ca {
         Ok(regex)
     }
 
-    pub fn bridge_new(&self, name: &str, key_file: &str, scope: &str)
-                      -> Result<()> {
-        let regex = Self::domain_to_regex(scope)?;
+    /// when scope is not set, it is derived from the email in the key_file
+    pub fn bridge_new(&self, key_file: &str,
+                      name: Option<&str>, scope: Option<&str>) -> Result<()> {
+        let remote_ca_cert = Cert::from_file(key_file)
+            .context("Failed to read key")?;
+
+        let scope = if scope.is_some() {
+            scope.unwrap().to_owned()
+        } else {
+            let uids: Vec<_> = remote_ca_cert.userids().collect();
+            assert_eq!(uids.len(), 1,
+                       "Expected exactly one userid in remote CA Cert");
+
+            let remote_uid = uids[0].userid();
+            let remote_email = remote_uid.email()?;
+
+            assert!(remote_email.is_some(),
+                    "Couldn't get email from remote CA Cert");
+
+            let remote_email = remote_email.unwrap();
+
+            let split: Vec<_> = remote_email.split("@").collect();
+            assert_eq!(split.len(), 2);
+
+            assert_eq!(split[0], "openpgp-ca");
+
+            let domain = split[1].to_owned();
+            domain
+        };
+
+        let name = match name {
+            None => format!("bridge to {}", scope),
+            Some(name) => name.to_owned()
+        };
+
+        let regex = Self::domain_to_regex(&scope)?;
 
         let regexes = vec![regex];
 
         let ca_cert = self.get_ca_cert().unwrap();
-
-        let remote_ca_cert = Cert::from_file(key_file)
-            .context("Failed to read key")?;
 
         // expect exactly one userid in remote CA key (otherwise fail)
         assert_eq!(remote_ca_cert.userids().len(), 1,
@@ -401,12 +431,8 @@ impl Ca {
 
         let pub_key = &Pgp::cert_to_armored(&bridged)?;
 
-        let new_bridge = models::NewBridge {
-            name,
-            pub_key,
-            cas_id:
-            ca_db.id,
-        };
+        let new_bridge =
+            models::NewBridge { name: &name, pub_key, cas_id: ca_db.id };
 
         self.db.insert_bridge(new_bridge)?;
 

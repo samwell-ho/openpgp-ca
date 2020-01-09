@@ -154,7 +154,7 @@ subcommands:
                   long: name
                   help: Bridge Name
               - scope:
-                  required: true
+                  required: false
                   takes_value: true
                   short: s
                   long: scope
@@ -168,6 +168,7 @@ subcommands:
             about: Revoke Bridge
             args:
               - name:
+                  required: true
                   takes_value: true
                   short: n
                   long: name
