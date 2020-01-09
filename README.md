@@ -14,7 +14,7 @@ OpenPGP CA requires:
 
 - Rust and Cargo, see https://www.rust-lang.org/tools/install
 
-- the C-dependencies of Sequoia PGP, see "Building Sequoia at" https://gitlab.com/sequoia-pgp/sequoia
+- the C-dependencies of Sequoia PGP, see "Building Sequoia" at https://gitlab.com/sequoia-pgp/sequoia
 
 Then run `cargo build --release` - the resulting binary is at `target/release/openpgp_ca`  
 
@@ -222,10 +222,15 @@ export public PGP Certificate of OpenPGP CA admin:
 
 `export OPENPGP_CA_DB=/tmp/openpgp-ca1.sqlite`
 
-CA 1 creates a trust signature for the public key of CA 2, scoped to the
-domainname "other.org" of the remote organization:
+CA 1 creates a trust signature for the public key of CA 2 (implicitely
+scoped to the domainname "other.org") of the remote organization
 
-`openpgp_ca bridge new -s "other.org" --remote-key-file ca2.pub -n "Bridge to other.org"`
+`openpgp_ca bridge new --remote-key-file ca2.pub`
+
+OpenPGP CA prints a message showing the fingerprint of the remote key
+that you just configured a bridge to. Please double-check that this
+fingerprint really belongs to the intended remote CA before disseminating
+the newly trust-signed public key!
 
 Export signed public key of CA 2:
 
@@ -239,10 +244,11 @@ Export user keys
 
 `export OPENPGP_CA_DB=/tmp/openpgp-ca2.sqlite`
 
-CA 2 creates a trust signature for the public key of CA 1, scoped to the
-domainname "some.org" of the remote organization
+CA 2 creates a trust signature for the public key of CA 1 (implicitly
+scoped to the domainname "some.org") of the remote organization (again,
+please make sure that the fingerprint belongs to the intended remote CA!)
 
-`openpgp_ca bridge new -s "some.org" --remote-key-file ca1.pub -n "Bridge to some.org"`
+`openpgp_ca bridge new --remote-key-file ca1.pub`
 
 Export signed public key of CA 1:
 
