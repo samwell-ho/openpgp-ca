@@ -375,9 +375,10 @@ impl Ca {
         Ok(regex)
     }
 
-    /// when scope is not set, it is derived from the email in the key_file
+    /// when scope is not set, it is derived from the user_id in the key_file
     pub fn bridge_new(&self, key_file: &str,
-                      name: Option<&str>, scope: Option<&str>) -> Result<()> {
+                      name: Option<&str>, scope: Option<&str>)
+                      -> Result<models::Bridge> {
         let remote_ca_cert = Cert::from_file(key_file)
             .context("Failed to read key")?;
 
@@ -442,9 +443,9 @@ impl Ca {
         let new_bridge =
             models::NewBridge { name: &name, pub_key, cas_id: ca_db.id };
 
-        self.db.insert_bridge(new_bridge)?;
+        let bridge = self.db.insert_bridge(new_bridge)?;
 
-        Ok(())
+        Ok(bridge)
     }
 
     pub fn bridge_revoke(&self, name: &str) -> Result<()> {

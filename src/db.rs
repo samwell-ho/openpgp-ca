@@ -456,13 +456,26 @@ impl Db {
         Ok(emails)
     }
 
-    pub fn insert_bridge(&self, bridge: NewBridge) -> Result<()> {
-        diesel::insert_into(bridges::table)
+    pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {
+        let inserted_count = diesel::insert_into(bridges::table)
             .values(&bridge)
             .execute(&self.conn)
             .context("Error saving new bridge")?;
 
-        Ok(())
+
+        assert_eq!(inserted_count, 1, "insert_user: couldn't insert bridge");
+
+        let b: Vec<Bridge> = bridges::table
+            .order(bridges::id.desc())
+            .limit(inserted_count as i64)
+            .load(&self.conn)?
+            .into_iter()
+            .rev()
+            .collect();
+
+        assert_eq!(b.len(), 1);
+
+        Ok(b[0].clone())
     }
 
     pub fn update_bridge(&self, bridge: &Bridge) -> Result<()> {
