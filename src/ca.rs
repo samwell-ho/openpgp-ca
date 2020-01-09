@@ -197,7 +197,7 @@ impl Ca {
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
         let res = self.db.new_user(name, pub_key,
-                                   &user.fingerprint().to_string(),
+                                   &user.fingerprint().to_hex(),
                                    emails, &vec![revoc],
                                    Some(&tsigned_ca_armored));
 
@@ -236,7 +236,7 @@ impl Ca {
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         self.db.new_user(name, pub_key,
-                         &certified.fingerprint().to_string(),
+                         &certified.fingerprint().to_hex(),
                          emails, &revoc, None)?;
 
         Ok(())
@@ -247,7 +247,7 @@ impl Ca {
         let user_cert = Cert::from_file(key_file)
             .context("Failed to read key")?;
 
-        let fingerprint = &user_cert.fingerprint().to_string();
+        let fingerprint = &user_cert.fingerprint().to_hex();
         let pub_cert = &Pgp::cert_to_armored(&user_cert)?;
 
         let newcert = models::NewUsercert { user_id, fingerprint, pub_cert };
@@ -269,7 +269,7 @@ impl Ca {
             .context("Couldn't load revocation cert")?;
 
         let sig_fingerprint =
-            &Pgp::get_revoc_fingerprint(&revoc_cert).to_string();
+            &Pgp::get_revoc_fingerprint(&revoc_cert).to_hex();
 
         let cert = self.db.get_usercert(sig_fingerprint)?;
 
