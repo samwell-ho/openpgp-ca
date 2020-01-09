@@ -381,9 +381,7 @@ impl Ca {
         let remote_ca_cert = Cert::from_file(key_file)
             .context("Failed to read key")?;
 
-        let scope = if scope.is_some() {
-            scope.unwrap().to_owned()
-        } else {
+        let domain = {
             let uids: Vec<_> = remote_ca_cert.userids().collect();
             assert_eq!(uids.len(), 1,
                        "Expected exactly one userid in remote CA Cert");
@@ -401,8 +399,18 @@ impl Ca {
 
             assert_eq!(split[0], "openpgp-ca");
 
-            let domain = split[1].to_owned();
-            domain
+            let domain: &str = split[1];
+            domain.to_owned()
+        };
+
+        let scope = match scope {
+            Some(scope) => {
+                // FIXME: if scope and domain don't match, warn/error?
+                // (... unless --force parameter has been given?!)
+
+                scope
+            }
+            None => &domain
         };
 
         let name = match name {
@@ -410,7 +418,7 @@ impl Ca {
             Some(name) => name.to_owned()
         };
 
-        let regex = Self::domain_to_regex(&scope)?;
+        let regex = Self::domain_to_regex(scope)?;
 
         let regexes = vec![regex];
 
