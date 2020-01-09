@@ -9,7 +9,7 @@ name = "openpgp_ca_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "openpgp_ca"
+name = "openpgp-ca"
 path = "src/bin.rs"
 
 [dependencies]
