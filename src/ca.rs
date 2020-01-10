@@ -377,12 +377,12 @@ impl Ca {
 
     /// when scope is not set, it is derived from the user_id in the key_file
     pub fn bridge_new(&self, key_file: &str,
-                      name: Option<&str>, scope: Option<&str>)
+                      email: Option<&str>, scope: Option<&str>)
                       -> Result<models::Bridge> {
         let remote_ca_cert = Cert::from_file(key_file)
             .context("Failed to read key")?;
 
-        let domain = {
+        let (cert_email, cert_domain) = {
             let uids: Vec<_> = remote_ca_cert.userids().collect();
             assert_eq!(uids.len(), 1,
                        "Expected exactly one userid in remote CA Cert");
@@ -401,7 +401,7 @@ impl Ca {
             assert_eq!(split[0], "openpgp-ca");
 
             let domain: &str = split[1];
-            domain.to_owned()
+            (remote_email.to_owned(), domain.to_owned())
         };
 
         let scope = match scope {
@@ -411,12 +411,12 @@ impl Ca {
 
                 scope
             }
-            None => &domain
+            None => &cert_domain
         };
 
-        let name = match name {
-            None => format!("bridge to {}", scope),
-            Some(name) => name.to_owned()
+        let email = match email {
+            None => cert_email,
+            Some(email) => email.to_owned()
         };
 
         let regex = Self::domain_to_regex(scope)?;
@@ -441,15 +441,20 @@ impl Ca {
         let pub_key = &Pgp::cert_to_armored(&bridged)?;
 
         let new_bridge =
-            models::NewBridge { name: &name, pub_key, cas_id: ca_db.id };
+            models::NewBridge {
+                email: &email,
+                scope,
+                pub_key,
+                cas_id: ca_db.id,
+            };
 
         let bridge = self.db.insert_bridge(new_bridge)?;
 
         Ok(bridge)
     }
 
-    pub fn bridge_revoke(&self, name: &str) -> Result<()> {
-        let bridge = self.db.search_bridge(name)?;
+    pub fn bridge_revoke(&self, email: &str) -> Result<()> {
+        let bridge = self.db.search_bridge(email)?;
         assert!(bridge.is_some(), "bridge not found");
 
         let mut bridge = bridge.unwrap();

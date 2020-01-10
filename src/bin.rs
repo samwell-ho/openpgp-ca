@@ -248,11 +248,11 @@ fn real_main() -> Result<()> {
                     let key_file =
                         m2.value_of("remote-key-file").unwrap();
 
-                    let name = m2.value_of("name");
+                    let email = m2.value_of("email");
 
-                    let bridge = ca.bridge_new(key_file, name, scope)?;
+                    let bridge = ca.bridge_new(key_file, email, scope)?;
                     let remote = Pgp::armored_to_cert(&bridge.pub_key);
-                    println!("configured bridge '{}'\n", bridge.name);
+                    println!("configured bridge to '{}'\n", bridge.email);
                     println!("CAUTION:");
                     println!("The fingerprint of the remote CA key is");
                     println!("{}", remote.fingerprint().to_string());
@@ -262,15 +262,16 @@ fn real_main() -> Result<()> {
                     OpenPGP CA");
                 }
                 ("revoke", Some(m2)) => {
-                    let name = m2.value_of("name").unwrap();
+                    let email = m2.value_of("email").unwrap();
 
-                    ca.bridge_revoke(name)?;
+                    ca.bridge_revoke(email)?;
                 }
                 ("list", Some(_m2)) => {
                     let bridges = ca.get_bridges()?;
 
                     for bridge in bridges {
-                        println!("Bridge '{}':\n\n{}", bridge.name, bridge.pub_key);
+                        println!("Bridge '{}':\n\n{}",
+                                 bridge.email, bridge.pub_key);
                     }
                 }
 

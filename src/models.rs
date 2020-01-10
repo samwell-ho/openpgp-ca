@@ -129,7 +129,8 @@ pub struct NewRevocation<'a> {
 #[derive(Identifiable, Queryable, Clone, AsChangeset, Debug)]
 pub struct Bridge {
     pub id: i32,
-    pub name: String,
+    pub email: String,
+    pub scope: String,
     pub pub_key: String,
     pub cas_id: i32,
 }
@@ -137,7 +138,8 @@ pub struct Bridge {
 #[derive(Insertable, Debug)]
 #[table_name = "bridges"]
 pub struct NewBridge<'a> {
-    pub name: &'a str,
+    pub email: &'a str,
+    pub scope: &'a str,
     pub pub_key: &'a str,
     pub cas_id: i32,
 }

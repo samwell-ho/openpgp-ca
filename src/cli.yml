@@ -148,11 +148,11 @@ subcommands:
         - new:
             about: Add New Bridge (sign existing remote CA Public Key)
             args:
-              - name:
+              - email:
                   takes_value: true
-                  short: n
-                  long: name
-                  help: Bridge Name
+                  short: e
+                  long: email
+                  help: Bridge remote Email
               - scope:
                   required: false
                   takes_value: true
@@ -171,8 +171,8 @@ subcommands:
                   required: true
                   takes_value: true
                   short: n
-                  long: name
-                  help: Bridge Name
+                  long: email
+                  help: Bridge remote Email
         - list:
             about: List Bridges
   - directory:

@@ -1,7 +1,8 @@
 table! {
     bridges (id) {
         id -> Integer,
-        name -> Text,
+        email -> Text,
+        scope -> Text,
         pub_key -> Text,
         cas_id -> Integer,
     }

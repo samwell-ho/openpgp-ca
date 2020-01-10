@@ -70,14 +70,15 @@ CREATE TABLE revocations (
 
 CREATE TABLE bridges (
   id INTEGER NOT NULL PRIMARY KEY,
-  name VARCHAR NOT NULL,
+  email VARCHAR NOT NULL,
+  scope VARCHAR NOT NULL,
   pub_key VARCHAR NOT NULL,
 
   cas_id INTEGER NOT NULL,
 
   FOREIGN KEY(cas_id) REFERENCES cas(id) ON DELETE RESTRICT,
 
-  CONSTRAINT bridge_name_unique UNIQUE (name)
+  CONSTRAINT bridge_email_unique UNIQUE (email)
 );
 
 CREATE TABLE prefs (

@@ -487,8 +487,8 @@ impl Db {
         Ok(())
     }
 
-    pub fn search_bridge(&self, name: &str) -> Result<Option<Bridge>> {
-        let res = bridges::table.filter(bridges::name.eq(name))
+    pub fn search_bridge(&self, email: &str) -> Result<Option<Bridge>> {
+        let res = bridges::table.filter(bridges::email.eq(email))
             .load::<Bridge>(&self.conn)
             .context("Error loading bridge")?;
 
@@ -497,7 +497,7 @@ impl Db {
             1 => Ok(Some(res[0].clone())),
             _ => panic!("search_bridge for {} found {} results, expected 1. \
             (Database constraints should make this impossible)",
-                        name, res.len())
+                        email, res.len())
         }
     }
 
