@@ -252,14 +252,14 @@ fn real_main() -> Result<()> {
 
                     let bridge = ca.bridge_new(key_file, email, scope)?;
                     let remote = Pgp::armored_to_cert(&bridge.pub_key);
-                    println!("configured bridge to '{}'\n", bridge.email);
+                    println!("signed certificate for {} as bridge\n",
+                             bridge.email);
                     println!("CAUTION:");
                     println!("The fingerprint of the remote CA key is");
-                    println!("{}", remote.fingerprint().to_string());
-                    println!("Please make sure this fingerprint belongs to \
-                    the remote party you want to bridge to before \
-                    disseminating the bridging trust signature from\
-                    OpenPGP CA");
+                    println!("{}\n", remote.fingerprint().to_string());
+                    println!("Please verify that this key is controlled by \
+                    {} before disseminating the signed remote certificate",
+                             bridge.email);
                 }
                 ("revoke", Some(m2)) => {
                     let email = m2.value_of("email").unwrap();
