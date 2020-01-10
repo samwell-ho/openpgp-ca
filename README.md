@@ -310,22 +310,13 @@ Export keys into a WKD structure:
 `openpgp-ca wkd-export /tmp/wkd/`
 
 
-## Some random usage examples:
+## Some usage examples using cargo to run openpgp-ca:
 
 ```
 cargo run ca new example.org
-cargo run -- -d /tmp/foo.sqlite ca new example.org
+cargo run -- -d /tmp/ca.sqlite ca new example.org
 
 cargo run user add --email alice@example.org --email a@example.org --name "Alice Adams"
-cargo run user add --email bob@example.org
-
-cargo run user import --email heiko@example.org --name Heiko --key-file ~/heiko.pubkey
-cargo run user import --email heiko@example.org --name Heiko --key-file _test_data/pubkey.asc --revocation-file _test_data/revoke.asc
-
-cargo run bridge new -r "*@foo.de" --remote-key-file /tmp/bar.txt --name foobridge
-cargo run bridge revoke --name foobridge
-
-cargo run wkd-export /tmp/wkdtest/
 ```
 
 ## Running in Docker
