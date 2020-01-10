@@ -182,15 +182,15 @@ Then `trust`, `5`, `quit`.
 
 This workflow builds on the "centralized key creation" workflow from above.
 
-Two independent instances of OpenPGP CA are set up, users created in each
+Two independent instances of OpenPGP CA are set up, users are created in each
 instance. Then a "bridge" is configured between both OpenPGP CA instances.
 
 Such a bridge is configured when the CA Admins at both organizations are
 satisfied that the CA Admin of the other organization is following good
 procedures in signing keys of users within their organization.
 
-The end result is that users can seamlessly authenticate each other, even
-between organizations.
+The end result is that users can seamlessly authenticate users in the
+other organization, and vice versa.
 
 ### (1) OpenPGP CA instance 1 (setup CA and create a user)
 
