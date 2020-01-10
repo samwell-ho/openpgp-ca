@@ -222,7 +222,7 @@ export public PGP Certificate of OpenPGP CA admin:
 
 `export OPENPGP_CA_DB=/tmp/openpgp-ca1.sqlite`
 
-CA 1 creates a trust signature for the public key of CA 2 (implicitely
+CA 1 creates a trust signature for the public key of CA 2 (implicitly
 scoped to the domainname "other.org") of the remote organization
 
 `openpgp-ca bridge new --remote-key-file ca2.pub`
