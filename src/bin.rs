@@ -112,7 +112,7 @@ fn real_main() -> Result<()> {
 
                             ca.user_import(name, &email_vec[..],
                                            key_file, revocation_file,
-                            )?;
+                                           None, false)?;
                         }
                         _ => unimplemented!(),
                     }

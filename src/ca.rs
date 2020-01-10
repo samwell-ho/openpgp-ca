@@ -196,10 +196,11 @@ impl Ca {
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
-        let res = self.db.new_usercert(name, pub_key,
+        let res = self.db.new_usercert(None, name, pub_key,
                                        &user.fingerprint().to_hex(),
                                        emails, &vec![revoc],
-                                       Some(&tsigned_ca_armored));
+                                       Some(&tsigned_ca_armored),
+                                       false);
 
         if res.is_err() {
             eprint!("{:?}", res);
@@ -216,7 +217,8 @@ impl Ca {
     }
 
     pub fn user_import(&self, name: Option<&str>, emails: &[&str],
-                       key_file: &str, revoc_file: Option<&str>) -> Result<()> {
+                       key_file: &str, revoc_file: Option<&str>,
+                       updates_id: Option<i32>, update: bool) -> Result<()> {
         let ca_cert = self.get_ca_cert().unwrap();
 
         let user_cert = Cert::from_file(key_file)
@@ -235,11 +237,27 @@ impl Ca {
         }
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
-        self.db.new_usercert(name, pub_key,
+        self.db.new_usercert(updates_id, name, pub_key,
                              &certified.fingerprint().to_hex(),
-                             emails, &revoc, None)?;
+                             emails, &revoc, None, update)?;
 
         Ok(())
+    }
+
+    pub fn usercert_update(&self, usercert: &models::Usercert, key_file: &str)
+                           -> Result<()> {
+        let emails = self.db.get_emails_by_usercert(usercert)?;
+        let emails: Vec<&str> = emails.iter()
+            .map(|e| e.addr.as_str())
+            .collect();
+
+        let name = match &usercert.name {
+            None => None,
+            Some(n) => Some(n.as_str())
+        };
+
+        self.user_import(name, &emails[..], key_file, None,
+                         Some(usercert.id), true)
     }
 
 

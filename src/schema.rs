@@ -55,6 +55,7 @@ table! {
 table! {
     usercerts (id) {
         id -> Integer,
+        updates_cert_id -> Nullable<Integer>,
         name -> Nullable<Text>,
         pub_cert -> Text,
         fingerprint -> Text,

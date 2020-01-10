@@ -38,14 +38,15 @@ pub struct Pgp {}
 
 impl Pgp {
     /// Generate an encryption- and signing-capable key for a user.
-    fn make_user_cert(emails: &[&str], name: Option<&str>) -> Result<(Cert, Signature)> {
+    fn make_user_cert(emails: &[&str], name: Option<&str>)
+                      -> Result<(Cert, Signature)> {
         let mut builder = cert::CertBuilder::new()
             .add_storage_encryption_subkey()
             .add_transport_encryption_subkey()
             .add_signing_subkey();
 
-        for &email in emails {
-            builder = builder.add_userid(Self::user_id(email, name));
+        for email in emails {
+            builder = builder.add_userid(Self::user_id(&email, name));
         }
 
 
@@ -80,7 +81,8 @@ impl Pgp {
     }
 
     /// make a user Cert with "emails" as UIDs (all UIDs get signed)
-    pub fn make_user(emails: &[&str], name: Option<&str>) -> Result<(Cert, Signature)> {
+    pub fn make_user(emails: &[&str], name: Option<&str>)
+                     -> Result<(Cert, Signature)> {
         Pgp::make_user_cert(emails, name)
     }
 
@@ -294,7 +296,8 @@ impl Pgp {
         Ok(certified)
     }
 
-    pub fn sign_user_emails(ca_cert: &Cert, user_cert: &Cert, emails: &[&str]) -> Result<Cert> {
+    pub fn sign_user_emails(ca_cert: &Cert, user_cert: &Cert,
+                            emails: &[&str]) -> Result<Cert> {
         let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
 
         let mut packets: Vec<Packet> = Vec::new();

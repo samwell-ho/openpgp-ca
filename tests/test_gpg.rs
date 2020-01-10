@@ -179,11 +179,11 @@ fn test_alice_authenticates_bob_key_imports() {
 
     // import alice + bob keys into CA
     ca.user_import(Some("Alice"), &vec!["alice@example.org"],
-                   &alice_file, None)
+                   &alice_file, None, None, false)
         .expect("import Alice to CA failed");
 
     ca.user_import(Some("Bob"), &vec!["bob@example.org"],
-                   &bob_file, None)
+                   &bob_file, None, None, false)
         .expect("import Bob to CA failed");
 
 

@@ -244,10 +244,12 @@ impl Db {
         }
     }
 
-    pub fn new_usercert(&self, name: Option<&str>,
-                        pub_cert: &str, fingerprint: &str, emails: &[&str],
+    pub fn new_usercert(&self, updates_cert_id: Option<i32>,
+                        name: Option<&str>, pub_cert: &str,
+                        fingerprint: &str, emails: &[&str],
                         revocs: &Vec<String>,
-                        ca_cert_tsigned: Option<&str>) -> Result<()> {
+                        ca_cert_tsigned: Option<&str>,
+                        update: bool) -> Result<()> {
         self.conn.transaction::<_, failure::Error, _>(|| {
             let (ca, mut ca_cert_db) = self.get_ca()
                 .context("Couldn't find CA")?.unwrap();
@@ -261,6 +263,7 @@ impl Db {
 
             // UserCert
             let newcert = NewUsercert {
+                updates_cert_id,
                 pub_cert,
                 name,
                 fingerprint,
@@ -276,7 +279,11 @@ impl Db {
 
             // Emails
             for addr in emails {
-                self.insert_email(NewEmail { addr }, c.id)?;
+                if update {
+                    self.insert_or_link_email(addr, c.id)?;
+                } else {
+                    self.insert_email(NewEmail { addr }, c.id)?;
+                }
             }
             Ok(())
         })

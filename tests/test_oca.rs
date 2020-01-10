@@ -72,7 +72,7 @@ fn test_update_user_cert() {
     std::fs::write(&alice1_file, alice1_key).expect("Unable to write file");
 
     ca.user_import(Some("Alice"), &vec!["alice@example.org"],
-                   &alice1_file, None)
+                   &alice1_file, None, None, false)
         .expect("import Alice 1 to CA failed");
 
 
@@ -85,27 +85,30 @@ fn test_update_user_cert() {
     std::fs::write(&alice2_file, alice2_key).expect("Unable to write file");
 
 
-    // get all users
+    // get usercert for alice
     let usercerts = ca.get_usercerts("alice@example.org");
     assert!(usercerts.is_ok());
 
     let usercerts = usercerts.unwrap();
     assert_eq!(usercerts.len(), 1);
 
-    let usercert = &usercerts[0];
+    let alice = &usercerts[0];
 
     // store updated version of cert
-    assert!(false); // need new fn in Ca
-//    let res = ca.user_add_cert(usercert.id, &alice2_file);
-//    assert!(res.is_ok());
+    let res = ca.usercert_update(alice, &alice2_file);
+
+    println!("{:?}", res);
+    assert!(res.is_ok());
 
 
     // check the state of CA data
     let usercerts = ca.get_all_usercerts();
     let usercerts = usercerts.unwrap();
 
-//    assert_eq!(usercerts.len(), 1);
-//
+    assert_eq!(usercerts.len(), 2);
+
+    // FIXME: add method to filter for "current" usercerts, or similar?!
+
 //    let certs = ca.get_user_certs(&usercerts[0]);
 //    assert!(certs.is_ok());
 //

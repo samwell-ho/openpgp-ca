@@ -50,6 +50,7 @@ pub struct NewCacert {
 #[belongs_to(Ca)]
 pub struct Usercert {
     pub id: i32,
+    pub updates_cert_id: Option<i32>,
     pub name: Option<String>,
     pub pub_cert: String,
     pub fingerprint: String,
@@ -60,8 +61,9 @@ pub struct Usercert {
 #[derive(Insertable, Debug)]
 #[table_name = "usercerts"]
 pub struct NewUsercert<'a> {
-    pub pub_cert: &'a str,
+    pub updates_cert_id: Option<i32>,
     pub name: Option<&'a str>,
+    pub pub_cert: &'a str,
     pub fingerprint: &'a str,
     pub ca_id: i32,
 }
@@ -79,7 +81,7 @@ pub struct NewEmail<'a> {
 }
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(Usercert)]
+#[belongs_to(Usercert < 'a >)]
 #[belongs_to(Email)]
 #[table_name = "certs_emails"]
 pub struct CertEmail {

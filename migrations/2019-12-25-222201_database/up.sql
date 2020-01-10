@@ -5,7 +5,6 @@ CREATE TABLE cas (
   domainname VARCHAR NOT NULL
 );
 
-
 CREATE TABLE cacerts (
   id INTEGER NOT NULL PRIMARY KEY,
   cert VARCHAR NOT NULL,
@@ -14,11 +13,11 @@ CREATE TABLE cacerts (
   FOREIGN KEY(ca_id) REFERENCES cas(id)
 );
 
-
 CREATE TABLE usercerts (
   id INTEGER NOT NULL PRIMARY KEY,
-  name VARCHAR,
+  updates_cert_id INTEGER, -- this is an update to an older usercert
 
+  name VARCHAR,
   pub_cert VARCHAR NOT NULL,
   fingerprint VARCHAR NOT NULL,
 
