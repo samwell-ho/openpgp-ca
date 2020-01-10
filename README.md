@@ -105,7 +105,7 @@ enter `tsign`, `2`, `250`, no domain (so just hit `Enter`), `y`, `save`.
 *  In OpenPGP CA, import Alice's key and revocation certificate - and Alice's
  trust signature on the CA key:
 
-`openpgp-ca user import --name "Alice User" --email alice@example.org --key-file alice.pubkey --revocation-file alice-revocation.asc`
+`openpgp-ca user import --name "Alice Adams" --email alice@example.org --key-file alice.pubkey --revocation-file alice-revocation.asc`
 
 `openpgp-ca ca import-tsig --file ca-tsigned.pubkey`
 
@@ -136,7 +136,7 @@ This should show that Alice's key has been signed by the CA and that Alice
 
 #### create new user
 
-`openpgp-ca user add --email alice@example.org --name "Alice User"`
+`openpgp-ca user add --email alice@example.org --name "Alice Adams"`
 
 The new user's private Key is shown as output of this command, but not
 stored. It needs to be copied to the user's devices and imported into the
@@ -200,7 +200,7 @@ set up CA, create a user
 
 `openpgp-ca ca new some.org`
 
-`openpgp-ca user add --email alice@some.org --name "Alice"`
+`openpgp-ca user add --email alice@some.org --name "Alice Adams"`
 
 export public PGP Certificate of OpenPGP CA admin:
 
@@ -212,7 +212,7 @@ export public PGP Certificate of OpenPGP CA admin:
 
 `openpgp-ca ca new other.org`
 
-`openpgp-ca user add --email bob@other.org --name "Bob"`
+`openpgp-ca user add --email bob@other.org --name "Bob Baker"`
 
 export public PGP Certificate of OpenPGP CA admin:
 
@@ -282,7 +282,7 @@ both OpenPGP CA Admin keys, as well as Bob (who works at "other.org"):
 
 In step (2), CA 2 creates an additional user outside of the domain "other.org":
 
-`openpgp-ca user add --email carol@third.org --name "Carol"`
+`openpgp-ca user add --email carol@third.org --name "Carol Cruz"`
 
 The rest of the workflow is performed exactly as above.
 
@@ -301,9 +301,9 @@ Set up a new OpenPGP CA instance and create two users:
 
 `openpgp-ca ca new example.org` 
 
-`openpgp-ca user add --email alice@example.org --name "Alice User"`
+`openpgp-ca user add --email alice@example.org --name "Alice Adams"`
 
-`openpgp-ca user add --email bob@example.org --name "Bob User"`
+`openpgp-ca user add --email bob@example.org --name "Bob Baker"`
 
 Export keys into a WKD structure:
 
@@ -316,7 +316,7 @@ Export keys into a WKD structure:
 cargo run ca new example.org
 cargo run -- -d /tmp/foo.sqlite ca new example.org
 
-cargo run user add --email alice@example.org --email a@example.org --name Alicia
+cargo run user add --email alice@example.org --email a@example.org --name "Alice Adams"
 cargo run user add --email bob@example.org
 
 cargo run user import --email heiko@example.org --name Heiko --key-file ~/heiko.pubkey
