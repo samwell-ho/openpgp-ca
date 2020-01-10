@@ -32,26 +32,19 @@ fn test_ca() {
     let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
-    let users = ca.get_all_users();
-    let users = users.unwrap();
+    let usercerts = ca.get_all_usercerts();
+    let usercerts = usercerts.unwrap();
 
-    assert_eq!(users.len(), 1);
+    assert_eq!(usercerts.len(), 1);
 
-    let user = &users[0];
-    let emails = ca.get_emails(user);
+    let usercert = &usercerts[0];
+    let emails = ca.get_emails(usercert);
 
     assert!(emails.is_ok());
     let emails = emails.unwrap();
     assert_eq!(emails.len(), 1);
 
-    let certs = ca.get_user_certs(user);
-    assert!(certs.is_ok());
-    let certs = certs.unwrap();
-    assert_eq!(certs.len(), 1);
-
-    let cert = &certs[0];
-
-    let revocs = ca.get_revocations(cert);
+    let revocs = ca.get_revocations(usercert);
     assert!(revocs.is_ok());
     let revocs = revocs.unwrap();
     assert_eq!(revocs.len(), 1);
@@ -93,32 +86,33 @@ fn test_update_user_cert() {
 
 
     // get all users
-    let users = ca.get_users("alice@example.org");
-    assert!(users.is_ok());
+    let usercerts = ca.get_usercerts("alice@example.org");
+    assert!(usercerts.is_ok());
 
-    let users = users.unwrap();
-    assert_eq!(users.len(), 1);
+    let usercerts = usercerts.unwrap();
+    assert_eq!(usercerts.len(), 1);
 
-    let user = &users[0];
+    let usercert = &usercerts[0];
 
-    // add updated cert
-    let res = ca.user_add_cert(user.id, &alice2_file);
-    assert!(res.is_ok());
+    // store updated version of cert
+    assert!(false); // need new fn in Ca
+//    let res = ca.user_add_cert(usercert.id, &alice2_file);
+//    assert!(res.is_ok());
 
 
     // check the state of CA data
-    let users = ca.get_all_users();
-    let users = users.unwrap();
+    let usercerts = ca.get_all_usercerts();
+    let usercerts = usercerts.unwrap();
 
-    assert_eq!(users.len(), 1);
-
-    let certs = ca.get_user_certs(&users[0]);
-    assert!(certs.is_ok());
-
-    let certs = certs.unwrap();
-
-    // expect to find both user certs
-    assert_eq!(certs.len(), 2);
+//    assert_eq!(usercerts.len(), 1);
+//
+//    let certs = ca.get_user_certs(&usercerts[0]);
+//    assert!(certs.is_ok());
+//
+//    let certs = certs.unwrap();
+//
+//    // expect to find both user certs
+//    assert_eq!(certs.len(), 2);
 }
 
 
@@ -143,10 +137,10 @@ fn test_ca_insert_duplicate_email() {
     let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(!res.is_ok());
 
-    let users = ca.get_all_users();
-    let users = users.unwrap();
+    let usercerts = ca.get_all_usercerts();
+    let usercerts = usercerts.unwrap();
 
-    assert_eq!(users.len(), 1);
+    assert_eq!(usercerts.len(), 1);
 }
 
 

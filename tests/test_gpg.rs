@@ -66,21 +66,14 @@ fn test_alice_authenticates_bob() {
 
 
     // import CA users into GnuPG
-    let users = ca.get_all_users();
+    let usercerts = ca.get_all_usercerts();
 
-    assert!(users.is_ok());
-    assert_eq!(users.as_ref().ok().unwrap().len(), 2);
+    assert!(usercerts.is_ok());
+    assert_eq!(usercerts.as_ref().ok().unwrap().len(), 2);
 
-    let users = users.unwrap();
-    for user in users {
-        let certs = ca.get_user_certs(&user);
-        assert!(certs.is_ok());
-
-        for cert in certs.unwrap() {
-            gnupg::import(&ctx, cert.pub_cert.as_bytes());
-        }
+    for cert in usercerts.unwrap() {
+        gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
-
 
     // ---- set "ultimate" ownertrust for alice ----
     let res = gnupg::edit_trust(&ctx, "alice", 5);
@@ -196,13 +189,12 @@ fn test_alice_authenticates_bob_key_imports() {
 
     // export bob, CA-key from CA
     let ca_key = ca.export_pubkey().unwrap();
-    let foo = ca.get_users(&"bob@example.org").unwrap();
-    let bob = foo.first().unwrap();
-    let bob_certs = ca.get_user_certs(bob).unwrap();
+    let usercerts = ca.get_usercerts(&"bob@example.org").unwrap();
+    let bob = usercerts.first().unwrap();
 
     // import bob+CA key into alice's GnuPG context
     gnupg::import(&ctx_alice, ca_key.as_bytes());
-    gnupg::import(&ctx_alice, bob_certs.first().unwrap().pub_cert.as_bytes());
+    gnupg::import(&ctx_alice, bob.pub_cert.as_bytes());
 
     // ---- set "ultimate" ownertrust for alice ----
     let res = gnupg::edit_trust(&ctx_alice, "alice", 5);
@@ -227,7 +219,7 @@ fn test_bridge() {
     let ctx = make_context!();
 
     // don't delete home dir (for manual inspection)
-//    ctx.leak_tempdir();
+    //    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
 
@@ -305,35 +297,23 @@ fn test_bridge() {
     gnupg::import(&ctx, ca2_cert.as_bytes());
 
     // import CA1 users into GnuPG
-    let users1 = ca1.get_all_users();
+    let usercerts1 = ca1.get_all_usercerts();
 
-    assert!(users1.is_ok());
-    assert_eq!(users1.as_ref().ok().unwrap().len(), 1);
+    assert!(usercerts1.is_ok());
+    assert_eq!(usercerts1.as_ref().ok().unwrap().len(), 1);
 
-    let users1 = users1.unwrap();
-    for user in users1 {
-        let certs = ca1.get_user_certs(&user);
-        assert!(certs.is_ok());
-
-        for cert in certs.unwrap() {
-            gnupg::import(&ctx, cert.pub_cert.as_bytes());
-        }
+    for cert in usercerts1.unwrap() {
+        gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 
     // import CA2 users into GnuPG
-    let users2 = ca2.get_all_users();
+    let usercerts2 = ca2.get_all_usercerts();
 
-    assert!(users2.is_ok());
-    assert_eq!(users2.as_ref().ok().unwrap().len(), 2);
+    assert!(usercerts2.is_ok());
+    assert_eq!(usercerts2.as_ref().ok().unwrap().len(), 2);
 
-    let users2 = users2.unwrap();
-    for user in users2 {
-        let certs = ca2.get_user_certs(&user);
-        assert!(certs.is_ok());
-
-        for cert in certs.unwrap() {
-            gnupg::import(&ctx, cert.pub_cert.as_bytes());
-        }
+    for cert in usercerts2.unwrap() {
+        gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 
 

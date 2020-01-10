@@ -196,10 +196,10 @@ impl Ca {
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
-        let res = self.db.new_user(name, pub_key,
-                                   &user.fingerprint().to_hex(),
-                                   emails, &vec![revoc],
-                                   Some(&tsigned_ca_armored));
+        let res = self.db.new_usercert(name, pub_key,
+                                       &user.fingerprint().to_hex(),
+                                       emails, &vec![revoc],
+                                       Some(&tsigned_ca_armored));
 
         if res.is_err() {
             eprint!("{:?}", res);
@@ -235,34 +235,13 @@ impl Ca {
         }
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
-        self.db.new_user(name, pub_key,
-                         &certified.fingerprint().to_hex(),
-                         emails, &revoc, None)?;
+        self.db.new_usercert(name, pub_key,
+                             &certified.fingerprint().to_hex(),
+                             emails, &revoc, None)?;
 
         Ok(())
     }
 
-
-    pub fn user_add_cert(&self, user_id: i32, key_file: &str) -> Result<()> {
-        let user_cert = Cert::from_file(key_file)
-            .context("Failed to read key")?;
-
-        let fingerprint = &user_cert.fingerprint().to_hex();
-        let pub_cert = &Pgp::cert_to_armored(&user_cert)?;
-
-        let newcert = models::NewUsercert { user_id, fingerprint, pub_cert };
-
-        let mut emails = Vec::new();
-
-        for uid in user_cert.userids() {
-            let email = uid.userid().email()?;
-            if let Some(email) = email {
-                emails.push(email);
-            }
-        }
-
-        self.db.add_usercert(newcert, &emails[..])
-    }
 
     pub fn add_revocation(&self, revoc_file: &str) -> Result<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
@@ -290,17 +269,13 @@ impl Ca {
         }
     }
 
-    pub fn get_all_users(&self) -> Result<Vec<models::User>> {
-        self.db.list_users()
+    pub fn get_all_usercerts(&self) -> Result<Vec<models::Usercert>> {
+        self.db.list_usercerts()
     }
 
-    pub fn get_users(&self, email: &str) -> Result<Vec<models::User>> {
-        self.db.get_users(email)
-    }
-
-    pub fn get_user_certs(&self, user: &models::User)
-                          -> Result<Vec<models::Usercert>> {
-        self.db.get_usercerts(user)
+    pub fn get_usercerts(&self, email: &str)
+                         -> Result<Vec<models::Usercert>> {
+        self.db.get_usercerts(email)
     }
 
     pub fn get_revocations(&self, cert: &models::Usercert)
@@ -308,50 +283,32 @@ impl Ca {
         self.db.get_revocations(cert)
     }
 
-    pub fn get_emails(&self, user: &models::User)
+    pub fn get_emails(&self, usercert: &models::Usercert)
                       -> Result<Vec<models::Email>> {
-        self.db.get_emails_by_user(user)
+        self.db.get_emails_by_usercert(usercert)
     }
 
-    // FIXME: check by Cert, not by User?
-    pub fn check_ca_sig(&self, user: &models::User) -> Result<bool> {
-        let certs = self.db.get_usercerts(user)?;
+    pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Result<bool> {
+        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert);
+        let sigs = Self::get_sigs(&user_cert);
 
-        let mut signed = true;
+        let ca = self.get_ca_cert()?;
 
-        for cert in certs {
-            let user_cert = Pgp::armored_to_cert(&cert.pub_cert);
-            let sigs = Self::get_sigs(&user_cert);
-
-            let ca = self.get_ca_cert()?;
-
-            if !sigs.iter()
-                .any(|&s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()) {
-                signed = false;
-            }
-        }
-
-        Ok(signed)
+        Ok(sigs.iter()
+            .any(|&s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
     }
 
-    // FIXME: check by Cert, not by User?
-    pub fn check_ca_has_tsig(&self, user: &models::User) -> Result<bool> {
+    pub fn check_ca_has_tsig(&self, usercert: &models::Usercert)
+                             -> Result<bool> {
         let ca = self.get_ca_cert()?;
         let tsigs = Self::get_tsigs(&ca);
 
-        let mut check = true;
 
-        let certs = self.db.get_usercerts(user)?;
-        for cert in certs {
-            let user_cert = Pgp::armored_to_cert(&cert.pub_cert);
+        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert);
 
-            if !tsigs.iter()
-                .any(|&t| t.issuer_fingerprint().unwrap()
-                    == &user_cert.fingerprint()) {
-                check = false
-            }
-        }
-        Ok(check)
+        Ok(tsigs.iter()
+            .any(|&t| t.issuer_fingerprint().unwrap()
+                == &user_cert.fingerprint()))
     }
 
     // -------- bridges
@@ -496,14 +453,9 @@ impl Ca {
         let ca_cert = Pgp::armored_to_cert(&self.export_pubkey()?);
         wkd::insert(&path, domain, None, &ca_cert)?;
 
-        let users = self.get_all_users()?;
-        for user in users {
-            let certs = self.get_user_certs(&user)?;
-
-            for uc in certs {
-                let c = Pgp::armored_to_cert(&uc.pub_cert);
-                wkd::insert(&path, domain, None, &c)?;
-            }
+        for uc in self.get_all_usercerts()? {
+            let c = Pgp::armored_to_cert(&uc.pub_cert);
+            wkd::insert(&path, domain, None, &c)?;
         }
 
         Ok(())

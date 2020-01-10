@@ -102,6 +102,7 @@ subcommands:
             args:
               - email:
                   takes_value: true
+                  multiple: false
                   short: e
                   long: email
                   help: Email address

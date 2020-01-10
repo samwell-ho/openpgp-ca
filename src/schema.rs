@@ -55,9 +55,10 @@ table! {
 table! {
     usercerts (id) {
         id -> Integer,
+        name -> Nullable<Text>,
         pub_cert -> Text,
         fingerprint -> Text,
-        user_id -> Integer,
+        ca_id -> Integer,
     }
 }
 
@@ -74,7 +75,7 @@ joinable!(cacerts -> cas (ca_id));
 joinable!(certs_emails -> emails (email_id));
 joinable!(certs_emails -> usercerts (usercert_id));
 joinable!(revocations -> usercerts (usercert_id));
-joinable!(usercerts -> users (user_id));
+joinable!(usercerts -> cas (ca_id));
 joinable!(users -> cas (ca_id));
 
 allow_tables_to_appear_in_same_query!(

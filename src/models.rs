@@ -48,36 +48,22 @@ pub struct NewCacert {
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
 #[belongs_to(Ca)]
-pub struct User {
-    pub id: i32,
-    pub name: Option<String>,
-    // https://docs.diesel.rs/diesel/associations/index.html
-    pub ca_id: i32,
-}
-
-#[derive(Insertable, Debug)]
-#[table_name = "users"]
-pub struct NewUser<'a> {
-    pub name: Option<&'a str>,
-    pub ca_id: i32,
-}
-
-#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(User)]
 pub struct Usercert {
     pub id: i32,
+    pub name: Option<String>,
     pub pub_cert: String,
     pub fingerprint: String,
     // https://docs.diesel.rs/diesel/associations/index.html
-    pub user_id: i32,
+    pub ca_id: i32,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "usercerts"]
 pub struct NewUsercert<'a> {
     pub pub_cert: &'a str,
+    pub name: Option<&'a str>,
     pub fingerprint: &'a str,
-    pub user_id: i32,
+    pub ca_id: i32,
 }
 
 #[derive(Identifiable, Queryable, Debug, Clone, PartialEq, Eq, Hash)]

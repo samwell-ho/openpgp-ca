@@ -15,24 +15,18 @@ CREATE TABLE cacerts (
 );
 
 
-CREATE TABLE users (
+CREATE TABLE usercerts (
   id INTEGER NOT NULL PRIMARY KEY,
   name VARCHAR,
+
+  pub_cert VARCHAR NOT NULL,
+  fingerprint VARCHAR NOT NULL,
 
   -- FIXME publish flag (wkd, ..?)
   -- FIXME user retired
 
   ca_id INTEGER NOT NULL,
   FOREIGN KEY(ca_id) REFERENCES cas(id) ON DELETE RESTRICT
-);
-
-CREATE TABLE usercerts (
-  id INTEGER NOT NULL PRIMARY KEY,
-  pub_cert VARCHAR NOT NULL,
-  fingerprint VARCHAR NOT NULL,
-
-  user_id INTEGER NOT NULL,
-  FOREIGN KEY(user_id) REFERENCES users(id),
 
   CONSTRAINT cert_fingerprint_unique UNIQUE (fingerprint)
 );
