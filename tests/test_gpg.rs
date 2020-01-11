@@ -178,12 +178,12 @@ fn test_alice_authenticates_bob_key_imports() {
 
 
     // import alice + bob keys into CA
-    ca.usercert_new(Some("Alice"), &vec!["alice@example.org"],
-                    &alice_file, None)
+    ca.usercert_import(Some("Alice"), &vec!["alice@example.org"],
+                       &alice_file, None)
         .expect("import Alice to CA failed");
 
-    ca.usercert_new(Some("Bob"), &vec!["bob@example.org"],
-                    &bob_file, None)
+    ca.usercert_import(Some("Bob"), &vec!["bob@example.org"],
+                       &bob_file, None)
         .expect("import Bob to CA failed");
 
 
@@ -264,8 +264,10 @@ fn test_bridge() {
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    ca1.bridge_new(&ca_other_file, None, None);
-    ca2.bridge_new(&ca_some_file, None, None);
+    let res = ca1.bridge_new(&ca_other_file, None, None);
+    assert!(res.is_ok());
+    let res = ca2.bridge_new(&ca_some_file, None, None);
+    assert!(res.is_ok());
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 

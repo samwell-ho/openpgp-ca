@@ -71,8 +71,8 @@ fn test_update_user_cert() {
     let alice1_file = format!("{}/alice1.key", home_path);
     std::fs::write(&alice1_file, alice1_key).expect("Unable to write file");
 
-    ca.usercert_new(Some("Alice"), &vec!["alice@example.org"],
-                    &alice1_file, None)
+    ca.usercert_import(Some("Alice"), &vec!["alice@example.org"],
+                       &alice1_file, None)
         .expect("import Alice 1 to CA failed");
 
 
@@ -95,7 +95,7 @@ fn test_update_user_cert() {
     let alice = &usercerts[0];
 
     // store updated version of cert
-    let res = ca.usercert_update(alice, &alice2_file);
+    let res = ca.usercert_import_update(alice, &alice2_file);
 
     println!("{:?}", res);
     assert!(res.is_ok());

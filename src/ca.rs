@@ -217,10 +217,14 @@ impl Ca {
         Ok(())
     }
 
-    // update existing or create independent new usercert
-    fn usercert_update_or_create(&self, name: Option<&str>, emails: &[&str],
-                                 key_file: &str, revoc_file: Option<&str>,
-                                 updates_id: Option<i32>) -> Result<()> {
+    // update existing or create independent new usercert,
+    // importing pub cert from file
+    fn usercert_import_update_or_create(&self, name: Option<&str>,
+                                        emails: &[&str],
+                                        key_file: &str,
+                                        revoc_file: Option<&str>,
+                                        updates_id: Option<i32>)
+                                        -> Result<()> {
         let ca_cert = self.get_ca_cert().unwrap();
 
         let user_cert = Cert::from_file(key_file)
@@ -242,19 +246,19 @@ impl Ca {
 
         self.db.new_usercert(name, pub_key,
                              &certified.fingerprint().to_hex(),
-                             emails, &revoc, None, None)?;
+                             emails, &revoc, None, updates_id)?;
 
 
         Ok(())
     }
 
-    pub fn usercert_new(&self, name: Option<&str>, emails: &[&str],
-                        key_file: &str, revoc_file: Option<&str>) -> Result<()> {
-        self.usercert_update_or_create(name, emails, key_file, revoc_file, None)
+    pub fn usercert_import(&self, name: Option<&str>, emails: &[&str],
+                           key_file: &str, revoc_file: Option<&str>) -> Result<()> {
+        self.usercert_import_update_or_create(name, emails, key_file, revoc_file, None)
     }
 
-    pub fn usercert_update(&self, usercert: &models::Usercert, key_file: &str)
-                           -> Result<()> {
+    pub fn usercert_import_update(&self, usercert: &models::Usercert,
+                                  key_file: &str) -> Result<()> {
         let emails = self.db.get_emails_by_usercert(usercert)?;
         let emails: Vec<&str> = emails.iter()
             .map(|e| e.addr.as_str())
@@ -265,8 +269,8 @@ impl Ca {
             Some(n) => Some(n.as_str())
         };
 
-        self.usercert_update_or_create(name, &emails[..], key_file, None,
-                                       Some(usercert.id))
+        self.usercert_import_update_or_create(name, &emails[..], key_file, None,
+                                              Some(usercert.id))
     }
 
 

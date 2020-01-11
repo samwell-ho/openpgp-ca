@@ -282,23 +282,7 @@ impl Db {
             Ok(())
         })
     }
-
-
-    pub fn add_usercert(&self, newcert: NewUsercert, emails: &[String])
-                        -> Result<()> {
-        self.conn.transaction::<_, failure::Error, _>(|| {
-            // UserCert
-            let c = self.insert_usercert(newcert)?;
-
-            // Emails
-            for addr in emails {
-                self.insert_or_link_email(addr, c.id)?;
-            }
-
-            Ok(())
-        })
-    }
-
+    
     pub fn get_usercert(&self, fingerprint: &str)
                         -> Result<Option<Usercert>> {
         let u = usercerts::table
