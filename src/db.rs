@@ -244,10 +244,10 @@ impl Db {
         }
     }
 
-    pub fn new_usercert(&self, name: Option<&str>, pub_cert: &str,
+    pub fn add_usercert(&self, name: Option<&str>, pub_cert: &str,
                         fingerprint: &str, emails: &[&str],
                         revocs: &Vec<String>, ca_cert_tsigned: Option<&str>,
-                        updates_cert_id: Option<i32>) -> Result<()> {
+                        updates_cert_id: Option<i32>) -> Result<Usercert> {
         self.conn.transaction::<_, failure::Error, _>(|| {
             let (ca, mut ca_cert_db) = self.get_ca()
                 .context("Couldn't find CA")?.unwrap();
@@ -279,10 +279,10 @@ impl Db {
             for addr in emails {
                 self.insert_or_link_email(addr, c.id)?;
             }
-            Ok(())
+            Ok(c)
         })
     }
-    
+
     pub fn get_usercert(&self, fingerprint: &str)
                         -> Result<Option<Usercert>> {
         let u = usercerts::table
@@ -337,23 +337,20 @@ impl Db {
 
     pub fn get_revocations(&self, cert: &Usercert)
                            -> Result<Vec<Revocation>> {
-        let res = Revocation::belonging_to(cert).load::<Revocation>(&self.conn);
-
-        // FIXME handle errors?!
-
-        Ok(res?)
+        Ok(Revocation::belonging_to(cert).load::<Revocation>(&self.conn)?)
     }
 
     pub fn add_revocation(&self, revocation: &str, cert: &Usercert)
                           -> Result<Revocation> {
-        self.insert_revocation(NewRevocation {
-            revocation,
-            usercert_id: cert.id,
-        })
+        self.insert_revocation(
+            NewRevocation { revocation, usercert_id: cert.id })
     }
 
     pub fn get_emails_by_usercert(&self, cert: &Usercert)
                                   -> Result<Vec<Email>> {
+
+        // FIXME: use DB join?
+
         let mut emails = Vec::new();
 
         let ces: Vec<CertEmail> = certs_emails::table

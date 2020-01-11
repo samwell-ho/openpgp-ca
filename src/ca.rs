@@ -198,7 +198,7 @@ impl Ca {
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
-        let res = self.db.new_usercert(name, pub_key,
+        let res = self.db.add_usercert(name, pub_key,
                                        &user.fingerprint().to_hex(),
                                        emails, &vec![revoc],
                                        Some(&tsigned_ca_armored), None);
@@ -244,7 +244,7 @@ impl Ca {
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
 
-        self.db.new_usercert(name, pub_key,
+        self.db.add_usercert(name, pub_key,
                              &certified.fingerprint().to_hex(),
                              emails, &revoc, None, updates_id)?;
 
