@@ -110,9 +110,8 @@ fn real_main() -> Result<()> {
                             let revocation_file = m2.value_of
                             ("revocation-file");
 
-                            ca.user_import(name, &email_vec[..],
-                                           key_file, revocation_file,
-                                           None, false)?;
+                            ca.usercert_new(name, &email_vec[..],
+                                            key_file, revocation_file)?;
                         }
                         _ => unimplemented!(),
                     }

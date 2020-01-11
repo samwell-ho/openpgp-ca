@@ -159,6 +159,8 @@ impl Ca {
         let signed = ca_cert.merge_packets(packets)
             .context("merging tsigs into CA Key failed")?;
 
+        // FIXME: DB transaction
+
         // update in DB
         let (_, mut ca_cert) = self.db.get_ca()
             .context("failed to load CA from database")?
@@ -196,11 +198,10 @@ impl Ca {
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
-        let res = self.db.new_usercert(None, name, pub_key,
+        let res = self.db.new_usercert(name, pub_key,
                                        &user.fingerprint().to_hex(),
                                        emails, &vec![revoc],
-                                       Some(&tsigned_ca_armored),
-                                       false);
+                                       Some(&tsigned_ca_armored), None);
 
         if res.is_err() {
             eprint!("{:?}", res);
@@ -216,9 +217,10 @@ impl Ca {
         Ok(())
     }
 
-    pub fn user_import(&self, name: Option<&str>, emails: &[&str],
-                       key_file: &str, revoc_file: Option<&str>,
-                       updates_id: Option<i32>, update: bool) -> Result<()> {
+    // update existing or create independent new usercert
+    fn usercert_update_or_create(&self, name: Option<&str>, emails: &[&str],
+                                 key_file: &str, revoc_file: Option<&str>,
+                                 updates_id: Option<i32>) -> Result<()> {
         let ca_cert = self.get_ca_cert().unwrap();
 
         let user_cert = Cert::from_file(key_file)
@@ -237,11 +239,18 @@ impl Ca {
         }
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
-        self.db.new_usercert(updates_id, name, pub_key,
+
+        self.db.new_usercert(name, pub_key,
                              &certified.fingerprint().to_hex(),
-                             emails, &revoc, None, update)?;
+                             emails, &revoc, None, None)?;
+
 
         Ok(())
+    }
+
+    pub fn usercert_new(&self, name: Option<&str>, emails: &[&str],
+                        key_file: &str, revoc_file: Option<&str>) -> Result<()> {
+        self.usercert_update_or_create(name, emails, key_file, revoc_file, None)
     }
 
     pub fn usercert_update(&self, usercert: &models::Usercert, key_file: &str)
@@ -256,8 +265,8 @@ impl Ca {
             Some(n) => Some(n.as_str())
         };
 
-        self.user_import(name, &emails[..], key_file, None,
-                         Some(usercert.id), true)
+        self.usercert_update_or_create(name, &emails[..], key_file, None,
+                                       Some(usercert.id))
     }
 
 

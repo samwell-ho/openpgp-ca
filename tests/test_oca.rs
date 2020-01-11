@@ -71,8 +71,8 @@ fn test_update_user_cert() {
     let alice1_file = format!("{}/alice1.key", home_path);
     std::fs::write(&alice1_file, alice1_key).expect("Unable to write file");
 
-    ca.user_import(Some("Alice"), &vec!["alice@example.org"],
-                   &alice1_file, None, None, false)
+    ca.usercert_new(Some("Alice"), &vec!["alice@example.org"],
+                    &alice1_file, None)
         .expect("import Alice 1 to CA failed");
 
 
@@ -121,6 +121,9 @@ fn test_update_user_cert() {
 
 #[test]
 fn test_ca_insert_duplicate_email() {
+    // two usercerts with the same email are considered distinct certs
+    // (e.g. "normal cert" vs "code signing cert")
+
     let ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
@@ -136,14 +139,14 @@ fn test_ca_insert_duplicate_email() {
     let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
-    // make CA user with the same email address
+    // make another CA user with the same email address
     let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
-    assert!(!res.is_ok());
+    assert!(res.is_ok());
 
     let usercerts = ca.get_all_usercerts();
     let usercerts = usercerts.unwrap();
 
-    assert_eq!(usercerts.len(), 1);
+    assert_eq!(usercerts.len(), 2);
 }
 
 
