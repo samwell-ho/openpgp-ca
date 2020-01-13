@@ -1,6 +1,8 @@
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp;
 use std::path::Path;
+use std::time::SystemTime;
+use failure::_core::time::Duration;
 
 mod gnupg;
 
@@ -50,6 +52,86 @@ fn test_ca() {
     assert_eq!(revocs.len(), 1);
 }
 
+
+#[test]
+fn test_update_usercert_key() {
+    let now = SystemTime::now();
+    let in_one_year =
+        now.checked_add(Duration::from_secs(3600 * 24 * 365 * 1));
+    let in_three_years =
+        now.checked_add(Duration::from_secs(3600 * 24 * 365 * 3));
+    let in_six_years =
+        now.checked_add(Duration::from_secs(3600 * 24 * 365 * 6));
+
+    // update key with new version, but same fingerprint
+    let mut ctx = make_context!();
+    ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let ca = ca::Ca::new(Some(&db));
+
+    // make new CA key
+    assert!(ca.ca_new("example.org").is_ok());
+
+    // import key as new user
+    gnupg::create_user(&ctx, "alice@example.org");
+    let alice1_key = gnupg::export(&ctx, &"alice@example.org");
+
+    let alice1_file = format!("{}/alice1.key", home_path);
+    std::fs::write(&alice1_file, alice1_key).expect("Unable to write file");
+
+    ca.usercert_import(Some("Alice"), &vec!["alice@example.org"],
+                       &alice1_file, None)
+        .expect("import Alice 1 to CA failed");
+
+
+    // check the state of CA data
+    let usercerts = ca.get_all_usercerts();
+    let usercerts = usercerts.unwrap();
+
+    assert_eq!(usercerts.len(), 1);
+
+    // check that expiry is not ~2y but ~5y
+    let cert = pgp::Pgp::armored_to_cert(&usercerts[0].pub_cert);
+
+    assert!(cert.alive(in_one_year).is_ok());
+    assert!(!cert.alive(in_three_years).is_ok());
+
+    // edit key with gpg, then import new version into CA
+    gnupg::edit_expire(&ctx, "alice@example.org", "5y");
+    let alice2_key = gnupg::export(&ctx, &"alice@example.org");
+
+    let alice2_file = format!("{}/alice2.key", home_path);
+    std::fs::write(&alice2_file, alice2_key).expect("Unable to write file");
+
+
+    // get usercert for alice
+    let usercerts = ca.get_usercerts("alice@example.org");
+    assert!(usercerts.is_ok());
+
+    let usercerts = usercerts.unwrap();
+    assert_eq!(usercerts.len(), 1);
+
+    let alice = &usercerts[0];
+
+    // store updated version of cert
+    let res = ca.usercert_import_update(alice, &alice2_file);
+
+
+    // check the state of CA data
+    let usercerts = ca.get_all_usercerts();
+    let usercerts = usercerts.unwrap();
+
+    assert_eq!(usercerts.len(), 1);
+
+    // check that expiry is not ~2y but ~5y
+    let cert = pgp::Pgp::armored_to_cert(&usercerts[0].pub_cert);
+
+    assert!(cert.alive(in_three_years).is_ok());
+    assert!(!cert.alive(in_six_years).is_ok());
+}
 
 #[test]
 fn test_update_user_cert() {

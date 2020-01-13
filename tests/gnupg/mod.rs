@@ -351,6 +351,28 @@ pub fn edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Result<()> {
     Ok(())
 }
 
+pub fn edit_expire(ctx: &Context, user_id: &str, expires: &str)
+                   -> Result<()> {
+    let homedir = String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
+
+    let cmd = format!("gpg --homedir {} --edit-key {}", homedir, user_id);
+
+    let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
+    p.exp_string("gpg>").unwrap();
+    p.send_line("expire").unwrap();
+    p.exp_string("Key is valid for? (0)").unwrap();
+    p.send_line(expires).unwrap();
+    p.exp_string("Is this correct? (y/N)").unwrap();
+    p.send_line("y").unwrap();
+    p.exp_string("gpg>").unwrap();
+    p.send_line("quit").unwrap();
+    p.exp_string("Save changes? (y/N)").unwrap();
+    p.send_line("y").unwrap();
+    p.exp_eof().unwrap();
+
+    Ok(())
+}
+
 
 pub fn create_user(ctx: &Context, user_id: &str) {
     let mut gpg = Command::new("gpg")
