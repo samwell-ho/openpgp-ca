@@ -29,6 +29,7 @@ use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
 use std::path::Path;
+use std::collections::HashSet;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -225,29 +226,64 @@ impl Ca {
                                         revoc_file: Option<&str>,
                                         updates_id: Option<i32>)
                                         -> Result<()> {
-        let ca_cert = self.get_ca_cert().unwrap();
-
         let user_cert = Cert::from_file(key_file)
             .context("Failed to read key")?;
 
-        // sign only the userids that have been specified
-        let certified =
-            Pgp::sign_user_emails(&ca_cert, &user_cert, emails)?;
+
+        let existing =
+            self.db.get_usercert(&user_cert.fingerprint().to_hex())?;
+
+        // check if a usercert with this fingerprint already exists?
+        if let Some(mut existing) = existing {
+            // yes - update existing Usercert in DB
+
+            assert!(updates_id.is_none()
+                        || Some(existing.id) == updates_id,
+                    "updates_id was specified, but is inconsistent for key update");
+
+            // set of email addresses should be the same
+            let existing_emails: HashSet<_> =
+                self.db.get_emails_by_usercert(&existing)?
+                    .iter().map(|e| e.addr.to_owned()).collect();
+            let emails: HashSet<_> = emails.iter().map(|s| s.to_string()).collect();
+            assert!(emails.eq(&existing_emails),
+                    "expecting the same set of email addresses on key update");
+
+            // this "update" workflow is not handling revocation certs for now
+            assert!(revoc_file.is_none(),
+                    "not expecting a revocation cert on key update");
+
+            // merge existing and new public key, update in DB usercert
+            let c1 = Pgp::armored_to_cert(&existing.pub_cert);
+
+            let updated = c1.merge(user_cert)?;
+            let armored = Pgp::cert_to_armored(&updated)?;
+
+            existing.pub_cert = armored;
+            self.db.update_usercert(&existing)?;
+        } else {
+            // no - this is a new usercert that we need to create in the DB
+
+            let ca_cert = self.get_ca_cert().unwrap();
+
+            // sign only the userids that have been specified
+            let certified =
+                Pgp::sign_user_emails(&ca_cert, &user_cert, emails)?;
 
 
-        // load revocation certificate
-        let mut revoc: Vec<String> = Vec::new();
+            // load revocation certificate
+            let mut revoc: Vec<String> = Vec::new();
 
-        if let Ok(rev) = Pgp::load_revocation_cert(revoc_file) {
-            revoc.push(Pgp::sig_to_armored(&rev)?);
+            if let Ok(rev) = Pgp::load_revocation_cert(revoc_file) {
+                revoc.push(Pgp::sig_to_armored(&rev)?);
+            }
+
+            let pub_key = &Pgp::cert_to_armored(&certified)?;
+
+            self.db.add_usercert(name, pub_key,
+                                 &certified.fingerprint().to_hex(),
+                                 emails, &revoc, None, updates_id)?;
         }
-
-        let pub_key = &Pgp::cert_to_armored(&certified)?;
-
-        self.db.add_usercert(name, pub_key,
-                             &certified.fingerprint().to_hex(),
-                             emails, &revoc, None, updates_id)?;
-
 
         Ok(())
     }

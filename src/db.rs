@@ -283,6 +283,15 @@ impl Db {
         })
     }
 
+    pub fn update_usercert(&self, usercert: &Usercert) -> Result<()> {
+        diesel::update(usercerts::table)
+            .set(usercert)
+            .execute(&self.conn)
+            .context("Error updating Usercert")?;
+
+        Ok(())
+    }
+
     pub fn get_usercert(&self, fingerprint: &str)
                         -> Result<Option<Usercert>> {
         let u = usercerts::table
