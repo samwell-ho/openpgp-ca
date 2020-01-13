@@ -147,6 +147,13 @@ fn test_ca_insert_duplicate_email() {
     let usercerts = usercerts.unwrap();
 
     assert_eq!(usercerts.len(), 2);
+
+    // ca cert should be tsigned by all usercerts
+    for uc in &usercerts {
+        let res = ca.check_ca_has_tsig(&uc);
+        assert!(res.is_ok());
+        assert!(res.unwrap());
+    }
 }
 
 
