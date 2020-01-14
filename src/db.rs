@@ -365,26 +365,13 @@ impl Db {
 
     pub fn get_emails_by_usercert(&self, cert: &Usercert)
                                   -> Result<Vec<Email>> {
+        let email_ids = CertEmail::belonging_to(cert)
+            .select(certs_emails::email_id);
 
-        // FIXME: use DB join?
-
-        let mut emails = Vec::new();
-
-        let ces: Vec<CertEmail> = certs_emails::table
-            .filter(certs_emails::usercert_id.eq(cert.id))
-            .load::<CertEmail>(&self.conn)
-            .context("Error loading CertEmails")?;
-
-        for ce in ces {
-            let mut e = emails::table
-                .filter(emails::id.eq(ce.email_id))
-                .load::<Email>(&self.conn)
-                .context("Error loading Email")?;
-
-            emails.append(&mut e);
-        }
-
-        Ok(emails)
+        Ok(emails::table
+            .filter(emails::id.eq_any(email_ids))
+            .load::<Email>(&self.conn)
+            .expect("could not load emails"))
     }
 
     pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {
