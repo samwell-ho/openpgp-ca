@@ -316,34 +316,18 @@ impl Db {
     }
 
     pub fn get_usercerts(&self, email: &str) -> Result<Vec<Usercert>> {
-        let e: Vec<Email> = emails::table.filter(emails::addr.eq(email))
-            .load::<Email>(&self.conn)
-            .context("Error loading email")?;
+        if let Some(email) = self.get_email(email)? {
+            let cert_ids = CertEmail::belonging_to(&email)
+                .select(certs_emails::usercert_id);
 
-        let e =
-            match e.len() {
-                0 => return Err(failure::err_msg("Email address not found")),
-                1 => &e[0],
-                _ => panic!("searching for email {} found {} results,\
-             expected 0 or 1. \
-            (Database constraints should make this impossible)",
-                            email, e.len())
-            };
-
-        let cert_email = CertEmail::belonging_to(e).load::<CertEmail>(&self.conn)
-            .expect("Error loading posts");
-
-        let mut certs: Vec<Usercert> = Vec::new();
-        for ce in cert_email {
-            let mut c = usercerts::table
-                .filter(usercerts::id.eq(ce.usercert_id))
+            Ok(usercerts::table
+                .filter(usercerts::id.eq_any(cert_ids))
                 .load::<Usercert>(&self.conn)
-                .context("Error loading Cert")?;
-
-            certs.append(&mut c);
+                .expect("could not load usercerts"))
+        } else {
+            // FIXME: or error for email not found?
+            Ok(vec![])
         }
-
-        Ok(certs)
     }
 
     pub fn list_usercerts(&self) -> Result<Vec<Usercert>> {
