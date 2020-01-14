@@ -81,7 +81,7 @@ pub struct NewEmail<'a> {
 }
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(Usercert < 'a >)]
+#[belongs_to(Usercert)]
 #[belongs_to(Email)]
 #[table_name = "certs_emails"]
 pub struct CertEmail {
