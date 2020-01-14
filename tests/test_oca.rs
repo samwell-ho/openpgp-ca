@@ -64,8 +64,8 @@ fn test_update_usercert_key() {
         now.checked_add(Duration::from_secs(3600 * 24 * 365 * 6));
 
     // update key with new version, but same fingerprint
-    let mut ctx = make_context!();
-    ctx.leak_tempdir();
+    let ctx = make_context!();
+//    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -110,10 +110,8 @@ fn test_update_usercert_key() {
     // get usercert for alice
     let usercerts = ca.get_usercerts("alice@example.org");
     assert!(usercerts.is_ok());
-
     let usercerts = usercerts.unwrap();
     assert_eq!(usercerts.len(), 1);
-
     let alice = &usercerts[0];
 
     // store updated version of cert
@@ -277,4 +275,63 @@ fn test_ca_export_wkd() {
         "openpgpkey.example.org/.well-known/openpgpkey/example.org\
          /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t");
     assert!(test_path.is_file());
+}
+
+#[test]
+fn test_ca_multiple_revocations() {
+    // create two different revocation certificates for one key and import them
+
+    let mut ctx = make_context!();
+    ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let mut ca = ca::Ca::new(Some(&db));
+
+    // make new CA key
+    assert!(ca.ca_new("example.org").is_ok());
+
+    // gpg: make key for Alice
+    gnupg::create_user(&ctx, "Alice <alice@example.org>");
+
+    let alice_file = format!("{}/alice.key", home_path);
+    let alice_key = gnupg::export(&ctx, &"alice@example.org");
+    std::fs::write(&alice_file, alice_key).expect("Unable to write file");
+
+    ca.usercert_import(None, &[], &alice_file, None);
+
+    // make two different revocation certificates and import them into the CA
+    let revoc_file1 = format!("{}/alice.revoc1", home_path);
+    gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file1, 1);
+
+    let revoc_file3 = format!("{}/alice.revoc3", home_path);
+    gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file3, 3);
+
+    ca.add_revocation(&revoc_file1);
+    ca.add_revocation(&revoc_file3);
+
+    // check data in CA
+    let usercerts = ca.get_all_usercerts();
+    assert!(usercerts.is_ok());
+    let usercerts = usercerts.unwrap();
+
+    // check that name/email has been autodetected on CA import from the pubkey
+    assert_eq!(usercerts.len(), 1);
+    let alice = &usercerts[0];
+
+    assert_eq!(alice.name, Some("Alice".to_string()));
+
+    let emails = ca.get_emails(alice);
+    assert!(emails.is_ok());
+    let emails = emails.unwrap();
+    assert_eq!(emails.len(), 1);
+    assert_eq!(emails[0].addr, "alice@example.org");
+
+    // check for both revocation certs
+    let revocs = ca.get_revocations(alice);
+    assert!(revocs.is_ok());
+    let revocs = revocs.unwrap();
+
+    assert_eq!(revocs.len(), 2)
 }

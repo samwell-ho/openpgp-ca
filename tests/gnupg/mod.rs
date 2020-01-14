@@ -351,6 +351,27 @@ pub fn edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Result<()> {
     Ok(())
 }
 
+pub fn make_revocation(ctx: &Context, user_id: &str,
+                       filename: &str, reason: u8) -> Result<()> {
+    let homedir = String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
+
+    let cmd = format!("gpg --homedir {} --output {} --gen-revoke {}",
+                      homedir, filename, user_id);
+
+    let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
+    p.exp_string("Create a revocation certificate for this key? (y/N)").unwrap();
+    p.send_line("y").unwrap();
+    p.exp_string("Your decision?").unwrap();
+    p.send_line(&format!("{}", reason)).unwrap();
+    p.exp_string(">").unwrap();
+    p.send_line("").unwrap();
+    p.exp_string("Is this okay? (y/N)").unwrap();
+    p.send_line("y").unwrap();
+    p.exp_eof().unwrap();
+
+    Ok(())
+}
+
 pub fn edit_expire(ctx: &Context, user_id: &str, expires: &str)
                    -> Result<()> {
     let homedir = String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
