@@ -281,8 +281,7 @@ fn test_ca_export_wkd() {
 fn test_ca_multiple_revocations() {
     // create two different revocation certificates for one key and import them
 
-    let mut ctx = make_context!();
-    ctx.leak_tempdir();
+    let ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
