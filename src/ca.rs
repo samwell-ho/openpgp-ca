@@ -270,6 +270,35 @@ impl Ca {
             let certified =
                 Pgp::sign_user_emails(&ca_cert, &user_cert, emails)?;
 
+            // use name from userids, if no name was passed
+            let name = match name {
+                Some(name) => Some(name.to_owned()),
+                None => {
+                    let userids: Vec<_> = user_cert.userids().collect();
+                    if userids.len() == 1 {
+                        let userid = userids[0];
+                        userid.userid().name()?
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            // use emails from userids, if no emails were passed
+            let emails = if !emails.is_empty() {
+                emails.iter().map(|&s| s.to_owned()).collect()
+            } else {
+                let userids: Vec<_> = user_cert.userids().collect();
+                let emails: Vec<String> = userids.iter()
+                    .map(|uid| uid.userid()
+                        .email().unwrap_or(None).unwrap())
+                    .collect();
+                emails
+            };
+
+            // map Vec<String> -> Vec<&str>
+            let emails: Vec<&str> = emails.iter().map(|s| &**s).collect();
+
 
             // load revocation certificate
             let mut revoc: Vec<String> = Vec::new();
@@ -280,9 +309,9 @@ impl Ca {
 
             let pub_key = &Pgp::cert_to_armored(&certified)?;
 
-            self.db.add_usercert(name, pub_key,
+            self.db.add_usercert(name.as_deref(), pub_key,
                                  &certified.fingerprint().to_hex(),
-                                 emails, &revoc, None, updates_id)?;
+                                 &emails[..], &revoc, None, updates_id)?;
         }
 
         Ok(())
