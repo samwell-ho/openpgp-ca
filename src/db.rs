@@ -21,6 +21,7 @@ use diesel::r2d2::{Pool, PooledConnection, ConnectionManager};
 
 use crate::schema::*;
 use crate::models::*;
+use crate::pgp::Pgp;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -174,6 +175,8 @@ impl Db {
     // --- public ---
 
     pub fn insert_ca(&self, ca: NewCa, ca_key: &str) -> Result<()> {
+        assert!(Pgp::armored_to_cert(ca_key).is_ok());
+
         self.conn.transaction::<_, failure::Error, _>(|| {
             diesel::insert_into(cas::table)
                 .values(&ca)
@@ -206,6 +209,8 @@ impl Db {
     }
 
     pub fn update_cacert(&self, cacert: &Cacert) -> Result<()> {
+        assert!(Pgp::armored_to_cert(&cacert.cert).is_ok());
+
         diesel::update(cacerts::table)
             .set(cacert)
             .execute(&self.conn)
@@ -249,14 +254,17 @@ impl Db {
                         revocs: &Vec<String>, ca_cert_tsigned: Option<&str>,
                         updates_cert_id: Option<i32>) -> Result<Usercert> {
         self.conn.transaction::<_, failure::Error, _>(|| {
-            let (ca, mut ca_cert_db) = self.get_ca()
+            let (ca, mut cacert_db) = self.get_ca()
                 .context("Couldn't find CA")?.unwrap();
 
-            // store updated CA cert, if applicable
-            // FIXME: fn parameter should be just the new tsig?
-            if let Some(ca_cert) = ca_cert_tsigned {
-                ca_cert_db.cert = ca_cert.to_string();
-                self.update_cacert(&ca_cert_db)?;
+            // merge updated tsigned CA cert, if applicable
+            if let Some(ca_cert_tsigned) = ca_cert_tsigned {
+                let tsigned = Pgp::armored_to_cert(&ca_cert_tsigned)?;
+
+                let merged = Pgp::armored_to_cert(&cacert_db.cert)?
+                    .merge(tsigned)?;
+                cacert_db.cert = Pgp::priv_cert_to_armored(&merged)?;
+                self.update_cacert(&cacert_db)?;
             }
 
             // UserCert

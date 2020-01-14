@@ -97,7 +97,7 @@ impl Ca {
     pub fn get_ca_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => {
-                Ok(Pgp::armored_to_cert(&cert.cert))
+                Ok(Pgp::armored_to_cert(&cert.cert)?)
             }
             None => panic!("get_domain_ca() failed")
         }
@@ -114,7 +114,7 @@ impl Ca {
         let (_, ca_cert) = self.db.get_ca()
             .context("failed to load CA from database")?.unwrap();
 
-        let cert = Pgp::armored_to_cert(&ca_cert.cert);
+        let cert = Pgp::armored_to_cert(&ca_cert.cert)?;
         let ca_pub = Pgp::cert_to_armored(&cert)
             .context("failed to transform CA key to armored pubkey")?;
 
@@ -254,7 +254,7 @@ impl Ca {
                     "not expecting a revocation cert on key update");
 
             // merge existing and new public key, update in DB usercert
-            let c1 = Pgp::armored_to_cert(&existing.pub_cert);
+            let c1 = Pgp::armored_to_cert(&existing.pub_cert)?;
 
             let updated = c1.merge(user_cert)?;
             let armored = Pgp::cert_to_armored(&updated)?;
@@ -385,7 +385,7 @@ impl Ca {
     }
 
     pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Result<bool> {
-        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert);
+        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
         let sigs = Self::get_sigs(&user_cert);
 
         let ca = self.get_ca_cert()?;
@@ -400,7 +400,7 @@ impl Ca {
         let tsigs = Self::get_tsigs(&ca);
 
 
-        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert);
+        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
 
         Ok(tsigs.iter()
             .any(|&t| t.issuer_fingerprint().unwrap()
@@ -516,9 +516,9 @@ impl Ca {
 //        let ca_id = bridge.clone().cas_id;
 
         let (_, ca_cert) = self.db.get_ca()?.unwrap();
-        let ca_cert = Pgp::armored_to_cert(&ca_cert.cert);
+        let ca_cert = Pgp::armored_to_cert(&ca_cert.cert)?;
 
-        let bridge_pub = Pgp::armored_to_cert(&bridge.pub_key);
+        let bridge_pub = Pgp::armored_to_cert(&bridge.pub_key)?;
 
         // make sig to revoke bridge
         let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_cert)?;
@@ -546,11 +546,11 @@ impl Ca {
         extern crate sequoia_net;
         use sequoia_net::wkd;
 
-        let ca_cert = Pgp::armored_to_cert(&self.export_pubkey()?);
+        let ca_cert = Pgp::armored_to_cert(&self.export_pubkey()?)?;
         wkd::insert(&path, domain, None, &ca_cert)?;
 
         for uc in self.get_all_usercerts()? {
-            let c = Pgp::armored_to_cert(&uc.pub_cert);
+            let c = Pgp::armored_to_cert(&uc.pub_cert)?;
             wkd::insert(&path, domain, None, &c)?;
         }
 

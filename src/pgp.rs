@@ -115,8 +115,11 @@ impl Pgp {
     }
 
     /// make a Cert from an ascii armored key
-    pub fn armored_to_cert(armored: &str) -> Cert {
-        Cert::from_bytes(armored.as_bytes()).unwrap()
+    pub fn armored_to_cert(armored: &str) -> Result<Cert> {
+        let cert = Cert::from_bytes(armored.as_bytes())
+            .expect("Cert::from_bytes failed");
+
+        Ok(cert)
     }
 
 

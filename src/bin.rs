@@ -180,7 +180,7 @@ fn real_main() -> Result<()> {
                             for usercert in ca.get_all_usercerts()
                                 .context("couldn't load usercerts")? {
                                 let cert =
-                                    Pgp::armored_to_cert(&usercert.pub_cert);
+                                    Pgp::armored_to_cert(&usercert.pub_cert)?;
                                 println!(" expires: {:?}", Pgp::get_expiry(&cert));
                             }
                         }
@@ -196,7 +196,7 @@ fn real_main() -> Result<()> {
                                      .unwrap_or("<no name>".to_string()),
                                  usercert.fingerprint);
 
-                        let cert = Pgp::armored_to_cert(&usercert.pub_cert);
+                        let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
 
                         for email in ca.get_emails(&usercert)? {
                             println!("- email {}", email.addr);
@@ -231,7 +231,7 @@ fn real_main() -> Result<()> {
                     let email = m2.value_of("email");
 
                     let bridge = ca.bridge_new(key_file, email, scope)?;
-                    let remote = Pgp::armored_to_cert(&bridge.pub_key);
+                    let remote = Pgp::armored_to_cert(&bridge.pub_key)?;
                     println!("signed certificate for {} as bridge\n",
                              bridge.email);
                     println!("CAUTION:");

@@ -94,7 +94,7 @@ fn test_update_usercert_key() {
     assert_eq!(usercerts.len(), 1);
 
     // check that expiry is not ~2y but ~5y
-    let cert = pgp::Pgp::armored_to_cert(&usercerts[0].pub_cert);
+    let cert = pgp::Pgp::armored_to_cert(&usercerts[0].pub_cert).unwrap();
 
     assert!(cert.alive(in_one_year).is_ok());
     assert!(!cert.alive(in_three_years).is_ok());
@@ -125,7 +125,7 @@ fn test_update_usercert_key() {
     assert_eq!(usercerts.len(), 1);
 
     // check that expiry is not ~2y but ~5y
-    let cert = pgp::Pgp::armored_to_cert(&usercerts[0].pub_cert);
+    let cert = pgp::Pgp::armored_to_cert(&usercerts[0].pub_cert).unwrap();
 
     assert!(cert.alive(in_three_years).is_ok());
     assert!(!cert.alive(in_six_years).is_ok());
