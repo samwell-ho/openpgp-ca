@@ -12,8 +12,8 @@ ENV OPENPGP_CA_DB=/var/run/openpgp-ca/openpgp-ca.sqlite
 # OpenPGP CA
 ADD ./ /opt/openpgp-ca/
 RUN cd /opt/openpgp-ca/ && cargo build --release
-RUN cp /opt/openpgp-ca/target/release/openpgp_ca /usr/local/bin/
+RUN cp /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/
 
 VOLUME ["/var/run/openpgp-ca/"]
-ENTRYPOINT ["/usr/local/bin/openpgp_ca"]
+ENTRYPOINT ["/usr/local/bin/openpgp-ca"]
 CMD ["--help"]
