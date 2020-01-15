@@ -116,7 +116,7 @@ fn test_update_usercert_key() {
 
     // store updated version of cert
     let res = ca.usercert_import_update(alice, &alice2_file);
-
+    assert!(res.is_ok());
 
     // check the state of CA data
     let usercerts = ca.get_all_usercerts();
