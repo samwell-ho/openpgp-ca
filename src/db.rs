@@ -67,6 +67,11 @@ impl Db {
         }
     }
 
+    pub fn get_conn(&self)
+                    -> &PooledConnection<ConnectionManager<SqliteConnection>> {
+        &self.conn
+    }
+
     // --- building block functions ---
 
     fn insert_usercert(&self, cert: NewUsercert) -> Result<Usercert> {

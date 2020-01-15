@@ -139,41 +139,42 @@ impl Ca {
     }
 
     pub fn import_tsig(&self, key_file: &str) -> Result<()> {
-        let ca_cert = self.get_ca_cert().unwrap();
+        use diesel::prelude::*;
+        self.db.get_conn().transaction::<_, failure::Error, _>(|| {
+            let ca_cert = self.get_ca_cert().unwrap();
 
-        let ca_cert_imported = Cert::from_file(key_file)
-            .context("Failed to read key")?;
+            let ca_cert_imported = Cert::from_file(key_file)
+                .context("Failed to read key")?;
 
-        // make sure the keys have the same KeyID
-        if ca_cert.keyid() != ca_cert_imported.keyid() {
-            return Err(failure::err_msg("The imported key has an \
-            unexpected keyid"));
-        }
+            // make sure the keys have the same Fingerprint
+            if ca_cert.fingerprint() != ca_cert_imported.fingerprint() {
+                return Err(failure::err_msg
+                    ("The imported cert has an unexpected Fingerprint"));
+            }
 
-        // get the tsig(s) from import
-        let tsigs = Self::get_tsigs(&ca_cert_imported);
+            // get the tsig(s) from import
+            let tsigs = Self::get_tsigs(&ca_cert_imported);
 
-        // add tsig(s) to our "own" version of the CA key
-        let mut packets: Vec<Packet> = Vec::new();
-        tsigs.iter().for_each(|&s| packets.push(s.clone().into()));
+            // add tsig(s) to our "own" version of the CA key
+            let mut packets: Vec<Packet> = Vec::new();
+            tsigs.iter().for_each(|&s| packets.push(s.clone().into()));
 
-        let signed = ca_cert.merge_packets(packets)
-            .context("merging tsigs into CA Key failed")?;
+            let signed = ca_cert.merge_packets(packets)
+                .context("merging tsigs into CA Key failed")?;
 
-        // FIXME: DB transaction
+            // update in DB
+            let (_, mut ca_cert) = self.db.get_ca()
+                .context("failed to load CA from database")?
+                .unwrap();
 
-        // update in DB
-        let (_, mut ca_cert) = self.db.get_ca()
-            .context("failed to load CA from database")?
-            .unwrap();
+            ca_cert.cert = Pgp::priv_cert_to_armored(&signed)
+                .context("failed to armor CA Cert")?;
 
-        ca_cert.cert = Pgp::priv_cert_to_armored(&signed)
-            .context("failed to armor CA Cert")?;
+            self.db.update_cacert(&ca_cert)
+                .context("Update of CA Cert in DB failed")?;
 
-        self.db.update_cacert(&ca_cert)
-            .context("Update of CA Cert in DB failed")?;
-
-        Ok(())
+            Ok(())
+        })
     }
 
     // -------- users
@@ -209,10 +210,9 @@ impl Ca {
             return Err(failure::err_msg("Couldn't insert user"));
         }
 
-        // FIXME: the private key needs to be handed over to
-        // the user -> print for now?
-        let priv_key = &Pgp::priv_cert_to_armored(&certified)?;
-        println!("new user key for {}:\n{}", name.unwrap_or(""), priv_key);
+        // the private key needs to be handed over to the user, print for now
+        println!("new user key for {}:\n{}", name.unwrap_or(""),
+                 &Pgp::priv_cert_to_armored(&certified)?);
         // --
 
         Ok(())
@@ -435,6 +435,7 @@ impl Ca {
         let remote_ca_cert = Cert::from_file(key_file)
             .context("Failed to read key")?;
 
+        // derive an email and domain from the user_id in the remote cert
         let (cert_email, cert_domain) = {
             let uids: Vec<_> = remote_ca_cert.userids().collect();
             assert_eq!(uids.len(), 1,
@@ -459,8 +460,9 @@ impl Ca {
 
         let scope = match scope {
             Some(scope) => {
-                // FIXME: if scope and domain don't match, warn/error?
-                // (... unless --force parameter has been given?!)
+                // if scope and domain don't match, warn/error?
+                // (FIXME: unless --force parameter has been given?!)
+                assert_eq!(scope, cert_domain);
 
                 scope
             }
