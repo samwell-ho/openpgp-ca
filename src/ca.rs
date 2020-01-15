@@ -19,6 +19,8 @@ use failure::{self, ResultExt};
 
 use std::env;
 
+use publicsuffix::Domain;
+
 use sequoia_openpgp as openpgp;
 use openpgp::Cert;
 use openpgp::Packet;
@@ -28,6 +30,7 @@ use openpgp::packet::Signature;
 use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
+
 use std::path::Path;
 use std::collections::HashSet;
 
@@ -74,10 +77,10 @@ impl Ca {
             return Err(failure::err_msg("ERROR: CA has already been created"));
         }
 
-        // FIXME: use a better syntax check for domainname
-        if domainname.contains("@") {
-            return Err(failure::err_msg(
-                "Parameter should be a domainname, not an email address"));
+        // domainname syntax check
+        if !Domain::has_valid_syntax(domainname) {
+            return Err(
+                failure::err_msg("Parameter is not a valid domainname"));
         }
 
         let (cert, _) = Pgp::make_private_ca_cert(domainname,
@@ -412,8 +415,11 @@ impl Ca {
     // "other.org" => "<[^>]+[@.]other\\.org>$"
     fn domain_to_regex(domain: &str) -> Result<String> {
 
-        // FIXME: check if domain String has the expected format
-        // ...
+        // syntax check domain
+        if !Domain::has_valid_syntax(domain) {
+            return Err(
+                failure::err_msg("Parameter is not a valid domainname"));
+        }
 
         // transform domain to regex
         let mut regex = "<[^>]+[@.]".to_string();

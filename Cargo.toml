@@ -21,6 +21,8 @@ lazy_static = "1.3"
 dotenv = "0.15"
 failure = "0.1"
 
+publicsuffix = "1.5"
+
 #sequoia-openpgp = "0.13.0"
 sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag="v0.13.0" }
 sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag="v0.13.0"}
