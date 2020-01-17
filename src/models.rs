@@ -103,6 +103,7 @@ pub struct NewCertEmail {
 pub struct Revocation {
     pub id: i32,
     pub revocation: String,
+    pub published: i32,
     // FIXME - https://docs.diesel.rs/diesel/associations/index.html
     pub usercert_id: i32,
 }
@@ -111,6 +112,7 @@ pub struct Revocation {
 #[table_name = "revocations"]
 pub struct NewRevocation<'a> {
     pub revocation: &'a str,
+    pub published: i32,
     pub usercert_id: i32,
 }
 

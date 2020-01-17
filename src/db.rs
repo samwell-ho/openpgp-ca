@@ -285,7 +285,7 @@ impl Db {
             // Revocations
             for revocation in revocs {
                 self.insert_revocation(
-                    NewRevocation { revocation, usercert_id: c.id })?;
+                    NewRevocation { revocation, usercert_id: c.id, published: 0 })?;
             }
 
             // Emails
@@ -349,7 +349,7 @@ impl Db {
     pub fn add_revocation(&self, revocation: &str, cert: &Usercert)
                           -> Result<Revocation> {
         self.insert_revocation(
-            NewRevocation { revocation, usercert_id: cert.id })
+            NewRevocation { revocation, usercert_id: cert.id, published: 0 })
     }
 
     pub fn get_emails_by_usercert(&self, cert: &Usercert)

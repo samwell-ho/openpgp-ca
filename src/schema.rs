@@ -48,6 +48,7 @@ table! {
     revocations (id) {
         id -> Integer,
         revocation -> Text,
+        published -> Integer,
         usercert_id -> Integer,
     }
 }
@@ -63,21 +64,12 @@ table! {
     }
 }
 
-table! {
-    users (id) {
-        id -> Integer,
-        name -> Nullable<Text>,
-        ca_id -> Integer,
-    }
-}
-
 joinable!(bridges -> cas (cas_id));
 joinable!(cacerts -> cas (ca_id));
 joinable!(certs_emails -> emails (email_id));
 joinable!(certs_emails -> usercerts (usercert_id));
 joinable!(revocations -> usercerts (usercert_id));
 joinable!(usercerts -> cas (ca_id));
-joinable!(users -> cas (ca_id));
 
 allow_tables_to_appear_in_same_query!(
     bridges,
@@ -88,5 +80,4 @@ allow_tables_to_appear_in_same_query!(
     prefs,
     revocations,
     usercerts,
-    users,
 );
