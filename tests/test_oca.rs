@@ -3,6 +3,8 @@ use openpgp_ca_lib::pgp;
 use std::path::Path;
 use std::time::SystemTime;
 use failure::_core::time::Duration;
+use sequoia_openpgp::{Fingerprint, KeyID, Cert};
+use tokio_core::reactor::Core;
 
 mod gnupg;
 
@@ -275,6 +277,64 @@ fn test_ca_export_wkd() {
         "openpgpkey.example.org/.well-known/openpgpkey/example.org\
          /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t");
     assert!(test_path.is_file());
+}
+
+#[test]
+#[ignore]
+fn test_ca_export_wkd_sequoia() {
+    let mut ctx = make_context!();
+    ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+
+    // -- get keys from hagrid
+
+    let c = sequoia_core::Context::new();
+    assert!(c.is_ok());
+    let c = c.unwrap();
+
+    let res = sequoia_net::KeyServer::keys_openpgp_org(&c);
+    assert!(res.is_ok());
+    let mut hagrid = res.unwrap();
+
+    let mut core = Core::new().unwrap();
+
+    let j = Fingerprint::from_hex
+        ("CBCD8F030588653EEDD7E2659B7DD433F254904A").unwrap();
+    let justus: Cert = core.run(hagrid.get(&KeyID::from(j))).unwrap();
+
+    let justus_file = format!("{}/justus.key", home_path);
+    let justus_key = pgp::Pgp::cert_to_armored(&justus).unwrap();
+    std::fs::write(&justus_file, justus_key)
+        .expect("Unable to write file");
+
+    let n = Fingerprint::from_hex
+        ("8F17777118A33DDA9BA48E62AACB3243630052D9").unwrap();
+    let neal: Cert = core.run(hagrid.get(&KeyID::from(n))).unwrap();
+
+    let neal_file = format!("{}/neal.key", home_path);
+    let neal_key = pgp::Pgp::cert_to_armored(&neal).unwrap();
+    std::fs::write(&neal_file, neal_key)
+        .expect("Unable to write file");
+
+    // -- import keys into CA
+
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let mut ca = ca::Ca::new(Some(&db));
+
+    assert!(ca.ca_new("sequoia-pgp.org").is_ok());
+
+    ca.usercert_import(None, &["justus@sequoia-pgp.org"], &justus_file, None);
+    ca.usercert_import(None, &["neal@sequoia-pgp.org"], &neal_file, None);
+
+    // -- export as WKD
+
+    let wkd_dir = home_path + "/wkd/";
+    let wkd_path = Path::new(&wkd_dir);
+
+    let res = ca.export_wkd("sequoia-pgp.org", &wkd_path);
+    assert!(res.is_ok());
 }
 
 #[test]
