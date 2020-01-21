@@ -81,11 +81,8 @@ fn test_update_usercert_key() {
     gnupg::create_user(&ctx, "alice@example.org");
     let alice1_key = gnupg::export(&ctx, &"alice@example.org");
 
-    let alice1_file = format!("{}/alice1.key", home_path);
-    std::fs::write(&alice1_file, alice1_key).expect("Unable to write file");
-
-    ca.usercert_import(Some("Alice"), &vec!["alice@example.org"],
-                       &alice1_file, None)
+    ca.usercert_import(&alice1_key, None, Some("Alice"),
+                       &vec!["alice@example.org"])
         .expect("import Alice 1 to CA failed");
 
 
@@ -105,9 +102,6 @@ fn test_update_usercert_key() {
     gnupg::edit_expire(&ctx, "alice@example.org", "5y");
     let alice2_key = gnupg::export(&ctx, &"alice@example.org");
 
-    let alice2_file = format!("{}/alice2.key", home_path);
-    std::fs::write(&alice2_file, alice2_key).expect("Unable to write file");
-
 
     // get usercert for alice
     let usercerts = ca.get_usercerts("alice@example.org");
@@ -117,7 +111,7 @@ fn test_update_usercert_key() {
     let alice = &usercerts[0];
 
     // store updated version of cert
-    let res = ca.usercert_import_update(alice, &alice2_file);
+    let res = ca.usercert_import_update(&alice2_key, alice);
     assert!(res.is_ok());
 
     // check the state of CA data
@@ -150,11 +144,8 @@ fn test_update_user_cert() {
     gnupg::create_user(&ctx_alice1, "alice@example.org");
     let alice1_key = gnupg::export(&ctx_alice1, &"alice@example.org");
 
-    let alice1_file = format!("{}/alice1.key", home_path);
-    std::fs::write(&alice1_file, alice1_key).expect("Unable to write file");
-
-    ca.usercert_import(Some("Alice"), &vec!["alice@example.org"],
-                       &alice1_file, None)
+    ca.usercert_import(&alice1_key, None, Some("Alice"),
+                       &vec!["alice@example.org"])
         .expect("import Alice 1 to CA failed");
 
 
@@ -162,10 +153,6 @@ fn test_update_user_cert() {
     let ctx_alice2 = make_context!();
     gnupg::create_user(&ctx_alice2, "alice@example.org");
     let alice2_key = gnupg::export(&ctx_alice2, &"alice@example.org");
-
-    let alice2_file = format!("{}/alice2.key", home_path);
-    std::fs::write(&alice2_file, alice2_key).expect("Unable to write file");
-
 
     // get usercert for alice
     let usercerts = ca.get_usercerts("alice@example.org");
@@ -177,7 +164,7 @@ fn test_update_user_cert() {
     let alice = &usercerts[0];
 
     // store updated version of cert
-    let res = ca.usercert_import_update(alice, &alice2_file);
+    let res = ca.usercert_import_update(&alice2_key, alice);
 
     println!("{:?}", res);
     assert!(res.is_ok());
@@ -302,20 +289,12 @@ fn test_ca_export_wkd_sequoia() {
     let j = Fingerprint::from_hex
         ("CBCD8F030588653EEDD7E2659B7DD433F254904A").unwrap();
     let justus: Cert = core.run(hagrid.get(&KeyID::from(j))).unwrap();
-
-    let justus_file = format!("{}/justus.key", home_path);
     let justus_key = pgp::Pgp::cert_to_armored(&justus).unwrap();
-    std::fs::write(&justus_file, justus_key)
-        .expect("Unable to write file");
 
     let n = Fingerprint::from_hex
         ("8F17777118A33DDA9BA48E62AACB3243630052D9").unwrap();
     let neal: Cert = core.run(hagrid.get(&KeyID::from(n))).unwrap();
-
-    let neal_file = format!("{}/neal.key", home_path);
     let neal_key = pgp::Pgp::cert_to_armored(&neal).unwrap();
-    std::fs::write(&neal_file, neal_key)
-        .expect("Unable to write file");
 
     // -- import keys into CA
 
@@ -325,8 +304,10 @@ fn test_ca_export_wkd_sequoia() {
 
     assert!(ca.ca_new("sequoia-pgp.org").is_ok());
 
-    ca.usercert_import(None, &["justus@sequoia-pgp.org"], &justus_file, None);
-    ca.usercert_import(None, &["neal@sequoia-pgp.org"], &neal_file, None);
+    ca.usercert_import(&justus_key, None, None,
+                       &["justus@sequoia-pgp.org"]);
+    ca.usercert_import(&neal_key, None, None,
+                       &["neal@sequoia-pgp.org"]);
 
     // -- export as WKD
 
@@ -354,11 +335,9 @@ fn test_ca_multiple_revocations() {
     // gpg: make key for Alice
     gnupg::create_user(&ctx, "Alice <alice@example.org>");
 
-    let alice_file = format!("{}/alice.key", home_path);
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
-    std::fs::write(&alice_file, alice_key).expect("Unable to write file");
 
-    ca.usercert_import(None, &[], &alice_file, None);
+    ca.usercert_import(&alice_key, None, None, &[]);
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);

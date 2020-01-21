@@ -223,15 +223,13 @@ impl Ca {
 
     // update existing or create independent new usercert,
     // importing pub cert from file
-    fn usercert_import_update_or_create(&self, name: Option<&str>,
+    fn usercert_import_update_or_create(&self, key: &str,
+                                        revoc: Option<&str>,
+                                        name: Option<&str>,
                                         emails: &[&str],
-                                        key_file: &str,
-                                        revoc_file: Option<&str>,
                                         updates_id: Option<i32>)
                                         -> Result<()> {
-        let user_cert = Cert::from_file(key_file)
-            .context("Failed to read key")?;
-
+        let user_cert = Pgp::armored_to_cert(&key)?;
 
         let existing =
             self.db.get_usercert(&user_cert.fingerprint().to_hex())?;
@@ -253,7 +251,7 @@ impl Ca {
                     "expecting the same set of email addresses on key update");
 
             // this "update" workflow is not handling revocation certs for now
-            assert!(revoc_file.is_none(),
+            assert!(revoc.is_none(),
                     "not expecting a revocation cert on key update");
 
             // merge existing and new public key, update in DB usercert
@@ -304,29 +302,29 @@ impl Ca {
 
 
             // load revocation certificate
-            let mut revoc: Vec<String> = Vec::new();
+            let mut revocs: Vec<String> = Vec::new();
 
-            if let Ok(rev) = Pgp::load_revocation_cert(revoc_file) {
-                revoc.push(Pgp::sig_to_armored(&rev)?);
+            if let Some(rev) = revoc {
+                revocs.push(rev.to_owned());
             }
 
             let pub_key = &Pgp::cert_to_armored(&certified)?;
 
             self.db.add_usercert(name.as_deref(), pub_key,
                                  &certified.fingerprint().to_hex(),
-                                 &emails[..], &revoc, None, updates_id)?;
+                                 &emails[..], &revocs, None, updates_id)?;
         }
 
         Ok(())
     }
 
-    pub fn usercert_import(&self, name: Option<&str>, emails: &[&str],
-                           key_file: &str, revoc_file: Option<&str>) -> Result<()> {
-        self.usercert_import_update_or_create(name, emails, key_file, revoc_file, None)
+    pub fn usercert_import(&self, key: &str, revoc: Option<&str>,
+                           name: Option<&str>, emails: &[&str])
+                           -> Result<()> {
+        self.usercert_import_update_or_create(key, revoc, name, emails, None)
     }
 
-    pub fn usercert_import_update(&self, usercert: &models::Usercert,
-                                  key_file: &str) -> Result<()> {
+    pub fn usercert_import_update(&self, key: &str, usercert: &models::Usercert) -> Result<()> {
         let emails = self.db.get_emails_by_usercert(usercert)?;
         let emails: Vec<&str> = emails.iter()
             .map(|e| e.addr.as_str())
@@ -337,8 +335,8 @@ impl Ca {
             Some(n) => Some(n.as_str())
         };
 
-        self.usercert_import_update_or_create(name, &emails[..], key_file, None,
-                                              Some(usercert.id))
+        self.usercert_import_update_or_create(key, None, name,
+                                              &emails[..], Some(usercert.id))
     }
 
 

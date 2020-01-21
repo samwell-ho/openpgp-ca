@@ -164,26 +164,18 @@ fn test_alice_authenticates_bob_key_imports() {
         .expect("import CA tsig from Bob failed");
 
 
-    // export alice + bob from their contexts
-    let alice_file = format!("{}/alice.key", home_path_alice);
-
+    // get public keys for alice and bob from their gnupg contexts
     let alice_key = gnupg::export(&ctx_alice, &"alice@example.org");
-    std::fs::write(&alice_file, alice_key).expect("Unable to write file");
-
-    // - bob
-    let bob_file = format!("{}/bob.key", home_path_bob);
-
     let bob_key = gnupg::export(&ctx_bob, &"bob@example.org");
-    std::fs::write(&bob_file, bob_key).expect("Unable to write file");
 
 
-    // import alice + bob keys into CA
-    ca.usercert_import(Some("Alice"), &vec!["alice@example.org"],
-                       &alice_file, None)
+    // import public keys for alice and bob into CA
+    ca.usercert_import(&alice_key, None, Some("Alice"),
+                       &vec!["alice@example.org"])
         .expect("import Alice to CA failed");
 
-    ca.usercert_import(Some("Bob"), &vec!["bob@example.org"],
-                       &bob_file, None)
+    ca.usercert_import(&bob_key, None, Some("Bob"),
+                       &vec!["bob@example.org"])
         .expect("import Bob to CA failed");
 
 

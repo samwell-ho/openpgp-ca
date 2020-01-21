@@ -107,11 +107,19 @@ fn real_main() -> Result<()> {
                             let name = m2.value_of("name");
 
                             let key_file = m2.value_of("key-file").unwrap();
-                            let revocation_file = m2.value_of
-                            ("revocation-file");
+                            let revocation_file =
+                                m2.value_of("revocation-file");
 
-                            ca.usercert_import(name, &email_vec[..],
-                                               key_file, revocation_file)?;
+                            let key = std::fs::read_to_string(key_file)?;
+
+                            let revoc = match revocation_file {
+                                Some(filename) =>
+                                    Some(std::fs::read_to_string(filename)?),
+                                None => None
+                            };
+
+                            ca.usercert_import(&key, revoc.as_deref(),
+                                               name, &email_vec[..])?;
                         }
                         _ => unimplemented!(),
                     }
