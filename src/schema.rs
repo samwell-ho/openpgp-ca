@@ -48,7 +48,7 @@ table! {
     revocations (id) {
         id -> Integer,
         revocation -> Text,
-        published -> Integer,
+        published -> Bool,
         usercert_id -> Integer,
     }
 }

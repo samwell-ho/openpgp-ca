@@ -16,6 +16,7 @@
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::schema::*;
+use diesel::sql_types::Bool;
 
 
 #[derive(Queryable, Debug, Clone, AsChangeset)]
@@ -98,12 +99,12 @@ pub struct NewCertEmail {
     pub email_id: i32,
 }
 
-#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
+#[derive(Identifiable, Queryable, Debug, Associations, Clone)]
 #[belongs_to(Usercert)]
 pub struct Revocation {
     pub id: i32,
     pub revocation: String,
-    pub published: i32,
+    pub published: bool,
     // FIXME - https://docs.diesel.rs/diesel/associations/index.html
     pub usercert_id: i32,
 }
@@ -112,7 +113,7 @@ pub struct Revocation {
 #[table_name = "revocations"]
 pub struct NewRevocation<'a> {
     pub revocation: &'a str,
-    pub published: i32,
+    pub published: bool,
     pub usercert_id: i32,
 }
 

@@ -52,7 +52,7 @@ CREATE TABLE certs_emails (
 CREATE TABLE revocations (
   id INTEGER NOT NULL PRIMARY KEY,
   revocation VARCHAR NOT NULL,
-  published INTEGER NOT NULL, -- boolean value
+  published BOOLEAN NOT NULL,
   -- uid/keyid? -- FIXME
   -- subkey? -- FIXME
   -- reason -- FIXME
