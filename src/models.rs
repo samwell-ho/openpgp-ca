@@ -16,7 +16,6 @@
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::schema::*;
-use diesel::sql_types::Bool;
 
 
 #[derive(Queryable, Debug, Clone, AsChangeset)]
