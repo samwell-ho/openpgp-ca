@@ -290,6 +290,36 @@ Alice can still authenticate both OpenPGP CA admin Certificates, as well as
 Bob. Carol however is (correctly) shown as not authenticated.
 
 
+## Workflows for exporting Certificates from OpenPGP CA
+
+Set up a new OpenPGP CA instance with two users: 
+
+`export OPENPGP_CA_DB=/tmp/openpgp-ca.sqlite`
+
+`openpgp-ca ca new example.org` 
+
+`openpgp-ca user add --email alice@example.org --name "Alice Adams"`
+
+`openpgp-ca user add --email bob@example.org --name "Bob Baker"`
+
+We can inspect the resulting state of the users in OpenPGP CA like this:
+
+`openpgp-ca user list`
+
+Exporting an individual user certificate (the armorded certificate will be
+printed on stdout):
+
+`openpgp-ca user export -e alice@example.org`
+
+To output all public certificates from OpenPGP:
+
+`openpgp-ca user export`
+
+To output the public certificate of the OpenPGP CA admin:
+
+`openpgp-ca ca export`
+
+
 ## Workflow: Export Certificates to a Web Key Directory (WKD)
 
 OpenPGP CA can export Certificates in Web Key Directory (WKD) format
