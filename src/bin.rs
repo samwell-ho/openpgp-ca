@@ -163,24 +163,36 @@ fn real_main() -> Result<()> {
                 ("check", Some(m)) => {
                     match m.subcommand() {
                         ("sigs", Some(_m2)) => {
-                            for usercert in ca.get_all_usercerts()
-                                .context("couldn't load users")? {
-                                let ca_sig = ca.check_ca_sig(&usercert).
+                            let mut count_ok = 0;
+                            let certs = ca.get_all_usercerts()
+                                .context("couldn't load users")?;
+                            for usercert in &certs {
+                                let mut ok = true;
+
+                                let ca_sig = ca.check_ca_sig(usercert).
                                     context("Failed while checking CA sig")?;
                                 if !ca_sig {
                                     println!("missing signature by CA for \
                                     user {:?} fingerprint {}",
                                              usercert.name,
                                              usercert.fingerprint);
+                                    ok = false;
                                 }
 
-                                let tsig_on_ca = ca.check_ca_has_tsig(&usercert).
+                                let tsig_on_ca = ca.check_ca_has_tsig(usercert).
                                     context("Failed while checking tsig on CA")?;
                                 if !tsig_on_ca {
                                     println!("CA Cert has not been tsigned \
                                     by user {:?}", usercert.name);
+                                    ok = false;
+                                }
+                                if ok {
+                                    count_ok += 1;
                                 }
                             }
+                            println!("checked {} certs, {} of them had good\
+                             signatures in both directions",
+                                     certs.len(), count_ok);
                         }
                         ("expiry", Some(_m2)) => {
                             // FIXME: use "days" argument
