@@ -26,6 +26,8 @@ use failure::{self, ResultExt};
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
 use std::path::Path;
+use std::time::SystemTime;
+use failure::_core::time::Duration;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -194,14 +196,41 @@ fn real_main() -> Result<()> {
                              signatures in both directions",
                                      certs.len(), count_ok);
                         }
-                        ("expiry", Some(_m2)) => {
-                            // FIXME: use "days" argument
+                        ("expiry", Some(m2)) => {
+
+                            // check that keys are valid for at least this
+                            // number of days from now
+                            let exp_days =
+                                if let Some(days) = m2.value_of("days") {
+                                    days.parse::<u64>().
+                                        context("days parameter must be a number")?
+                                } else {
+                                    0
+                                };
+
+                            let now = SystemTime::now();
+                            let days = Duration::new(60 * 60 * 24 * exp_days, 0);
+                            let expiry_test = now.checked_add(days).unwrap();
 
                             for usercert in ca.get_all_usercerts()
                                 .context("couldn't load usercerts")? {
+                                println!("name {}, fingerprint {}",
+                                         usercert.name.clone()
+                                             .unwrap_or("<no name>".to_string()),
+                                         usercert.fingerprint);
+
                                 let cert =
                                     Pgp::armored_to_cert(&usercert.pub_cert)?;
-                                println!(" expires: {:?}", Pgp::get_expiry(&cert));
+
+                                println!(" expiry: {:?}", Pgp::get_expiry
+                                    (&cert));
+
+                                if cert.alive(expiry_test).is_err() {
+                                    println!("user cert EXPIRED/EXPIRING: {:?}",
+                                             usercert.name);
+                                }
+
+                                println!();
                             }
                         }
                         _ => unimplemented!(),

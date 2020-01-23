@@ -319,6 +319,12 @@ To output the public certificate of the OpenPGP CA admin:
 
 `openpgp-ca ca export`
 
+OpenPGP CA can check if all keys are mutually signed (user keys tsigned the
+ CA key, and the CA key has signed the user key), and report the results:
+ 
+ `openpgp-ca user check sigs`
+ 
+  
 
 ## Workflow: Export Certificates to a Web Key Directory (WKD)
 
