@@ -18,6 +18,7 @@
 use failure::{self, ResultExt};
 
 use std::env;
+use std::time::Duration;
 
 use publicsuffix::Domain;
 
@@ -32,7 +33,8 @@ use crate::models;
 use crate::pgp::Pgp;
 
 use std::path::Path;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
+use std::time::SystemTime;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -339,6 +341,45 @@ impl Ca {
                                               &emails[..], Some(usercert.id))
     }
 
+    pub fn usercert_expiry(&self, days: u64)
+                           -> Result<HashMap<models::Usercert, (bool, Option<Duration>)>> {
+        let mut map = HashMap::new();
+
+        let days = Duration::new(60 * 60 * 24 * days, 0);
+        let expiry_test = SystemTime::now().checked_add(days).unwrap();
+
+        let usercerts = self.get_all_usercerts()
+            .context("couldn't load usercerts")?;
+
+        for usercert in usercerts {
+            let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+            let exp = Pgp::get_expiry(&cert);
+            let alive = cert.alive(expiry_test).is_ok();
+
+            map.insert(usercert, (alive, exp));
+        }
+
+        Ok(map)
+    }
+
+    pub fn usercert_signatures(&self) -> Result<HashMap<models::Usercert, (bool, bool)>> {
+        let mut map = HashMap::new();
+
+        let usercerts = self.get_all_usercerts()
+            .context("couldn't load usercerts")?;
+
+        for usercert in usercerts {
+            let sig_from_ca = self.check_ca_sig(&usercert).
+                context("Failed while checking CA sig")?;
+
+            let tsig_on_ca = self.check_ca_has_tsig(&usercert).
+                context("Failed while checking tsig on CA")?;
+
+            map.insert(usercert, (sig_from_ca, tsig_on_ca));
+        }
+
+        Ok(map)
+    }
 
     pub fn add_revocation(&self, revoc_file: &str) -> Result<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))

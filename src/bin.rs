@@ -26,8 +26,6 @@ use failure::{self, ResultExt};
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
 use std::path::Path;
-use std::time::SystemTime;
-use failure::_core::time::Duration;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -166,14 +164,12 @@ fn real_main() -> Result<()> {
                     match m.subcommand() {
                         ("sigs", Some(_m2)) => {
                             let mut count_ok = 0;
-                            let certs = ca.get_all_usercerts()
-                                .context("couldn't load users")?;
-                            for usercert in &certs {
+
+                            let sigs_status = ca.usercert_signatures()?;
+                            for (usercert, (sig_from_ca, tsig_on_ca)) in &sigs_status {
                                 let mut ok = true;
 
-                                let ca_sig = ca.check_ca_sig(usercert).
-                                    context("Failed while checking CA sig")?;
-                                if !ca_sig {
+                                if !sig_from_ca {
                                     println!("missing signature by CA for \
                                     user {:?} fingerprint {}",
                                              usercert.name,
@@ -181,8 +177,6 @@ fn real_main() -> Result<()> {
                                     ok = false;
                                 }
 
-                                let tsig_on_ca = ca.check_ca_has_tsig(usercert).
-                                    context("Failed while checking tsig on CA")?;
                                 if !tsig_on_ca {
                                     println!("CA Cert has not been tsigned \
                                     by user {:?}", usercert.name);
@@ -192,9 +186,9 @@ fn real_main() -> Result<()> {
                                     count_ok += 1;
                                 }
                             }
-                            println!("checked {} certs, {} of them had good\
+                            println!("checked {} certs, {} of them had good \
                              signatures in both directions",
-                                     certs.len(), count_ok);
+                                     sigs_status.len(), count_ok);
                         }
                         ("expiry", Some(m2)) => {
 
@@ -208,24 +202,17 @@ fn real_main() -> Result<()> {
                                     0
                                 };
 
-                            let now = SystemTime::now();
-                            let days = Duration::new(60 * 60 * 24 * exp_days, 0);
-                            let expiry_test = now.checked_add(days).unwrap();
+                            let expiries = ca.usercert_expiry(exp_days)?;
 
-                            for usercert in ca.get_all_usercerts()
-                                .context("couldn't load usercerts")? {
+                            for (usercert, (alive, expiry)) in expiries {
                                 println!("name {}, fingerprint {}",
                                          usercert.name.clone()
                                              .unwrap_or("<no name>".to_string()),
                                          usercert.fingerprint);
 
-                                let cert =
-                                    Pgp::armored_to_cert(&usercert.pub_cert)?;
+                                println!(" expiry: {:?}", expiry);
 
-                                println!(" expiry: {:?}", Pgp::get_expiry
-                                    (&cert));
-
-                                if cert.alive(expiry_test).is_err() {
+                                if !alive {
                                     println!("user cert EXPIRED/EXPIRING: {:?}",
                                              usercert.name);
                                 }

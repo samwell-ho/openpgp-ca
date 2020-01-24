@@ -46,7 +46,7 @@ pub struct NewCacert {
     pub ca_id: i32,
 }
 
-#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset, PartialEq, Eq, Hash)]
 #[belongs_to(Ca)]
 pub struct Usercert {
     pub id: i32,
