@@ -99,7 +99,7 @@ fn test_update_usercert_key() {
     assert!(!cert.alive(in_three_years).is_ok());
 
     // edit key with gpg, then import new version into CA
-    gnupg::edit_expire(&ctx, "alice@example.org", "5y");
+    assert!(gnupg::edit_expire(&ctx, "alice@example.org", "5y").is_ok());
     let alice2_key = gnupg::export(&ctx, &"alice@example.org");
 
 
@@ -300,14 +300,14 @@ fn test_ca_export_wkd_sequoia() {
 
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = ca::Ca::new(Some(&db));
+    let ca = ca::Ca::new(Some(&db));
 
     assert!(ca.ca_new("sequoia-pgp.org").is_ok());
 
-    ca.usercert_import(&justus_key, None, None,
-                       &["justus@sequoia-pgp.org"]);
-    ca.usercert_import(&neal_key, None, None,
-                       &["neal@sequoia-pgp.org"]);
+    assert!(ca.usercert_import(&justus_key, None, None,
+                               &["justus@sequoia-pgp.org"]).is_ok());
+    assert!(ca.usercert_import(&neal_key, None, None,
+                               &["neal@sequoia-pgp.org"]).is_ok());
 
     // -- export as WKD
 
@@ -327,7 +327,7 @@ fn test_ca_multiple_revocations() {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = ca::Ca::new(Some(&db));
+    let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
     assert!(ca.ca_new("example.org").is_ok());
@@ -337,17 +337,19 @@ fn test_ca_multiple_revocations() {
 
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import(&alice_key, None, None, &[]);
+    assert!(ca.usercert_import(&alice_key, None, None, &[]).is_ok());
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
-    gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file1, 1);
+    assert!(gnupg::make_revocation(&ctx, "alice@example.org",
+                                   &revoc_file1, 1).is_ok());
 
     let revoc_file3 = format!("{}/alice.revoc3", home_path);
-    gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file3, 3);
+    assert!(gnupg::make_revocation(&ctx, "alice@example.org",
+                                   &revoc_file3, 3).is_ok());
 
-    ca.add_revocation(&revoc_file1);
-    ca.add_revocation(&revoc_file3);
+    assert!(ca.add_revocation(&revoc_file1).is_ok());
+    assert!(ca.add_revocation(&revoc_file3).is_ok());
 
     // check data in CA
     let usercerts = ca.get_all_usercerts();
