@@ -103,12 +103,12 @@ fn test_update_usercert_key() {
     // check the same with ca.usercert_expiry()
     let exp1 = ca.usercert_expiry(365).unwrap();
     assert_eq!(exp1.len(), 1);
-    let (alice, (alive, _)) = exp1.iter().next().unwrap();
+    let (_, (alive, _)) = exp1.iter().next().unwrap();
     assert!(alive);
 
     let exp3 = ca.usercert_expiry(3 * 365).unwrap();
     assert_eq!(exp3.len(), 1);
-    let (alice, (alive, _)) = exp3.iter().next().unwrap();
+    let (_, (alive, _)) = exp3.iter().next().unwrap();
     assert!(!alive);
 
 
@@ -143,12 +143,12 @@ fn test_update_usercert_key() {
     // check the same with ca.usercert_expiry()
     let exp3 = ca.usercert_expiry(3 * 365).unwrap();
     assert_eq!(exp3.len(), 1);
-    let (alice, (alive, _)) = exp3.iter().next().unwrap();
+    let (_, (alive, _)) = exp3.iter().next().unwrap();
     assert!(alive);
 
     let exp5 = ca.usercert_expiry(5 * 365).unwrap();
     assert_eq!(exp5.len(), 1);
-    let (alice, (alive, _)) = exp5.iter().next().unwrap();
+    let (_, (alive, _)) = exp5.iter().next().unwrap();
     assert!(!alive);
 }
 
