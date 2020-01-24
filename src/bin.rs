@@ -224,31 +224,27 @@ fn real_main() -> Result<()> {
                     }
                 }
                 ("list", Some(_m2)) => {
-                    let usercerts = ca.get_all_usercerts()?;
-
-                    for usercert in usercerts {
-                        println!(" name {}, fingerprint {}",
+                    for (usercert, (sig_from_ca, tsig_on_ca)) in ca.usercert_signatures()? {
+                        println!("usercert for '{}'",
                                  usercert.name.clone()
-                                     .unwrap_or("<no name>".to_string()),
-                                 usercert.fingerprint);
+                                     .unwrap_or("<no name>".to_string()));
 
-                        let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+                        println!("fingerprint {}", usercert.fingerprint);
 
                         for email in ca.get_emails(&usercert)? {
                             println!("- email {}", email.addr);
                         }
 
-                        println!(" expires: {:?}", Pgp::get_expiry(&cert));
+                        let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+                        if let Some(exp) = Pgp::get_expiry(&cert) {
+                            println!(" expires: {:?}", exp);
+                        } else {
+                            println!(" cert doesn't expire");
+                        }
 
-                        let ca_sig = ca.check_ca_sig(&usercert).
-                            context("Failed while checking CA sig")?;
-                        println!(" user key (or subkey) signed by CA: {}",
-                                 ca_sig);
-
-                        let tsig_on_ca = ca.check_ca_has_tsig(&usercert).
-                            context("Failed while checking tsig on CA")?;
-                        println!(" user has tsigned CA: {}", tsig_on_ca);
-
+                        println!(" user cert (or subkey) signed by CA: {}",
+                                 sig_from_ca);
+                        println!(" user cert has tsigned CA: {}", tsig_on_ca);
                         println!();
                     }
                 }
