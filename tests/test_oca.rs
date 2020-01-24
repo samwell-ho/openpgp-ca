@@ -92,11 +92,25 @@ fn test_update_usercert_key() {
 
     assert_eq!(usercerts.len(), 1);
 
-    // check that expiry is not ~2y but ~5y
-    let cert = pgp::Pgp::armored_to_cert(&usercerts[0].pub_cert).unwrap();
+    let alice = &usercerts[0];
+
+    // check that expiry is ~2y
+    let cert = pgp::Pgp::armored_to_cert(&alice.pub_cert).unwrap();
 
     assert!(cert.alive(in_one_year).is_ok());
     assert!(!cert.alive(in_three_years).is_ok());
+
+    // check the same with ca.usercert_expiry()
+    let exp1 = ca.usercert_expiry(365).unwrap();
+    assert_eq!(exp1.len(), 1);
+    let (alice, (alive, _)) = exp1.iter().next().unwrap();
+    assert!(alive);
+
+    let exp3 = ca.usercert_expiry(3 * 365).unwrap();
+    assert_eq!(exp3.len(), 1);
+    let (alice, (alive, _)) = exp3.iter().next().unwrap();
+    assert!(!alive);
+
 
     // edit key with gpg, then import new version into CA
     assert!(gnupg::edit_expire(&ctx, "alice@example.org", "5y").is_ok());
@@ -125,6 +139,17 @@ fn test_update_usercert_key() {
 
     assert!(cert.alive(in_three_years).is_ok());
     assert!(!cert.alive(in_six_years).is_ok());
+
+    // check the same with ca.usercert_expiry()
+    let exp3 = ca.usercert_expiry(3 * 365).unwrap();
+    assert_eq!(exp3.len(), 1);
+    let (alice, (alive, _)) = exp3.iter().next().unwrap();
+    assert!(alive);
+
+    let exp5 = ca.usercert_expiry(5 * 365).unwrap();
+    assert_eq!(exp5.len(), 1);
+    let (alice, (alive, _)) = exp5.iter().next().unwrap();
+    assert!(!alive);
 }
 
 #[test]
