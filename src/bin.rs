@@ -23,6 +23,9 @@ use clap::crate_version;
 
 use failure::{self, ResultExt};
 
+use chrono::offset::Utc;
+use chrono::DateTime;
+
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
 use std::path::Path;
@@ -210,10 +213,16 @@ fn real_main() -> Result<()> {
                                              .unwrap_or("<no name>".to_string()),
                                          usercert.fingerprint);
 
-                                println!(" expiry: {:?}", expiry);
+                                if let Some(exp) = expiry {
+                                    let datetime: DateTime<Utc> = exp.into();
+                                    println!(" expires: {}", datetime.format("%d/%m/%Y"));
+                                } else {
+                                    println!(" cert doesn't expire");
+                                }
+
 
                                 if !alive {
-                                    println!("user cert EXPIRED/EXPIRING: {:?}",
+                                    println!(" user cert EXPIRED/EXPIRING: {:?}",
                                              usercert.name);
                                 }
 
@@ -236,8 +245,9 @@ fn real_main() -> Result<()> {
                         }
 
                         let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
-                        if let Some(exp) = Pgp::get_expiry(&cert) {
-                            println!(" expires: {:?}", exp);
+                        if let Some(exp) = Pgp::get_expiry(&cert)? {
+                            let datetime: DateTime<Utc> = exp.into();
+                            println!(" expires: {}", datetime.format("%d/%m/%Y"));
                         } else {
                             println!(" cert doesn't expire");
                         }

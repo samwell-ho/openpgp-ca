@@ -342,7 +342,7 @@ impl Ca {
     }
 
     pub fn usercert_expiry(&self, days: u64)
-                           -> Result<HashMap<models::Usercert, (bool, Option<Duration>)>> {
+                           -> Result<HashMap<models::Usercert, (bool, Option<SystemTime>)>> {
         let mut map = HashMap::new();
 
         let days = Duration::new(60 * 60 * 24 * days, 0);
@@ -353,7 +353,7 @@ impl Ca {
 
         for usercert in usercerts {
             let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
-            let exp = Pgp::get_expiry(&cert);
+            let exp = Pgp::get_expiry(&cert)?;
             let alive = cert.alive(expiry_test).is_ok();
 
             map.insert(usercert, (alive, exp));

@@ -20,6 +20,7 @@ diesel_migrations = "1.4"
 lazy_static = "1.4"
 dotenv = "0.15"
 failure = "0.1"
+chrono = "0.4"
 
 publicsuffix = "1.5"
 

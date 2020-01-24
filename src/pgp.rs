@@ -30,7 +30,7 @@ use openpgp::cert;
 
 use failure::{self, ResultExt};
 use sequoia_openpgp::{KeyHandle, Fingerprint};
-use std::time::Duration;
+use std::time::SystemTime;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -95,8 +95,15 @@ impl Pgp {
         Ok(String::from_utf8(v)?.to_string())
     }
 
-    pub fn get_expiry(cert: &Cert) -> Option<Duration> {
-        cert.primary_key_signature(None).unwrap().key_expiration_time()
+    pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
+        let primary = cert.primary_key_signature(None).unwrap();
+        if let Some(duration) = primary.key_expiration_time() {
+            let creation = primary.signature_creation_time()
+                .ok_or(failure::err_msg("Signature creation time is None"))?;
+            Ok(creation.checked_add(duration))
+        } else {
+            Ok(None)
+        }
     }
 
     /// make a "private key" ascii-armored representation of a Cert
