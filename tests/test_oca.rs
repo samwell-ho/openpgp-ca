@@ -400,3 +400,54 @@ fn test_ca_multiple_revocations() {
 
     assert_eq!(revocs.len(), 2)
 }
+
+
+#[test]
+fn test_ca_signatures() {
+    let ctx = make_context!();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let mut ca = ca::Ca::new(Some(&db));
+    assert!(ca.ca_new("example.org").is_ok());
+
+
+    // create/import alice, CA signs alice's key
+    gnupg::create_user(&ctx, "alice@example.org");
+    let alice_key = gnupg::export(&ctx, &"alice@example.org");
+
+    ca.usercert_import(&alice_key, None, Some("Alice"),
+                       &vec!["alice@example.org"])
+        .expect("import Alice 1 to CA failed");
+
+    // create/import bob, CA does not signs bob's key
+    gnupg::create_user(&ctx, "bob@example.org");
+    let bob_key = gnupg::export(&ctx, &"bob@example.org");
+
+    ca.usercert_import(&bob_key, None, Some("Bob"), &[])
+        .expect("import Alice 1 to CA failed");
+
+    // create carol, CA will sign carol's key.
+    // also, CA key gets a tsig by carol
+    assert!(ca.user_new(Some(&"Carol"), &["carol@example.org"]).is_ok());
+
+    let sigs = ca.usercert_signatures().unwrap();
+    for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
+        match usercert.name.as_deref() {
+            Some("Alice") => {
+                assert!(sig_from_ca);
+                assert!(!tsig_on_ca);
+            }
+            Some("Bob") => {
+                assert!(!sig_from_ca);
+                assert!(!tsig_on_ca);
+            }
+            Some("Carol") => {
+                assert!(sig_from_ca);
+                assert!(tsig_on_ca);
+            }
+            _ => panic!()
+        }
+    }
+}
