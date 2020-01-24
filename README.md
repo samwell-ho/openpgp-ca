@@ -302,6 +302,9 @@ Set up a new OpenPGP CA instance with two users:
 
 `openpgp-ca user add --email bob@example.org --name "Bob Baker"`
 
+
+### Inspecting user certificates in OpenPGP CA
+
 We can inspect the resulting state of the users in OpenPGP CA like this:
 
 `openpgp-ca user list`
@@ -324,6 +327,14 @@ OpenPGP CA can check if all keys are mutually signed (user keys tsigned the
  
  `openpgp-ca user check sigs`
  
+OpenPGP CA can check if any keys have expired, and report the results:
+ 
+ `openpgp-ca user check expiry`
+
+OpenPGP CA can also check if any keys have expired a specified number of
+ days in the future and report the results:
+ 
+ `openpgp-ca user check expiry --days 60`
   
 
 ## Workflow: Export Certificates to a Web Key Directory (WKD)
