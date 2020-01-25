@@ -161,6 +161,9 @@ fn real_main() -> Result<()> {
                                 let revoc = ca.get_revocations(&cert)?;
                                 for r in revoc {
                                     println!(" revocation id {:?}", r.id);
+                                    if r.published {
+                                        println!(" this revocation has been PUBLISHED");
+                                    }
                                     println!("{}", r.revocation);
                                     println!();
                                 }
