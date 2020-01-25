@@ -157,8 +157,13 @@ fn real_main() -> Result<()> {
                             println!("User not found");
                         } else {
                             for cert in usercerts {
+                                println!("revocations for {:?}", cert.name);
                                 let revoc = ca.get_revocations(&cert)?;
-                                println!("{:?}", revoc);
+                                for r in revoc {
+                                    println!(" revocation id {:?}", r.id);
+                                    println!("{}", r.revocation);
+                                    println!();
+                                }
                             }
                         }
                     }
