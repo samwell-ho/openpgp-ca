@@ -32,6 +32,7 @@ use openpgp::{KeyHandle, Fingerprint};
 
 use failure::{self, ResultExt};
 use std::time::SystemTime;
+use sequoia_openpgp::PacketPile;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -147,17 +148,24 @@ impl Pgp {
     /// make a Cert from an ascii armored key
     pub fn armored_to_cert(armored: &str) -> Result<Cert> {
         let cert = Cert::from_bytes(armored.as_bytes())
-            .expect("Cert::from_bytes failed");
+            .context("Cert::from_bytes failed")?;
 
         Ok(cert)
     }
 
     /// make a Signature from an ascii armored signature
     pub fn armored_to_signature(armored: &str) -> Result<Signature> {
-        let sig = Signature::from_bytes(armored.as_bytes())
-            .expect("Signature::from_bytes failed");
+        let pile = PacketPile::from_bytes(armored.as_bytes())
+            .context("PacketPile::from_bytes failed")?;
 
-        Ok(sig)
+        let packets: Vec<_> = pile.into_children().collect();
+        assert_eq!(packets.len(), 1);
+
+        if let Packet::Signature(s) = &packets[0] {
+            Ok(s.to_owned())
+        } else {
+            Err(failure::err_msg("Couldn't convert to Signature"))
+        }
     }
 
 
