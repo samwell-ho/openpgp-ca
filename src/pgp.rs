@@ -23,7 +23,7 @@ use openpgp::armor;
 use openpgp::types::{SignatureType, ReasonForRevocation};
 use openpgp::crypto::KeyPair;
 use openpgp::packet::{Signature, UserID};
-use openpgp::packet::signature::Builder;
+use openpgp::packet::signature;
 use openpgp::parse::Parse;
 use openpgp::serialize::Serialize;
 use openpgp::cert;
@@ -31,6 +31,7 @@ use openpgp::cert;
 use failure::{self, ResultExt};
 use sequoia_openpgp::{KeyHandle, Fingerprint};
 use std::time::SystemTime;
+use sequoia_openpgp::types::{KeyFlags, HashAlgorithm};
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -60,11 +61,27 @@ impl Pgp {
         // FIXME: should not be encryption capable
         // FIXME: should not have subkeys
 
-        let email = "openpgp-ca@".to_owned() + domainname;
-        let builder = cert::CertBuilder::new()
-            .add_userid(Self::user_id(&email, name));
+        // Generate a Cert, and create a keypair from the primary key.
+        let (cert, sig) = cert::CertBuilder::new()
+            .generate()?;
 
-        Ok(builder.generate()?)
+        let mut keypair = cert.primary().clone()
+            .mark_parts_secret()?.into_keypair()?;
+
+        // Generate a userid and a binding signature.
+        let email = "openpgp-ca@".to_owned() + domainname;
+        let userid = Self::user_id(&email, name);
+
+        let builder =
+            signature::Builder::new(SignatureType::PositiveCertification)
+                .set_hash_algo(HashAlgorithm::SHA512)
+                .set_key_flags(&KeyFlags::empty().set_certification(true))?;
+        let binding = userid.bind(&mut keypair, &cert, builder, None)?;
+
+        // Now merge the userid and binding signature into the Cert.
+        let cert = cert.merge_packets(vec![userid.into(), binding.into()])?;
+
+        Ok((cert, sig))
     }
 
     fn user_id(email: &str, name: Option<&str>) -> UserID {
@@ -195,8 +212,9 @@ impl Pgp {
         // create a TSIG for each UserID
         for ca_uidb in ca_cert.userids() {
             for signer in &mut cert_keys {
-                let builder = Builder::new(SignatureType::GenericCertification)
-                    .set_trust_signature(255, 120)?;
+                let builder =
+                    signature::Builder::new(SignatureType::GenericCertification)
+                        .set_trust_signature(255, 120)?;
 
 
                 let tsig = ca_uidb.userid().bind(signer,
@@ -232,9 +250,10 @@ impl Pgp {
         // create one TSIG for each regex
         for regex in scope_regexes {
             for signer in &mut cert_keys {
-                let builder = Builder::new(SignatureType::GenericCertification)
-                    .set_trust_signature(255, 120)?
-                    .set_regular_expression(regex.as_bytes())?;
+                let builder =
+                    signature::Builder::new(SignatureType::GenericCertification)
+                        .set_trust_signature(255, 120)?
+                        .set_regular_expression(regex.as_bytes())?;
 
                 let tsig = userid.bind(signer,
                                        remote_ca_cert,
