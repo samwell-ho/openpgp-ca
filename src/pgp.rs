@@ -27,11 +27,11 @@ use openpgp::packet::signature;
 use openpgp::parse::Parse;
 use openpgp::serialize::Serialize;
 use openpgp::cert;
+use openpgp::types::{KeyFlags, HashAlgorithm};
+use openpgp::{KeyHandle, Fingerprint};
 
 use failure::{self, ResultExt};
-use sequoia_openpgp::{KeyHandle, Fingerprint};
 use std::time::SystemTime;
-use sequoia_openpgp::types::{KeyFlags, HashAlgorithm};
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -75,7 +75,13 @@ impl Pgp {
         let builder =
             signature::Builder::new(SignatureType::PositiveCertification)
                 .set_hash_algo(HashAlgorithm::SHA512)
-                .set_key_flags(&KeyFlags::empty().set_certification(true))?;
+                .set_key_flags(&KeyFlags::empty().set_certification(true))?
+                // notation: "openpgp-ca:domain=domain1;domain2"
+                .add_notation("openpgp-ca",
+                              ("domain=".to_owned() + domainname).as_bytes(),
+                              signature::subpacket::NotationDataFlags::default()
+                                  .set_human_readable(true),
+                              false)?;
         let binding = userid.bind(&mut keypair, &cert, builder, None)?;
 
         // Now merge the userid and binding signature into the Cert.
