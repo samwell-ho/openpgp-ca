@@ -32,7 +32,7 @@ fn run_gpg() {
 }
 
 #[test]
-fn test_alice_authenticates_bob() {
+fn test_alice_authenticates_bob_centralized() {
     let ctx = make_context!();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
@@ -100,10 +100,11 @@ fn test_alice_authenticates_bob() {
 #[test]
 /// Alice and Bob create their own keys locally,
 /// then those keys get imported into the CA.
+///
 /// TSigning the CA key is done in user GnuPG contexts,
 /// signing of user keys in the CA.
 /// Alice imports Bob's key from CA and checks if she can authenticate Bob.
-fn test_alice_authenticates_bob_key_imports() {
+fn test_alice_authenticates_bob_decentralized() {
     let ctx_alice = make_context!();
     let ctx_bob = make_context!();
 
