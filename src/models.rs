@@ -98,7 +98,7 @@ pub struct NewCertEmail {
     pub email_id: i32,
 }
 
-#[derive(Identifiable, Queryable, Debug, Associations, Clone)]
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
 #[belongs_to(Usercert)]
 pub struct Revocation {
     pub id: i32,

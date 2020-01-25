@@ -421,6 +421,35 @@ impl Ca {
         self.db.get_revocations(cert)
     }
 
+    pub fn apply_revocation(&self, revoc: models::Revocation) -> Result<()> {
+        use diesel::prelude::*;
+        self.db.get_conn().transaction::<_, failure::Error, _>(|| {
+            let usercert =
+                self.db.get_usercert_by_id(revoc.usercert_id)?;
+
+            if let Some(mut usercert) = usercert {
+                let sig = Pgp::armored_to_signature(&revoc.revocation)?;
+                let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+
+                let revocation: Packet = sig.into();
+                let revoked = cert.merge_packets(vec![revocation])?;
+
+                usercert.pub_cert = Pgp::cert_to_armored(&revoked)?;
+
+                let mut revoc = revoc.clone();
+                revoc.published = true;
+
+                self.db.update_usercert(&usercert)?;
+                self.db.update_revocation(&revoc)?;
+
+                Ok(())
+            } else {
+                Err(failure::err_msg(
+                    "Couldn't find usercert for apply_revocation"))
+            }
+        })
+    }
+
     pub fn get_emails(&self, usercert: &models::Usercert)
                       -> Result<Vec<models::Email>> {
         self.db.get_emails_by_usercert(usercert)

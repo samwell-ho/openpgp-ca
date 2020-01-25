@@ -152,6 +152,14 @@ impl Pgp {
         Ok(cert)
     }
 
+    /// make a Signature from an ascii armored signature
+    pub fn armored_to_signature(armored: &str) -> Result<Signature> {
+        let sig = Signature::from_bytes(armored.as_bytes())
+            .expect("Signature::from_bytes failed");
+
+        Ok(sig)
+    }
+
 
     /// Load Revocation Cert from file
     pub fn load_revocation_cert(revoc_file: Option<&str>) -> Result<Signature> {

@@ -309,6 +309,28 @@ impl Db {
         Ok(())
     }
 
+    pub fn update_revocation(&self, revocation: &Revocation) -> Result<()> {
+        diesel::update(revocations::table)
+            .set(revocation)
+            .execute(&self.conn)
+            .context("Error updating Revocation")?;
+
+        Ok(())
+    }
+
+    pub fn get_usercert_by_id(&self, id: i32) -> Result<Option<Usercert>> {
+        let db: Vec<Usercert> = usercerts::table
+            .filter(usercerts::id.eq(id))
+            .load::<Usercert>(&self.conn)
+            .context("Error loading UserCert by id")?;
+
+        if let Some(usercert) = db.get(0) {
+            Ok(Some(usercert.clone()))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_usercert(&self, fingerprint: &str)
                         -> Result<Option<Usercert>> {
         let u = usercerts::table
