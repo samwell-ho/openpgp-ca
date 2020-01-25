@@ -303,9 +303,9 @@ Set up a new OpenPGP CA instance with two users:
 `openpgp-ca user add --email bob@example.org --name "Bob Baker"`
 
 
-### Inspecting user certificates in OpenPGP CA
+## Inspecting user certificates in OpenPGP CA
 
-We can inspect the resulting state of the users in OpenPGP CA like this:
+We can inspect the state of the users in OpenPGP CA like this:
 
 `openpgp-ca user list`
 
