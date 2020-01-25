@@ -451,3 +451,41 @@ fn test_ca_signatures() {
         }
     }
 }
+
+#[test]
+fn test_apply_revocation() {
+    let ctx = make_context!();
+//    ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let mut ca = ca::Ca::new(Some(&db));
+    assert!(ca.ca_new("example.org").is_ok());
+
+    // make CA user
+    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
+    assert!(res.is_ok());
+
+    let usercerts = ca.get_all_usercerts();
+    let usercerts = usercerts.unwrap();
+
+    assert_eq!(usercerts.len(), 1);
+
+    let alice = &usercerts[0];
+
+    let rev = ca.get_revocations(alice);
+    assert!(rev.is_ok());
+
+    let rev = rev.unwrap();
+    assert_eq!(rev.len(), 1);
+
+    ca.apply_revocation(rev[0].clone());
+
+    let rev = ca.get_revocations(alice);
+    assert!(rev.is_ok());
+
+    let rev = rev.unwrap();
+    assert_eq!(rev.len(), 1);
+    assert!(rev.get(0).unwrap().published);
+}
