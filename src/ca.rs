@@ -439,8 +439,10 @@ impl Ca {
                 let mut revoc = revoc.clone();
                 revoc.published = true;
 
-                self.db.update_usercert(&usercert)?;
-                self.db.update_revocation(&revoc)?;
+                self.db.update_usercert(&usercert)
+                    .context("Couldn't update Usercert")?;
+                self.db.update_revocation(&revoc)
+                    .context("Couldn't update Revocation")?;
 
                 Ok(())
             } else {
