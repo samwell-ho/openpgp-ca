@@ -106,8 +106,8 @@ subcommands:
                   short: e
                   long: email
                   help: Email address
-        - revocation:
-            about: Show Revocation Key (if available)
+        - show-revocations:
+            about: Show Revocation Keys (if available)
             args:
               - email:
                   takes_value: true

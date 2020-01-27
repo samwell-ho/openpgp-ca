@@ -157,7 +157,7 @@ fn real_main() -> Result<()> {
                         }
                     }
                 }
-                ("revocation", Some(m2)) => {
+                ("show-revocations", Some(m2)) => {
                     if let Some(email) = m2.values_of("email") {
                         let email = email.into_iter().next().unwrap();
 
