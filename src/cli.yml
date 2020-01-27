@@ -126,6 +126,14 @@ subcommands:
                   required: true
                   multiple: false
                   help: File that contains a revocation cert
+        - apply-revocation:
+            about: Apply a Revocation Certificate
+            args:
+              - id:
+                  takes_value: true
+                  short: i
+                  long: id
+                  help: File that contains a revocation cert
         - check:
             about: Bulk checks on Users
             subcommands:

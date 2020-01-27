@@ -421,6 +421,15 @@ impl Ca {
         self.db.get_revocations(cert)
     }
 
+    pub fn get_revocation_by_id(&self, id: i32) -> Result<models::Revocation> {
+        if let Some(foo) = self.db.get_revocation_by_id(id)? {
+            Ok(foo)
+        } else {
+            Err(failure::err_msg("no revocation found"))
+        }
+    }
+
+
     pub fn apply_revocation(&self, revoc: models::Revocation) -> Result<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
@@ -439,8 +448,13 @@ impl Ca {
                 let mut revoc = revoc.clone();
                 revoc.published = true;
 
+                println!("cert {:?}", usercert);
+
                 self.db.update_usercert(&usercert)
                     .context("Couldn't update Usercert")?;
+
+                println!("y");
+
                 self.db.update_revocation(&revoc)
                     .context("Couldn't update Revocation")?;
 

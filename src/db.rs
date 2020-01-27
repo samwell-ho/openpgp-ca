@@ -382,6 +382,19 @@ impl Db {
             })
     }
 
+    pub fn get_revocation_by_id(&self, id: i32) -> Result<Option<Revocation>> {
+        let db: Vec<Revocation> = revocations::table
+            .filter(revocations::id.eq(id))
+            .load::<Revocation>(&self.conn)
+            .context("Error loading Revocation by id")?;
+
+        if let Some(revocation) = db.get(0) {
+            Ok(Some(revocation.clone()))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_emails_by_usercert(&self, cert: &Usercert)
                                   -> Result<Vec<Email>> {
         let email_ids = CertEmail::belonging_to(cert)

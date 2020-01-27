@@ -133,6 +133,15 @@ fn real_main() -> Result<()> {
 
                     ca.add_revocation(revocation_file)?;
                 }
+                ("apply-revocation", Some(m2)) => {
+                    let id = m2.value_of("id").unwrap();
+                    let id: i32 = id.parse::<i32>()
+                        .context("ID bad syntax")?;
+
+                    let rev = ca.get_revocation_by_id(id)?;
+
+                    ca.apply_revocation(rev)?;
+                }
                 ("export", Some(m2)) => {
                     match m2.value_of("email") {
                         Some(email) => {
