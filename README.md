@@ -325,17 +325,36 @@ To output the public certificate of the OpenPGP CA admin:
 OpenPGP CA can check if all keys are mutually signed (user keys tsigned the
  CA key, and the CA key has signed the user key), and report the results:
  
- `openpgp-ca user check sigs`
+`openpgp-ca user check sigs`
  
 OpenPGP CA can check if any keys have expired, and report the results:
  
- `openpgp-ca user check expiry`
+`openpgp-ca user check expiry`
 
 OpenPGP CA can also check if any keys have expired a specified number of
  days in the future and report the results:
  
- `openpgp-ca user check expiry --days 60`
+`openpgp-ca user check expiry --days 60`
   
+  
+## Dealing with revocations of user certificates in OpenPGP CA
+
+Check which revocation certificates exist for a given email.
+
+`openpgp-ca user show-revocations --email bob@example.org`
+
+The results show a numeric "revocation id".
+
+Apply a revocation to the user's certificate:
+
+`openpgp-ca user apply-revocation --id 2`
+
+Afterwards, "show-revocations" will display "this revocation has been
+ PUBLISHED", and the user's public key contains the revocation certificate.
+
+The updated public key can be displayed by running
+ 
+`openpgp-ca user export --email 'bob@example.org'`
 
 ## Workflow: Export Certificates to a Web Key Directory (WKD)
 
