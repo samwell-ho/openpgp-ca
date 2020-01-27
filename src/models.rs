@@ -18,7 +18,7 @@
 use super::schema::*;
 
 
-#[derive(Queryable, Debug, Clone, AsChangeset)]
+#[derive(Queryable, Debug, Clone, AsChangeset, Identifiable)]
 pub struct Ca {
     pub id: i32,
     pub domainname: String,
@@ -30,7 +30,7 @@ pub struct NewCa<'a> {
     pub domainname: &'a str,
 }
 
-#[derive(Queryable, Debug, Associations, Clone, AsChangeset)]
+#[derive(Queryable, Debug, Associations, Clone, AsChangeset, Identifiable)]
 #[belongs_to(Ca)]
 pub struct Cacert {
     pub id: i32,
