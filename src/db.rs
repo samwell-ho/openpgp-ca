@@ -205,7 +205,7 @@ impl Db {
     }
 
     pub fn update_ca(&self, ca: &Ca) -> Result<()> {
-        diesel::update(cas::table)
+        diesel::update(ca)
             .set(ca)
             .execute(&self.conn)
             .context("Error updating CA")?;
@@ -216,7 +216,7 @@ impl Db {
     pub fn update_cacert(&self, cacert: &Cacert) -> Result<()> {
         assert!(Pgp::armored_to_cert(&cacert.cert).is_ok());
 
-        diesel::update(cacerts::table)
+        diesel::update(cacert)
             .set(cacert)
             .execute(&self.conn)
             .context("Error updating CaCert")?;
@@ -301,7 +301,7 @@ impl Db {
     }
 
     pub fn update_usercert(&self, usercert: &Usercert) -> Result<()> {
-        diesel::update(usercerts::table)
+        diesel::update(usercert)
             .set(usercert)
             .execute(&self.conn)
             .context("Error updating Usercert")?;
@@ -310,7 +310,7 @@ impl Db {
     }
 
     pub fn update_revocation(&self, revocation: &Revocation) -> Result<()> {
-        diesel::update(revocations::table)
+        diesel::update(revocation)
             .set(revocation)
             .execute(&self.conn)
             .context("Error updating Revocation")?;
@@ -416,7 +416,7 @@ impl Db {
     }
 
     pub fn update_bridge(&self, bridge: &Bridge) -> Result<()> {
-        diesel::update(bridges::table)
+        diesel::update(bridge)
             .set(bridge)
             .execute(&self.conn)
             .context("Error updating Bridge")?;
