@@ -111,9 +111,9 @@ impl Pgp {
     }
 
     /// make a "public key" ascii-armored representation of a Cert
-    pub fn cert_to_armored(certified: &Cert) -> Result<String> {
+    pub fn cert_to_armored(cert: &Cert) -> Result<String> {
         let mut v = Vec::new();
-        certified.armored().serialize(&mut v)
+        cert.armored().serialize(&mut v)
             .context("Cert serialize failed")?;
 
         Ok(String::from_utf8(v)?.to_string())
