@@ -648,4 +648,57 @@ impl Ca {
 
         Ok(())
     }
+
+    pub fn update_from_wkd(&self, usercert: &models::Usercert) -> Result<()> {
+        use tokio_core::reactor::Core;
+        use sequoia_net::wkd;
+
+        let emails = self.get_emails(&usercert)?;
+
+        let mut merge = Pgp::armored_to_cert(&usercert.pub_cert)?;
+
+        for email in emails {
+            let mut core = Core::new().unwrap();
+            let certs = core.run(wkd::get(&email.addr)).unwrap();
+
+            for cert in certs {
+                if cert.fingerprint().to_hex() == usercert.fingerprint {
+                    merge = merge.merge(cert)?;
+                }
+            }
+        }
+
+        let mut updated = usercert.clone();
+        updated.pub_cert = Pgp::cert_to_armored(&merge)?;
+
+        self.db.update_usercert(&updated)?;
+
+        Ok(())
+    }
+
+    pub fn update_from_hagrid(&self, usercert: &models::Usercert) -> Result<()> {
+        use tokio_core::reactor::Core;
+        use openpgp::{Fingerprint, KeyID};
+
+        let mut merge = Pgp::armored_to_cert(&usercert.pub_cert)?;
+
+        // get key from hagrid
+        let c = sequoia_core::Context::new()?;
+        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
+
+        let mut core = Core::new().unwrap();
+
+        let f = Fingerprint::from_hex(&usercert.fingerprint)?;
+        let cert = core.run(hagrid.get(&KeyID::from(f)))?;
+
+        // update in DB
+        merge = merge.merge(cert)?;
+
+        let mut updated = usercert.clone();
+        updated.pub_cert = Pgp::cert_to_armored(&merge)?;
+
+        self.db.update_usercert(&updated)?;
+
+        Ok(())
+    }
 }
