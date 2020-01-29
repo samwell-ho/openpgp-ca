@@ -1,0 +1,7 @@
+image: registry.gitlab.com/sequoia-pgp/build-docker-image:latest
+
+Cargo test:
+  stage: test
+  script:
+  - cargo test --release
+
