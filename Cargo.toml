@@ -28,9 +28,9 @@ futures = "0.1"
 tokio-core = "0.1"
 
 #sequoia-openpgp = "0.13.0"
-sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag="v0.13.0" }
-sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag="v0.13.0"}
-sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag="v0.13.0"}
+sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git" }
+sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git" }
+sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git" }
 
 # tests
 tempfile = "3.0"

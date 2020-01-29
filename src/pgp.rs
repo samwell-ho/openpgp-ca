@@ -66,7 +66,7 @@ impl Pgp {
         let (cert, sig) = cert::CertBuilder::new()
             .generate()?;
 
-        let mut keypair = cert.primary().clone()
+        let mut keypair = cert.primary_key().key().clone()
             .mark_parts_secret()?.into_keypair()?;
 
         // Generate a userid and a binding signature.
@@ -83,7 +83,7 @@ impl Pgp {
                               signature::subpacket::NotationDataFlags::default()
                                   .set_human_readable(true),
                               false)?;
-        let binding = userid.bind(&mut keypair, &cert, builder, None)?;
+        let binding = userid.bind(&mut keypair, &cert, builder)?;
 
         // Now merge the userid and binding signature into the Cert.
         let cert = cert.merge_packets(vec![userid.into(), binding.into()])?;
@@ -120,10 +120,9 @@ impl Pgp {
     }
 
     pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
-        let primary = cert.primary_key_signature(None).unwrap();
+        let primary = cert.primary_key().policy(None)?;
         if let Some(duration) = primary.key_expiration_time() {
-            let creation = primary.signature_creation_time()
-                .ok_or(failure::err_msg("Signature creation time is None"))?;
+            let creation = primary.creation_time();
             Ok(creation.checked_add(duration))
         } else {
             Ok(None)
@@ -238,12 +237,7 @@ impl Pgp {
                     signature::Builder::new(SignatureType::GenericCertification)
                         .set_trust_signature(255, 120)?;
 
-
-                let tsig = ca_uidb.userid().bind(signer,
-                                                 ca_cert,
-                                                 builder,
-                                                 None)?;
-
+                let tsig = ca_uidb.userid().bind(signer, ca_cert, builder)?;
                 sigs.push(tsig.into());
             }
         }
@@ -262,8 +256,7 @@ impl Pgp {
         // -> or force users to explicitly set a catchall regex, then.
 
         // there should be exactly one userid!
-        let userid = remote_ca_cert.userids().next().unwrap().userid();
-
+        let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
 
@@ -277,9 +270,7 @@ impl Pgp {
                         .set_trust_signature(255, 120)?
                         .set_regular_expression(regex.as_bytes())?;
 
-                let tsig = userid.bind(signer,
-                                       remote_ca_cert,
-                                       builder, None)?;
+                let tsig = userid.bind(signer, remote_ca_cert, builder)?;
 
                 packets.push(tsig.into());
             }
@@ -295,7 +286,7 @@ impl Pgp {
     pub fn bridge_revoke(remote_ca_cert: &Cert, ca_cert: &Cert)
                          -> Result<(Signature, Cert)> {
         // there should be exactly one userid!
-        let userid = remote_ca_cert.userids().next().unwrap().userid();
+        let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
         // set_trust_signature, set_regular_expression(s), expiration
 
@@ -313,7 +304,7 @@ impl Pgp {
                 .set_reason_for_revocation(
                     ReasonForRevocation::Unspecified,
                     b"removing OpenPGP CA bridge").unwrap()
-                .build(signer, &remote_ca_cert, userid, None)?;
+                .build(signer, &remote_ca_cert, &userid, None)?;
 
         packets.push(revocation_sig.clone().into());
 
@@ -382,7 +373,8 @@ impl Pgp {
 
     /// get all valid, certification capable keys with secret key material
     fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair>> {
-        let keys = cert.keys().alive().revoked(false).for_certification().secret();
+        let keys = cert.keys().policy(None)
+            .alive().revoked(false).for_certification().secret();
 
         Ok(keys.filter_map(|ka|
             ka.key().clone().mark_parts_secret()

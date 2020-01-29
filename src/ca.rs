@@ -129,7 +129,7 @@ impl Ca {
     /// get all tsig(s) in this Cert
     fn get_tsigs(c: &Cert) -> Vec<&Signature> {
         c.userids()
-            .flat_map(|b| b.certifications())
+            .flat_map(|b| b.binding().certifications())
             .filter(|&s| s.trust_signature().is_some())
             .collect()
     }
@@ -138,8 +138,8 @@ impl Ca {
     /// FIXME: is this what we want?
     fn get_sigs(c: &Cert) -> Vec<&Signature> {
         c.userids()
-            .flat_map(|b| b.certifications())
-            .chain(c.subkeys().flat_map(|s| s.certifications()))
+            .flat_map(|b| b.binding().certifications())
+            .chain(c.keys().flat_map(|s| s.binding().certifications()))
             .collect()
     }
 
@@ -279,7 +279,7 @@ impl Ca {
                 None => {
                     let userids: Vec<_> = user_cert.userids().collect();
                     if userids.len() == 1 {
-                        let userid = userids[0];
+                        let userid = &userids[0];
                         userid.userid().name()?
                     } else {
                         None
