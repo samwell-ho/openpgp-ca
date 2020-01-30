@@ -27,6 +27,9 @@ publicsuffix = "1.5"
 futures = "0.1"
 tokio-core = "0.1"
 
+# workaround for rustc (in debian stable) vs. SmallVec incompatibility
+unicode-normalization = "=0.1.9"
+
 #sequoia-openpgp = "0.13.0"
 
 sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git#v0.13.0-gb9b6533b" }
