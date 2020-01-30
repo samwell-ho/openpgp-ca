@@ -44,12 +44,12 @@ pub struct Ca {
 
 impl Ca {
     pub fn new(database: Option<&str>) -> Self {
-        let db = if database.is_some() {
-            Some(database.unwrap().to_string())
+        let db = if let Some(database) = database {
+            Some(database.to_string())
         } else {
             let database = env::var("OPENPGP_CA_DB");
-            if database.is_ok() {
-                Some(database.unwrap())
+            if let Ok(database) = database {
+                Some(database)
             } else {
                 // load config from .env
                 dotenv::dotenv().ok();
@@ -75,7 +75,7 @@ impl Ca {
     // -------- CAs
 
     pub fn ca_new(&self, domainname: &str) -> Result<()> {
-        if let Some(_) = self.db.get_ca()? {
+        if self.db.get_ca()?.is_some() {
             return Err(failure::err_msg(
                 "ERROR: CA has already been created",
             ));
@@ -225,7 +225,7 @@ impl Ca {
             pub_key,
             &user.fingerprint().to_hex(),
             emails,
-            &vec![revoc],
+            &[revoc],
             Some(&tsigned_ca_armored),
             None,
         );
@@ -278,7 +278,7 @@ impl Ca {
                 .map(|e| e.addr.to_owned())
                 .collect();
             let emails: HashSet<_> =
-                emails.iter().map(|s| s.to_string()).collect();
+                emails.iter().map(|&s| s.to_string()).collect();
             assert!(
                 emails.eq(&existing_emails),
                 "expecting the same set of email addresses on key update"
@@ -484,8 +484,8 @@ impl Ca {
     }
 
     pub fn get_revocation_by_id(&self, id: i32) -> Result<models::Revocation> {
-        if let Some(foo) = self.db.get_revocation_by_id(id)? {
-            Ok(foo)
+        if let Some(rev) = self.db.get_revocation_by_id(id)? {
+            Ok(rev)
         } else {
             Err(failure::err_msg("no revocation found"))
         }
@@ -575,7 +575,7 @@ impl Ca {
         // transform domain to regex
         let mut regex = "<[^>]+[@.]".to_string();
 
-        regex.push_str(&domain.split(".").collect::<Vec<_>>().join("\\."));
+        regex.push_str(&domain.split('.').collect::<Vec<_>>().join("\\."));
 
         regex.push_str(">$");
 
@@ -611,7 +611,7 @@ impl Ca {
 
             let remote_email = remote_email.unwrap();
 
-            let split: Vec<_> = remote_email.split("@").collect();
+            let split: Vec<_> = remote_email.split('@').collect();
             assert_eq!(split.len(), 2);
 
             assert_eq!(split[0], "openpgp-ca");

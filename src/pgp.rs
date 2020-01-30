@@ -128,7 +128,7 @@ impl Pgp {
             .serialize(&mut v)
             .context("Cert serialize failed")?;
 
-        Ok(String::from_utf8(v)?.to_string())
+        Ok(String::from_utf8(v)?)
     }
 
     pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
@@ -155,7 +155,7 @@ impl Pgp {
             cert.as_tsk().serialize(&mut writer)?;
         }
 
-        Ok(String::from_utf8(buffer.get_ref().to_vec())?.to_string())
+        Ok(String::from_utf8(buffer.get_ref().to_vec())?)
     }
 
     /// make a Cert from an ascii armored key
@@ -243,7 +243,7 @@ impl Pgp {
             rev.serialize(&mut writer)?;
         }
 
-        Ok(String::from_utf8(buf.get_ref().to_vec())?.to_string())
+        Ok(String::from_utf8(buf.get_ref().to_vec())?)
     }
 
     /// user tsigns CA key

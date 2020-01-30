@@ -39,6 +39,12 @@ subcommands:
               - domain:
                   takes_value: true
                   help: CA domain name
+              - name:
+                  takes_value: true
+                  required: false
+                  short: n
+                  long: name
+                  help: User Name
         - show:
             about: Show CA
         - export:

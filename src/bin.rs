@@ -48,8 +48,8 @@ fn real_main() -> Result<()> {
         }
         ("wkd-export", Some(m)) => match m.value_of("path") {
             Some(path) => {
-                let (foo, _) = ca.get_ca()?.unwrap();
-                ca.export_wkd(&foo.domainname, Path::new(path))?;
+                let (db_ca, _) = ca.get_ca()?.unwrap();
+                ca.export_wkd(&db_ca.domainname, Path::new(path))?;
             }
             _ => unimplemented!("missing domain name"),
         },
@@ -79,8 +79,7 @@ fn real_main() -> Result<()> {
                 ("add", Some(m2)) => {
                     match m2.values_of("email") {
                         Some(email) => {
-                            let email_vec =
-                                email.into_iter().collect::<Vec<_>>();
+                            let email_vec = email.collect::<Vec<_>>();
 
                             let name = m2.value_of("name");
 
@@ -97,7 +96,7 @@ fn real_main() -> Result<()> {
                 }
                 ("import", Some(m2)) => match m2.values_of("email") {
                     Some(email) => {
-                        let email_vec = email.into_iter().collect::<Vec<_>>();
+                        let email_vec = email.collect::<Vec<_>>();
 
                         let name = m2.value_of("name");
 
@@ -184,25 +183,26 @@ fn real_main() -> Result<()> {
                             for (usercert, (sig_from_ca, tsig_on_ca)) in
                                 &sigs_status
                             {
-                                let mut ok = true;
-
-                                if !sig_from_ca {
+                                let ok = if *sig_from_ca {
+                                    true
+                                } else {
                                     println!(
                                         "missing signature by CA for \
                                          user {:?} fingerprint {}",
                                         usercert.name, usercert.fingerprint
                                     );
-                                    ok = false;
-                                }
-
-                                if !tsig_on_ca {
+                                    false
+                                } && if *tsig_on_ca {
+                                    true
+                                } else {
                                     println!(
                                         "CA Cert has not been tsigned \
                                          by user {:?}",
                                         usercert.name
                                     );
-                                    ok = false;
-                                }
+                                    false
+                                };
+
                                 if ok {
                                     count_ok += 1;
                                 }
@@ -231,10 +231,9 @@ fn real_main() -> Result<()> {
                             for (usercert, (alive, expiry)) in expiries {
                                 println!(
                                     "name {}, fingerprint {}",
-                                    usercert
-                                        .name
-                                        .clone()
-                                        .unwrap_or("<no name>".to_string()),
+                                    usercert.name.clone().unwrap_or_else(
+                                        || "<no name>".to_string()
+                                    ),
                                     usercert.fingerprint
                                 );
 
@@ -270,7 +269,7 @@ fn real_main() -> Result<()> {
                             usercert
                                 .name
                                 .clone()
-                                .unwrap_or("<no name>".to_string())
+                                .unwrap_or_else(|| "<no name>".to_string())
                         );
 
                         println!("fingerprint {}", usercert.fingerprint);

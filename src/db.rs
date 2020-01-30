@@ -289,7 +289,7 @@ impl Db {
         pub_cert: &str,
         fingerprint: &str,
         emails: &[&str],
-        revocs: &Vec<String>,
+        revocs: &[String],
         ca_cert_tsigned: Option<&str>,
         updates_cert_id: Option<i32>,
     ) -> Result<Usercert> {
