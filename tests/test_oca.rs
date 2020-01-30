@@ -1,9 +1,9 @@
+use failure::_core::time::Duration;
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp;
+use sequoia_openpgp::{Cert, Fingerprint, KeyID};
 use std::path::Path;
 use std::time::SystemTime;
-use failure::_core::time::Duration;
-use sequoia_openpgp::{Fingerprint, KeyID, Cert};
 use tokio_core::reactor::Core;
 
 mod gnupg;
@@ -31,7 +31,6 @@ fn test_ca() {
     // make new CA key
     assert!(ca.ca_new("example.org").is_ok());
 
-
     // make CA user
     let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
@@ -54,7 +53,6 @@ fn test_ca() {
     assert_eq!(revocs.len(), 1);
 }
 
-
 #[test]
 fn test_update_usercert_key() {
     let now = SystemTime::now();
@@ -67,7 +65,7 @@ fn test_update_usercert_key() {
 
     // update key with new version, but same fingerprint
     let ctx = make_context!();
-//    ctx.leak_tempdir();
+    //    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -81,10 +79,13 @@ fn test_update_usercert_key() {
     gnupg::create_user(&ctx, "alice@example.org");
     let alice1_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import(&alice1_key, None, Some("Alice"),
-                       &vec!["alice@example.org"])
-        .expect("import Alice 1 to CA failed");
-
+    ca.usercert_import(
+        &alice1_key,
+        None,
+        Some("Alice"),
+        &vec!["alice@example.org"],
+    )
+    .expect("import Alice 1 to CA failed");
 
     // check the state of CA data
     let usercerts = ca.get_all_usercerts();
@@ -111,11 +112,9 @@ fn test_update_usercert_key() {
     let (_, (alive, _)) = exp3.iter().next().unwrap();
     assert!(!alive);
 
-
     // edit key with gpg, then import new version into CA
     assert!(gnupg::edit_expire(&ctx, "alice@example.org", "5y").is_ok());
     let alice2_key = gnupg::export(&ctx, &"alice@example.org");
-
 
     // get usercert for alice
     let usercerts = ca.get_usercerts("alice@example.org");
@@ -169,10 +168,13 @@ fn test_update_user_cert() {
     gnupg::create_user(&ctx_alice1, "alice@example.org");
     let alice1_key = gnupg::export(&ctx_alice1, &"alice@example.org");
 
-    ca.usercert_import(&alice1_key, None, Some("Alice"),
-                       &vec!["alice@example.org"])
-        .expect("import Alice 1 to CA failed");
-
+    ca.usercert_import(
+        &alice1_key,
+        None,
+        Some("Alice"),
+        &vec!["alice@example.org"],
+    )
+    .expect("import Alice 1 to CA failed");
 
     // import key as update to user key
     let ctx_alice2 = make_context!();
@@ -194,7 +196,6 @@ fn test_update_user_cert() {
     println!("{:?}", res);
     assert!(res.is_ok());
 
-
     // check the state of CA data
     let usercerts = ca.get_all_usercerts();
     let usercerts = usercerts.unwrap();
@@ -203,15 +204,14 @@ fn test_update_user_cert() {
 
     // FIXME: add method to filter for "current" usercerts, or similar?!
 
-//    let certs = ca.get_user_certs(&usercerts[0]);
-//    assert!(certs.is_ok());
-//
-//    let certs = certs.unwrap();
-//
-//    // expect to find both user certs
-//    assert_eq!(certs.len(), 2);
+    //    let certs = ca.get_user_certs(&usercerts[0]);
+    //    assert!(certs.is_ok());
+    //
+    //    let certs = certs.unwrap();
+    //
+    //    // expect to find both user certs
+    //    assert_eq!(certs.len(), 2);
 }
-
 
 #[test]
 fn test_ca_insert_duplicate_email() {
@@ -227,7 +227,6 @@ fn test_ca_insert_duplicate_email() {
 
     // make new CA key
     assert!(ca.ca_new("example.org").is_ok());
-
 
     // make CA user
     let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
@@ -250,11 +249,10 @@ fn test_ca_insert_duplicate_email() {
     }
 }
 
-
 #[test]
 fn test_ca_export_wkd() {
     let ctx = make_context!();
-//    ctx.leak_tempdir();
+    //    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -271,23 +269,24 @@ fn test_ca_export_wkd() {
     let res = ca.export_wkd("example.org", &wkd_path);
     assert!(res.is_ok());
 
-
     // check that both user keys have been written to files
     let test_path = wkd_path.join(
         "openpgpkey.example.org/.well-known/openpgpkey/example.org\
-         /hu/jycbiujnsxs47xrkethgtj69xuunurok");
+         /hu/jycbiujnsxs47xrkethgtj69xuunurok",
+    );
     assert!(test_path.is_file());
 
     let test_path = wkd_path.join(
         "openpgpkey.example.org/.well-known/openpgpkey/example.org\
-         /hu/kei1q4tipxxu1yj79k9kfukdhfy631xe");
+         /hu/kei1q4tipxxu1yj79k9kfukdhfy631xe",
+    );
     assert!(test_path.is_file());
-
 
     // check that CA key has been written to file
     let test_path = wkd_path.join(
         "openpgpkey.example.org/.well-known/openpgpkey/example.org\
-         /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t");
+         /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t",
+    );
     assert!(test_path.is_file());
 }
 
@@ -311,13 +310,13 @@ fn test_ca_export_wkd_sequoia() {
 
     let mut core = Core::new().unwrap();
 
-    let j = Fingerprint::from_hex
-        ("CBCD8F030588653EEDD7E2659B7DD433F254904A").unwrap();
+    let j = Fingerprint::from_hex("CBCD8F030588653EEDD7E2659B7DD433F254904A")
+        .unwrap();
     let justus: Cert = core.run(hagrid.get(&KeyID::from(j))).unwrap();
     let justus_key = pgp::Pgp::cert_to_armored(&justus).unwrap();
 
-    let n = Fingerprint::from_hex
-        ("8F17777118A33DDA9BA48E62AACB3243630052D9").unwrap();
+    let n = Fingerprint::from_hex("8F17777118A33DDA9BA48E62AACB3243630052D9")
+        .unwrap();
     let neal: Cert = core.run(hagrid.get(&KeyID::from(n))).unwrap();
     let neal_key = pgp::Pgp::cert_to_armored(&neal).unwrap();
 
@@ -329,10 +328,12 @@ fn test_ca_export_wkd_sequoia() {
 
     assert!(ca.ca_new("sequoia-pgp.org").is_ok());
 
-    assert!(ca.usercert_import(&justus_key, None, None,
-                               &["justus@sequoia-pgp.org"]).is_ok());
-    assert!(ca.usercert_import(&neal_key, None, None,
-                               &["neal@sequoia-pgp.org"]).is_ok());
+    assert!(ca
+        .usercert_import(&justus_key, None, None, &["justus@sequoia-pgp.org"])
+        .is_ok());
+    assert!(ca
+        .usercert_import(&neal_key, None, None, &["neal@sequoia-pgp.org"])
+        .is_ok());
 
     // -- export as WKD
 
@@ -366,12 +367,22 @@ fn test_ca_multiple_revocations() {
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
-    assert!(gnupg::make_revocation(&ctx, "alice@example.org",
-                                   &revoc_file1, 1).is_ok());
+    assert!(gnupg::make_revocation(
+        &ctx,
+        "alice@example.org",
+        &revoc_file1,
+        1
+    )
+    .is_ok());
 
     let revoc_file3 = format!("{}/alice.revoc3", home_path);
-    assert!(gnupg::make_revocation(&ctx, "alice@example.org",
-                                   &revoc_file3, 3).is_ok());
+    assert!(gnupg::make_revocation(
+        &ctx,
+        "alice@example.org",
+        &revoc_file3,
+        3
+    )
+    .is_ok());
 
     assert!(ca.add_revocation(&revoc_file1).is_ok());
     assert!(ca.add_revocation(&revoc_file3).is_ok());
@@ -401,7 +412,6 @@ fn test_ca_multiple_revocations() {
     assert_eq!(revocs.len(), 2)
 }
 
-
 #[test]
 fn test_ca_signatures() {
     let ctx = make_context!();
@@ -412,14 +422,17 @@ fn test_ca_signatures() {
     let mut ca = ca::Ca::new(Some(&db));
     assert!(ca.ca_new("example.org").is_ok());
 
-
     // create/import alice, CA signs alice's key
     gnupg::create_user(&ctx, "alice@example.org");
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import(&alice_key, None, Some("Alice"),
-                       &vec!["alice@example.org"])
-        .expect("import Alice 1 to CA failed");
+    ca.usercert_import(
+        &alice_key,
+        None,
+        Some("Alice"),
+        &vec!["alice@example.org"],
+    )
+    .expect("import Alice 1 to CA failed");
 
     // create/import bob, CA does not signs bob's key
     gnupg::create_user(&ctx, "bob@example.org");
@@ -447,7 +460,7 @@ fn test_ca_signatures() {
                 assert!(sig_from_ca);
                 assert!(tsig_on_ca);
             }
-            _ => panic!()
+            _ => panic!(),
         }
     }
 }
@@ -455,7 +468,7 @@ fn test_ca_signatures() {
 #[test]
 fn test_apply_revocation() {
     let ctx = make_context!();
-//    ctx.leak_tempdir();
+    //    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);

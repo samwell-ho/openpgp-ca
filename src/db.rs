@@ -15,21 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
-use failure::{self, ResultExt};
 use diesel::prelude::*;
-use diesel::r2d2::{Pool, PooledConnection, ConnectionManager};
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use failure::{self, ResultExt};
 
-use crate::schema::*;
 use crate::models::*;
 use crate::pgp::Pgp;
+use crate::schema::*;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
-
 // FIXME: or keep a Connection as lazy_static? or just make new Connections?!
-fn get_conn(database: Option<String>)
-            -> Result<PooledConnection<ConnectionManager<SqliteConnection>>> {
-
+fn get_conn(
+    database: Option<String>,
+) -> Result<PooledConnection<ConnectionManager<SqliteConnection>>> {
     // bulk insert doesn't currently work with sqlite and r2d2:
     // https://github.com/diesel-rs/diesel/issues/1822
 
@@ -63,12 +62,13 @@ impl Db {
     pub fn new(database: Option<String>) -> Self {
         match get_conn(database) {
             Ok(conn) => Db { conn },
-            _ => panic!("couldn't get database connection")
+            _ => panic!("couldn't get database connection"),
         }
     }
 
-    pub fn get_conn(&self)
-                    -> &PooledConnection<ConnectionManager<SqliteConnection>> {
+    pub fn get_conn(
+        &self,
+    ) -> &PooledConnection<ConnectionManager<SqliteConnection>> {
         &self.conn
     }
 
@@ -79,7 +79,10 @@ impl Db {
             .values(&cert)
             .execute(&self.conn)?;
 
-        assert_eq!(inserted_count, 1, "insert_usercert: couldn't insert usercert");
+        assert_eq!(
+            inserted_count, 1,
+            "insert_usercert: couldn't insert usercert"
+        );
 
         let c: Vec<Usercert> = usercerts::table
             .order(usercerts::id.desc())
@@ -94,13 +97,15 @@ impl Db {
         Ok(c[0].clone())
     }
 
-    fn insert_revocation(&self, revoc: NewRevocation)
-                         -> Result<Revocation> {
+    fn insert_revocation(&self, revoc: NewRevocation) -> Result<Revocation> {
         let inserted_count = diesel::insert_into(revocations::table)
             .values(&revoc)
             .execute(&self.conn)?;
 
-        assert_eq!(inserted_count, 1, "insert_revocation: couldn't insert revocation");
+        assert_eq!(
+            inserted_count, 1,
+            "insert_revocation: couldn't insert revocation"
+        );
 
         let r: Vec<Revocation> = revocations::table
             .order(revocations::id.desc())
@@ -115,22 +120,31 @@ impl Db {
         Ok(r[0].clone())
     }
 
-    fn insert_or_link_email(&self, addr: &str, usercert_id: i32) -> Result<Email> {
+    fn insert_or_link_email(
+        &self,
+        addr: &str,
+        usercert_id: i32,
+    ) -> Result<Email> {
         if let Some(e) = self.get_email(addr)? {
-            let ce = NewCertEmail { usercert_id, email_id: e.id };
+            let ce = NewCertEmail {
+                usercert_id,
+                email_id: e.id,
+            };
             let inserted_count = diesel::insert_into(certs_emails::table)
                 .values(&ce)
                 .execute(&self.conn)
                 .context("Error saving new certs_emails")?;
 
-            assert_eq!(inserted_count, 1, "insert_email: couldn't insert certs_emails");
+            assert_eq!(
+                inserted_count, 1,
+                "insert_email: couldn't insert certs_emails"
+            );
 
             Ok(e)
         } else {
             self.insert_email(NewEmail { addr }, usercert_id)
         }
     }
-
 
     fn get_email(&self, addr: &str) -> Result<Option<Email>> {
         let emails: Vec<Email> = emails::table
@@ -141,12 +155,18 @@ impl Db {
         match emails.len() {
             0 => Ok(None),
             1 => Ok(Some(emails[0].clone())),
-            _ => Err(failure::err_msg("found more than one email for addr, \
-            this should not happen"))
+            _ => Err(failure::err_msg(
+                "found more than one email for addr, \
+                 this should not happen",
+            )),
         }
     }
 
-    fn insert_email(&self, email: NewEmail, usercert_id: i32) -> Result<Email> {
+    fn insert_email(
+        &self,
+        email: NewEmail,
+        usercert_id: i32,
+    ) -> Result<Email> {
         let inserted_count = diesel::insert_into(emails::table)
             .values(&email)
             .execute(&self.conn)
@@ -166,13 +186,19 @@ impl Db {
 
         let e = e[0].clone();
 
-        let ce = NewCertEmail { usercert_id, email_id: e.id };
+        let ce = NewCertEmail {
+            usercert_id,
+            email_id: e.id,
+        };
         let inserted_count = diesel::insert_into(certs_emails::table)
             .values(&ce)
             .execute(&self.conn)
             .context("Error saving new certs_emails")?;
 
-        assert_eq!(inserted_count, 1, "insert_email: couldn't insert certs_emails");
+        assert_eq!(
+            inserted_count, 1,
+            "insert_email: couldn't insert certs_emails"
+        );
 
         Ok(e)
     }
@@ -194,7 +220,10 @@ impl Db {
 
             let ca = cas.first().unwrap();
 
-            let ca_cert = NewCacert { ca_id: ca.id, cert: ca_key.to_string() };
+            let ca_cert = NewCacert {
+                ca_id: ca.id,
+                cert: ca_key.to_string(),
+            };
             diesel::insert_into(cacerts::table)
                 .values(&ca_cert)
                 .execute(&self.conn)
@@ -224,12 +253,10 @@ impl Db {
         Ok(())
     }
 
-
     pub fn get_ca(&self) -> Result<Option<(Ca, Cacert)>> {
         let cas = cas::table
             .load::<Ca>(&self.conn)
             .context("Error loading CAs")?;
-
 
         match cas.len() {
             0 => Ok(None),
@@ -249,25 +276,33 @@ impl Db {
 
                 Ok(Some((ca, ca_cert)))
             }
-            _ => panic!("found more than 1 CA in database. this should \
-            never happen")
+            _ => panic!(
+                "found more than 1 CA in database. this should \
+                 never happen"
+            ),
         }
     }
 
-    pub fn add_usercert(&self, name: Option<&str>, pub_cert: &str,
-                        fingerprint: &str, emails: &[&str],
-                        revocs: &Vec<String>, ca_cert_tsigned: Option<&str>,
-                        updates_cert_id: Option<i32>) -> Result<Usercert> {
+    pub fn add_usercert(
+        &self,
+        name: Option<&str>,
+        pub_cert: &str,
+        fingerprint: &str,
+        emails: &[&str],
+        revocs: &Vec<String>,
+        ca_cert_tsigned: Option<&str>,
+        updates_cert_id: Option<i32>,
+    ) -> Result<Usercert> {
         self.conn.transaction::<_, failure::Error, _>(|| {
-            let (ca, mut cacert_db) = self.get_ca()
-                .context("Couldn't find CA")?.unwrap();
+            let (ca, mut cacert_db) =
+                self.get_ca().context("Couldn't find CA")?.unwrap();
 
             // merge updated tsigned CA cert, if applicable
             if let Some(ca_cert_tsigned) = ca_cert_tsigned {
                 let tsigned = Pgp::armored_to_cert(&ca_cert_tsigned)?;
 
-                let merged = Pgp::armored_to_cert(&cacert_db.cert)?
-                    .merge(tsigned)?;
+                let merged =
+                    Pgp::armored_to_cert(&cacert_db.cert)?.merge(tsigned)?;
                 cacert_db.cert = Pgp::priv_cert_to_armored(&merged)?;
                 self.update_cacert(&cacert_db)?;
             }
@@ -284,12 +319,11 @@ impl Db {
 
             // Revocations
             for revocation in revocs {
-                self.insert_revocation(
-                    NewRevocation {
-                        revocation,
-                        usercert_id: c.id,
-                        published: false,
-                    })?;
+                self.insert_revocation(NewRevocation {
+                    revocation,
+                    usercert_id: c.id,
+                    published: false,
+                })?;
             }
 
             // Emails
@@ -331,8 +365,7 @@ impl Db {
         }
     }
 
-    pub fn get_usercert(&self, fingerprint: &str)
-                        -> Result<Option<Usercert>> {
+    pub fn get_usercert(&self, fingerprint: &str) -> Result<Option<Usercert>> {
         let u = usercerts::table
             .filter(usercerts::fingerprint.eq(fingerprint))
             .load::<Usercert>(&self.conn)
@@ -367,19 +400,20 @@ impl Db {
             .context("Error loading usercerts")?)
     }
 
-    pub fn get_revocations(&self, cert: &Usercert)
-                           -> Result<Vec<Revocation>> {
+    pub fn get_revocations(&self, cert: &Usercert) -> Result<Vec<Revocation>> {
         Ok(Revocation::belonging_to(cert).load::<Revocation>(&self.conn)?)
     }
 
-    pub fn add_revocation(&self, revocation: &str, cert: &Usercert)
-                          -> Result<Revocation> {
-        self.insert_revocation(
-            NewRevocation {
-                revocation,
-                usercert_id: cert.id,
-                published: false,
-            })
+    pub fn add_revocation(
+        &self,
+        revocation: &str,
+        cert: &Usercert,
+    ) -> Result<Revocation> {
+        self.insert_revocation(NewRevocation {
+            revocation,
+            usercert_id: cert.id,
+            published: false,
+        })
     }
 
     pub fn get_revocation_by_id(&self, id: i32) -> Result<Option<Revocation>> {
@@ -395,10 +429,12 @@ impl Db {
         }
     }
 
-    pub fn get_emails_by_usercert(&self, cert: &Usercert)
-                                  -> Result<Vec<Email>> {
-        let email_ids = CertEmail::belonging_to(cert)
-            .select(certs_emails::email_id);
+    pub fn get_emails_by_usercert(
+        &self,
+        cert: &Usercert,
+    ) -> Result<Vec<Email>> {
+        let email_ids =
+            CertEmail::belonging_to(cert).select(certs_emails::email_id);
 
         Ok(emails::table
             .filter(emails::id.eq_any(email_ids))
@@ -411,7 +447,6 @@ impl Db {
             .values(&bridge)
             .execute(&self.conn)
             .context("Error saving new bridge")?;
-
 
         assert_eq!(inserted_count, 1, "insert_user: couldn't insert bridge");
 
@@ -438,16 +473,20 @@ impl Db {
     }
 
     pub fn search_bridge(&self, email: &str) -> Result<Option<Bridge>> {
-        let res = bridges::table.filter(bridges::email.eq(email))
+        let res = bridges::table
+            .filter(bridges::email.eq(email))
             .load::<Bridge>(&self.conn)
             .context("Error loading bridge")?;
 
         match res.len() {
             0 => Ok(None),
             1 => Ok(Some(res[0].clone())),
-            _ => panic!("search_bridge for {} found {} results, expected 1. \
-            (Database constraints should make this impossible)",
-                        email, res.len())
+            _ => panic!(
+                "search_bridge for {} found {} results, expected 1. \
+                 (Database constraints should make this impossible)",
+                email,
+                res.len()
+            ),
         }
     }
 

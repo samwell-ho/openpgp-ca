@@ -17,9 +17,9 @@
 
 use std::process::exit;
 
-use clap::App;
-use clap::load_yaml;
 use clap::crate_version;
+use clap::load_yaml;
+use clap::App;
 
 use failure::{self, ResultExt};
 
@@ -46,47 +46,41 @@ fn real_main() -> Result<()> {
         ("init", Some(_m)) => {
             ca.init();
         }
-        ("wkd-export", Some(m)) => {
-            match m.value_of("path") {
-                Some(path) => {
-                    let (foo, _) = ca.get_ca()?.unwrap();
-                    ca.export_wkd(&foo.domainname, Path::new(path))?;
+        ("wkd-export", Some(m)) => match m.value_of("path") {
+            Some(path) => {
+                let (foo, _) = ca.get_ca()?.unwrap();
+                ca.export_wkd(&foo.domainname, Path::new(path))?;
+            }
+            _ => unimplemented!("missing domain name"),
+        },
+        ("ca", Some(m)) => match m.subcommand() {
+            ("new", Some(m2)) => match m2.value_of("domain") {
+                Some(domain) => {
+                    ca.ca_new(&domain)?;
                 }
                 _ => unimplemented!("missing domain name"),
+            },
+            ("show", Some(_m2)) => {
+                ca.show_cas()?;
             }
-        }
-        ("ca", Some(m)) => {
-            match m.subcommand() {
-                ("new", Some(m2)) => {
-                    match m2.value_of("domain") {
-                        Some(domain) => {
-                            ca.ca_new(&domain)?;
-                        }
-                        _ => unimplemented!("missing domain name"),
-                    }
-                }
-                ("show", Some(_m2)) => {
-                    ca.show_cas()?;
-                }
-                ("export", Some(_m2)) => {
-                    let ca_key = ca.export_pubkey()?;
-                    println!("{}", ca_key);
-                }
-                ("import-tsig", Some(m2)) => {
-                    let key_file = m2.value_of("key-file").unwrap();
-                    ca.import_tsig(key_file)?;
-                }
+            ("export", Some(_m2)) => {
+                let ca_key = ca.export_pubkey()?;
+                println!("{}", ca_key);
+            }
+            ("import-tsig", Some(m2)) => {
+                let key_file = m2.value_of("key-file").unwrap();
+                ca.import_tsig(key_file)?;
+            }
 
-                _ => unimplemented!(),
-            }
-        }
+            _ => unimplemented!(),
+        },
         ("user", Some(m)) => {
             match m.subcommand() {
                 ("add", Some(m2)) => {
                     match m2.values_of("email") {
                         Some(email) => {
-                            let email_vec = email.into_iter()
-                                .collect::<Vec<_>>();
+                            let email_vec =
+                                email.into_iter().collect::<Vec<_>>();
 
                             let name = m2.value_of("name");
 
@@ -101,32 +95,33 @@ fn real_main() -> Result<()> {
                         _ => unimplemented!(),
                     }
                 }
-                ("import", Some(m2)) => {
-                    match m2.values_of("email") {
-                        Some(email) => {
-                            let email_vec = email.into_iter()
-                                .collect::<Vec<_>>();
+                ("import", Some(m2)) => match m2.values_of("email") {
+                    Some(email) => {
+                        let email_vec = email.into_iter().collect::<Vec<_>>();
 
-                            let name = m2.value_of("name");
+                        let name = m2.value_of("name");
 
-                            let key_file = m2.value_of("key-file").unwrap();
-                            let revocation_file =
-                                m2.value_of("revocation-file");
+                        let key_file = m2.value_of("key-file").unwrap();
+                        let revocation_file = m2.value_of("revocation-file");
 
-                            let key = std::fs::read_to_string(key_file)?;
+                        let key = std::fs::read_to_string(key_file)?;
 
-                            let revoc = match revocation_file {
-                                Some(filename) =>
-                                    Some(std::fs::read_to_string(filename)?),
-                                None => None
-                            };
+                        let revoc = match revocation_file {
+                            Some(filename) => {
+                                Some(std::fs::read_to_string(filename)?)
+                            }
+                            None => None,
+                        };
 
-                            ca.usercert_import(&key, revoc.as_deref(),
-                                               name, &email_vec[..])?;
-                        }
-                        _ => unimplemented!(),
+                        ca.usercert_import(
+                            &key,
+                            revoc.as_deref(),
+                            name,
+                            &email_vec[..],
+                        )?;
                     }
-                }
+                    _ => unimplemented!(),
+                },
                 ("add-revocation", Some(m2)) => {
                     let revocation_file =
                         m2.value_of("revocation-file").unwrap();
@@ -135,8 +130,8 @@ fn real_main() -> Result<()> {
                 }
                 ("apply-revocation", Some(m2)) => {
                     let id = m2.value_of("id").unwrap();
-                    let id: i32 = id.parse::<i32>()
-                        .context("ID bad syntax")?;
+                    let id: i32 =
+                        id.parse::<i32>().context("ID bad syntax")?;
 
                     let rev = ca.get_revocation_by_id(id)?;
 
@@ -186,38 +181,47 @@ fn real_main() -> Result<()> {
                             let mut count_ok = 0;
 
                             let sigs_status = ca.usercert_signatures()?;
-                            for (usercert, (sig_from_ca, tsig_on_ca)) in &sigs_status {
+                            for (usercert, (sig_from_ca, tsig_on_ca)) in
+                                &sigs_status
+                            {
                                 let mut ok = true;
 
                                 if !sig_from_ca {
-                                    println!("missing signature by CA for \
-                                    user {:?} fingerprint {}",
-                                             usercert.name,
-                                             usercert.fingerprint);
+                                    println!(
+                                        "missing signature by CA for \
+                                         user {:?} fingerprint {}",
+                                        usercert.name, usercert.fingerprint
+                                    );
                                     ok = false;
                                 }
 
                                 if !tsig_on_ca {
-                                    println!("CA Cert has not been tsigned \
-                                    by user {:?}", usercert.name);
+                                    println!(
+                                        "CA Cert has not been tsigned \
+                                         by user {:?}",
+                                        usercert.name
+                                    );
                                     ok = false;
                                 }
                                 if ok {
                                     count_ok += 1;
                                 }
                             }
-                            println!("checked {} certs, {} of them had good \
-                             signatures in both directions",
-                                     sigs_status.len(), count_ok);
+                            println!(
+                                "checked {} certs, {} of them had good \
+                                 signatures in both directions",
+                                sigs_status.len(),
+                                count_ok
+                            );
                         }
                         ("expiry", Some(m2)) => {
-
                             // check that keys are valid for at least this
                             // number of days from now
                             let exp_days =
                                 if let Some(days) = m2.value_of("days") {
-                                    days.parse::<u64>().
-                                        context("days parameter must be a number")?
+                                    days.parse::<u64>().context(
+                                        "days parameter must be a number",
+                                    )?
                                 } else {
                                     0
                                 };
@@ -225,22 +229,30 @@ fn real_main() -> Result<()> {
                             let expiries = ca.usercert_expiry(exp_days)?;
 
                             for (usercert, (alive, expiry)) in expiries {
-                                println!("name {}, fingerprint {}",
-                                         usercert.name.clone()
-                                             .unwrap_or("<no name>".to_string()),
-                                         usercert.fingerprint);
+                                println!(
+                                    "name {}, fingerprint {}",
+                                    usercert
+                                        .name
+                                        .clone()
+                                        .unwrap_or("<no name>".to_string()),
+                                    usercert.fingerprint
+                                );
 
                                 if let Some(exp) = expiry {
                                     let datetime: DateTime<Utc> = exp.into();
-                                    println!(" expires: {}", datetime.format("%d/%m/%Y"));
+                                    println!(
+                                        " expires: {}",
+                                        datetime.format("%d/%m/%Y")
+                                    );
                                 } else {
                                     println!(" cert doesn't expire");
                                 }
 
-
                                 if !alive {
-                                    println!(" user cert EXPIRED/EXPIRING: {:?}",
-                                             usercert.name);
+                                    println!(
+                                        " user cert EXPIRED/EXPIRING: {:?}",
+                                        usercert.name
+                                    );
                                 }
 
                                 println!();
@@ -250,10 +262,16 @@ fn real_main() -> Result<()> {
                     }
                 }
                 ("list", Some(_m2)) => {
-                    for (usercert, (sig_from_ca, tsig_on_ca)) in ca.usercert_signatures()? {
-                        println!("usercert for '{}'",
-                                 usercert.name.clone()
-                                     .unwrap_or("<no name>".to_string()));
+                    for (usercert, (sig_from_ca, tsig_on_ca)) in
+                        ca.usercert_signatures()?
+                    {
+                        println!(
+                            "usercert for '{}'",
+                            usercert
+                                .name
+                                .clone()
+                                .unwrap_or("<no name>".to_string())
+                        );
 
                         println!("fingerprint {}", usercert.fingerprint);
 
@@ -264,13 +282,18 @@ fn real_main() -> Result<()> {
                         let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
                         if let Some(exp) = Pgp::get_expiry(&cert)? {
                             let datetime: DateTime<Utc> = exp.into();
-                            println!(" expires: {}", datetime.format("%d/%m/%Y"));
+                            println!(
+                                " expires: {}",
+                                datetime.format("%d/%m/%Y")
+                            );
                         } else {
                             println!(" cert doesn't expire");
                         }
 
-                        println!(" user cert (or subkey) signed by CA: {}",
-                                 sig_from_ca);
+                        println!(
+                            " user cert (or subkey) signed by CA: {}",
+                            sig_from_ca
+                        );
                         println!(" user cert has tsigned CA: {}", tsig_on_ca);
                         println!();
                     }
@@ -284,15 +307,16 @@ fn real_main() -> Result<()> {
                 ("new", Some(m2)) => {
                     let scope = m2.value_of("scope");
 
-                    let key_file =
-                        m2.value_of("remote-key-file").unwrap();
+                    let key_file = m2.value_of("remote-key-file").unwrap();
 
                     let email = m2.value_of("email");
 
                     let bridge = ca.bridge_new(key_file, email, scope)?;
                     let remote = Pgp::armored_to_cert(&bridge.pub_key)?;
-                    println!("signed certificate for {} as bridge\n",
-                             bridge.email);
+                    println!(
+                        "signed certificate for {} as bridge\n",
+                        bridge.email
+                    );
                     println!("CAUTION:");
                     println!("The fingerprint of the remote CA key is");
                     println!("{}\n", remote.fingerprint().to_string());
@@ -309,8 +333,10 @@ fn real_main() -> Result<()> {
                     let bridges = ca.get_bridges()?;
 
                     for bridge in bridges {
-                        println!("Bridge '{}':\n\n{}",
-                                 bridge.email, bridge.pub_key);
+                        println!(
+                            "Bridge '{}':\n\n{}",
+                            bridge.email, bridge.pub_key
+                        );
                     }
                 }
 

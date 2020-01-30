@@ -3,7 +3,6 @@ extern crate clap;
 
 use clap::App;
 
-
 #[test]
 fn load_config() {
     // try to load the clap yaml config file

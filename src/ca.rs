@@ -22,18 +22,18 @@ use std::time::Duration;
 
 use publicsuffix::Domain;
 
-use sequoia_openpgp as openpgp;
+use openpgp::packet::Signature;
+use openpgp::parse::Parse;
 use openpgp::Cert;
 use openpgp::Packet;
-use openpgp::parse::Parse;
-use openpgp::packet::Signature;
+use sequoia_openpgp as openpgp;
 
 use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
 
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::collections::{HashSet, HashMap};
 use std::time::SystemTime;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
@@ -44,19 +44,20 @@ pub struct Ca {
 
 impl Ca {
     pub fn new(database: Option<&str>) -> Self {
-        let db =
-            if database.is_some() {
-                Some(database.unwrap().to_string())
+        let db = if database.is_some() {
+            Some(database.unwrap().to_string())
+        } else {
+            let database = env::var("OPENPGP_CA_DB");
+            if database.is_ok() {
+                Some(database.unwrap())
             } else {
-                let database = env::var("OPENPGP_CA_DB");
-                if database.is_ok() { Some(database.unwrap()) } else {
-                    // load config from .env
-                    dotenv::dotenv().ok();
+                // load config from .env
+                dotenv::dotenv().ok();
 
-                    // diesel naming convention for .env
-                    Some(env::var("DATABASE_URL").unwrap())
-                }
-            };
+                // diesel naming convention for .env
+                Some(env::var("DATABASE_URL").unwrap())
+            }
+        };
 
         let db = Db::new(db);
         db.migrations();
@@ -71,22 +72,24 @@ impl Ca {
         unimplemented!();
     }
 
-
     // -------- CAs
 
     pub fn ca_new(&self, domainname: &str) -> Result<()> {
         if let Some(_) = self.db.get_ca()? {
-            return Err(failure::err_msg("ERROR: CA has already been created"));
+            return Err(failure::err_msg(
+                "ERROR: CA has already been created",
+            ));
         }
 
         // domainname syntax check
         if !Domain::has_valid_syntax(domainname) {
-            return Err(
-                failure::err_msg("Parameter is not a valid domainname"));
+            return Err(failure::err_msg(
+                "Parameter is not a valid domainname",
+            ));
         }
 
-        let (cert, _) = Pgp::make_private_ca_cert(domainname,
-                                                  Some("OpenPGP CA"))?;
+        let (cert, _) =
+            Pgp::make_private_ca_cert(domainname, Some("OpenPGP CA"))?;
 
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
 
@@ -101,23 +104,27 @@ impl Ca {
 
     pub fn get_ca_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
-            Some((_, cert)) => {
-                Ok(Pgp::armored_to_cert(&cert.cert)?)
-            }
-            None => panic!("get_domain_ca() failed")
+            Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
+            None => panic!("get_domain_ca() failed"),
         }
     }
 
     pub fn show_cas(&self) -> Result<()> {
-        let (ca, ca_cert) = self.db.get_ca()
-            .context("failed to load CA from database")?.unwrap();
+        let (ca, ca_cert) = self
+            .db
+            .get_ca()
+            .context("failed to load CA from database")?
+            .unwrap();
         println!("\n{}\n\n{}", ca.domainname, ca_cert.cert);
         Ok(())
     }
 
     pub fn export_pubkey(&self) -> Result<String> {
-        let (_, ca_cert) = self.db.get_ca()
-            .context("failed to load CA from database")?.unwrap();
+        let (_, ca_cert) = self
+            .db
+            .get_ca()
+            .context("failed to load CA from database")?
+            .unwrap();
 
         let cert = Pgp::armored_to_cert(&ca_cert.cert)?;
         let ca_pub = Pgp::cert_to_armored(&cert)
@@ -148,13 +155,14 @@ impl Ca {
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
             let ca_cert = self.get_ca_cert().unwrap();
 
-            let ca_cert_imported = Cert::from_file(key_file)
-                .context("Failed to read key")?;
+            let ca_cert_imported =
+                Cert::from_file(key_file).context("Failed to read key")?;
 
             // make sure the keys have the same Fingerprint
             if ca_cert.fingerprint() != ca_cert_imported.fingerprint() {
-                return Err(failure::err_msg
-                    ("The imported cert has an unexpected Fingerprint"));
+                return Err(failure::err_msg(
+                    "The imported cert has an unexpected Fingerprint",
+                ));
             }
 
             // get the tsig(s) from import
@@ -164,18 +172,22 @@ impl Ca {
             let mut packets: Vec<Packet> = Vec::new();
             tsigs.iter().for_each(|&s| packets.push(s.clone().into()));
 
-            let signed = ca_cert.merge_packets(packets)
+            let signed = ca_cert
+                .merge_packets(packets)
                 .context("merging tsigs into CA Key failed")?;
 
             // update in DB
-            let (_, mut ca_cert) = self.db.get_ca()
+            let (_, mut ca_cert) = self
+                .db
+                .get_ca()
                 .context("failed to load CA from database")?
                 .unwrap();
 
             ca_cert.cert = Pgp::priv_cert_to_armored(&signed)
                 .context("failed to armor CA Cert")?;
 
-            self.db.update_cacert(&ca_cert)
+            self.db
+                .update_cacert(&ca_cert)
                 .context("Update of CA Cert in DB failed")?;
 
             Ok(())
@@ -184,7 +196,11 @@ impl Ca {
 
     // -------- users
 
-    pub fn user_new(&mut self, name: Option<&str>, emails: &[&str]) -> Result<()> {
+    pub fn user_new(
+        &mut self,
+        name: Option<&str>,
+        emails: &[&str],
+    ) -> Result<()> {
         let ca_cert = self.get_ca_cert().unwrap();
 
         // make user key (signed by CA)
@@ -196,19 +212,23 @@ impl Ca {
             Pgp::sign_user(&ca_cert, &user).context("sign_user failed")?;
 
         // user tsigns CA key
-        let tsigned_ca =
-            Pgp::tsign_ca(&ca_cert, &user).context("failed: user tsigns CA")?;
+        let tsigned_ca = Pgp::tsign_ca(&ca_cert, &user)
+            .context("failed: user tsigns CA")?;
 
         let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
-
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
-        let res = self.db.add_usercert(name, pub_key,
-                                       &user.fingerprint().to_hex(),
-                                       emails, &vec![revoc],
-                                       Some(&tsigned_ca_armored), None);
+        let res = self.db.add_usercert(
+            name,
+            pub_key,
+            &user.fingerprint().to_hex(),
+            emails,
+            &vec![revoc],
+            Some(&tsigned_ca_armored),
+            None,
+        );
 
         if res.is_err() {
             eprint!("{:?}", res);
@@ -216,8 +236,11 @@ impl Ca {
         }
 
         // the private key needs to be handed over to the user, print for now
-        println!("new user key for {}:\n{}", name.unwrap_or(""),
-                 &Pgp::priv_cert_to_armored(&certified)?);
+        println!(
+            "new user key for {}:\n{}",
+            name.unwrap_or(""),
+            &Pgp::priv_cert_to_armored(&certified)?
+        );
         // --
 
         Ok(())
@@ -225,12 +248,14 @@ impl Ca {
 
     // update existing or create independent new usercert,
     // importing pub cert from file
-    fn usercert_import_update_or_create(&self, key: &str,
-                                        revoc: Option<&str>,
-                                        name: Option<&str>,
-                                        emails: &[&str],
-                                        updates_id: Option<i32>)
-                                        -> Result<()> {
+    fn usercert_import_update_or_create(
+        &self,
+        key: &str,
+        revoc: Option<&str>,
+        name: Option<&str>,
+        emails: &[&str],
+        updates_id: Option<i32>,
+    ) -> Result<()> {
         let user_cert = Pgp::armored_to_cert(&key)?;
 
         let existing =
@@ -240,21 +265,30 @@ impl Ca {
         if let Some(mut existing) = existing {
             // yes - update existing Usercert in DB
 
-            assert!(updates_id.is_none()
-                        || Some(existing.id) == updates_id,
-                    "updates_id was specified, but is inconsistent for key update");
+            assert!(
+                updates_id.is_none() || Some(existing.id) == updates_id,
+                "updates_id was specified, but is inconsistent for key update"
+            );
 
             // set of email addresses should be the same
-            let existing_emails: HashSet<_> =
-                self.db.get_emails_by_usercert(&existing)?
-                    .iter().map(|e| e.addr.to_owned()).collect();
-            let emails: HashSet<_> = emails.iter().map(|s| s.to_string()).collect();
-            assert!(emails.eq(&existing_emails),
-                    "expecting the same set of email addresses on key update");
+            let existing_emails: HashSet<_> = self
+                .db
+                .get_emails_by_usercert(&existing)?
+                .iter()
+                .map(|e| e.addr.to_owned())
+                .collect();
+            let emails: HashSet<_> =
+                emails.iter().map(|s| s.to_string()).collect();
+            assert!(
+                emails.eq(&existing_emails),
+                "expecting the same set of email addresses on key update"
+            );
 
             // this "update" workflow is not handling revocation certs for now
-            assert!(revoc.is_none(),
-                    "not expecting a revocation cert on key update");
+            assert!(
+                revoc.is_none(),
+                "not expecting a revocation cert on key update"
+            );
 
             // merge existing and new public key, update in DB usercert
             let c1 = Pgp::armored_to_cert(&existing.pub_cert)?;
@@ -292,16 +326,15 @@ impl Ca {
                 emails.iter().map(|&s| s.to_owned()).collect()
             } else {
                 let userids: Vec<_> = user_cert.userids().collect();
-                let emails: Vec<String> = userids.iter()
-                    .map(|uid| uid.userid()
-                        .email().unwrap_or(None).unwrap())
+                let emails: Vec<String> = userids
+                    .iter()
+                    .map(|uid| uid.userid().email().unwrap_or(None).unwrap())
                     .collect();
                 emails
             };
 
             // map Vec<String> -> Vec<&str>
             let emails: Vec<&str> = emails.iter().map(|s| &**s).collect();
-
 
             // load revocation certificate
             let mut revocs: Vec<String> = Vec::new();
@@ -312,43 +345,64 @@ impl Ca {
 
             let pub_key = &Pgp::cert_to_armored(&certified)?;
 
-            self.db.add_usercert(name.as_deref(), pub_key,
-                                 &certified.fingerprint().to_hex(),
-                                 &emails[..], &revocs, None, updates_id)?;
+            self.db.add_usercert(
+                name.as_deref(),
+                pub_key,
+                &certified.fingerprint().to_hex(),
+                &emails[..],
+                &revocs,
+                None,
+                updates_id,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn usercert_import(&self, key: &str, revoc: Option<&str>,
-                           name: Option<&str>, emails: &[&str])
-                           -> Result<()> {
+    pub fn usercert_import(
+        &self,
+        key: &str,
+        revoc: Option<&str>,
+        name: Option<&str>,
+        emails: &[&str],
+    ) -> Result<()> {
         self.usercert_import_update_or_create(key, revoc, name, emails, None)
     }
 
-    pub fn usercert_import_update(&self, key: &str, usercert: &models::Usercert) -> Result<()> {
+    pub fn usercert_import_update(
+        &self,
+        key: &str,
+        usercert: &models::Usercert,
+    ) -> Result<()> {
         let emails = self.db.get_emails_by_usercert(usercert)?;
-        let emails: Vec<&str> = emails.iter()
-            .map(|e| e.addr.as_str())
-            .collect();
+        let emails: Vec<&str> =
+            emails.iter().map(|e| e.addr.as_str()).collect();
 
         let name = match &usercert.name {
             None => None,
-            Some(n) => Some(n.as_str())
+            Some(n) => Some(n.as_str()),
         };
 
-        self.usercert_import_update_or_create(key, None, name,
-                                              &emails[..], Some(usercert.id))
+        self.usercert_import_update_or_create(
+            key,
+            None,
+            name,
+            &emails[..],
+            Some(usercert.id),
+        )
     }
 
-    pub fn usercert_expiry(&self, days: u64)
-                           -> Result<HashMap<models::Usercert, (bool, Option<SystemTime>)>> {
+    pub fn usercert_expiry(
+        &self,
+        days: u64,
+    ) -> Result<HashMap<models::Usercert, (bool, Option<SystemTime>)>> {
         let mut map = HashMap::new();
 
         let days = Duration::new(60 * 60 * 24 * days, 0);
         let expiry_test = SystemTime::now().checked_add(days).unwrap();
 
-        let usercerts = self.get_all_usercerts()
+        let usercerts = self
+            .get_all_usercerts()
             .context("couldn't load usercerts")?;
 
         for usercert in usercerts {
@@ -362,18 +416,23 @@ impl Ca {
         Ok(map)
     }
 
-    pub fn usercert_signatures(&self) -> Result<HashMap<models::Usercert, (bool, bool)>> {
+    pub fn usercert_signatures(
+        &self,
+    ) -> Result<HashMap<models::Usercert, (bool, bool)>> {
         let mut map = HashMap::new();
 
-        let usercerts = self.get_all_usercerts()
+        let usercerts = self
+            .get_all_usercerts()
             .context("couldn't load usercerts")?;
 
         for usercert in usercerts {
-            let sig_from_ca = self.check_ca_sig(&usercert).
-                context("Failed while checking CA sig")?;
+            let sig_from_ca = self
+                .check_ca_sig(&usercert)
+                .context("Failed while checking CA sig")?;
 
-            let tsig_on_ca = self.check_ca_has_tsig(&usercert).
-                context("Failed while checking tsig on CA")?;
+            let tsig_on_ca = self
+                .check_ca_has_tsig(&usercert)
+                .context("Failed while checking tsig on CA")?;
 
             map.insert(usercert, (sig_from_ca, tsig_on_ca));
         }
@@ -391,7 +450,9 @@ impl Ca {
         let cert = self.db.get_usercert(sig_fingerprint)?;
 
         match cert {
-            None => Err(failure::err_msg("couldn't find cert for this fingerprint")),
+            None => Err(failure::err_msg(
+                "couldn't find cert for this fingerprint",
+            )),
             Some(c) => {
                 let cert_fingerprint = &c.fingerprint;
                 assert_eq!(sig_fingerprint, cert_fingerprint);
@@ -411,13 +472,14 @@ impl Ca {
         self.db.list_usercerts()
     }
 
-    pub fn get_usercerts(&self, email: &str)
-                         -> Result<Vec<models::Usercert>> {
+    pub fn get_usercerts(&self, email: &str) -> Result<Vec<models::Usercert>> {
         self.db.get_usercerts(email)
     }
 
-    pub fn get_revocations(&self, cert: &models::Usercert)
-                           -> Result<Vec<models::Revocation>> {
+    pub fn get_revocations(
+        &self,
+        cert: &models::Usercert,
+    ) -> Result<Vec<models::Revocation>> {
         self.db.get_revocations(cert)
     }
 
@@ -429,12 +491,10 @@ impl Ca {
         }
     }
 
-
     pub fn apply_revocation(&self, revoc: models::Revocation) -> Result<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
-            let usercert =
-                self.db.get_usercert_by_id(revoc.usercert_id)?;
+            let usercert = self.db.get_usercert_by_id(revoc.usercert_id)?;
 
             if let Some(mut usercert) = usercert {
                 let sig = Pgp::armored_to_signature(&revoc.revocation)?;
@@ -450,24 +510,29 @@ impl Ca {
 
                 println!("cert {:?}", usercert);
 
-                self.db.update_usercert(&usercert)
+                self.db
+                    .update_usercert(&usercert)
                     .context("Couldn't update Usercert")?;
 
                 println!("y");
 
-                self.db.update_revocation(&revoc)
+                self.db
+                    .update_revocation(&revoc)
                     .context("Couldn't update Revocation")?;
 
                 Ok(())
             } else {
                 Err(failure::err_msg(
-                    "Couldn't find usercert for apply_revocation"))
+                    "Couldn't find usercert for apply_revocation",
+                ))
             }
         })
     }
 
-    pub fn get_emails(&self, usercert: &models::Usercert)
-                      -> Result<Vec<models::Email>> {
+    pub fn get_emails(
+        &self,
+        usercert: &models::Usercert,
+    ) -> Result<Vec<models::Email>> {
         self.db.get_emails_by_usercert(usercert)
     }
 
@@ -477,41 +542,40 @@ impl Ca {
 
         let ca = self.get_ca_cert()?;
 
-        Ok(sigs.iter()
+        Ok(sigs
+            .iter()
             .any(|&s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
     }
 
-    pub fn check_ca_has_tsig(&self, usercert: &models::Usercert)
-                             -> Result<bool> {
+    pub fn check_ca_has_tsig(
+        &self,
+        usercert: &models::Usercert,
+    ) -> Result<bool> {
         let ca = self.get_ca_cert()?;
         let tsigs = Self::get_tsigs(&ca);
 
-
         let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
 
-        Ok(tsigs.iter()
-            .any(|&t| t.issuer_fingerprint().unwrap()
-                == &user_cert.fingerprint()))
+        Ok(tsigs.iter().any(|&t| {
+            t.issuer_fingerprint().unwrap() == &user_cert.fingerprint()
+        }))
     }
 
     // -------- bridges
 
     // "other.org" => "<[^>]+[@.]other\\.org>$"
     fn domain_to_regex(domain: &str) -> Result<String> {
-
         // syntax check domain
         if !Domain::has_valid_syntax(domain) {
-            return Err(
-                failure::err_msg("Parameter is not a valid domainname"));
+            return Err(failure::err_msg(
+                "Parameter is not a valid domainname",
+            ));
         }
 
         // transform domain to regex
         let mut regex = "<[^>]+[@.]".to_string();
 
-        regex.push_str(&domain
-            .split(".")
-            .collect::<Vec<_>>()
-            .join("\\."));
+        regex.push_str(&domain.split(".").collect::<Vec<_>>().join("\\."));
 
         regex.push_str(">$");
 
@@ -519,23 +583,31 @@ impl Ca {
     }
 
     /// when scope is not set, it is derived from the user_id in the key_file
-    pub fn bridge_new(&self, key_file: &str,
-                      email: Option<&str>, scope: Option<&str>)
-                      -> Result<models::Bridge> {
-        let remote_ca_cert = Cert::from_file(key_file)
-            .context("Failed to read key")?;
+    pub fn bridge_new(
+        &self,
+        key_file: &str,
+        email: Option<&str>,
+        scope: Option<&str>,
+    ) -> Result<models::Bridge> {
+        let remote_ca_cert =
+            Cert::from_file(key_file).context("Failed to read key")?;
 
         // derive an email and domain from the user_id in the remote cert
         let (cert_email, cert_domain) = {
             let uids: Vec<_> = remote_ca_cert.userids().collect();
-            assert_eq!(uids.len(), 1,
-                       "Expected exactly one userid in remote CA Cert");
+            assert_eq!(
+                uids.len(),
+                1,
+                "Expected exactly one userid in remote CA Cert"
+            );
 
             let remote_uid = uids[0].userid();
             let remote_email = remote_uid.email()?;
 
-            assert!(remote_email.is_some(),
-                    "Couldn't get email from remote CA Cert");
+            assert!(
+                remote_email.is_some(),
+                "Couldn't get email from remote CA Cert"
+            );
 
             let remote_email = remote_email.unwrap();
 
@@ -556,12 +628,12 @@ impl Ca {
 
                 scope
             }
-            None => &cert_domain
+            None => &cert_domain,
         };
 
         let email = match email {
             None => cert_email,
-            Some(email) => email.to_owned()
+            Some(email) => email.to_owned(),
         };
 
         let regex = Self::domain_to_regex(scope)?;
@@ -571,27 +643,28 @@ impl Ca {
         let ca_cert = self.get_ca_cert().unwrap();
 
         // expect exactly one userid in remote CA key (otherwise fail)
-        assert_eq!(remote_ca_cert.userids().len(), 1,
-                   "remote CA should have exactly one userid, but has {}",
-                   remote_ca_cert.userids().len());
+        assert_eq!(
+            remote_ca_cert.userids().len(),
+            1,
+            "remote CA should have exactly one userid, but has {}",
+            remote_ca_cert.userids().len()
+        );
 
-        let bridged = Pgp::bridge_to_remote_ca(&ca_cert, &remote_ca_cert,
-                                               regexes)?;
+        let bridged =
+            Pgp::bridge_to_remote_ca(&ca_cert, &remote_ca_cert, regexes)?;
 
         // store in DB
         let (ca_db, _) =
-            self.db.get_ca().context("Couldn't find CA")?
-                .unwrap();
+            self.db.get_ca().context("Couldn't find CA")?.unwrap();
 
         let pub_key = &Pgp::cert_to_armored(&bridged)?;
 
-        let new_bridge =
-            models::NewBridge {
-                email: &email,
-                scope,
-                pub_key,
-                cas_id: ca_db.id,
-            };
+        let new_bridge = models::NewBridge {
+            email: &email,
+            scope,
+            pub_key,
+            cas_id: ca_db.id,
+        };
 
         let bridge = self.db.insert_bridge(new_bridge)?;
 
@@ -604,8 +677,8 @@ impl Ca {
 
         let mut bridge = bridge.unwrap();
 
-//        println!("bridge {:?}", &bridge.clone());
-//        let ca_id = bridge.clone().cas_id;
+        //        println!("bridge {:?}", &bridge.clone());
+        //        let ca_id = bridge.clone().cas_id;
 
         let (_, ca_cert) = self.db.get_ca()?.unwrap();
         let ca_cert = Pgp::armored_to_cert(&ca_cert.cert)?;
@@ -650,8 +723,8 @@ impl Ca {
     }
 
     pub fn update_from_wkd(&self, usercert: &models::Usercert) -> Result<()> {
-        use tokio_core::reactor::Core;
         use sequoia_net::wkd;
+        use tokio_core::reactor::Core;
 
         let emails = self.get_emails(&usercert)?;
 
@@ -676,9 +749,12 @@ impl Ca {
         Ok(())
     }
 
-    pub fn update_from_hagrid(&self, usercert: &models::Usercert) -> Result<()> {
-        use tokio_core::reactor::Core;
+    pub fn update_from_hagrid(
+        &self,
+        usercert: &models::Usercert,
+    ) -> Result<()> {
         use openpgp::{Fingerprint, KeyID};
+        use tokio_core::reactor::Core;
 
         let mut merge = Pgp::armored_to_cert(&usercert.pub_cert)?;
 

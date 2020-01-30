@@ -22,7 +22,7 @@ extern crate diesel;
 extern crate diesel_migrations;
 
 pub mod ca;
-pub mod models;
-pub mod schema;
 pub mod db;
+pub mod models;
 pub mod pgp;
+pub mod schema;

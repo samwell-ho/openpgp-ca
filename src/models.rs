@@ -17,7 +17,6 @@
 
 use super::schema::*;
 
-
 #[derive(Queryable, Debug, Clone, AsChangeset, Identifiable)]
 pub struct Ca {
     pub id: i32,
@@ -46,7 +45,17 @@ pub struct NewCacert {
     pub ca_id: i32,
 }
 
-#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset, PartialEq, Eq, Hash)]
+#[derive(
+    Identifiable,
+    Queryable,
+    Debug,
+    Associations,
+    Clone,
+    AsChangeset,
+    PartialEq,
+    Eq,
+    Hash,
+)]
 #[belongs_to(Ca)]
 pub struct Usercert {
     pub id: i32,

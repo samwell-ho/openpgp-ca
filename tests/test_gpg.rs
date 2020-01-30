@@ -64,7 +64,6 @@ fn test_alice_authenticates_bob_centralized() {
     ca_cert.unwrap().as_tsk().serialize(&mut buf).unwrap();
     gnupg::import(&ctx, &buf);
 
-
     // import CA users into GnuPG
     let usercerts = ca.get_all_usercerts();
 
@@ -85,17 +84,22 @@ fn test_alice_authenticates_bob_centralized() {
 
     assert_eq!(gpg_trust.len(), 3);
 
-    assert_eq!(gpg_trust.get("Alice <alice@example.org>"),
-               Some(&"u".to_string()));
-    assert_eq!(gpg_trust.get("OpenPGP CA <openpgp-ca@example.org>"),
-               Some(&"f".to_string()));
-    assert_eq!(gpg_trust.get("Bob <bob@example.org>"),
-               Some(&"f".to_string()));
+    assert_eq!(
+        gpg_trust.get("Alice <alice@example.org>"),
+        Some(&"u".to_string())
+    );
+    assert_eq!(
+        gpg_trust.get("OpenPGP CA <openpgp-ca@example.org>"),
+        Some(&"f".to_string())
+    );
+    assert_eq!(
+        gpg_trust.get("Bob <bob@example.org>"),
+        Some(&"f".to_string())
+    );
 
     // don't delete home dir (for manual inspection)
     //    ctx.leak_tempdir();
 }
-
 
 #[test]
 /// Alice and Bob create their own keys locally,
@@ -108,9 +112,9 @@ fn test_alice_authenticates_bob_decentralized() {
     let ctx_alice = make_context!();
     let ctx_bob = make_context!();
 
-    let home_path_alice = String::from(ctx_alice.get_homedir().to_str().unwrap());
+    let home_path_alice =
+        String::from(ctx_alice.get_homedir().to_str().unwrap());
     let home_path_bob = String::from(ctx_bob.get_homedir().to_str().unwrap());
-
 
     let ctx_ca = make_context!();
 
@@ -141,13 +145,9 @@ fn test_alice_authenticates_bob_decentralized() {
     gnupg::create_user(&ctx_alice, "Alice <alice@example.org>");
     gnupg::create_user(&ctx_bob, "Bob <bob@example.org>");
 
-
     // create tsig for ca key in user GnuPG contexts
-    gnupg::tsign(&ctx_alice, &ca_keyid, 1, 2)
-        .expect("tsign alice failed");
-    gnupg::tsign(&ctx_bob, &ca_keyid, 1, 2)
-        .expect("tsign bob failed");
-
+    gnupg::tsign(&ctx_alice, &ca_keyid, 1, 2).expect("tsign alice failed");
+    gnupg::tsign(&ctx_bob, &ca_keyid, 1, 2).expect("tsign bob failed");
 
     // export CA key from both contexts, import to CA
     let alice_ca_key = gnupg::export(&ctx_alice, &"openpgp-ca@example.org");
@@ -156,7 +156,8 @@ fn test_alice_authenticates_bob_decentralized() {
     let alice_ca_file = format!("{}/ca.key.alice", home_path_alice);
     let bob_ca_file = format!("{}/ca.key.bob", home_path_bob);
 
-    std::fs::write(&alice_ca_file, alice_ca_key).expect("Unable to write file");
+    std::fs::write(&alice_ca_file, alice_ca_key)
+        .expect("Unable to write file");
     std::fs::write(&bob_ca_file, bob_ca_key).expect("Unable to write file");
 
     ca.import_tsig(&alice_ca_file)
@@ -164,21 +165,21 @@ fn test_alice_authenticates_bob_decentralized() {
     ca.import_tsig(&bob_ca_file)
         .expect("import CA tsig from Bob failed");
 
-
     // get public keys for alice and bob from their gnupg contexts
     let alice_key = gnupg::export(&ctx_alice, &"alice@example.org");
     let bob_key = gnupg::export(&ctx_bob, &"bob@example.org");
 
-
     // import public keys for alice and bob into CA
-    ca.usercert_import(&alice_key, None, Some("Alice"),
-                       &vec!["alice@example.org"])
-        .expect("import Alice to CA failed");
+    ca.usercert_import(
+        &alice_key,
+        None,
+        Some("Alice"),
+        &vec!["alice@example.org"],
+    )
+    .expect("import Alice to CA failed");
 
-    ca.usercert_import(&bob_key, None, Some("Bob"),
-                       &vec!["bob@example.org"])
+    ca.usercert_import(&bob_key, None, Some("Bob"), &vec!["bob@example.org"])
         .expect("import Bob to CA failed");
-
 
     // export bob, CA-key from CA
     let ca_key = ca.export_pubkey().unwrap();
@@ -199,12 +200,18 @@ fn test_alice_authenticates_bob_decentralized() {
 
     assert_eq!(gpg_trust.len(), 3);
 
-    assert_eq!(gpg_trust.get("Alice <alice@example.org>"),
-               Some(&"u".to_string()));
-    assert_eq!(gpg_trust.get("OpenPGP CA <openpgp-ca@example.org>"),
-               Some(&"f".to_string()));
-    assert_eq!(gpg_trust.get("Bob <bob@example.org>"),
-               Some(&"f".to_string()));
+    assert_eq!(
+        gpg_trust.get("Alice <alice@example.org>"),
+        Some(&"u".to_string())
+    );
+    assert_eq!(
+        gpg_trust.get("OpenPGP CA <openpgp-ca@example.org>"),
+        Some(&"f".to_string())
+    );
+    assert_eq!(
+        gpg_trust.get("Bob <bob@example.org>"),
+        Some(&"f".to_string())
+    );
 }
 
 #[test]
@@ -275,7 +282,6 @@ fn test_bridge() {
 
     let ca1_cert = &bridges2[0].pub_key;
 
-
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)
     let bridges1 = ca1.get_bridges();
@@ -285,7 +291,6 @@ fn test_bridge() {
     assert_eq!(bridges1.len(), 1);
 
     let ca2_cert = &bridges1[0].pub_key;
-
 
     // import CA keys into GnuPG
     gnupg::import(&ctx, ca1_cert.as_bytes());
@@ -311,7 +316,6 @@ fn test_bridge() {
         gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 
-
     // ---- set "ultimate" ownertrust for alice ----
     let res = gnupg::edit_trust(&ctx, "alice", 5);
 
@@ -322,19 +326,29 @@ fn test_bridge() {
 
     assert_eq!(gpg_trust.len(), 5);
 
-    assert_eq!(gpg_trust.get("Alice <alice@some.org>"),
-               Some(&"u".to_string()),
-               "alice@some.org");
-    assert_eq!(gpg_trust.get("OpenPGP CA <openpgp-ca@some.org>"),
-               Some(&"f".to_string()),
-               "openpgp-ca@some.org");
-    assert_eq!(gpg_trust.get("OpenPGP CA <openpgp-ca@other.org>"),
-               Some(&"f".to_string()),
-               "openpgp-ca@other.org");
-    assert_eq!(gpg_trust.get("Bob <bob@other.org>"),
-               Some(&"f".to_string()),
-               "bob@other.org");
-    assert_eq!(gpg_trust.get("Carol <carol@third.org>"),
-               Some(&"-".to_string()),
-               "carol@third.org");
+    assert_eq!(
+        gpg_trust.get("Alice <alice@some.org>"),
+        Some(&"u".to_string()),
+        "alice@some.org"
+    );
+    assert_eq!(
+        gpg_trust.get("OpenPGP CA <openpgp-ca@some.org>"),
+        Some(&"f".to_string()),
+        "openpgp-ca@some.org"
+    );
+    assert_eq!(
+        gpg_trust.get("OpenPGP CA <openpgp-ca@other.org>"),
+        Some(&"f".to_string()),
+        "openpgp-ca@other.org"
+    );
+    assert_eq!(
+        gpg_trust.get("Bob <bob@other.org>"),
+        Some(&"f".to_string()),
+        "bob@other.org"
+    );
+    assert_eq!(
+        gpg_trust.get("Carol <carol@third.org>"),
+        Some(&"-".to_string()),
+        "carol@third.org"
+    );
 }
