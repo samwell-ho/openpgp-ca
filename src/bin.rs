@@ -152,199 +152,205 @@ fn real_main() -> Result<()> {
                     }
                 }
                 ("show-revocations", Some(m2)) => {
-                    if let Some(email) = m2.values_of("email") {
-                        let email = email.into_iter().next().unwrap();
-
-                        let usercerts = ca.get_usercerts(email)?;
-                        if usercerts.is_empty() {
-                            println!("User not found");
-                        } else {
-                            for cert in usercerts {
-                                println!("revocations for {:?}", cert.name);
-                                let revoc = ca.get_revocations(&cert)?;
-                                for r in revoc {
-                                    println!(" revocation id {:?}", r.id);
-                                    if r.published {
-                                        println!(" this revocation has been PUBLISHED");
-                                    }
-                                    println!("{}", r.revocation);
-                                    println!();
-                                }
-                            }
-                        }
+                    if let Some(email) = m2.value_of("email") {
+                        show_revocations(&ca, email)?;
                     }
                 }
-                ("check", Some(m)) => {
-                    match m.subcommand() {
-                        ("sigs", Some(_m2)) => {
-                            let mut count_ok = 0;
-
-                            let sigs_status = ca.usercert_signatures()?;
-                            for (usercert, (sig_from_ca, tsig_on_ca)) in
-                                &sigs_status
-                            {
-                                let ok = if *sig_from_ca {
-                                    true
-                                } else {
-                                    println!(
-                                        "missing signature by CA for \
-                                         user {:?} fingerprint {}",
-                                        usercert.name, usercert.fingerprint
-                                    );
-                                    false
-                                } && if *tsig_on_ca {
-                                    true
-                                } else {
-                                    println!(
-                                        "CA Cert has not been tsigned \
-                                         by user {:?}",
-                                        usercert.name
-                                    );
-                                    false
-                                };
-
-                                if ok {
-                                    count_ok += 1;
-                                }
-                            }
-                            println!(
-                                "checked {} certs, {} of them had good \
-                                 signatures in both directions",
-                                sigs_status.len(),
-                                count_ok
-                            );
-                        }
-                        ("expiry", Some(m2)) => {
-                            // check that keys are valid for at least this
-                            // number of days from now
-                            let exp_days =
-                                if let Some(days) = m2.value_of("days") {
-                                    days.parse::<u64>().context(
-                                        "days parameter must be a number",
-                                    )?
-                                } else {
-                                    0
-                                };
-
-                            let expiries = ca.usercert_expiry(exp_days)?;
-
-                            for (usercert, (alive, expiry)) in expiries {
-                                println!(
-                                    "name {}, fingerprint {}",
-                                    usercert.name.clone().unwrap_or_else(
-                                        || "<no name>".to_string()
-                                    ),
-                                    usercert.fingerprint
-                                );
-
-                                if let Some(exp) = expiry {
-                                    let datetime: DateTime<Utc> = exp.into();
-                                    println!(
-                                        " expires: {}",
-                                        datetime.format("%d/%m/%Y")
-                                    );
-                                } else {
-                                    println!(" cert doesn't expire");
-                                }
-
-                                if !alive {
-                                    println!(
-                                        " user cert EXPIRED/EXPIRING: {:?}",
-                                        usercert.name
-                                    );
-                                }
-
-                                println!();
-                            }
-                        }
-                        _ => unimplemented!(),
+                ("check", Some(m)) => match m.subcommand() {
+                    ("sigs", Some(_m2)) => {
+                        check_sigs(&ca)?;
                     }
-                }
+                    ("expiry", Some(m2)) => {
+                        // check that keys are valid for at least this
+                        // number of days from now
+                        let exp_days = m2
+                            .value_of("days")
+                            .unwrap_or_else(|| "0")
+                            .parse::<u64>()
+                            .context("days parameter must be a number")?;
+                        check_expiry(&ca, exp_days)?;
+                    }
+                    _ => unimplemented!(),
+                },
                 ("list", Some(_m2)) => {
-                    for (usercert, (sig_from_ca, tsig_on_ca)) in
-                        ca.usercert_signatures()?
-                    {
-                        println!(
-                            "usercert for '{}'",
-                            usercert
-                                .name
-                                .clone()
-                                .unwrap_or_else(|| "<no name>".to_string())
-                        );
-
-                        println!("fingerprint {}", usercert.fingerprint);
-
-                        for email in ca.get_emails(&usercert)? {
-                            println!("- email {}", email.addr);
-                        }
-
-                        let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
-                        if let Some(exp) = Pgp::get_expiry(&cert)? {
-                            let datetime: DateTime<Utc> = exp.into();
-                            println!(
-                                " expires: {}",
-                                datetime.format("%d/%m/%Y")
-                            );
-                        } else {
-                            println!(" cert doesn't expire");
-                        }
-
-                        println!(
-                            " user cert (or subkey) signed by CA: {}",
-                            sig_from_ca
-                        );
-                        println!(" user cert has tsigned CA: {}", tsig_on_ca);
-                        println!();
-                    }
+                    list_users(&ca)?;
                 }
 
                 _ => unimplemented!("unexpected/missing subcommand"),
             }
         }
-        ("bridge", Some(m)) => {
-            match m.subcommand() {
-                ("new", Some(m2)) => {
-                    let scope = m2.value_of("scope");
+        ("bridge", Some(m)) => match m.subcommand() {
+            ("new", Some(m2)) => {
+                let scope = m2.value_of("scope");
 
-                    let key_file = m2.value_of("remote-key-file").unwrap();
+                let key_file = m2.value_of("remote-key-file").unwrap();
 
-                    let email = m2.value_of("email");
-
-                    let bridge = ca.bridge_new(key_file, email, scope)?;
-                    let remote = Pgp::armored_to_cert(&bridge.pub_key)?;
-                    println!(
-                        "signed certificate for {} as bridge\n",
-                        bridge.email
-                    );
-                    println!("CAUTION:");
-                    println!("The fingerprint of the remote CA key is");
-                    println!("{}\n", remote.fingerprint().to_string());
-                    println!("Please verify that this key is controlled by \
-                    {} before disseminating the signed remote certificate",
-                             bridge.email);
-                }
-                ("revoke", Some(m2)) => {
-                    let email = m2.value_of("email").unwrap();
-
-                    ca.bridge_revoke(email)?;
-                }
-                ("list", Some(_m2)) => {
-                    let bridges = ca.get_bridges()?;
-
-                    for bridge in bridges {
-                        println!(
-                            "Bridge '{}':\n\n{}",
-                            bridge.email, bridge.pub_key
-                        );
-                    }
-                }
-
-                _ => unimplemented!(),
+                let email = m2.value_of("email");
+                new_bridge(&ca, email, key_file, scope)?;
             }
-        }
+            ("revoke", Some(m2)) => {
+                let email = m2.value_of("email").unwrap();
+
+                ca.bridge_revoke(email)?;
+            }
+            ("list", Some(_m2)) => {
+                list_bridges(&ca)?;
+            }
+
+            _ => unimplemented!(),
+        },
         _ => unimplemented!(),
     }
 
+    Ok(())
+}
+
+fn show_revocations(ca: &ca::Ca, email: &str) -> Result<()> {
+    let usercerts = ca.get_usercerts(email)?;
+    if usercerts.is_empty() {
+        println!("User not found");
+    } else {
+        for cert in usercerts {
+            println!("revocations for {:?}", cert.name);
+            let revoc = ca.get_revocations(&cert)?;
+            for r in revoc {
+                println!(" revocation id {:?}", r.id);
+                if r.published {
+                    println!(" this revocation has been PUBLISHED");
+                }
+                println!("{}", r.revocation);
+                println!();
+            }
+        }
+    }
+    Ok(())
+}
+
+fn check_sigs(ca: &ca::Ca) -> Result<()> {
+    let mut count_ok = 0;
+
+    let sigs_status = ca.usercert_signatures()?;
+    for (usercert, (sig_from_ca, tsig_on_ca)) in &sigs_status {
+        let ok = if *sig_from_ca {
+            true
+        } else {
+            println!(
+                "missing signature by CA for \
+                 user {:?} fingerprint {}",
+                usercert.name, usercert.fingerprint
+            );
+            false
+        } && if *tsig_on_ca {
+            true
+        } else {
+            println!(
+                "CA Cert has not been tsigned \
+                 by user {:?}",
+                usercert.name
+            );
+            false
+        };
+
+        if ok {
+            count_ok += 1;
+        }
+    }
+    println!(
+        "checked {} certs, {} of them had good signatures in both directions",
+        sigs_status.len(),
+        count_ok
+    );
+
+    Ok(())
+}
+
+fn check_expiry(ca: &ca::Ca, exp_days: u64) -> Result<()> {
+    let expiries = ca.usercert_expiry(exp_days)?;
+
+    for (usercert, (alive, expiry)) in expiries {
+        println!(
+            "name {}, fingerprint {}",
+            usercert
+                .name
+                .clone()
+                .unwrap_or_else(|| "<no name>".to_string()),
+            usercert.fingerprint
+        );
+
+        if let Some(exp) = expiry {
+            let datetime: DateTime<Utc> = exp.into();
+            println!(" expires: {}", datetime.format("%d/%m/%Y"));
+        } else {
+            println!(" cert doesn't expire");
+        }
+
+        if !alive {
+            println!(" user cert EXPIRED/EXPIRING: {:?}", usercert.name);
+        }
+
+        println!();
+    }
+
+    Ok(())
+}
+
+fn list_users(ca: &ca::Ca) -> Result<()> {
+    for (usercert, (sig_from_ca, tsig_on_ca)) in ca.usercert_signatures()? {
+        println!(
+            "usercert for '{}'",
+            usercert
+                .name
+                .clone()
+                .unwrap_or_else(|| "<no name>".to_string())
+        );
+
+        println!("fingerprint {}", usercert.fingerprint);
+
+        for email in ca.get_emails(&usercert)? {
+            println!("- email {}", email.addr);
+        }
+
+        let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+        if let Some(exp) = Pgp::get_expiry(&cert)? {
+            let datetime: DateTime<Utc> = exp.into();
+            println!(" expires: {}", datetime.format("%d/%m/%Y"));
+        } else {
+            println!(" cert doesn't expire");
+        }
+
+        println!(" user cert (or subkey) signed by CA: {}", sig_from_ca);
+        println!(" user cert has tsigned CA: {}", tsig_on_ca);
+        println!();
+    }
+
+    Ok(())
+}
+
+fn list_bridges(ca: &ca::Ca) -> Result<()> {
+    for bridge in ca.get_bridges()? {
+        println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key);
+    }
+    Ok(())
+}
+
+fn new_bridge(
+    ca: &ca::Ca,
+    email: Option<&str>,
+    key_file: &str,
+    scope: Option<&str>,
+) -> Result<()> {
+    let bridge = ca.bridge_new(key_file, email, scope)?;
+    let remote = Pgp::armored_to_cert(&bridge.pub_key)?;
+
+    println!("signed certificate for {} as bridge\n", bridge.email);
+    println!("CAUTION:");
+    println!("The fingerprint of the remote CA key is");
+    println!("{}\n", remote.fingerprint().to_string());
+    println!(
+        "Please verify that this key is controlled by \
+         {} before disseminating the signed remote certificate",
+        bridge.email
+    );
     Ok(())
 }
 
