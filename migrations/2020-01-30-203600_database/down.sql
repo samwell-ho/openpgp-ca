@@ -5,4 +5,4 @@ DROP TABLE if exists emails;
 DROP TABLE if exists certs_emails;
 DROP TABLE if exists revocations;
 DROP TABLE if exists bridges;
-DROP TABLE if exists prefs;
+--DROP TABLE if exists prefs;

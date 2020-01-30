@@ -33,9 +33,6 @@ CREATE TABLE usercerts (
 CREATE TABLE emails (
   id INTEGER NOT NULL PRIMARY KEY,
   addr VARCHAR NOT NULL,
-
--- FIXME: n:m mapping to usercerts
-
   CONSTRAINT emails_addr_unique UNIQUE (addr)
 );
 
@@ -75,10 +72,8 @@ CREATE TABLE bridges (
   CONSTRAINT bridge_email_unique UNIQUE (email)
 );
 
-CREATE TABLE prefs (
-  id INTEGER NOT NULL PRIMARY KEY
-
--- FIXME
+--CREATE TABLE prefs (
+--  id INTEGER NOT NULL PRIMARY KEY
 
   -- keygen defaults
 
@@ -87,4 +82,4 @@ CREATE TABLE prefs (
   -- wkd address (?)
 
   -- key/value store? (a.b.c... structure)
-);
+--);

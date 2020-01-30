@@ -39,12 +39,6 @@ table! {
 }
 
 table! {
-    prefs (id) {
-        id -> Integer,
-    }
-}
-
-table! {
     revocations (id) {
         id -> Integer,
         revocation -> Text,
@@ -77,7 +71,6 @@ allow_tables_to_appear_in_same_query!(
     cas,
     certs_emails,
     emails,
-    prefs,
     revocations,
     usercerts,
 );
