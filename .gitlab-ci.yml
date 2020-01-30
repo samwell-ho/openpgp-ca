@@ -9,3 +9,13 @@ Cargo test:
   stage: test
   script:
   - cargo test
+
+cargo-fmt:
+  script:
+    - rustup component add rustfmt
+    - cargo fmt -- --check
+
+cargo-clippy:
+  script:
+    - rustup component add clippy
+    - cargo clippy
