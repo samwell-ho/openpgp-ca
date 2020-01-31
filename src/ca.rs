@@ -203,16 +203,16 @@ impl Ca {
         let ca_cert = self.get_ca_cert().unwrap();
 
         // make user key (signed by CA)
-        let (user, revoc) =
-            Pgp::make_user_cert(emails, name).context("make_user failed")?;
+        let (user, revoc) = Pgp::make_user_cert(emails, name.clone())
+            .context("make_user failed")?;
 
         // sign user key with CA key
-        let certified =
-            Pgp::sign_user(&ca_cert, &user).context("sign_user failed")?;
+        let certified = Pgp::sign_user(&ca_cert, user.clone())
+            .context("sign_user failed")?;
 
         // user tsigns CA key
-        let tsigned_ca = Pgp::tsign_ca(&ca_cert, &user)
-            .context("failed: user tsigns CA")?;
+        let tsigned_ca =
+            Pgp::tsign_ca(ca_cert, &user).context("failed: user tsigns CA")?;
 
         let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
 
@@ -648,7 +648,7 @@ impl Ca {
         );
 
         let bridged =
-            Pgp::bridge_to_remote_ca(&ca_cert, &remote_ca_cert, regexes)?;
+            Pgp::bridge_to_remote_ca(ca_cert, remote_ca_cert, regexes)?;
 
         // store in DB
         let (ca_db, _) =

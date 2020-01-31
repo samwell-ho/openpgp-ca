@@ -19,18 +19,21 @@ use sequoia_openpgp as openpgp;
 
 use openpgp::armor;
 use openpgp::cert;
+use openpgp::cert::components::Amalgamation;
+use openpgp::cert::ValidKeyIter;
 use openpgp::crypto::KeyPair;
+use openpgp::packet::key::SecretParts;
 use openpgp::packet::signature;
 use openpgp::packet::{Signature, UserID};
 use openpgp::parse::Parse;
-use openpgp::serialize::Serialize;
+use openpgp::serialize::{Serialize, SerializeInto};
 use openpgp::types::{HashAlgorithm, KeyFlags};
 use openpgp::types::{ReasonForRevocation, SignatureType};
-use openpgp::{Cert, Fingerprint, KeyHandle, Packet, PacketPile};
+use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
 use std::time::SystemTime;
 
-use failure::{self, ResultExt};
+use failure::{self, Fallible, ResultExt};
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
@@ -53,7 +56,12 @@ impl Pgp {
         // FIXME: should not have subkeys
 
         // Generate a Cert, and create a keypair from the primary key.
-        let (cert, sig) = cert::CertBuilder::new().generate()?;
+        let (cert, sig) = cert::CertBuilder::new()
+            .add_signing_subkey()
+            // FIXME: set expiration from CLI
+            // std::time::Duration::new(123456, 0)
+            .set_expiration(None)
+            .generate()?;
 
         let mut keypair = cert
             .primary_key()
@@ -66,18 +74,20 @@ impl Pgp {
         let email = "openpgp-ca@".to_owned() + domainname;
         let userid = Self::user_id(&email, name);
 
-        let builder =
-            signature::Builder::new(SignatureType::PositiveCertification)
-                .set_hash_algo(HashAlgorithm::SHA512)
-                .set_key_flags(&KeyFlags::empty().set_certification(true))?
-                // notation: "openpgp-ca:domain=domain1;domain2"
-                .add_notation(
-                    "openpgp-ca",
-                    ("domain=".to_owned() + domainname).as_bytes(),
-                    signature::subpacket::NotationDataFlags::default()
-                        .set_human_readable(true),
-                    false,
-                )?;
+        let direct_key_sig =
+            cert.primary_key().policy(None).unwrap().binding_signature();
+        let builder = signature::Builder::from(direct_key_sig.clone())
+            .set_type(SignatureType::PositiveCertification)
+            .set_hash_algo(HashAlgorithm::SHA512)
+            .set_key_flags(&KeyFlags::empty().set_certification(true))?
+            // notation: "openpgp-ca:domain=domain1;domain2"
+            .add_notation(
+                "openpgp-ca",
+                ("domain=".to_owned() + domainname).as_bytes(),
+                signature::subpacket::NotationDataFlags::default()
+                    .set_human_readable(true),
+                false,
+            )?;
         let binding = userid.bind(&mut keypair, &cert, builder)?;
 
         // Now merge the userid and binding signature into the Cert.
@@ -86,14 +96,18 @@ impl Pgp {
         Ok((cert, sig))
     }
 
-    /// make a user Cert with "emails" as UIDs (all UIDs get signed)
+    /// Makes a user Cert with "emails" as UIDs.
     pub fn make_user_cert(
         emails: &[&str],
         name: Option<&str>,
     ) -> Result<(Cert, Signature)> {
         let mut builder = cert::CertBuilder::new()
-            .add_storage_encryption_subkey()
-            .add_transport_encryption_subkey()
+            .add_subkey(
+                KeyFlags::default()
+                    .set_transport_encryption(true)
+                    .set_storage_encryption(true),
+                None,
+            )
             .add_signing_subkey();
 
         for email in emails {
@@ -105,49 +119,53 @@ impl Pgp {
 
     /// make a "public key" ascii-armored representation of a Cert
     pub fn cert_to_armored(cert: &Cert) -> Result<String> {
+        // FIXME: currently sequoia bug, but use this later:
+        //    let v = cert.armored().to_vec().context("Cert serialize failed")?;
+
         let mut v = Vec::new();
-        cert.armored()
-            .serialize(&mut v)
-            .context("Cert serialize failed")?;
+        cert.armored().serialize(&mut v);
 
         Ok(String::from_utf8(v)?)
     }
 
     /// make a "private key" ascii-armored representation of a Cert
     pub fn priv_cert_to_armored(cert: &Cert) -> Result<String> {
-        let mut buffer = std::io::Cursor::new(vec![]);
+        let mut buffer = vec![];
         {
+            let headers = cert.armor_headers();
+            let headers: Vec<_> = headers
+                .iter()
+                .map(|value| ("Comment", value.as_str()))
+                .collect();
+
             let mut writer = armor::Writer::new(
                 &mut buffer,
                 armor::Kind::SecretKey,
-                &[][..],
+                &headers,
             )
             .unwrap();
 
             cert.as_tsk().serialize(&mut writer)?;
         }
 
-        Ok(String::from_utf8(buffer.get_ref().to_vec())?)
+        Ok(String::from_utf8(buffer)?)
     }
 
     /// make a Cert from an ascii armored key
-    pub fn armored_to_cert(armored: &str) -> Result<Cert> {
-        let cert = Cert::from_bytes(armored.as_bytes())
-            .context("Cert::from_bytes failed")?;
+    pub fn armored_to_cert(armored: &str) -> Fallible<Cert> {
+        let cert =
+            Cert::from_bytes(armored).context("Cert::from_bytes failed")?;
 
         Ok(cert)
     }
 
     /// make a Signature from an ascii armored signature
     pub fn armored_to_signature(armored: &str) -> Result<Signature> {
-        let pile = PacketPile::from_bytes(armored.as_bytes())
-            .context("PacketPile::from_bytes failed")?;
+        let p = openpgp::Packet::from_bytes(armored)
+            .context("Input could not be parsed")?;
 
-        let packets: Vec<_> = pile.into_children().collect();
-        assert_eq!(packets.len(), 1);
-
-        if let Packet::Signature(s) = &packets[0] {
-            Ok(s.to_owned())
+        if let Packet::Signature(s) = p {
+            Ok(s)
         } else {
             Err(failure::err_msg("Couldn't convert to Signature"))
         }
@@ -155,10 +173,7 @@ impl Pgp {
 
     /// make an ascii-armored representation of a Signature
     pub fn sig_to_armored(sig: &Signature) -> Result<String> {
-        // maybe use:
-        // https://docs.sequoia-pgp.org/sequoia_openpgp/serialize/trait.Serialize.html#method.export
-
-        let mut buf = std::io::Cursor::new(vec![]);
+        let mut buf = vec![];
         {
             let rev = Packet::Signature(sig.clone());
 
@@ -168,7 +183,7 @@ impl Pgp {
             rev.serialize(&mut writer)?;
         }
 
-        Ok(String::from_utf8(buf.get_ref().to_vec())?)
+        Ok(String::from_utf8(buf)?)
     }
 
     /// get expiration of cert as SystemTime
@@ -187,23 +202,18 @@ impl Pgp {
         revoc_file: Option<&str>,
     ) -> Result<Signature> {
         if let Some(filename) = revoc_file {
-            // handle optional revocation cert
+            let p = openpgp::Packet::from_file(filename)
+                .context("Input could not be parsed")?;
 
-            let pile = PacketPile::from_file(filename)
-                .context("Failed to read revocation cert")?;
-
-            assert_eq!(
-                pile.clone().into_children().len(),
-                1,
-                "expected exactly one packet in revocation cert"
-            );
-
-            if let Packet::Signature(s) = pile.into_children().next().unwrap()
-            {
+            if let Packet::Signature(s) = p {
                 return Ok(s);
+            } else {
+                return Err(failure::err_msg(
+                    "Couldn't convert to revocation",
+                ));
             }
         };
-        Err(failure::err_msg("Couldn't load Signature from file"))
+        Err(failure::err_msg("Couldn't load revocation from file"))
     }
 
     pub fn get_revoc_fingerprint(revoc_cert: &Signature) -> Fingerprint {
@@ -230,7 +240,7 @@ impl Pgp {
     }
 
     /// user tsigns CA key
-    pub fn tsign_ca(ca_cert: &Cert, user: &Cert) -> Result<Cert> {
+    pub fn tsign_ca(ca_cert: Cert, user: &Cert) -> Result<Cert> {
         let mut cert_keys = Self::get_cert_keys(&user)
             .context("filtered for unencrypted secret keys above")?;
 
@@ -244,26 +254,27 @@ impl Pgp {
                 )
                 .set_trust_signature(255, 120)?;
 
-                let tsig = ca_uidb.userid().bind(signer, ca_cert, builder)?;
+                let tsig = ca_uidb.userid().bind(signer, &ca_cert, builder)?;
                 sigs.push(tsig.into());
             }
         }
 
-        let signed = ca_cert.clone().merge_packets(sigs)?;
+        let signed = ca_cert.merge_packets(sigs)?;
 
         Ok(signed)
     }
 
     /// add trust signature to the public key of a remote CA
     pub fn bridge_to_remote_ca(
-        ca_cert: &Cert,
-        remote_ca_cert: &Cert,
+        ca_cert: Cert,
+        remote_ca_cert: Cert,
         scope_regexes: Vec<String>,
     ) -> Result<Cert> {
         // FIXME: do we want to support a tsig without any scope regex?
         // -> or force users to explicitly set a catchall regex, then.
 
         // there should be exactly one userid!
+        // FIXME: assert 1
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
@@ -279,7 +290,7 @@ impl Pgp {
                 .set_trust_signature(255, 120)?
                 .set_regular_expression(regex.as_bytes())?;
 
-                let tsig = userid.bind(signer, remote_ca_cert, builder)?;
+                let tsig = userid.bind(signer, &remote_ca_cert, builder)?;
 
                 packets.push(tsig.into());
             }
@@ -287,16 +298,18 @@ impl Pgp {
 
         // FIXME: expiration?
 
-        let signed = remote_ca_cert.clone().merge_packets(packets)?;
+        let signed = remote_ca_cert.merge_packets(packets)?;
 
         Ok(signed)
     }
 
+    // FIXME: justus thinks this might not be supported by implementations
     pub fn bridge_revoke(
         remote_ca_cert: &Cert,
         ca_cert: &Cert,
     ) -> Result<(Signature, Cert)> {
         // there should be exactly one userid!
+        // FIXME: assert 1
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
         // set_trust_signature, set_regular_expression(s), expiration
@@ -326,13 +339,17 @@ impl Pgp {
     }
 
     /// sign all userids of Cert with CA Cert
-    pub fn sign_user(ca_cert: &Cert, user: &Cert) -> Result<Cert> {
+    pub fn sign_user(ca_cert: &Cert, user: Cert) -> Result<Cert> {
         // sign Cert with CA key
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)
             .context("filtered for unencrypted secret keys above")?;
 
         let mut sigs = Vec::new();
+
+        // FIXME: do we want to sign all uids?
+        // (right now, we only use this fn for keys that the CA makes, so
+        // that's ok)
 
         for uidb in user.userids() {
             for signer in &mut cert_keys {
@@ -344,7 +361,7 @@ impl Pgp {
             }
         }
 
-        let certified = user.clone().merge_packets(sigs)?;
+        let certified = user.merge_packets(sigs)?;
 
         Ok(certified)
     }
@@ -362,11 +379,15 @@ impl Pgp {
             for signer in &mut cert_keys {
                 let userid = uid.userid();
 
-                let uid_addr = userid.email_normalized()?.unwrap();
+                let uid_addr = userid
+                    .email_normalized()?
+                    .expect("email normalization failed");
 
                 // Sign this userid if email has been given for this import call
                 if emails.contains(&uid_addr.as_str()) {
                     // certify this userid
+                    // FIXME: possibly use "uid.certify(signer, &user, None,
+                    // None, None)?;" like above?
                     let cert = userid.certify(
                         signer,
                         &user_cert,
@@ -390,7 +411,7 @@ impl Pgp {
 
     /// get all valid, certification capable keys with secret key material
     fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair>> {
-        let keys = cert
+        let keys: ValidKeyIter<SecretParts> = cert
             .keys()
             .policy(None)
             .alive()
@@ -399,14 +420,7 @@ impl Pgp {
             .secret();
 
         Ok(keys
-            .filter_map(|ka| {
-                ka.key()
-                    .clone()
-                    .mark_parts_secret()
-                    .expect("mark_parts_secret failed")
-                    .into_keypair()
-                    .ok()
-            })
+            .filter_map(|ka| ka.key().clone().into_keypair().ok())
             .collect())
     }
 }
