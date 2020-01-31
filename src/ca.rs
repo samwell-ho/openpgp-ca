@@ -51,16 +51,14 @@ impl Ca {
     pub fn new(db_url: Option<&str>) -> Self {
         let db_url = if let Some(s) = db_url {
             Some(s.to_owned())
+        } else if let Ok(database) = env::var("OPENPGP_CA_DB") {
+            Some(database)
         } else {
-            if let Ok(database) = env::var("OPENPGP_CA_DB") {
-                Some(database)
-            } else {
-                // load config from .env
-                dotenv::dotenv().ok();
+            // load config from .env
+            dotenv::dotenv().ok();
 
-                // diesel naming convention for .env
-                Some(env::var("DATABASE_URL").unwrap())
-            }
+            // diesel naming convention for .env
+            Some(env::var("DATABASE_URL").unwrap())
         };
 
         let db = Db::new(db_url.as_deref());
