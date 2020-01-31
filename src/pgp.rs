@@ -379,7 +379,7 @@ impl Pgp {
                 }
 
                 // FIXME: complain about emails that have been specified but
-                // haven't been found in the userids
+                // haven't been found in the userids?
                 //            panic!("Email {} not found in the key", );
             }
         }
