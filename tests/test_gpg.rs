@@ -15,7 +15,7 @@ fn run_gpg() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
 
     // get Cert for CA
     let ca_cert = ca.get_ca_cert();
@@ -42,7 +42,7 @@ fn test_alice_authenticates_bob_centralized() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    let res = ca.ca_new("example.org");
+    let res = ca.ca_new("example.org", None);
     assert!(res.is_ok());
 
     // make CA users
@@ -120,7 +120,7 @@ fn test_alice_authenticates_bob_decentralized() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    let res = ca.ca_new("example.org");
+    let res = ca.ca_new("example.org", None);
     assert!(res.is_ok());
 
     let ca_key = ca.get_ca_pubkey_armored().unwrap();
@@ -220,7 +220,7 @@ fn test_bridge() {
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    assert!(ca1.ca_new("some.org").is_ok());
+    assert!(ca1.ca_new("some.org", None).is_ok());
 
     // make CA user
     assert!(ca1
@@ -230,7 +230,7 @@ fn test_bridge() {
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    assert!(ca2.ca_new("other.org").is_ok());
+    assert!(ca2.ca_new("other.org", None).is_ok());
 
     // make CA user
     assert!(ca2.usercert_new(Some(&"Bob"), &["bob@other.org"]).is_ok());

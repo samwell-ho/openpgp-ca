@@ -29,6 +29,7 @@ use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
 
 use failure::{self, ResultExt};
+
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 fn real_main() -> Result<()> {
@@ -55,8 +56,10 @@ fn real_main() -> Result<()> {
         ("ca", Some(m)) => match m.subcommand() {
             ("new", Some(m2)) => match m2.value_of("domain") {
                 Some(domain) => {
-                    ca.ca_new(&domain)?;
+                    let name = m2.value_of("name");
+                    ca.ca_new(&domain, name)?;
                 }
+
                 _ => unimplemented!("missing domain name"),
             },
             ("show", Some(_m2)) => {

@@ -29,7 +29,7 @@ fn test_ca() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
 
     // make CA user
     let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
@@ -72,7 +72,7 @@ fn test_update_usercert_key() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
 
     // import key as new user
     gnupg::create_user(&ctx, "alice@example.org");
@@ -160,7 +160,7 @@ fn test_update_user_cert() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
 
     // import key as new user
     let ctx_alice1 = make_context!();
@@ -225,7 +225,7 @@ fn test_ca_insert_duplicate_email() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
 
     // make CA user
     let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
@@ -258,7 +258,7 @@ fn test_ca_export_wkd() {
 
     let mut ca = ca::Ca::new(Some(&db));
 
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
     assert!(ca
         .usercert_new(Some(&"Alice"), &["alice@example.org"])
         .is_ok());
@@ -327,7 +327,7 @@ fn test_ca_export_wkd_sequoia() {
 
     let ca = ca::Ca::new(Some(&db));
 
-    assert!(ca.ca_new("sequoia-pgp.org").is_ok());
+    assert!(ca.ca_new("sequoia-pgp.org", None).is_ok());
 
     assert!(ca
         .usercert_import(&justus_key, None, None, &["justus@sequoia-pgp.org"])
@@ -357,7 +357,7 @@ fn test_ca_multiple_revocations() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
 
     // gpg: make key for Alice
     gnupg::create_user(&ctx, "Alice <alice@example.org>");
@@ -421,7 +421,7 @@ fn test_ca_signatures() {
     let db = format!("{}/ca.sqlite", home_path);
 
     let mut ca = ca::Ca::new(Some(&db));
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
 
     // create/import alice, CA signs alice's key
     gnupg::create_user(&ctx, "alice@example.org");
@@ -477,7 +477,7 @@ fn test_apply_revocation() {
     let db = format!("{}/ca.sqlite", home_path);
 
     let mut ca = ca::Ca::new(Some(&db));
-    assert!(ca.ca_new("example.org").is_ok());
+    assert!(ca.ca_new("example.org", None).is_ok());
 
     // make CA user
     let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);

@@ -72,7 +72,7 @@ impl Ca {
     // -------- CAs
 
     /// create a new Ca database entry (only one CA is allowed per database)
-    pub fn ca_new(&self, domainname: &str) -> Result<()> {
+    pub fn ca_new(&self, domainname: &str, name: Option<&str>) -> Result<()> {
         if self.db.get_ca()?.is_some() {
             return Err(failure::err_msg(
                 "ERROR: CA has already been created",
@@ -86,8 +86,12 @@ impl Ca {
             ));
         }
 
-        let (cert, _) =
-            Pgp::make_private_ca_cert(domainname, Some("OpenPGP CA"))?;
+        let name = match name {
+            Some(name) => Some(name),
+            _ => Some("OpenPGP CA"),
+        };
+
+        let (cert, _) = Pgp::make_private_ca_cert(domainname, name)?;
 
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
 
