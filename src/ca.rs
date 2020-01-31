@@ -222,8 +222,7 @@ impl Ca {
 
         let res = self.db.add_usercert(
             name,
-            pub_key,
-            &user.fingerprint().to_hex(),
+            (pub_key, &user.fingerprint().to_hex()),
             emails,
             &[revoc],
             Some(&tsigned_ca_armored),
@@ -347,8 +346,7 @@ impl Ca {
 
             self.db.add_usercert(
                 name.as_deref(),
-                pub_key,
-                &certified.fingerprint().to_hex(),
+                (pub_key, &certified.fingerprint().to_hex()),
                 &emails[..],
                 &revocs,
                 None,

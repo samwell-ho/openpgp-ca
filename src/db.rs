@@ -286,8 +286,7 @@ impl Db {
     pub fn add_usercert(
         &self,
         name: Option<&str>,
-        pub_cert: &str,
-        fingerprint: &str,
+        (pub_cert, fingerprint): (&str, &str),
         emails: &[&str],
         revocs: &[String],
         ca_cert_tsigned: Option<&str>,
