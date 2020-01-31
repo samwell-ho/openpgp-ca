@@ -393,7 +393,7 @@ impl Db {
         }
     }
 
-    pub fn list_usercerts(&self) -> Result<Vec<Usercert>> {
+    pub fn get_all_usercerts(&self) -> Result<Vec<Usercert>> {
         Ok(usercerts::table
             .load::<Usercert>(&self.conn)
             .context("Error loading usercerts")?)

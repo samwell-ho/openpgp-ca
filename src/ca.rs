@@ -356,6 +356,7 @@ impl Ca {
         Ok(())
     }
 
+    /// import a usercert that isn't an update for an existing usercert
     pub fn usercert_import(
         &self,
         key: &str,
@@ -366,29 +367,25 @@ impl Ca {
         self.usercert_import_update_or_create(key, revoc, name, emails, None)
     }
 
+    /// import a usercert that is an update for an existing usercert
     pub fn usercert_import_update(
         &self,
         key: &str,
         usercert: &models::Usercert,
     ) -> Result<()> {
         let emails = self.db.get_emails_by_usercert(usercert)?;
-        let emails: Vec<&str> =
-            emails.iter().map(|e| e.addr.as_str()).collect();
-
-        let name = match &usercert.name {
-            None => None,
-            Some(n) => Some(n.as_str()),
-        };
+        let emails: Vec<_> = emails.iter().map(|e| e.addr.as_str()).collect();
 
         self.usercert_import_update_or_create(
             key,
             None,
-            name,
+            usercert.name.as_deref(),
             &emails[..],
             Some(usercert.id),
         )
     }
 
+    /// which usercerts will be expired in 'days' days?
     pub fn usercert_expiry(
         &self,
         days: u64,
@@ -413,6 +410,7 @@ impl Ca {
         Ok(map)
     }
 
+    /// get a map 'usercert -> (sig_from_ca, tsig_on_ca)'
     pub fn usercert_signatures(
         &self,
     ) -> Result<HashMap<models::Usercert, (bool, bool)>> {
@@ -436,6 +434,16 @@ impl Ca {
 
         Ok(map)
     }
+
+    pub fn get_all_usercerts(&self) -> Result<Vec<models::Usercert>> {
+        self.db.get_all_usercerts()
+    }
+
+    pub fn get_usercerts(&self, email: &str) -> Result<Vec<models::Usercert>> {
+        self.db.get_usercerts(email)
+    }
+
+    // ---- revocations ----
 
     pub fn add_revocation(&self, revoc_file: &str) -> Result<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
@@ -463,14 +471,6 @@ impl Ca {
                 Ok(())
             }
         }
-    }
-
-    pub fn get_all_usercerts(&self) -> Result<Vec<models::Usercert>> {
-        self.db.list_usercerts()
-    }
-
-    pub fn get_usercerts(&self, email: &str) -> Result<Vec<models::Usercert>> {
-        self.db.get_usercerts(email)
     }
 
     pub fn get_revocations(
