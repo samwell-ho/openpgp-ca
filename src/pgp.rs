@@ -28,9 +28,9 @@ use openpgp::types::{HashAlgorithm, KeyFlags};
 use openpgp::types::{ReasonForRevocation, SignatureType};
 use openpgp::{Cert, Fingerprint, KeyHandle, Packet, PacketPile};
 
-use failure::{self, ResultExt};
 use std::time::SystemTime;
 
+use failure::{self, ResultExt};
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 pub struct Pgp {}

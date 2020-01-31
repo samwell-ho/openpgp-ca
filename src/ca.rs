@@ -15,26 +15,25 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
-use failure::{self, ResultExt};
-
+use std::collections::{HashMap, HashSet};
 use std::env;
+use std::path::Path;
 use std::time::Duration;
+use std::time::SystemTime;
 
-use publicsuffix::Domain;
+use publicsuffix;
+
+use sequoia_openpgp as openpgp;
 
 use openpgp::packet::Signature;
 use openpgp::parse::Parse;
 use openpgp::{Cert, Fingerprint, KeyID, Packet};
-use sequoia_openpgp as openpgp;
 
 use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
 
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
-use std::time::SystemTime;
-
+use failure::{self, ResultExt};
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 pub struct Ca {
@@ -81,7 +80,7 @@ impl Ca {
         }
 
         // domainname syntax check
-        if !Domain::has_valid_syntax(domainname) {
+        if !publicsuffix::Domain::has_valid_syntax(domainname) {
             return Err(failure::err_msg(
                 "Parameter is not a valid domainname",
             ));
@@ -563,7 +562,7 @@ impl Ca {
     // "other.org" => "<[^>]+[@.]other\\.org>$"
     fn domain_to_regex(domain: &str) -> Result<String> {
         // syntax check domain
-        if !Domain::has_valid_syntax(domain) {
+        if !publicsuffix::Domain::has_valid_syntax(domain) {
             return Err(failure::err_msg(
                 "Parameter is not a valid domainname",
             ));
