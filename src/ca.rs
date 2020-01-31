@@ -192,7 +192,8 @@ impl Ca {
 
     // -------- users
 
-    pub fn user_new(
+    /// create a new usercert in the database
+    pub fn usercert_new(
         &mut self,
         name: Option<&str>,
         emails: &[&str],
@@ -241,8 +242,8 @@ impl Ca {
         Ok(())
     }
 
-    // update existing or create independent new usercert,
-    // importing pub cert from file
+    /// update existing or create independent new usercert,
+    /// receives a pub cert from armored string
     fn usercert_import_update_or_create(
         &self,
         key: &str,

@@ -32,7 +32,7 @@ fn test_ca() {
     assert!(ca.ca_new("example.org").is_ok());
 
     // make CA user
-    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
+    let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
     let usercerts = ca.get_all_usercerts();
@@ -228,11 +228,11 @@ fn test_ca_insert_duplicate_email() {
     assert!(ca.ca_new("example.org").is_ok());
 
     // make CA user
-    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
+    let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
     // make another CA user with the same email address
-    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
+    let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
     let usercerts = ca.get_all_usercerts();
@@ -259,8 +259,10 @@ fn test_ca_export_wkd() {
     let mut ca = ca::Ca::new(Some(&db));
 
     assert!(ca.ca_new("example.org").is_ok());
-    assert!(ca.user_new(Some(&"Alice"), &["alice@example.org"]).is_ok());
-    assert!(ca.user_new(Some(&"Bob"), &["bob@example.org"]).is_ok());
+    assert!(ca
+        .usercert_new(Some(&"Alice"), &["alice@example.org"])
+        .is_ok());
+    assert!(ca.usercert_new(Some(&"Bob"), &["bob@example.org"]).is_ok());
 
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
@@ -442,7 +444,9 @@ fn test_ca_signatures() {
 
     // create carol, CA will sign carol's key.
     // also, CA key gets a tsig by carol
-    assert!(ca.user_new(Some(&"Carol"), &["carol@example.org"]).is_ok());
+    assert!(ca
+        .usercert_new(Some(&"Carol"), &["carol@example.org"])
+        .is_ok());
 
     let sigs = ca.usercert_signatures().unwrap();
     for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
@@ -476,7 +480,7 @@ fn test_apply_revocation() {
     assert!(ca.ca_new("example.org").is_ok());
 
     // make CA user
-    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
+    let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
     let usercerts = ca.get_all_usercerts();

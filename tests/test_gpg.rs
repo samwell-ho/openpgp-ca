@@ -46,10 +46,10 @@ fn test_alice_authenticates_bob_centralized() {
     assert!(res.is_ok());
 
     // make CA users
-    let res = ca.user_new(Some(&"Alice"), &["alice@example.org"]);
+    let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
     assert!(res.is_ok());
 
-    let res = ca.user_new(Some(&"Bob"), &["bob@example.org"]);
+    let res = ca.usercert_new(Some(&"Bob"), &["bob@example.org"]);
     assert!(res.is_ok());
 
     // ---- import keys from OpenPGP CA into GnuPG ----
@@ -223,7 +223,9 @@ fn test_bridge() {
     assert!(ca1.ca_new("some.org").is_ok());
 
     // make CA user
-    assert!(ca1.user_new(Some(&"Alice"), &["alice@some.org"]).is_ok());
+    assert!(ca1
+        .usercert_new(Some(&"Alice"), &["alice@some.org"])
+        .is_ok());
 
     // ---- populate second OpenPGP CA instance ----
 
@@ -231,10 +233,12 @@ fn test_bridge() {
     assert!(ca2.ca_new("other.org").is_ok());
 
     // make CA user
-    assert!(ca2.user_new(Some(&"Bob"), &["bob@other.org"]).is_ok());
+    assert!(ca2.usercert_new(Some(&"Bob"), &["bob@other.org"]).is_ok());
 
     // make CA user that is out of the domain scope for ca2
-    assert!(ca2.user_new(Some(&"Carol"), &["carol@third.org"]).is_ok());
+    assert!(ca2
+        .usercert_new(Some(&"Carol"), &["carol@third.org"])
+        .is_ok());
 
     // ---- setup bridges: scoped trust between one.org and two.org ---
 

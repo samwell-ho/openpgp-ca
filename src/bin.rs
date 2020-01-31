@@ -89,7 +89,7 @@ fn real_main() -> Result<()> {
                             //  .value_name("key-profile")
                             //  .help("Key Profile"))
 
-                            ca.user_new(name, &email_vec[..])?;
+                            ca.usercert_new(name, &email_vec[..])?;
                         }
                         _ => unimplemented!(),
                     }
