@@ -6,31 +6,6 @@ use openpgp_ca_lib::ca;
 pub mod gnupg;
 
 #[test]
-fn run_gpg() {
-    let ctx = make_context!();
-
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let ca = ca::Ca::new(Some(&db));
-
-    // make new CA key
-    assert!(ca.ca_new("example.org", None).is_ok());
-
-    // get Cert for CA
-    let ca_cert = ca.get_ca_cert();
-    assert!(ca_cert.is_ok());
-
-    // import CA key into GnuPG
-    let mut buf = Vec::new();
-    let cert = ca_cert.unwrap();
-    cert.as_tsk().serialize(&mut buf).unwrap();
-    gnupg::import(&ctx, &buf);
-
-    // FIXME - what to assert?
-}
-
-#[test]
 fn test_alice_authenticates_bob_centralized() {
     let ctx = make_context!();
 
