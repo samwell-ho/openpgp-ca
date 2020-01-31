@@ -31,34 +31,25 @@ use openpgp::{Cert, Fingerprint, KeyHandle, Packet, PacketPile};
 use std::time::SystemTime;
 
 use failure::{self, ResultExt};
+
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 pub struct Pgp {}
 
 impl Pgp {
-    /// Generate an encryption- and signing-capable key for a user.
-    fn make_user_cert(
-        emails: &[&str],
-        name: Option<&str>,
-    ) -> Result<(Cert, Signature)> {
-        let mut builder = cert::CertBuilder::new()
-            .add_storage_encryption_subkey()
-            .add_transport_encryption_subkey()
-            .add_signing_subkey();
-
-        for email in emails {
-            builder = builder.add_userid(Self::user_id(&email, name));
+    fn user_id(email: &str, name: Option<&str>) -> UserID {
+        match name {
+            Some(name) => UserID::from(name.to_owned() + " <" + email + ">"),
+            None => UserID::from("<".to_owned() + email + ">"),
         }
-
-        Ok(builder.generate()?)
     }
 
-    /// Generate a key for the CA.
-    fn make_ca_cert(
+    /// make a private CA key
+    pub fn make_ca_cert(
         domainname: &str,
         name: Option<&str>,
     ) -> Result<(Cert, Signature)> {
-        // FIXME: should not be encryption capable
+        // FIXME: should not be encryption capable (?)
         // FIXME: should not have subkeys
 
         // Generate a Cert, and create a keypair from the primary key.
@@ -95,27 +86,21 @@ impl Pgp {
         Ok((cert, sig))
     }
 
-    fn user_id(email: &str, name: Option<&str>) -> UserID {
-        match name {
-            Some(name) => UserID::from(name.to_owned() + " <" + email + ">"),
-            None => UserID::from("<".to_owned() + email + ">"),
-        }
-    }
-
-    /// make a private CA key
-    pub fn make_private_ca_cert(
-        domainname: &str,
-        name: Option<&str>,
-    ) -> Result<(Cert, Signature)> {
-        Pgp::make_ca_cert(domainname, name)
-    }
-
     /// make a user Cert with "emails" as UIDs (all UIDs get signed)
-    pub fn make_user(
+    pub fn make_user_cert(
         emails: &[&str],
         name: Option<&str>,
     ) -> Result<(Cert, Signature)> {
-        Pgp::make_user_cert(emails, name)
+        let mut builder = cert::CertBuilder::new()
+            .add_storage_encryption_subkey()
+            .add_transport_encryption_subkey()
+            .add_signing_subkey();
+
+        for email in emails {
+            builder = builder.add_userid(Self::user_id(&email, name));
+        }
+
+        Ok(builder.generate()?)
     }
 
     /// make a "public key" ascii-armored representation of a Cert

@@ -89,7 +89,7 @@ impl Ca {
             _ => Some("OpenPGP CA"),
         };
 
-        let (cert, _) = Pgp::make_private_ca_cert(domainname, name)?;
+        let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
 
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
 
@@ -204,7 +204,7 @@ impl Ca {
 
         // make user key (signed by CA)
         let (user, revoc) =
-            Pgp::make_user(emails, name).context("make_user failed")?;
+            Pgp::make_user_cert(emails, name).context("make_user failed")?;
 
         // sign user key with CA key
         let certified =

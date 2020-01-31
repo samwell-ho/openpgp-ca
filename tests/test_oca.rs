@@ -11,7 +11,7 @@ pub mod gnupg;
 #[test]
 fn test_pgp_wrapper() {
     let (cert, _) =
-        pgp::Pgp::make_user(&["foo@example.org"], Some("Foo")).unwrap();
+        pgp::Pgp::make_user_cert(&["foo@example.org"], Some("Foo")).unwrap();
 
     let armored = pgp::Pgp::priv_cert_to_armored(&cert);
 
