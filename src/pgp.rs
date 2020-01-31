@@ -26,12 +26,9 @@ use openpgp::parse::Parse;
 use openpgp::serialize::Serialize;
 use openpgp::types::{HashAlgorithm, KeyFlags};
 use openpgp::types::{ReasonForRevocation, SignatureType};
-use openpgp::Cert;
-use openpgp::Packet;
-use openpgp::{Fingerprint, KeyHandle};
+use openpgp::{Cert, Fingerprint, KeyHandle, Packet, PacketPile};
 
 use failure::{self, ResultExt};
-use sequoia_openpgp::PacketPile;
 use std::time::SystemTime;
 
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
@@ -188,7 +185,7 @@ impl Pgp {
         if let Some(filename) = revoc_file {
             // handle optional revocation cert
 
-            let pile = openpgp::PacketPile::from_file(filename)
+            let pile = PacketPile::from_file(filename)
                 .context("Failed to read revocation cert")?;
 
             assert_eq!(

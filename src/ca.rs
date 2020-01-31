@@ -24,8 +24,7 @@ use publicsuffix::Domain;
 
 use openpgp::packet::Signature;
 use openpgp::parse::Parse;
-use openpgp::Cert;
-use openpgp::Packet;
+use openpgp::{Cert, Fingerprint, KeyID, Packet};
 use sequoia_openpgp as openpgp;
 
 use crate::db::Db;
@@ -751,7 +750,6 @@ impl Ca {
         &self,
         usercert: &models::Usercert,
     ) -> Result<()> {
-        use openpgp::{Fingerprint, KeyID};
         use tokio_core::reactor::Core;
 
         let mut merge = Pgp::armored_to_cert(&usercert.pub_cert)?;
