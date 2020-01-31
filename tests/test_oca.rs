@@ -29,7 +29,9 @@ fn test_ca() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    assert!(ca.ca_new("example.org", None).is_ok());
+    assert!(ca
+        .ca_new("example.org", Some("Example Org OpenPGP CA Key"))
+        .is_ok());
 
     // make CA user
     let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
@@ -51,6 +53,15 @@ fn test_ca() {
     assert!(revocs.is_ok());
     let revocs = revocs.unwrap();
     assert_eq!(revocs.len(), 1);
+
+    // check that the custom name has ended up in the CA Cert
+    let ca_cert = ca.get_ca_cert().unwrap();
+    let uid = ca_cert.userids().find(|c| {
+        c.binding().userid().name().unwrap()
+            == Some("Example Org OpenPGP CA Key".to_owned())
+    });
+
+    assert!(uid.is_some());
 }
 
 #[test]
