@@ -123,7 +123,7 @@ fn test_alice_authenticates_bob_decentralized() {
     let res = ca.ca_new("example.org");
     assert!(res.is_ok());
 
-    let ca_key = ca.export_pubkey().unwrap();
+    let ca_key = ca.get_ca_pubkey_armored().unwrap();
 
     // ---- import CA key from OpenPGP CA into GnuPG instances ----
     gnupg::import(&ctx_alice, ca_key.as_bytes());
@@ -170,7 +170,7 @@ fn test_alice_authenticates_bob_decentralized() {
         .expect("import Bob to CA failed");
 
     // export bob, CA-key from CA
-    let ca_key = ca.export_pubkey().unwrap();
+    let ca_key = ca.get_ca_pubkey_armored().unwrap();
     let usercerts = ca.get_usercerts(&"bob@example.org").unwrap();
     let bob = usercerts.first().unwrap();
 
@@ -241,8 +241,8 @@ fn test_bridge() {
     let ca_some_file = format!("{}/ca1.pubkey", home_path);
     let ca_other_file = format!("{}/ca2.pubkey", home_path);
 
-    let pub_ca1 = ca1.export_pubkey().unwrap();
-    let pub_ca2 = ca2.export_pubkey().unwrap();
+    let pub_ca1 = ca1.get_ca_pubkey_armored().unwrap();
+    let pub_ca2 = ca2.get_ca_pubkey_armored().unwrap();
 
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");

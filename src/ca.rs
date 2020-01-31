@@ -42,6 +42,12 @@ pub struct Ca {
 }
 
 impl Ca {
+    /// instantiate a new Ca object
+    ///
+    /// the sqlite backend can be configured explicitly via
+    /// - the database parameter,
+    /// - the environment variable OPENPGP_CA_DB, or
+    /// - the .env DATABASE_URL
     pub fn new(database: Option<&str>) -> Self {
         let db = if let Some(database) = database {
             Some(database.to_string())
@@ -64,15 +70,9 @@ impl Ca {
         Ca { db }
     }
 
-    pub fn init(&self) {
-        println!("Initializing!");
-
-        // FIXME what should this do?
-        unimplemented!();
-    }
-
     // -------- CAs
 
+    /// create a new Ca database entry (only one CA is allowed per database)
     pub fn ca_new(&self, domainname: &str) -> Result<()> {
         if self.db.get_ca()?.is_some() {
             return Err(failure::err_msg(
@@ -97,18 +97,21 @@ impl Ca {
         Ok(())
     }
 
+    /// get the Ca and Cacert objects from the database
     pub fn get_ca(&self) -> Result<Option<(models::Ca, models::Cacert)>> {
         self.db.get_ca()
     }
 
+    /// get the Cert object for the Ca from the database
     pub fn get_ca_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
-            None => panic!("get_domain_ca() failed"),
+            _ => panic!("get_ca_cert() failed"),
         }
     }
 
-    pub fn show_cas(&self) -> Result<()> {
+    /// print information about the Ca
+    pub fn show_ca(&self) -> Result<()> {
         let (ca, ca_cert) = self
             .db
             .get_ca()
@@ -118,21 +121,16 @@ impl Ca {
         Ok(())
     }
 
-    pub fn export_pubkey(&self) -> Result<String> {
-        let (_, ca_cert) = self
-            .db
-            .get_ca()
-            .context("failed to load CA from database")?
-            .unwrap();
-
-        let cert = Pgp::armored_to_cert(&ca_cert.cert)?;
+    /// returns the pubkey of the Ca as armored String
+    pub fn get_ca_pubkey_armored(&self) -> Result<String> {
+        let cert = self.get_ca_cert()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
             .context("failed to transform CA key to armored pubkey")?;
 
         Ok(ca_pub)
     }
 
-    /// get all tsig(s) in this Cert
+    /// get all tsig(s) on user_ids in this Cert
     fn get_tsigs(c: &Cert) -> Vec<&Signature> {
         c.userids()
             .flat_map(|b| b.binding().certifications())
@@ -140,8 +138,7 @@ impl Ca {
             .collect()
     }
 
-    /// get all sig(s) in this Cert (including subkeys)
-    /// FIXME: is this what we want?
+    /// get all sig(s) in this Cert (from subkeys and user_ids)
     fn get_sigs(c: &Cert) -> Vec<&Signature> {
         c.userids()
             .flat_map(|b| b.binding().certifications())
@@ -149,8 +146,8 @@ impl Ca {
             .collect()
     }
 
-    /// import a key from a file, find any tsigs on it, then merge those
-    /// into "our" copy of the CA key
+    /// receive an armored key, find any tsigs on it,
+    /// then merge those into "our" copy of the CA key
     pub fn import_tsig_for_ca(&self, key: &str) -> Result<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
@@ -706,10 +703,9 @@ impl Ca {
     /// export all user keys + CA key into a wkd directory structure
     /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
     pub fn export_wkd(&self, domain: &str, path: &Path) -> Result<()> {
-        extern crate sequoia_net;
         use sequoia_net::wkd;
 
-        let ca_cert = Pgp::armored_to_cert(&self.export_pubkey()?)?;
+        let ca_cert = self.get_ca_cert()?;
         wkd::insert(&path, domain, None, &ca_cert)?;
 
         for uc in self.get_all_usercerts()? {
@@ -720,6 +716,8 @@ impl Ca {
         Ok(())
     }
 
+    /// pull a key from WKD and merge any updates into our local version of
+    /// this key
     pub fn update_from_wkd(&self, usercert: &models::Usercert) -> Result<()> {
         use sequoia_net::wkd;
         use tokio_core::reactor::Core;
@@ -747,6 +745,8 @@ impl Ca {
         Ok(())
     }
 
+    /// pull a key from hagrid and merge any updates into our local version of
+    /// this key
     pub fn update_from_hagrid(
         &self,
         usercert: &models::Usercert,

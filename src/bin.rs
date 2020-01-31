@@ -15,21 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::path::Path;
 use std::process::exit;
 
 use clap::crate_version;
 use clap::load_yaml;
 use clap::App;
 
-use failure::{self, ResultExt};
-
 use chrono::offset::Utc;
 use chrono::DateTime;
 
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
-use std::path::Path;
 
+use failure::{self, ResultExt};
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 fn real_main() -> Result<()> {
@@ -44,7 +43,7 @@ fn real_main() -> Result<()> {
 
     match matches.subcommand() {
         ("init", Some(_m)) => {
-            ca.init();
+            unimplemented!("what should this do?");
         }
         ("wkd-export", Some(m)) => match m.value_of("path") {
             Some(path) => {
@@ -61,10 +60,10 @@ fn real_main() -> Result<()> {
                 _ => unimplemented!("missing domain name"),
             },
             ("show", Some(_m2)) => {
-                ca.show_cas()?;
+                ca.show_ca()?;
             }
             ("export", Some(_m2)) => {
-                let ca_key = ca.export_pubkey()?;
+                let ca_key = ca.get_ca_pubkey_armored()?;
                 println!("{}", ca_key);
             }
             ("import-tsig", Some(m2)) => {
