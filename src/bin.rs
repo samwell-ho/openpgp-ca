@@ -69,7 +69,8 @@ fn real_main() -> Result<()> {
             }
             ("import-tsig", Some(m2)) => {
                 let key_file = m2.value_of("key-file").unwrap();
-                ca.import_tsig(key_file)?;
+                let key = std::fs::read_to_string(key_file)?;
+                ca.import_tsig_for_ca(&key)?;
             }
 
             _ => unimplemented!(),

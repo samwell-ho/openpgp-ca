@@ -111,10 +111,6 @@ fn test_alice_authenticates_bob_decentralized() {
     let ctx_alice = make_context!();
     let ctx_bob = make_context!();
 
-    let home_path_alice =
-        String::from(ctx_alice.get_homedir().to_str().unwrap());
-    let home_path_bob = String::from(ctx_bob.get_homedir().to_str().unwrap());
-
     let ctx_ca = make_context!();
 
     let home_path_ca = String::from(ctx_ca.get_homedir().to_str().unwrap());
@@ -152,16 +148,9 @@ fn test_alice_authenticates_bob_decentralized() {
     let alice_ca_key = gnupg::export(&ctx_alice, &"openpgp-ca@example.org");
     let bob_ca_key = gnupg::export(&ctx_bob, &"openpgp-ca@example.org");
 
-    let alice_ca_file = format!("{}/ca.key.alice", home_path_alice);
-    let bob_ca_file = format!("{}/ca.key.bob", home_path_bob);
-
-    std::fs::write(&alice_ca_file, alice_ca_key)
-        .expect("Unable to write file");
-    std::fs::write(&bob_ca_file, bob_ca_key).expect("Unable to write file");
-
-    ca.import_tsig(&alice_ca_file)
+    ca.import_tsig_for_ca(&alice_ca_key)
         .expect("import CA tsig from Alice failed");
-    ca.import_tsig(&bob_ca_file)
+    ca.import_tsig_for_ca(&bob_ca_key)
         .expect("import CA tsig from Bob failed");
 
     // get public keys for alice and bob from their gnupg contexts

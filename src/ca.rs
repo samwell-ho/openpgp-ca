@@ -34,6 +34,7 @@ use crate::models;
 use crate::pgp::Pgp;
 
 use failure::{self, ResultExt};
+
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 pub struct Ca {
@@ -148,23 +149,24 @@ impl Ca {
             .collect()
     }
 
-    pub fn import_tsig(&self, key_file: &str) -> Result<()> {
+    /// import a key from a file, find any tsigs on it, then merge those
+    /// into "our" copy of the CA key
+    pub fn import_tsig_for_ca(&self, key: &str) -> Result<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
             let ca_cert = self.get_ca_cert().unwrap();
 
-            let ca_cert_imported =
-                Cert::from_file(key_file).context("Failed to read key")?;
+            let cert_import = Pgp::armored_to_cert(key)?;
 
             // make sure the keys have the same Fingerprint
-            if ca_cert.fingerprint() != ca_cert_imported.fingerprint() {
+            if ca_cert.fingerprint() != cert_import.fingerprint() {
                 return Err(failure::err_msg(
                     "The imported cert has an unexpected Fingerprint",
                 ));
             }
 
             // get the tsig(s) from import
-            let tsigs = Self::get_tsigs(&ca_cert_imported);
+            let tsigs = Self::get_tsigs(&cert_import);
 
             // add tsig(s) to our "own" version of the CA key
             let mut packets: Vec<Packet> = Vec::new();
