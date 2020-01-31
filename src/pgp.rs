@@ -113,16 +113,6 @@ impl Pgp {
         Ok(String::from_utf8(v)?)
     }
 
-    pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
-        let primary = cert.primary_key().policy(None)?;
-        if let Some(duration) = primary.key_expiration_time() {
-            let creation = primary.creation_time();
-            Ok(creation.checked_add(duration))
-        } else {
-            Ok(None)
-        }
-    }
-
     /// make a "private key" ascii-armored representation of a Cert
     pub fn priv_cert_to_armored(cert: &Cert) -> Result<String> {
         let mut buffer = std::io::Cursor::new(vec![]);
@@ -160,6 +150,35 @@ impl Pgp {
             Ok(s.to_owned())
         } else {
             Err(failure::err_msg("Couldn't convert to Signature"))
+        }
+    }
+
+    /// make an ascii-armored representation of a Signature
+    pub fn sig_to_armored(sig: &Signature) -> Result<String> {
+        // maybe use:
+        // https://docs.sequoia-pgp.org/sequoia_openpgp/serialize/trait.Serialize.html#method.export
+
+        let mut buf = std::io::Cursor::new(vec![]);
+        {
+            let rev = Packet::Signature(sig.clone());
+
+            let mut writer =
+                armor::Writer::new(&mut buf, armor::Kind::Signature, &[][..])
+                    .unwrap();
+            rev.serialize(&mut writer)?;
+        }
+
+        Ok(String::from_utf8(buf.get_ref().to_vec())?)
+    }
+
+    /// get expiration of cert as SystemTime
+    pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
+        let primary = cert.primary_key().policy(None)?;
+        if let Some(duration) = primary.key_expiration_time() {
+            let creation = primary.creation_time();
+            Ok(creation.checked_add(duration))
+        } else {
+            Ok(None)
         }
     }
 
@@ -208,24 +227,6 @@ impl Pgp {
             "expected exactly one Fingerprint in revocation cert"
         );
         sig_fingerprints[0].clone()
-    }
-
-    /// make an ascii-armored representation of a Signature
-    pub fn sig_to_armored(sig: &Signature) -> Result<String> {
-        // maybe use:
-        // https://docs.sequoia-pgp.org/sequoia_openpgp/serialize/trait.Serialize.html#method.export
-
-        let mut buf = std::io::Cursor::new(vec![]);
-        {
-            let rev = Packet::Signature(sig.clone());
-
-            let mut writer =
-                armor::Writer::new(&mut buf, armor::Kind::Signature, &[][..])
-                    .unwrap();
-            rev.serialize(&mut writer)?;
-        }
-
-        Ok(String::from_utf8(buf.get_ref().to_vec())?)
     }
 
     /// user tsigns CA key
