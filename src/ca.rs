@@ -48,12 +48,11 @@ impl Ca {
     /// - the database parameter,
     /// - the environment variable OPENPGP_CA_DB, or
     /// - the .env DATABASE_URL
-    pub fn new(database: Option<&str>) -> Self {
-        let db = if let Some(database) = database {
-            Some(database.to_string())
+    pub fn new(db_url: Option<&str>) -> Self {
+        let db_url = if let Some(s) = db_url {
+            Some(s.to_owned())
         } else {
-            let database = env::var("OPENPGP_CA_DB");
-            if let Ok(database) = database {
+            if let Ok(database) = env::var("OPENPGP_CA_DB") {
                 Some(database)
             } else {
                 // load config from .env
@@ -64,7 +63,7 @@ impl Ca {
             }
         };
 
-        let db = Db::new(db);
+        let db = Db::new(db_url.as_deref());
         db.migrations();
 
         Ca { db }

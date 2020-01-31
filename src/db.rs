@@ -27,15 +27,15 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 // FIXME: or keep a Connection as lazy_static? or just make new Connections?!
 fn get_conn(
-    database: Option<String>,
+    db_url: Option<&str>,
 ) -> Result<PooledConnection<ConnectionManager<SqliteConnection>>> {
     // bulk insert doesn't currently work with sqlite and r2d2:
     // https://github.com/diesel-rs/diesel/issues/1822
 
     // setup DB
-    let database_url = database.expect("no database has been set");
+    let db_url = db_url.expect("no database has been set");
 
-    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+    let manager = ConnectionManager::<SqliteConnection>::new(db_url);
     let pool = Pool::builder().build(manager).unwrap();
 
     // --
@@ -59,8 +59,8 @@ pub struct Db {
 }
 
 impl Db {
-    pub fn new(database: Option<String>) -> Self {
-        match get_conn(database) {
+    pub fn new(db_url: Option<&str>) -> Self {
+        match get_conn(db_url) {
             Ok(conn) => Db { conn },
             _ => panic!("couldn't get database connection"),
         }
