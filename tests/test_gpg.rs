@@ -231,26 +231,21 @@ fn test_bridge() {
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    let res = ca1.ca_new("some.org");
-    assert!(res.is_ok());
+    assert!(ca1.ca_new("some.org").is_ok());
 
     // make CA user
-    let res = ca1.user_new(Some(&"Alice"), &["alice@some.org"]);
-    assert!(res.is_ok());
+    assert!(ca1.user_new(Some(&"Alice"), &["alice@some.org"]).is_ok());
 
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    let res = ca2.ca_new("other.org");
-    assert!(res.is_ok());
+    assert!(ca2.ca_new("other.org").is_ok());
 
     // make CA user
-    let res = ca2.user_new(Some(&"Bob"), &["bob@other.org"]);
-    assert!(res.is_ok());
+    assert!(ca2.user_new(Some(&"Bob"), &["bob@other.org"]).is_ok());
 
     // make CA user that is out of the domain scope for ca2
-    let res = ca2.user_new(Some(&"Carol"), &["carol@third.org"]);
-    assert!(res.is_ok());
+    assert!(ca2.user_new(Some(&"Carol"), &["carol@third.org"]).is_ok());
 
     // ---- setup bridges: scoped trust between one.org and two.org ---
 
@@ -263,10 +258,8 @@ fn test_bridge() {
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    let res = ca1.bridge_new(&ca_other_file, None, None);
-    assert!(res.is_ok());
-    let res = ca2.bridge_new(&ca_some_file, None, None);
-    assert!(res.is_ok());
+    assert!(ca1.bridge_new(&ca_other_file, None, None).is_ok());
+    assert!(ca2.bridge_new(&ca_some_file, None, None).is_ok());
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
@@ -316,9 +309,7 @@ fn test_bridge() {
     }
 
     // ---- set "ultimate" ownertrust for alice ----
-    let res = gnupg::edit_trust(&ctx, "alice", 5);
-
-    assert!(res.is_ok());
+    assert!(gnupg::edit_trust(&ctx, "alice", 5).is_ok());
 
     // ---- read calculated "trust" per uid from GnuPG ----
     let gpg_trust = gnupg::list_keys(&ctx).unwrap();
