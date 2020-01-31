@@ -376,8 +376,9 @@ Export keys into a WKD structure:
 
 `openpgp-ca wkd-export /tmp/wkd/`
 
-Using/testing WKD as a client (the WKD data needs to be on a webserver for
-the relevant domain, with https set up):
+Using/testing WKD as a client (to use WKD, the export needs to be on the
+webserver for the relevant domain, in the correct directory, with https set
+up):
 
 `gpg --auto-key-locate clear,nodefault,wkd --locate-key openpgp-ca@example.org`
 
