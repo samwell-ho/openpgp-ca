@@ -192,7 +192,7 @@ impl Ca {
         })
     }
 
-    // -------- users
+    // -------- usercertss
 
     /// create a new usercert in the database
     pub fn usercert_new(
@@ -435,6 +435,33 @@ impl Ca {
         Ok(map)
     }
 
+    /// check if this usercert has been signed by the CA
+    pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Result<bool> {
+        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+        let sigs = Self::get_sigs(&user_cert);
+
+        let ca = self.get_ca_cert()?;
+
+        Ok(sigs
+            .iter()
+            .any(|&s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
+    }
+
+    /// check if this usercert has tsigned the CA
+    pub fn check_ca_has_tsig(
+        &self,
+        usercert: &models::Usercert,
+    ) -> Result<bool> {
+        let ca = self.get_ca_cert()?;
+        let tsigs = Self::get_tsigs(&ca);
+
+        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+
+        Ok(tsigs.iter().any(|&t| {
+            t.issuer_fingerprint().unwrap() == &user_cert.fingerprint()
+        }))
+    }
+
     pub fn get_all_usercerts(&self) -> Result<Vec<models::Usercert>> {
         self.db.get_all_usercerts()
     }
@@ -443,7 +470,7 @@ impl Ca {
         self.db.get_usercerts(email)
     }
 
-    // ---- revocations ----
+    // -------- revocations
 
     pub fn add_revocation(&self, revoc_file: &str) -> Result<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
@@ -505,13 +532,9 @@ impl Ca {
                 let mut revoc = revoc.clone();
                 revoc.published = true;
 
-                println!("cert {:?}", usercert);
-
                 self.db
                     .update_usercert(&usercert)
                     .context("Couldn't update Usercert")?;
-
-                println!("y");
 
                 self.db
                     .update_revocation(&revoc)
@@ -526,36 +549,13 @@ impl Ca {
         })
     }
 
+    // -------- emails
+
     pub fn get_emails(
         &self,
         usercert: &models::Usercert,
     ) -> Result<Vec<models::Email>> {
         self.db.get_emails_by_usercert(usercert)
-    }
-
-    pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Result<bool> {
-        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
-        let sigs = Self::get_sigs(&user_cert);
-
-        let ca = self.get_ca_cert()?;
-
-        Ok(sigs
-            .iter()
-            .any(|&s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
-    }
-
-    pub fn check_ca_has_tsig(
-        &self,
-        usercert: &models::Usercert,
-    ) -> Result<bool> {
-        let ca = self.get_ca_cert()?;
-        let tsigs = Self::get_tsigs(&ca);
-
-        let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
-
-        Ok(tsigs.iter().any(|&t| {
-            t.issuer_fingerprint().unwrap() == &user_cert.fingerprint()
-        }))
     }
 
     // -------- bridges
@@ -717,6 +717,8 @@ impl Ca {
 
         Ok(())
     }
+
+    // -------- update keys from public key sources
 
     /// pull a key from WKD and merge any updates into our local version of
     /// this key
