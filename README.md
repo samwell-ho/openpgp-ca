@@ -376,6 +376,14 @@ Export keys into a WKD structure:
 
 `openpgp-ca wkd-export /tmp/wkd/`
 
+Using/testing WKD:
+
+`gpg --auto-key-locate clear,nodefault,wkd --locate-key openpgp-ca@example.org`
+
+or
+
+`sq wkd get openpgp-ca@example.org`
+
 
 ## Some usage examples using cargo to run openpgp-ca:
 
