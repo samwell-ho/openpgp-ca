@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::SystemTime;
 use tokio_core::reactor::Core;
 
-mod gnupg;
+pub mod gnupg;
 
 #[test]
 fn test_pgp_wrapper() {
@@ -16,7 +16,7 @@ fn test_pgp_wrapper() {
     let armored = pgp::Pgp::priv_cert_to_armored(&cert);
 
     assert!(armored.is_ok());
-    assert!(armored.unwrap().len() > 0);
+    assert!(!armored.unwrap().is_empty());
 }
 
 #[test]
@@ -56,8 +56,7 @@ fn test_ca() {
 #[test]
 fn test_update_usercert_key() {
     let now = SystemTime::now();
-    let in_one_year =
-        now.checked_add(Duration::from_secs(3600 * 24 * 365 * 1));
+    let in_one_year = now.checked_add(Duration::from_secs(3600 * 24 * 365));
     let in_three_years =
         now.checked_add(Duration::from_secs(3600 * 24 * 365 * 3));
     let in_six_years =
@@ -83,7 +82,7 @@ fn test_update_usercert_key() {
         &alice1_key,
         None,
         Some("Alice"),
-        &vec!["alice@example.org"],
+        &["alice@example.org"],
     )
     .expect("import Alice 1 to CA failed");
 
@@ -172,7 +171,7 @@ fn test_update_user_cert() {
         &alice1_key,
         None,
         Some("Alice"),
-        &vec!["alice@example.org"],
+        &["alice@example.org"],
     )
     .expect("import Alice 1 to CA failed");
 
@@ -371,7 +370,7 @@ fn test_ca_multiple_revocations() {
         &ctx,
         "alice@example.org",
         &revoc_file1,
-        1
+        1,
     )
     .is_ok());
 
@@ -380,7 +379,7 @@ fn test_ca_multiple_revocations() {
         &ctx,
         "alice@example.org",
         &revoc_file3,
-        3
+        3,
     )
     .is_ok());
 
@@ -430,7 +429,7 @@ fn test_ca_signatures() {
         &alice_key,
         None,
         Some("Alice"),
-        &vec!["alice@example.org"],
+        &["alice@example.org"],
     )
     .expect("import Alice 1 to CA failed");
 
@@ -493,7 +492,7 @@ fn test_apply_revocation() {
     let rev = rev.unwrap();
     assert_eq!(rev.len(), 1);
 
-    ca.apply_revocation(rev[0].clone());
+    let _ = ca.apply_revocation(rev[0].clone());
 
     let rev = ca.get_revocations(alice);
     assert!(rev.is_ok());

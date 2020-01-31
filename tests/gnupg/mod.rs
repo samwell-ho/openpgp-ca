@@ -87,8 +87,8 @@ impl Context {
     /// test-run.
     pub fn leak_tempdir(&mut self) -> Option<PathBuf> {
         if self.ephemeral.is_some() {
-            self.stop_all();
-            self.remove_socket_dir();
+            let _ = self.stop_all();
+            let _ = self.remove_socket_dir();
         }
         self.ephemeral.take().map(tempfile::TempDir::into_path)
     }
@@ -169,7 +169,7 @@ impl Context {
         if output.status.success() {
             let mut result = Vec::new();
             for line in output.stdout.split(nl) {
-                if line.len() == 0 {
+                if line.is_empty() {
                     // EOF.
                     break;
                 }
@@ -349,7 +349,7 @@ pub fn list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
     let uids = res
         .iter()
         .filter(|&line| line.get(0) == Some("uid"))
-        .map(|r| r.clone())
+        .cloned()
         .collect::<Vec<_>>();
 
     // map: uid -> trust

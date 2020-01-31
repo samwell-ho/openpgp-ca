@@ -3,7 +3,7 @@ use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca;
 
-mod gnupg;
+pub mod gnupg;
 
 #[test]
 fn run_gpg() {
@@ -28,7 +28,6 @@ fn run_gpg() {
     gnupg::import(&ctx, &buf);
 
     // FIXME - what to assert?
-    assert!(true);
 }
 
 #[test]
@@ -139,7 +138,7 @@ fn test_alice_authenticates_bob_decentralized() {
     assert!(ca_cert.is_ok());
     let ca_cert = ca_cert.unwrap();
 
-    let ca_keyid = ca_cert.clone().keyid().to_hex();
+    let ca_keyid = ca_cert.keyid().to_hex();
 
     // create users in their respective GnuPG contexts
     gnupg::create_user(&ctx_alice, "Alice <alice@example.org>");
@@ -174,11 +173,11 @@ fn test_alice_authenticates_bob_decentralized() {
         &alice_key,
         None,
         Some("Alice"),
-        &vec!["alice@example.org"],
+        &["alice@example.org"],
     )
     .expect("import Alice to CA failed");
 
-    ca.usercert_import(&bob_key, None, Some("Bob"), &vec!["bob@example.org"])
+    ca.usercert_import(&bob_key, None, Some("Bob"), &["bob@example.org"])
         .expect("import Bob to CA failed");
 
     // export bob, CA-key from CA
