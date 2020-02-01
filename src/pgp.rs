@@ -271,8 +271,12 @@ impl Pgp {
         // FIXME: do we want to support a tsig without any scope regex?
         // -> or force users to explicitly set a catchall regex, then.
 
-        // there should be exactly one userid!
-        // FIXME: assert 1
+        // there should be exactly one userid
+        assert_eq!(
+            remote_ca_cert.userids().len(),
+            1,
+            "expect CA cert to have exactly one user_id"
+        );
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
@@ -307,7 +311,11 @@ impl Pgp {
         ca_cert: &Cert,
     ) -> Fallible<(Signature, Cert)> {
         // there should be exactly one userid!
-        // FIXME: assert 1
+        assert_eq!(
+            remote_ca_cert.userids().len(),
+            1,
+            "expect CA cert to have exactly one user_id"
+        );
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
         // set_trust_signature, set_regular_expression(s), expiration
@@ -336,7 +344,7 @@ impl Pgp {
         Ok((revocation_sig, revoked))
     }
 
-    /// sign all userids of Cert with CA Cert
+    /// CA signs all userids of Cert
     pub fn sign_user(ca_cert: &Cert, user: Cert) -> Fallible<Cert> {
         // sign Cert with CA key
 
@@ -346,8 +354,8 @@ impl Pgp {
         let mut sigs = Vec::new();
 
         // FIXME: do we want to sign all uids?
-        // (right now, we only use this fn for keys that the CA makes, so
-        // that's ok)
+        // (right now, this fn is only called for keys that the CA makes, so
+        // that probably makes sense?)
 
         for uidb in user.userids() {
             for signer in &mut cert_keys {
@@ -384,17 +392,10 @@ impl Pgp {
                 // Sign this userid if email has been given for this import call
                 if emails.contains(&uid_addr.as_str()) {
                     // certify this userid
-                    // FIXME: possibly use "uid.certify(signer, &user, None,
-                    // None, None)?;" like above?
-                    let cert = userid.certify(
-                        signer,
-                        &user_cert,
-                        SignatureType::PositiveCertification,
-                        None,
-                        None,
-                    )?;
+                    let sig = userid
+                        .certify(signer, &user_cert, None, None, None)?;
 
-                    packets.push(cert.into());
+                    packets.push(sig.into());
                 }
 
                 // FIXME: complain about emails that have been specified but
