@@ -35,8 +35,6 @@ use std::time::SystemTime;
 
 use failure::{self, Fallible, ResultExt};
 
-pub type Result<T> = ::std::result::Result<T, failure::Error>;
-
 pub struct Pgp {}
 
 impl Pgp {
@@ -51,7 +49,7 @@ impl Pgp {
     pub fn make_ca_cert(
         domainname: &str,
         name: Option<&str>,
-    ) -> Result<(Cert, Signature)> {
+    ) -> Fallible<(Cert, Signature)> {
         // FIXME: should not be encryption capable (?)
         // FIXME: should not have subkeys
 
@@ -100,7 +98,7 @@ impl Pgp {
     pub fn make_user_cert(
         emails: &[&str],
         name: Option<&str>,
-    ) -> Result<(Cert, Signature)> {
+    ) -> Fallible<(Cert, Signature)> {
         let mut builder = cert::CertBuilder::new()
             .add_subkey(
                 KeyFlags::default()
@@ -118,7 +116,7 @@ impl Pgp {
     }
 
     /// make a "public key" ascii-armored representation of a Cert
-    pub fn cert_to_armored(cert: &Cert) -> Result<String> {
+    pub fn cert_to_armored(cert: &Cert) -> Fallible<String> {
         // FIXME: currently sequoia bug, but use this later:
         //    let v = cert.armored().to_vec().context("Cert serialize failed")?;
 
@@ -129,7 +127,7 @@ impl Pgp {
     }
 
     /// make a "private key" ascii-armored representation of a Cert
-    pub fn priv_cert_to_armored(cert: &Cert) -> Result<String> {
+    pub fn priv_cert_to_armored(cert: &Cert) -> Fallible<String> {
         let mut buffer = vec![];
         {
             let headers = cert.armor_headers();
@@ -160,7 +158,7 @@ impl Pgp {
     }
 
     /// make a Signature from an ascii armored signature
-    pub fn armored_to_signature(armored: &str) -> Result<Signature> {
+    pub fn armored_to_signature(armored: &str) -> Fallible<Signature> {
         let p = openpgp::Packet::from_bytes(armored)
             .context("Input could not be parsed")?;
 
@@ -172,7 +170,7 @@ impl Pgp {
     }
 
     /// make an ascii-armored representation of a Signature
-    pub fn sig_to_armored(sig: &Signature) -> Result<String> {
+    pub fn sig_to_armored(sig: &Signature) -> Fallible<String> {
         let mut buf = vec![];
         {
             let rev = Packet::Signature(sig.clone());
@@ -187,7 +185,7 @@ impl Pgp {
     }
 
     /// get expiration of cert as SystemTime
-    pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
+    pub fn get_expiry(cert: &Cert) -> Fallible<Option<SystemTime>> {
         let primary = cert.primary_key().policy(None)?;
         if let Some(duration) = primary.key_expiration_time() {
             let creation = primary.creation_time();
@@ -200,7 +198,7 @@ impl Pgp {
     /// Load Revocation Cert from file
     pub fn load_revocation_cert(
         revoc_file: Option<&str>,
-    ) -> Result<Signature> {
+    ) -> Fallible<Signature> {
         if let Some(filename) = revoc_file {
             let p = openpgp::Packet::from_file(filename)
                 .context("Input could not be parsed")?;
@@ -240,7 +238,7 @@ impl Pgp {
     }
 
     /// user tsigns CA key
-    pub fn tsign_ca(ca_cert: Cert, user: &Cert) -> Result<Cert> {
+    pub fn tsign_ca(ca_cert: Cert, user: &Cert) -> Fallible<Cert> {
         let mut cert_keys = Self::get_cert_keys(&user)
             .context("filtered for unencrypted secret keys above")?;
 
@@ -269,7 +267,7 @@ impl Pgp {
         ca_cert: Cert,
         remote_ca_cert: Cert,
         scope_regexes: Vec<String>,
-    ) -> Result<Cert> {
+    ) -> Fallible<Cert> {
         // FIXME: do we want to support a tsig without any scope regex?
         // -> or force users to explicitly set a catchall regex, then.
 
@@ -307,7 +305,7 @@ impl Pgp {
     pub fn bridge_revoke(
         remote_ca_cert: &Cert,
         ca_cert: &Cert,
-    ) -> Result<(Signature, Cert)> {
+    ) -> Fallible<(Signature, Cert)> {
         // there should be exactly one userid!
         // FIXME: assert 1
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
@@ -339,7 +337,7 @@ impl Pgp {
     }
 
     /// sign all userids of Cert with CA Cert
-    pub fn sign_user(ca_cert: &Cert, user: Cert) -> Result<Cert> {
+    pub fn sign_user(ca_cert: &Cert, user: Cert) -> Fallible<Cert> {
         // sign Cert with CA key
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)
@@ -370,7 +368,7 @@ impl Pgp {
         ca_cert: &Cert,
         user_cert: &Cert,
         emails: &[&str],
-    ) -> Result<Cert> {
+    ) -> Fallible<Cert> {
         let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
 
         let mut packets: Vec<Packet> = Vec::new();
@@ -410,7 +408,7 @@ impl Pgp {
     }
 
     /// get all valid, certification capable keys with secret key material
-    fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair>> {
+    fn get_cert_keys(cert: &Cert) -> Fallible<Vec<KeyPair>> {
         let keys: ValidKeyIter<SecretParts> = cert
             .keys()
             .policy(None)

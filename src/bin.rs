@@ -28,11 +28,9 @@ use chrono::DateTime;
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
 
-use failure::{self, ResultExt};
+use failure::{self, Fallible, ResultExt};
 
-pub type Result<T> = ::std::result::Result<T, failure::Error>;
-
-fn real_main() -> Result<()> {
+fn real_main() -> Fallible<()> {
     let yaml = load_yaml!("cli.yml");
     let app = App::from_yaml(yaml).version(crate_version!());
 
@@ -208,7 +206,7 @@ fn real_main() -> Result<()> {
     Ok(())
 }
 
-fn show_revocations(ca: &ca::Ca, email: &str) -> Result<()> {
+fn show_revocations(ca: &ca::Ca, email: &str) -> Fallible<()> {
     let usercerts = ca.get_usercerts(email)?;
     if usercerts.is_empty() {
         println!("User not found");
@@ -229,7 +227,7 @@ fn show_revocations(ca: &ca::Ca, email: &str) -> Result<()> {
     Ok(())
 }
 
-fn check_sigs(ca: &ca::Ca) -> Result<()> {
+fn check_sigs(ca: &ca::Ca) -> Fallible<()> {
     let mut count_ok = 0;
 
     let sigs_status = ca.usercert_signatures()?;
@@ -267,7 +265,7 @@ fn check_sigs(ca: &ca::Ca) -> Result<()> {
     Ok(())
 }
 
-fn check_expiry(ca: &ca::Ca, exp_days: u64) -> Result<()> {
+fn check_expiry(ca: &ca::Ca, exp_days: u64) -> Fallible<()> {
     let expiries = ca.usercert_expiry(exp_days)?;
 
     for (usercert, (alive, expiry)) in expiries {
@@ -297,7 +295,7 @@ fn check_expiry(ca: &ca::Ca, exp_days: u64) -> Result<()> {
     Ok(())
 }
 
-fn list_users(ca: &ca::Ca) -> Result<()> {
+fn list_users(ca: &ca::Ca) -> Fallible<()> {
     for (usercert, (sig_from_ca, tsig_on_ca)) in ca.usercert_signatures()? {
         println!(
             "usercert for '{}'",
@@ -329,7 +327,7 @@ fn list_users(ca: &ca::Ca) -> Result<()> {
     Ok(())
 }
 
-fn list_bridges(ca: &ca::Ca) -> Result<()> {
+fn list_bridges(ca: &ca::Ca) -> Fallible<()> {
     for bridge in ca.get_bridges()? {
         println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key);
     }
@@ -341,7 +339,7 @@ fn new_bridge(
     email: Option<&str>,
     key_file: &str,
     scope: Option<&str>,
-) -> Result<()> {
+) -> Fallible<()> {
     let bridge = ca.bridge_new(key_file, email, scope)?;
     let remote = Pgp::armored_to_cert(&bridge.pub_key)?;
 

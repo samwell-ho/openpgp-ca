@@ -33,9 +33,7 @@ use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
 
-use failure::{self, ResultExt};
-
-pub type Result<T> = ::std::result::Result<T, failure::Error>;
+use failure::{self, Fallible, ResultExt};
 
 pub struct Ca {
     db: Db,
@@ -70,7 +68,11 @@ impl Ca {
     // -------- CAs
 
     /// create a new Ca database entry (only one CA is allowed per database)
-    pub fn ca_new(&self, domainname: &str, name: Option<&str>) -> Result<()> {
+    pub fn ca_new(
+        &self,
+        domainname: &str,
+        name: Option<&str>,
+    ) -> Fallible<()> {
         if self.db.get_ca()?.is_some() {
             return Err(failure::err_msg(
                 "ERROR: CA has already been created",
@@ -99,12 +101,12 @@ impl Ca {
     }
 
     /// get the Ca and Cacert objects from the database
-    pub fn get_ca(&self) -> Result<Option<(models::Ca, models::Cacert)>> {
+    pub fn get_ca(&self) -> Fallible<Option<(models::Ca, models::Cacert)>> {
         self.db.get_ca()
     }
 
     /// get the Cert object for the Ca from the database
-    pub fn get_ca_cert(&self) -> Result<Cert> {
+    pub fn get_ca_cert(&self) -> Fallible<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
             _ => panic!("get_ca_cert() failed"),
@@ -112,7 +114,7 @@ impl Ca {
     }
 
     /// print information about the Ca
-    pub fn show_ca(&self) -> Result<()> {
+    pub fn show_ca(&self) -> Fallible<()> {
         let (ca, ca_cert) = self
             .db
             .get_ca()
@@ -123,7 +125,7 @@ impl Ca {
     }
 
     /// returns the pubkey of the Ca as armored String
-    pub fn get_ca_pubkey_armored(&self) -> Result<String> {
+    pub fn get_ca_pubkey_armored(&self) -> Fallible<String> {
         let cert = self.get_ca_cert()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
             .context("failed to transform CA key to armored pubkey")?;
@@ -149,7 +151,7 @@ impl Ca {
 
     /// receive an armored key, find any tsigs on it,
     /// then merge those into "our" copy of the CA key
-    pub fn import_tsig_for_ca(&self, key: &str) -> Result<()> {
+    pub fn import_tsig_for_ca(&self, key: &str) -> Fallible<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
             let ca_cert = self.get_ca_cert().unwrap();
@@ -199,7 +201,7 @@ impl Ca {
         &mut self,
         name: Option<&str>,
         emails: &[&str],
-    ) -> Result<()> {
+    ) -> Fallible<()> {
         let ca_cert = self.get_ca_cert().unwrap();
 
         // make user key (signed by CA)
@@ -253,7 +255,7 @@ impl Ca {
         name: Option<&str>,
         emails: &[&str],
         updates_id: Option<i32>,
-    ) -> Result<()> {
+    ) -> Fallible<()> {
         let user_cert = Pgp::armored_to_cert(&key)?;
 
         let existing =
@@ -363,7 +365,7 @@ impl Ca {
         revoc: Option<&str>,
         name: Option<&str>,
         emails: &[&str],
-    ) -> Result<()> {
+    ) -> Fallible<()> {
         self.usercert_import_update_or_create(key, revoc, name, emails, None)
     }
 
@@ -372,7 +374,7 @@ impl Ca {
         &self,
         key: &str,
         usercert: &models::Usercert,
-    ) -> Result<()> {
+    ) -> Fallible<()> {
         let emails = self.db.get_emails_by_usercert(usercert)?;
         let emails: Vec<_> = emails.iter().map(|e| e.addr.as_str()).collect();
 
@@ -389,7 +391,7 @@ impl Ca {
     pub fn usercert_expiry(
         &self,
         days: u64,
-    ) -> Result<HashMap<models::Usercert, (bool, Option<SystemTime>)>> {
+    ) -> Fallible<HashMap<models::Usercert, (bool, Option<SystemTime>)>> {
         let mut map = HashMap::new();
 
         let days = Duration::new(60 * 60 * 24 * days, 0);
@@ -413,7 +415,7 @@ impl Ca {
     /// get a map 'usercert -> (sig_from_ca, tsig_on_ca)'
     pub fn usercert_signatures(
         &self,
-    ) -> Result<HashMap<models::Usercert, (bool, bool)>> {
+    ) -> Fallible<HashMap<models::Usercert, (bool, bool)>> {
         let mut map = HashMap::new();
 
         let usercerts = self
@@ -436,7 +438,7 @@ impl Ca {
     }
 
     /// check if this usercert has been signed by the CA
-    pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Result<bool> {
+    pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Fallible<bool> {
         let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
         let sigs = Self::get_sigs(&user_cert);
 
@@ -451,7 +453,7 @@ impl Ca {
     pub fn check_ca_has_tsig(
         &self,
         usercert: &models::Usercert,
-    ) -> Result<bool> {
+    ) -> Fallible<bool> {
         let ca = self.get_ca_cert()?;
         let tsigs = Self::get_tsigs(&ca);
 
@@ -462,17 +464,20 @@ impl Ca {
         }))
     }
 
-    pub fn get_all_usercerts(&self) -> Result<Vec<models::Usercert>> {
+    pub fn get_all_usercerts(&self) -> Fallible<Vec<models::Usercert>> {
         self.db.get_all_usercerts()
     }
 
-    pub fn get_usercerts(&self, email: &str) -> Result<Vec<models::Usercert>> {
+    pub fn get_usercerts(
+        &self,
+        email: &str,
+    ) -> Fallible<Vec<models::Usercert>> {
         self.db.get_usercerts(email)
     }
 
     // -------- revocations
 
-    pub fn add_revocation(&self, revoc_file: &str) -> Result<()> {
+    pub fn add_revocation(&self, revoc_file: &str) -> Fallible<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
             .context("Couldn't load revocation cert")?;
 
@@ -503,11 +508,14 @@ impl Ca {
     pub fn get_revocations(
         &self,
         cert: &models::Usercert,
-    ) -> Result<Vec<models::Revocation>> {
+    ) -> Fallible<Vec<models::Revocation>> {
         self.db.get_revocations(cert)
     }
 
-    pub fn get_revocation_by_id(&self, id: i32) -> Result<models::Revocation> {
+    pub fn get_revocation_by_id(
+        &self,
+        id: i32,
+    ) -> Fallible<models::Revocation> {
         if let Some(rev) = self.db.get_revocation_by_id(id)? {
             Ok(rev)
         } else {
@@ -515,7 +523,7 @@ impl Ca {
         }
     }
 
-    pub fn apply_revocation(&self, revoc: models::Revocation) -> Result<()> {
+    pub fn apply_revocation(&self, revoc: models::Revocation) -> Fallible<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
             let usercert = self.db.get_usercert_by_id(revoc.usercert_id)?;
@@ -554,14 +562,14 @@ impl Ca {
     pub fn get_emails(
         &self,
         usercert: &models::Usercert,
-    ) -> Result<Vec<models::Email>> {
+    ) -> Fallible<Vec<models::Email>> {
         self.db.get_emails_by_usercert(usercert)
     }
 
     // -------- bridges
 
     // "other.org" => "<[^>]+[@.]other\\.org>$"
-    fn domain_to_regex(domain: &str) -> Result<String> {
+    fn domain_to_regex(domain: &str) -> Fallible<String> {
         // syntax check domain
         if !publicsuffix::Domain::has_valid_syntax(domain) {
             return Err(failure::err_msg(
@@ -581,7 +589,7 @@ impl Ca {
         key_file: &str,
         email: Option<&str>,
         scope: Option<&str>,
-    ) -> Result<models::Bridge> {
+    ) -> Fallible<models::Bridge> {
         let remote_ca_cert =
             Cert::from_file(key_file).context("Failed to read key")?;
 
@@ -664,7 +672,7 @@ impl Ca {
         Ok(bridge)
     }
 
-    pub fn bridge_revoke(&self, email: &str) -> Result<()> {
+    pub fn bridge_revoke(&self, email: &str) -> Fallible<()> {
         let bridge = self.db.search_bridge(email)?;
         assert!(bridge.is_some(), "bridge not found");
 
@@ -694,13 +702,13 @@ impl Ca {
         Ok(())
     }
 
-    pub fn get_bridges(&self) -> Result<Vec<models::Bridge>> {
+    pub fn get_bridges(&self) -> Fallible<Vec<models::Bridge>> {
         self.db.list_bridges()
     }
 
     /// export all user keys + CA key into a wkd directory structure
     /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
-    pub fn export_wkd(&self, domain: &str, path: &Path) -> Result<()> {
+    pub fn export_wkd(&self, domain: &str, path: &Path) -> Fallible<()> {
         use sequoia_net::wkd;
 
         let ca_cert = self.get_ca_cert()?;
@@ -718,7 +726,10 @@ impl Ca {
 
     /// pull a key from WKD and merge any updates into our local version of
     /// this key
-    pub fn update_from_wkd(&self, usercert: &models::Usercert) -> Result<()> {
+    pub fn update_from_wkd(
+        &self,
+        usercert: &models::Usercert,
+    ) -> Fallible<()> {
         use sequoia_net::wkd;
         use tokio_core::reactor::Core;
 
@@ -750,7 +761,7 @@ impl Ca {
     pub fn update_from_hagrid(
         &self,
         usercert: &models::Usercert,
-    ) -> Result<()> {
+    ) -> Fallible<()> {
         use tokio_core::reactor::Core;
 
         let mut merge = Pgp::armored_to_cert(&usercert.pub_cert)?;

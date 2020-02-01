@@ -17,18 +17,16 @@
 
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
-use failure::{self, ResultExt};
+use failure::{self, Fallible, ResultExt};
 
 use crate::models::*;
 use crate::pgp::Pgp;
 use crate::schema::*;
 
-pub type Result<T> = ::std::result::Result<T, failure::Error>;
-
 // FIXME: or keep a Connection as lazy_static? or just make new Connections?!
 fn get_conn(
     db_url: Option<&str>,
-) -> Result<PooledConnection<ConnectionManager<SqliteConnection>>> {
+) -> Fallible<PooledConnection<ConnectionManager<SqliteConnection>>> {
     // bulk insert doesn't currently work with sqlite and r2d2:
     // https://github.com/diesel-rs/diesel/issues/1822
 
@@ -74,7 +72,7 @@ impl Db {
 
     // --- building block functions ---
 
-    fn insert_usercert(&self, cert: NewUsercert) -> Result<Usercert> {
+    fn insert_usercert(&self, cert: NewUsercert) -> Fallible<Usercert> {
         let inserted_count = diesel::insert_into(usercerts::table)
             .values(&cert)
             .execute(&self.conn)?;
@@ -97,7 +95,7 @@ impl Db {
         Ok(c[0].clone())
     }
 
-    fn insert_revocation(&self, revoc: NewRevocation) -> Result<Revocation> {
+    fn insert_revocation(&self, revoc: NewRevocation) -> Fallible<Revocation> {
         let inserted_count = diesel::insert_into(revocations::table)
             .values(&revoc)
             .execute(&self.conn)?;
@@ -124,7 +122,7 @@ impl Db {
         &self,
         addr: &str,
         usercert_id: i32,
-    ) -> Result<Email> {
+    ) -> Fallible<Email> {
         if let Some(e) = self.get_email(addr)? {
             let ce = NewCertEmail {
                 usercert_id,
@@ -146,7 +144,7 @@ impl Db {
         }
     }
 
-    fn get_email(&self, addr: &str) -> Result<Option<Email>> {
+    fn get_email(&self, addr: &str) -> Fallible<Option<Email>> {
         let emails: Vec<Email> = emails::table
             .filter(emails::addr.eq(addr))
             .load::<Email>(&self.conn)
@@ -166,7 +164,7 @@ impl Db {
         &self,
         email: NewEmail,
         usercert_id: i32,
-    ) -> Result<Email> {
+    ) -> Fallible<Email> {
         let inserted_count = diesel::insert_into(emails::table)
             .values(&email)
             .execute(&self.conn)
@@ -205,7 +203,7 @@ impl Db {
 
     // --- public ---
 
-    pub fn insert_ca(&self, ca: NewCa, ca_key: &str) -> Result<()> {
+    pub fn insert_ca(&self, ca: NewCa, ca_key: &str) -> Fallible<()> {
         assert!(Pgp::armored_to_cert(ca_key).is_ok());
 
         self.conn.transaction::<_, failure::Error, _>(|| {
@@ -233,7 +231,7 @@ impl Db {
         })
     }
 
-    pub fn update_ca(&self, ca: &Ca) -> Result<()> {
+    pub fn update_ca(&self, ca: &Ca) -> Fallible<()> {
         diesel::update(ca)
             .set(ca)
             .execute(&self.conn)
@@ -242,7 +240,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn update_cacert(&self, cacert: &Cacert) -> Result<()> {
+    pub fn update_cacert(&self, cacert: &Cacert) -> Fallible<()> {
         assert!(Pgp::armored_to_cert(&cacert.cert).is_ok());
 
         diesel::update(cacert)
@@ -253,7 +251,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn get_ca(&self) -> Result<Option<(Ca, Cacert)>> {
+    pub fn get_ca(&self) -> Fallible<Option<(Ca, Cacert)>> {
         let cas = cas::table
             .load::<Ca>(&self.conn)
             .context("Error loading CAs")?;
@@ -291,7 +289,7 @@ impl Db {
         revocs: &[String],
         ca_cert_tsigned: Option<&str>,
         updates_cert_id: Option<i32>,
-    ) -> Result<Usercert> {
+    ) -> Fallible<Usercert> {
         self.conn.transaction::<_, failure::Error, _>(|| {
             let (ca, mut cacert_db) =
                 self.get_ca().context("Couldn't find CA")?.unwrap();
@@ -333,7 +331,7 @@ impl Db {
         })
     }
 
-    pub fn update_usercert(&self, usercert: &Usercert) -> Result<()> {
+    pub fn update_usercert(&self, usercert: &Usercert) -> Fallible<()> {
         diesel::update(usercert)
             .set(usercert)
             .execute(&self.conn)
@@ -342,7 +340,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn update_revocation(&self, revocation: &Revocation) -> Result<()> {
+    pub fn update_revocation(&self, revocation: &Revocation) -> Fallible<()> {
         diesel::update(revocation)
             .set(revocation)
             .execute(&self.conn)
@@ -351,7 +349,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn get_usercert_by_id(&self, id: i32) -> Result<Option<Usercert>> {
+    pub fn get_usercert_by_id(&self, id: i32) -> Fallible<Option<Usercert>> {
         let db: Vec<Usercert> = usercerts::table
             .filter(usercerts::id.eq(id))
             .load::<Usercert>(&self.conn)
@@ -364,7 +362,10 @@ impl Db {
         }
     }
 
-    pub fn get_usercert(&self, fingerprint: &str) -> Result<Option<Usercert>> {
+    pub fn get_usercert(
+        &self,
+        fingerprint: &str,
+    ) -> Fallible<Option<Usercert>> {
         let u = usercerts::table
             .filter(usercerts::fingerprint.eq(fingerprint))
             .load::<Usercert>(&self.conn)
@@ -378,7 +379,7 @@ impl Db {
         }
     }
 
-    pub fn get_usercerts(&self, email: &str) -> Result<Vec<Usercert>> {
+    pub fn get_usercerts(&self, email: &str) -> Fallible<Vec<Usercert>> {
         if let Some(email) = self.get_email(email)? {
             let cert_ids = CertEmail::belonging_to(&email)
                 .select(certs_emails::usercert_id);
@@ -393,13 +394,16 @@ impl Db {
         }
     }
 
-    pub fn get_all_usercerts(&self) -> Result<Vec<Usercert>> {
+    pub fn get_all_usercerts(&self) -> Fallible<Vec<Usercert>> {
         Ok(usercerts::table
             .load::<Usercert>(&self.conn)
             .context("Error loading usercerts")?)
     }
 
-    pub fn get_revocations(&self, cert: &Usercert) -> Result<Vec<Revocation>> {
+    pub fn get_revocations(
+        &self,
+        cert: &Usercert,
+    ) -> Fallible<Vec<Revocation>> {
         Ok(Revocation::belonging_to(cert).load::<Revocation>(&self.conn)?)
     }
 
@@ -407,7 +411,7 @@ impl Db {
         &self,
         revocation: &str,
         cert: &Usercert,
-    ) -> Result<Revocation> {
+    ) -> Fallible<Revocation> {
         self.insert_revocation(NewRevocation {
             revocation,
             usercert_id: cert.id,
@@ -415,7 +419,10 @@ impl Db {
         })
     }
 
-    pub fn get_revocation_by_id(&self, id: i32) -> Result<Option<Revocation>> {
+    pub fn get_revocation_by_id(
+        &self,
+        id: i32,
+    ) -> Fallible<Option<Revocation>> {
         let db: Vec<Revocation> = revocations::table
             .filter(revocations::id.eq(id))
             .load::<Revocation>(&self.conn)
@@ -431,7 +438,7 @@ impl Db {
     pub fn get_emails_by_usercert(
         &self,
         cert: &Usercert,
-    ) -> Result<Vec<Email>> {
+    ) -> Fallible<Vec<Email>> {
         let email_ids =
             CertEmail::belonging_to(cert).select(certs_emails::email_id);
 
@@ -441,7 +448,7 @@ impl Db {
             .expect("could not load emails"))
     }
 
-    pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {
+    pub fn insert_bridge(&self, bridge: NewBridge) -> Fallible<Bridge> {
         let inserted_count = diesel::insert_into(bridges::table)
             .values(&bridge)
             .execute(&self.conn)
@@ -462,7 +469,7 @@ impl Db {
         Ok(b[0].clone())
     }
 
-    pub fn update_bridge(&self, bridge: &Bridge) -> Result<()> {
+    pub fn update_bridge(&self, bridge: &Bridge) -> Fallible<()> {
         diesel::update(bridge)
             .set(bridge)
             .execute(&self.conn)
@@ -471,7 +478,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn search_bridge(&self, email: &str) -> Result<Option<Bridge>> {
+    pub fn search_bridge(&self, email: &str) -> Fallible<Option<Bridge>> {
         let res = bridges::table
             .filter(bridges::email.eq(email))
             .load::<Bridge>(&self.conn)
@@ -481,7 +488,7 @@ impl Db {
             0 => Ok(None),
             1 => Ok(Some(res[0].clone())),
             _ => panic!(
-                "search_bridge for {} found {} results, expected 1. \
+                "search_bridge for {} found {} Fallibles, expected 1. \
                  (Database constraints should make this impossible)",
                 email,
                 res.len()
@@ -489,7 +496,7 @@ impl Db {
         }
     }
 
-    pub fn list_bridges(&self) -> Result<Vec<Bridge>> {
+    pub fn list_bridges(&self) -> Fallible<Vec<Bridge>> {
         Ok(bridges::table
             .load::<Bridge>(&self.conn)
             .context("Error loading bridges")?)
