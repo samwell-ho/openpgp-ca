@@ -76,7 +76,6 @@ impl Pgp {
             cert.primary_key().policy(None).unwrap().binding_signature();
         let builder = signature::Builder::from(direct_key_sig.clone())
             .set_type(SignatureType::PositiveCertification)
-            .set_hash_algo(HashAlgorithm::SHA512)
             .set_key_flags(&KeyFlags::empty().set_certification(true))?
             // notation: "openpgp-ca:domain=domain1;domain2"
             .add_notation(
