@@ -26,7 +26,7 @@ use openpgp::packet::key::SecretParts;
 use openpgp::packet::signature;
 use openpgp::packet::{Signature, UserID};
 use openpgp::parse::Parse;
-use openpgp::serialize::{Serialize, SerializeInto};
+use openpgp::serialize::Serialize;
 use openpgp::types::{HashAlgorithm, KeyFlags};
 use openpgp::types::{ReasonForRevocation, SignatureType};
 use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
@@ -42,8 +42,8 @@ pub struct Pgp {}
 impl Pgp {
     fn user_id(email: &str, name: Option<&str>) -> UserID {
         match name {
-            Some(name) => UserID::from(name.to_owned() + " <" + email + ">"),
-            None => UserID::from("<".to_owned() + email + ">"),
+            Some(name) => UserID::from(format!("{} <{}>", name, email)),
+            None => UserID::from(format!("<{}>", email)),
         }
     }
 
@@ -123,7 +123,7 @@ impl Pgp {
         //    let v = cert.armored().to_vec().context("Cert serialize failed")?;
 
         let mut v = Vec::new();
-        cert.armored().serialize(&mut v);
+        cert.armored().serialize(&mut v)?;
 
         Ok(String::from_utf8(v)?)
     }

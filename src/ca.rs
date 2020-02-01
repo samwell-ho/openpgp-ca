@@ -570,13 +570,9 @@ impl Ca {
         }
 
         // transform domain to regex
-        let mut regex = "<[^>]+[@.]".to_string();
-
-        regex.push_str(&domain.split('.').collect::<Vec<_>>().join("\\."));
-
-        regex.push_str(">$");
-
-        Ok(regex)
+        let escaped_domain =
+            &domain.split('.').collect::<Vec<_>>().join("\\.");
+        Ok(format!("<[^>]+[@.]{}>$", escaped_domain))
     }
 
     /// when scope is not set, it is derived from the user_id in the key_file
