@@ -205,8 +205,8 @@ impl Ca {
         let ca_cert = self.get_ca_cert().unwrap();
 
         // make user key (signed by CA)
-        let (user, revoc) = Pgp::make_user_cert(emails, name.clone())
-            .context("make_user failed")?;
+        let (user, revoc) =
+            Pgp::make_user_cert(emails, name).context("make_user failed")?;
 
         // sign user key with CA key
         let certified = Pgp::sign_user(&ca_cert, user.clone())
