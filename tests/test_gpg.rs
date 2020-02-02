@@ -3,11 +3,13 @@ use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca;
 
+use failure::{self, Fallible, ResultExt};
+
 pub mod gnupg;
 
 #[test]
-fn test_alice_authenticates_bob_centralized() {
-    let ctx = make_context!();
+fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
+    let ctx = gnupg::make_context()?;
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -17,44 +19,36 @@ fn test_alice_authenticates_bob_centralized() {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    let res = ca.ca_new("example.org", None);
-    assert!(res.is_ok());
+    ca.ca_new("example.org", None)?;
 
     // make CA users
-    let res = ca.usercert_new(Some(&"Alice"), &["alice@example.org"]);
-    assert!(res.is_ok());
-
-    let res = ca.usercert_new(Some(&"Bob"), &["bob@example.org"]);
-    assert!(res.is_ok());
+    ca.usercert_new(Some(&"Alice"), &["alice@example.org"])?;
+    ca.usercert_new(Some(&"Bob"), &["bob@example.org"])?;
 
     // ---- import keys from OpenPGP CA into GnuPG ----
 
     // get Cert for CA
-    let ca_cert = ca.get_ca_cert();
-    assert!(ca_cert.is_ok());
+    let ca_cert = ca.get_ca_cert()?;
 
     // import CA key into GnuPG
     let mut buf = Vec::new();
-    ca_cert.unwrap().as_tsk().serialize(&mut buf).unwrap();
+    ca_cert.as_tsk().serialize(&mut buf)?;
     gnupg::import(&ctx, &buf);
 
     // import CA users into GnuPG
-    let usercerts = ca.get_all_usercerts();
+    let usercerts = ca.get_all_usercerts()?;
 
-    assert!(usercerts.is_ok());
-    assert_eq!(usercerts.as_ref().ok().unwrap().len(), 2);
+    assert_eq!(usercerts.len(), 2);
 
-    for cert in usercerts.unwrap() {
+    for cert in usercerts {
         gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 
     // ---- set "ultimate" ownertrust for alice ----
-    let res = gnupg::edit_trust(&ctx, "alice", 5);
-
-    assert!(res.is_ok());
+    gnupg::edit_trust(&ctx, "alice", 5)?;
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gnupg::list_keys(&ctx).unwrap();
+    let gpg_trust = gnupg::list_keys(&ctx)?;
 
     assert_eq!(gpg_trust.len(), 3);
 
@@ -73,6 +67,8 @@ fn test_alice_authenticates_bob_centralized() {
 
     // don't delete home dir (for manual inspection)
     //    ctx.leak_tempdir();
+
+    Ok(())
 }
 
 #[test]
@@ -82,11 +78,11 @@ fn test_alice_authenticates_bob_centralized() {
 /// TSigning the CA key is done in user GnuPG contexts,
 /// signing of user keys in the CA.
 /// Alice imports Bob's key from CA and checks if she can authenticate Bob.
-fn test_alice_authenticates_bob_decentralized() {
-    let ctx_alice = make_context!();
-    let ctx_bob = make_context!();
+fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
+    let ctx_alice = gnupg::make_context()?;
+    let ctx_bob = gnupg::make_context()?;
 
-    let ctx_ca = make_context!();
+    let ctx_ca = gnupg::make_context()?;
 
     let home_path_ca = String::from(ctx_ca.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path_ca);
@@ -95,19 +91,16 @@ fn test_alice_authenticates_bob_decentralized() {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    let res = ca.ca_new("example.org", None);
-    assert!(res.is_ok());
+    ca.ca_new("example.org", None)?;
 
-    let ca_key = ca.get_ca_pubkey_armored().unwrap();
+    let ca_key = ca.get_ca_pubkey_armored()?;
 
     // ---- import CA key from OpenPGP CA into GnuPG instances ----
     gnupg::import(&ctx_alice, ca_key.as_bytes());
     gnupg::import(&ctx_bob, ca_key.as_bytes());
 
     // get Cert for CA
-    let ca_cert = ca.get_ca_cert();
-    assert!(ca_cert.is_ok());
-    let ca_cert = ca_cert.unwrap();
+    let ca_cert = ca.get_ca_cert()?;
 
     let ca_keyid = ca_cert.keyid().to_hex();
 
@@ -124,9 +117,9 @@ fn test_alice_authenticates_bob_decentralized() {
     let bob_ca_key = gnupg::export(&ctx_bob, &"openpgp-ca@example.org");
 
     ca.import_tsig_for_ca(&alice_ca_key)
-        .expect("import CA tsig from Alice failed");
+        .context("import CA tsig from Alice failed")?;
     ca.import_tsig_for_ca(&bob_ca_key)
-        .expect("import CA tsig from Bob failed");
+        .context("import CA tsig from Bob failed")?;
 
     // get public keys for alice and bob from their gnupg contexts
     let alice_key = gnupg::export(&ctx_alice, &"alice@example.org");
@@ -139,14 +132,14 @@ fn test_alice_authenticates_bob_decentralized() {
         Some("Alice"),
         &["alice@example.org"],
     )
-    .expect("import Alice to CA failed");
+    .context("import Alice to CA failed")?;
 
     ca.usercert_import(&bob_key, None, Some("Bob"), &["bob@example.org"])
-        .expect("import Bob to CA failed");
+        .context("import Bob to CA failed")?;
 
     // export bob, CA-key from CA
-    let ca_key = ca.get_ca_pubkey_armored().unwrap();
-    let usercerts = ca.get_usercerts(&"bob@example.org").unwrap();
+    let ca_key = ca.get_ca_pubkey_armored()?;
+    let usercerts = ca.get_usercerts(&"bob@example.org")?;
     let bob = usercerts.first().unwrap();
 
     // import bob+CA key into alice's GnuPG context
@@ -154,12 +147,10 @@ fn test_alice_authenticates_bob_decentralized() {
     gnupg::import(&ctx_alice, bob.pub_cert.as_bytes());
 
     // ---- set "ultimate" ownertrust for alice ----
-    let res = gnupg::edit_trust(&ctx_alice, "alice", 5);
-
-    assert!(res.is_ok());
+    gnupg::edit_trust(&ctx_alice, "alice", 5)?;
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gnupg::list_keys(&ctx_alice).unwrap();
+    let gpg_trust = gnupg::list_keys(&ctx_alice)?;
 
     assert_eq!(gpg_trust.len(), 3);
 
@@ -175,11 +166,13 @@ fn test_alice_authenticates_bob_decentralized() {
         gpg_trust.get("Bob <bob@example.org>"),
         Some(&"f".to_string())
     );
+
+    Ok(())
 }
 
 #[test]
-fn test_bridge() {
-    let ctx = make_context!();
+fn test_bridge() -> Fallible<()> {
+    let ctx = gnupg::make_context()?;
 
     // don't delete home dir (for manual inspection)
     //    ctx.leak_tempdir();
@@ -195,7 +188,7 @@ fn test_bridge() {
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    assert!(ca1.ca_new("some.org", None).is_ok());
+    ca1.ca_new("some.org", None)?;
 
     // make CA user
     assert!(ca1
@@ -205,49 +198,41 @@ fn test_bridge() {
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    assert!(ca2.ca_new("other.org", None).is_ok());
+    ca2.ca_new("other.org", None)?;
 
     // make CA user
-    assert!(ca2.usercert_new(Some(&"Bob"), &["bob@other.org"]).is_ok());
+    ca2.usercert_new(Some(&"Bob"), &["bob@other.org"])?;
 
     // make CA user that is out of the domain scope for ca2
-    assert!(ca2
-        .usercert_new(Some(&"Carol"), &["carol@third.org"])
-        .is_ok());
+    ca2.usercert_new(Some(&"Carol"), &["carol@third.org"])?;
 
     // ---- setup bridges: scoped trust between one.org and two.org ---
 
     let ca_some_file = format!("{}/ca1.pubkey", home_path);
     let ca_other_file = format!("{}/ca2.pubkey", home_path);
 
-    let pub_ca1 = ca1.get_ca_pubkey_armored().unwrap();
-    let pub_ca2 = ca2.get_ca_pubkey_armored().unwrap();
+    let pub_ca1 = ca1.get_ca_pubkey_armored()?;
+    let pub_ca2 = ca2.get_ca_pubkey_armored()?;
 
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    assert!(ca1.bridge_new(&ca_other_file, None, None).is_ok());
-    assert!(ca2.bridge_new(&ca_some_file, None, None).is_ok());
+    ca1.bridge_new(&ca_other_file, None, None)?;
+    ca2.bridge_new(&ca_some_file, None, None)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
     // get Cert for ca1 from ca2 bridge
     // (this has the signed version of the ca1 pubkey)
 
-    let bridges2 = ca2.get_bridges();
-    assert!(bridges2.is_ok());
-
-    let bridges2 = bridges2.unwrap();
+    let bridges2 = ca2.get_bridges()?;
     assert_eq!(bridges2.len(), 1);
 
     let ca1_cert = &bridges2[0].pub_key;
 
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)
-    let bridges1 = ca1.get_bridges();
-    assert!(bridges1.is_ok());
-
-    let bridges1 = bridges1.unwrap();
+    let bridges1 = ca1.get_bridges()?;
     assert_eq!(bridges1.len(), 1);
 
     let ca2_cert = &bridges1[0].pub_key;
@@ -257,30 +242,28 @@ fn test_bridge() {
     gnupg::import(&ctx, ca2_cert.as_bytes());
 
     // import CA1 users into GnuPG
-    let usercerts1 = ca1.get_all_usercerts();
+    let usercerts1 = ca1.get_all_usercerts()?;
 
-    assert!(usercerts1.is_ok());
-    assert_eq!(usercerts1.as_ref().ok().unwrap().len(), 1);
+    assert_eq!(usercerts1.len(), 1);
 
-    for cert in usercerts1.unwrap() {
+    for cert in usercerts1 {
         gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 
     // import CA2 users into GnuPG
-    let usercerts2 = ca2.get_all_usercerts();
+    let usercerts2 = ca2.get_all_usercerts()?;
 
-    assert!(usercerts2.is_ok());
-    assert_eq!(usercerts2.as_ref().ok().unwrap().len(), 2);
+    assert_eq!(usercerts2.len(), 2);
 
-    for cert in usercerts2.unwrap() {
+    for cert in usercerts2 {
         gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 
     // ---- set "ultimate" ownertrust for alice ----
-    assert!(gnupg::edit_trust(&ctx, "alice", 5).is_ok());
+    gnupg::edit_trust(&ctx, "alice", 5)?;
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gnupg::list_keys(&ctx).unwrap();
+    let gpg_trust = gnupg::list_keys(&ctx)?;
 
     assert_eq!(gpg_trust.len(), 5);
 
@@ -309,4 +292,6 @@ fn test_bridge() {
         Some(&"-".to_string()),
         "carol@third.org"
     );
+
+    Ok(())
 }

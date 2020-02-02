@@ -9,39 +9,22 @@ use std::process::Stdio;
 
 use csv;
 use csv::StringRecord;
-use failure::Fail;
+use failure::{Fail, Fallible, ResultExt};
 use rexpect;
 use tempfile;
 
-pub type Result<T> = ::std::result::Result<T, failure::Error>;
-
-#[macro_export]
-macro_rules! make_context {
-    () => {{
-        let ctx = match gnupg::Context::ephemeral() {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!(
-                    "SKIP: Failed to create GnuPG context: {}\n\
+pub fn make_context() -> Fallible<Context> {
+    let ctx = Context::ephemeral().context(
+        "SKIP: Failed to create GnuPG context: {}\n\
                      SKIP: Is GnuPG installed?",
-                    e
-                );
-                return;
-            }
-        };
-        match ctx.start("gpg-agent") {
-            Ok(_) => (),
-            Err(e) => {
-                eprintln!(
-                    "SKIP: Failed to create GnuPG context: {}\n\
+    )?;
+
+    ctx.start("gpg-agent").context(
+        "SKIP: Failed to create GnuPG context: {}\n\
                      SKIP: Is the GnuPG agent installed?",
-                    e
-                );
-                return;
-            }
-        }
-        ctx
-    }};
+    )?;
+
+    Ok(ctx)
 }
 
 /// A GnuPG context.
@@ -57,7 +40,7 @@ pub struct Context {
 
 impl Context {
     /// Creates a new context for the default GnuPG home directory.
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Fallible<Self> {
         Self::make(None, None)
     }
 
@@ -67,7 +50,7 @@ impl Context {
     }
 
     /// Creates a new context for the given GnuPG home directory.
-    pub fn with_homedir<P>(homedir: P) -> Result<Self>
+    pub fn with_homedir<P>(homedir: P) -> Fallible<Self>
     where
         P: AsRef<Path>,
     {
@@ -78,7 +61,7 @@ impl Context {
     ///
     /// The created home directory will be deleted once this object is
     /// dropped.
-    pub fn ephemeral() -> Result<Self> {
+    pub fn ephemeral() -> Fallible<Self> {
         Self::make(None, Some(tempfile::tempdir()?))
     }
 
@@ -96,7 +79,7 @@ impl Context {
     fn make(
         homedir: Option<&Path>,
         ephemeral: Option<tempfile::TempDir>,
-    ) -> Result<Self> {
+    ) -> Fallible<Self> {
         let mut components: BTreeMap<String, PathBuf> = Default::default();
         let mut directories: BTreeMap<String, PathBuf> = Default::default();
         let mut sockets: BTreeMap<String, PathBuf> = Default::default();
@@ -147,7 +130,7 @@ impl Context {
         homedir: &Option<PathBuf>,
         arguments: &[&str],
         nfields: usize,
-    ) -> Result<Vec<Vec<Vec<u8>>>> {
+    ) -> Fallible<Vec<Vec<Vec<u8>>>> {
         let nl = |&c: &u8| c as char == '\n';
         let colon = |&c: &u8| c as char == ':';
 
@@ -200,7 +183,7 @@ impl Context {
     }
 
     /// Returns the path to a GnuPG component.
-    pub fn component<C>(&self, component: C) -> Result<&Path>
+    pub fn component<C>(&self, component: C) -> Fallible<&Path>
     where
         C: AsRef<str>,
     {
@@ -217,7 +200,7 @@ impl Context {
     }
 
     /// Returns the path to a GnuPG directory.
-    pub fn directory<C>(&self, directory: C) -> Result<&Path>
+    pub fn directory<C>(&self, directory: C) -> Fallible<&Path>
     where
         C: AsRef<str>,
     {
@@ -234,7 +217,7 @@ impl Context {
     }
 
     /// Returns the path to a GnuPG socket.
-    pub fn socket<C>(&self, socket: C) -> Result<&Path>
+    pub fn socket<C>(&self, socket: C) -> Fallible<&Path>
     where
         C: AsRef<str>,
     {
@@ -248,7 +231,7 @@ impl Context {
     }
 
     /// Creates directories for RPC communication.
-    pub fn create_socket_dir(&self) -> Result<()> {
+    pub fn create_socket_dir(&self) -> Fallible<()> {
         Self::gpgconf(&self.homedir, &["--create-socketdir"], 1)?;
         Ok(())
     }
@@ -257,26 +240,26 @@ impl Context {
     ///
     /// Note: This will stop all servers once they note that their
     /// socket is gone.
-    pub fn remove_socket_dir(&self) -> Result<()> {
+    pub fn remove_socket_dir(&self) -> Fallible<()> {
         Self::gpgconf(&self.homedir, &["--remove-socketdir"], 1)?;
         Ok(())
     }
 
     /// Starts a GnuPG component.
-    pub fn start(&self, component: &str) -> Result<()> {
+    pub fn start(&self, component: &str) -> Fallible<()> {
         self.create_socket_dir()?;
         Self::gpgconf(&self.homedir, &["--launch", component], 1)?;
         Ok(())
     }
 
     /// Stops a GnuPG component.
-    pub fn stop(&self, component: &str) -> Result<()> {
+    pub fn stop(&self, component: &str) -> Fallible<()> {
         Self::gpgconf(&self.homedir, &["--kill", component], 1)?;
         Ok(())
     }
 
     /// Stops all GnuPG components.
-    pub fn stop_all(&self) -> Result<()> {
+    pub fn stop_all(&self) -> Fallible<()> {
         self.stop("all")
     }
 }
@@ -342,7 +325,7 @@ pub fn export(ctx: &Context, search: &str) -> String {
     out
 }
 
-pub fn list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
+pub fn list_keys(ctx: &Context) -> Fallible<HashMap<String, String>> {
     let res = list_keys_raw(&ctx).unwrap();
 
     // filter: keep only the "uid" lines
@@ -359,7 +342,7 @@ pub fn list_keys(ctx: &Context) -> Result<HashMap<String, String>> {
         .collect())
 }
 
-fn list_keys_raw(ctx: &Context) -> Result<Vec<StringRecord>> {
+fn list_keys_raw(ctx: &Context) -> Fallible<Vec<StringRecord>> {
     let gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir")
@@ -381,7 +364,7 @@ fn list_keys_raw(ctx: &Context) -> Result<Vec<StringRecord>> {
     Ok(rdr.records().map(|rec| rec.unwrap()).collect())
 }
 
-pub fn edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Result<()> {
+pub fn edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Fallible<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
@@ -409,7 +392,7 @@ pub fn make_revocation(
     user_id: &str,
     filename: &str,
     reason: u8,
-) -> Result<()> {
+) -> Fallible<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
@@ -433,7 +416,11 @@ pub fn make_revocation(
     Ok(())
 }
 
-pub fn edit_expire(ctx: &Context, user_id: &str, expires: &str) -> Result<()> {
+pub fn edit_expire(
+    ctx: &Context,
+    user_id: &str,
+    expires: &str,
+) -> Fallible<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
@@ -476,7 +463,7 @@ pub fn tsign(
     user_id: &str,
     level: u8,
     trust: u8,
-) -> Result<()> {
+) -> Fallible<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
