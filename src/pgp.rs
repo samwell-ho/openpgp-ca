@@ -27,7 +27,7 @@ use openpgp::packet::signature;
 use openpgp::packet::{Signature, UserID};
 use openpgp::parse::Parse;
 use openpgp::serialize::Serialize;
-use openpgp::types::{HashAlgorithm, KeyFlags};
+use openpgp::types::KeyFlags;
 use openpgp::types::{ReasonForRevocation, SignatureType};
 use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
