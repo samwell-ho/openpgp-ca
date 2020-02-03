@@ -18,9 +18,7 @@
 use std::path::Path;
 use std::process::exit;
 
-use clap::crate_version;
-use clap::load_yaml;
-use clap::App;
+use structopt::StructOpt;
 
 use chrono::offset::Utc;
 use chrono::DateTime;
@@ -28,179 +26,368 @@ use chrono::DateTime;
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
 
-use failure::{self, Fallible, ResultExt};
+use failure::{self, Fallible};
+
+#[derive(StructOpt, Debug)]
+#[structopt(
+    name = "openpgp-ca",
+    author = "Heiko Schäfer <heiko@schaefer.name>",
+    about = "OpenPGP CA is a tool for managing OpenPGP keys within organizations."
+)]
+struct Opt {
+    #[structopt(
+        name = "database",
+        short = "d",
+        long = "database",
+        value_name = "filename"
+    )]
+    database: Option<String>,
+
+    #[structopt(subcommand)]
+    cmd: Command,
+}
+
+#[derive(StructOpt, Debug)]
+enum Command {
+    //init           Initialize OpenPGP CA
+    /// Manage CA
+    Ca {
+        #[structopt(subcommand)]
+        cmd: CaCommand,
+    },
+    /// Manage Users
+    User {
+        #[structopt(subcommand)]
+        cmd: UserCommand,
+    },
+    /// Manage Bridges
+    Bridge {
+        #[structopt(subcommand)]
+        cmd: BridgeCommand,
+    },
+    /// Export all Certs to WKD
+    WkdExport {
+        // FIXME: refactor to "wkd export"
+        #[structopt(subcommand)]
+        cmd: WkdCommand,
+    },
+    //    /// Manage Directories
+    //    Directory {
+    //        #[structopt(subcommand)]
+    //        cmd: DirCommand,
+    //    },
+    //    /// Manage key-profiles
+    //    KeyProfile {},
+}
+
+#[derive(StructOpt, Debug)]
+enum CaCommand {
+    /// Create CA
+    New {
+        #[structopt(takes_value = true, help = "CA domain name")]
+        domain: String,
+
+        #[structopt(
+            short = "n",
+            long = "name",
+            takes_value = true,
+            help = "User Name"
+        )]
+        name: Option<String>,
+    },
+    /// Export CA public key
+    Export,
+    /// Import trust signature for CA Key
+    ImportTsig {
+        #[structopt(
+            short = "f",
+            long = "file",
+            takes_value = true,
+            help = "File that contains the tsigned CA Key"
+        )]
+        key_file: String,
+    },
+    /// Show CA
+    Show,
+}
+
+#[derive(StructOpt, Debug)]
+enum UserCommand {
+    /// Add User (create new Key-Pair)
+    Add {
+        #[structopt(
+            short = "e",
+            long = "email",
+            takes_value = true,
+            help = "Email address"
+        )]
+        email: Vec<String>,
+
+        #[structopt(
+            short = "n",
+            long = "name",
+            takes_value = true,
+            help = "User Name"
+        )]
+        name: Option<String>,
+    },
+
+    /// Add Revocation Certificate
+    AddRevocation {
+        #[structopt(
+            short = "r",
+            long = "revocation-file",
+            takes_value = true,
+            help = "File that contains a revocation cert"
+        )]
+        revocation_file: String,
+    },
+    /// Bulk checks on Users
+    Check {
+        #[structopt(subcommand)]
+        cmd: UserCheckSubcommand,
+    },
+    /// Import User (use existing Public Key)
+    Import {
+        #[structopt(
+            short = "e",
+            long = "email",
+            takes_value = true,
+            help = "Email address"
+        )]
+        email: Vec<String>,
+
+        #[structopt(
+            short = "f",
+            long = "key-file",
+            takes_value = true,
+            help = "File that contains the User's Public Key"
+        )]
+        key_file: String,
+
+        #[structopt(
+            short = "n",
+            long = "name",
+            takes_value = true,
+            help = "User Name"
+        )]
+        name: Option<String>,
+
+        #[structopt(
+            short = "r",
+            long = "revocation-file",
+            takes_value = true,
+            help = "File that contains the User's revocation cert"
+        )]
+        revocation_file: Option<String>,
+    },
+    /// Export User Public Key (bulk, if no email address is given)
+    Export {
+        #[structopt(
+            short = "e",
+            long = "email",
+            takes_value = true,
+            help = "Email address"
+        )]
+        email: Option<String>,
+    },
+    /// List Users
+    List,
+    /// Apply a Revocation Certificate
+    ApplyRevocation {
+        #[structopt(
+            short = "i",
+            long = "id",
+            takes_value = true,
+            help = "Id of a revocation cert"
+        )]
+        id: i32,
+    },
+    /// Show Revocation Key (if available)
+    ShowRevocation {
+        #[structopt(
+            short = "e",
+            long = "email",
+            takes_value = true,
+            help = "Email address"
+        )]
+        email: String,
+    },
+}
+
+#[derive(StructOpt, Debug)]
+enum UserCheckSubcommand {
+    /// Check user key expiry
+    Expiry {
+        #[structopt(
+            short = "d",
+            long = "days",
+            takes_value = true,
+            help = "Check for keys that expire within 'days' days"
+        )]
+        days: Option<u64>,
+    },
+    /// Check signatures and trust signatures on CA key
+    Sigs,
+}
+
+#[derive(StructOpt, Debug)]
+enum BridgeCommand {
+    /// List Bridges
+    List,
+    /// Add New Bridge (sign existing remote CA Public Key)
+    New {
+        #[structopt(
+            short = "e",
+            long = "email",
+            takes_value = true,
+            help = "Bridge remote Email"
+        )]
+        email: Option<String>,
+
+        #[structopt(
+            short = "f",
+            long = "remote-key-file",
+            takes_value = true,
+            help = "File that contains the remote CA's Public Key"
+        )]
+        remote_key_file: String,
+
+        #[structopt(
+            short = "s",
+            long = "scope",
+            takes_value = true,
+            help = "Scope for trust of this bridge (domainname)"
+        )]
+        scope: Option<String>,
+    },
+    /// Revoke Bridge
+    Revoke {
+        #[structopt(
+            short = "e",
+            long = "email",
+            takes_value = true,
+            help = "Bridge remote Email"
+        )]
+        email: String,
+    },
+}
+
+#[derive(StructOpt, Debug)]
+struct WkdCommand {
+    #[structopt(
+        takes_value = true,
+        help = "Filesystem directory for WKD export"
+    )]
+    path: String,
+}
 
 fn real_main() -> Fallible<()> {
-    let yaml = load_yaml!("cli.yml");
-    let app = App::from_yaml(yaml).version(crate_version!());
+    let opt = Opt::from_args();
 
-    let matches = app.get_matches();
+    let db: Option<String> = opt.database;
+    let mut ca = ca::Ca::new(db.as_deref());
 
-    let db = matches.value_of("database");
-
-    let mut ca = ca::Ca::new(db);
-
-    match matches.subcommand() {
-        ("init", Some(_m)) => {
-            unimplemented!("what should this do?");
-        }
-        ("wkd-export", Some(m)) => match m.value_of("path") {
-            Some(path) => {
-                let (db_ca, _) = ca.get_ca()?.unwrap();
-                ca.export_wkd(&db_ca.domainname, Path::new(path))?;
+    match opt.cmd {
+        Command::Ca { cmd } => match cmd {
+            CaCommand::New { domain, name } => {
+                ca.ca_new(&domain, name.as_deref())?;
             }
-            _ => unimplemented!("missing domain name"),
-        },
-        ("ca", Some(m)) => match m.subcommand() {
-            ("new", Some(m2)) => match m2.value_of("domain") {
-                Some(domain) => {
-                    let name = m2.value_of("name");
-                    ca.ca_new(&domain, name)?;
-                }
-
-                _ => unimplemented!("missing domain name"),
-            },
-            ("show", Some(_m2)) => {
-                ca.show_ca()?;
-            }
-            ("export", Some(_m2)) => {
+            CaCommand::Export => {
                 let ca_key = ca.get_ca_pubkey_armored()?;
                 println!("{}", ca_key);
             }
-            ("import-tsig", Some(m2)) => {
-                let key_file = m2.value_of("key-file").unwrap();
+            CaCommand::ImportTsig { key_file } => {
                 let key = std::fs::read_to_string(key_file)?;
                 ca.import_tsig_for_ca(&key)?;
             }
-
-            _ => unimplemented!(),
+            CaCommand::Show => ca.show_ca()?,
         },
-        ("user", Some(m)) => {
-            match m.subcommand() {
-                ("add", Some(m2)) => {
-                    match m2.values_of("email") {
-                        Some(email) => {
-                            let email_vec = email.collect::<Vec<_>>();
+        Command::User { cmd } => match cmd {
+            UserCommand::Add { email, name } => {
+                // TODO: key-profile?
 
-                            let name = m2.value_of("name");
+                let email: Vec<&str> =
+                    email.iter().map(String::as_str).collect();
 
-                            // TODO
-                            // .arg(Arg::with_name("key-profile")
-                            //  .long("key-profile")
-                            //  .value_name("key-profile")
-                            //  .help("Key Profile"))
+                ca.usercert_new(name.as_deref(), &email[..])?;
+            }
+            UserCommand::AddRevocation { revocation_file } => {
+                ca.add_revocation(&revocation_file)?
+            }
 
-                            ca.usercert_new(name, &email_vec[..])?;
-                        }
-                        _ => unimplemented!(),
-                    }
+            UserCommand::Check { cmd } => match cmd {
+                UserCheckSubcommand::Expiry { days } => {
+                    check_expiry(&ca, days.unwrap_or(0))?;
                 }
-                ("import", Some(m2)) => match m2.values_of("email") {
+                UserCheckSubcommand::Sigs => {
+                    check_sigs(&ca)?;
+                }
+            },
+            UserCommand::Import {
+                key_file,
+                name,
+                email,
+                revocation_file,
+            } => {
+                let key = std::fs::read_to_string(key_file)?;
+                let revoc = match revocation_file {
+                    Some(filename) => Some(std::fs::read_to_string(filename)?),
+                    None => None,
+                };
+
+                let email: Vec<&str> =
+                    email.iter().map(String::as_str).collect();
+
+                ca.usercert_import(
+                    &key,
+                    revoc.as_deref(),
+                    name.as_deref(),
+                    &email[..],
+                )?;
+            }
+            UserCommand::Export { email } => {
+                match email {
                     Some(email) => {
-                        let email_vec = email.collect::<Vec<_>>();
-
-                        let name = m2.value_of("name");
-
-                        let key_file = m2.value_of("key-file").unwrap();
-                        let revocation_file = m2.value_of("revocation-file");
-
-                        let key = std::fs::read_to_string(key_file)?;
-
-                        let revoc = match revocation_file {
-                            Some(filename) => {
-                                Some(std::fs::read_to_string(filename)?)
-                            }
-                            None => None,
-                        };
-
-                        ca.usercert_import(
-                            &key,
-                            revoc.as_deref(),
-                            name,
-                            &email_vec[..],
-                        )?;
-                    }
-                    _ => unimplemented!(),
-                },
-                ("add-revocation", Some(m2)) => {
-                    let revocation_file =
-                        m2.value_of("revocation-file").unwrap();
-
-                    ca.add_revocation(revocation_file)?;
-                }
-                ("apply-revocation", Some(m2)) => {
-                    let id = m2.value_of("id").unwrap();
-                    let id: i32 =
-                        id.parse::<i32>().context("ID bad syntax")?;
-
-                    let rev = ca.get_revocation_by_id(id)?;
-
-                    ca.apply_revocation(rev)?;
-                }
-                ("export", Some(m2)) => {
-                    match m2.value_of("email") {
-                        Some(email) => {
-                            for cert in ca.get_usercerts(email)? {
-                                println!("{}", cert.pub_cert);
-                            }
+                        for cert in ca.get_usercerts(&email)? {
+                            println!("{}", cert.pub_cert);
                         }
-                        None => {
-                            // bulk export
-                            for cert in ca.get_all_usercerts()? {
-                                println!("{}", cert.pub_cert);
-                            }
+                    }
+                    None => {
+                        // bulk export
+                        for cert in ca.get_all_usercerts()? {
+                            println!("{}", cert.pub_cert);
                         }
                     }
                 }
-                ("show-revocations", Some(m2)) => {
-                    if let Some(email) = m2.value_of("email") {
-                        show_revocations(&ca, email)?;
-                    }
-                }
-                ("check", Some(m)) => match m.subcommand() {
-                    ("sigs", Some(_m2)) => {
-                        check_sigs(&ca)?;
-                    }
-                    ("expiry", Some(m2)) => {
-                        // check that keys are valid for at least this
-                        // number of days from now
-                        let exp_days = m2
-                            .value_of("days")
-                            .unwrap_or_else(|| "0")
-                            .parse::<u64>()
-                            .context("days parameter must be a number")?;
-                        check_expiry(&ca, exp_days)?;
-                    }
-                    _ => unimplemented!(),
-                },
-                ("list", Some(_m2)) => {
-                    list_users(&ca)?;
-                }
-
-                _ => unimplemented!("unexpected/missing subcommand"),
             }
-        }
-        ("bridge", Some(m)) => match m.subcommand() {
-            ("new", Some(m2)) => {
-                let scope = m2.value_of("scope");
-
-                let key_file = m2.value_of("remote-key-file").unwrap();
-
-                let email = m2.value_of("email");
-                new_bridge(&ca, email, key_file, scope)?;
+            UserCommand::List => list_users(&ca)?,
+            UserCommand::ShowRevocation { email } => {
+                show_revocations(&ca, &email)?;
             }
-            ("revoke", Some(m2)) => {
-                let email = m2.value_of("email").unwrap();
-
-                ca.bridge_revoke(email)?;
+            UserCommand::ApplyRevocation { id } => {
+                let rev = ca.get_revocation_by_id(id)?;
+                ca.apply_revocation(rev)?;
             }
-            ("list", Some(_m2)) => {
-                list_bridges(&ca)?;
-            }
-
-            _ => unimplemented!(),
         },
-        _ => unimplemented!(),
+        Command::Bridge { cmd } => match cmd {
+            BridgeCommand::New {
+                email,
+                scope,
+                remote_key_file,
+            } => new_bridge(
+                &ca,
+                email.as_deref(),
+                &remote_key_file,
+                scope.as_deref(),
+            )?,
+            BridgeCommand::Revoke { email } => ca.bridge_revoke(&email)?,
+            BridgeCommand::List => list_bridges(&ca)?,
+        },
+        Command::WkdExport { cmd } => {
+            let (db_ca, _) = ca.get_ca()?.unwrap();
+            ca.export_wkd(&db_ca.domainname, Path::new(&cmd.path))?;
+        }
     }
 
     Ok(())
@@ -241,7 +428,7 @@ fn check_sigs(ca: &ca::Ca) -> Fallible<()> {
                 usercert.name, usercert.fingerprint
             );
             false
-        } && if *tsig_on_ca {
+        } & &if *tsig_on_ca {
             true
         } else {
             println!(

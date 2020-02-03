@@ -1,6 +1,6 @@
 [package]
 name = "openpgp-ca"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Heiko Schaefer <heiko.schaefer@posteo.de>"]
 edition = "2018"
 
@@ -13,7 +13,8 @@ name = "openpgp-ca"
 path = "src/bin.rs"
 
 [dependencies]
-clap = {version = "2.33", features = ["yaml"]}
+structopt = "0.3"
+
 diesel = { version = "1.4", features = ["sqlite","r2d2"] }
 diesel_migrations = "1.4"
 
