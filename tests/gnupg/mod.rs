@@ -15,13 +15,11 @@ use tempfile;
 
 pub fn make_context() -> Fallible<Context> {
     let ctx = Context::ephemeral().context(
-        "SKIP: Failed to create GnuPG context: {}\n\
-                     SKIP: Is GnuPG installed?",
+        "SKIP: Failed to create GnuPG context. Is GnuPG installed?",
     )?;
 
     ctx.start("gpg-agent").context(
-        "SKIP: Failed to create GnuPG context: {}\n\
-                     SKIP: Is the GnuPG agent installed?",
+        "SKIP: Failed to to start gpg-agent. Is the GnuPG agent installed?",
     )?;
 
     Ok(ctx)
