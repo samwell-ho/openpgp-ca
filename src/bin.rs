@@ -428,7 +428,7 @@ fn check_sigs(ca: &ca::Ca) -> Fallible<()> {
                 usercert.name, usercert.fingerprint
             );
             false
-        } & &if *tsig_on_ca {
+        } && if *tsig_on_ca {
             true
         } else {
             println!(
