@@ -65,9 +65,8 @@ enum Command {
         #[structopt(subcommand)]
         cmd: BridgeCommand,
     },
-    /// Export all Certs to WKD
-    WkdExport {
-        // FIXME: refactor to "wkd export"
+    /// WKD
+    Wkd {
         #[structopt(subcommand)]
         cmd: WkdCommand,
     },
@@ -274,12 +273,15 @@ enum BridgeCommand {
 }
 
 #[derive(StructOpt, Debug)]
-struct WkdCommand {
-    #[structopt(
-        takes_value = true,
-        help = "Filesystem directory for WKD export"
-    )]
-    path: String,
+enum WkdCommand {
+    /// Export WKD structure
+    Export {
+        #[structopt(
+            takes_value = true,
+            help = "Filesystem directory for WKD export"
+        )]
+        path: String,
+    },
 }
 
 fn real_main() -> Fallible<()> {
@@ -384,10 +386,12 @@ fn real_main() -> Fallible<()> {
             BridgeCommand::Revoke { email } => ca.bridge_revoke(&email)?,
             BridgeCommand::List => list_bridges(&ca)?,
         },
-        Command::WkdExport { cmd } => {
-            let (db_ca, _) = ca.get_ca()?.unwrap();
-            ca.export_wkd(&db_ca.domainname, Path::new(&cmd.path))?;
-        }
+        Command::Wkd { cmd } => match cmd {
+            WkdCommand::Export { path } => {
+                let (db_ca, _) = ca.get_ca()?.unwrap();
+                ca.export_wkd(&db_ca.domainname, Path::new(&path))?;
+            }
+        },
     }
 
     Ok(())
