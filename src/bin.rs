@@ -203,8 +203,8 @@ enum UserCommand {
         )]
         id: i32,
     },
-    /// Show Revocation Key (if available)
-    ShowRevocation {
+    /// Show Revocation Keys (if available)
+    ShowRevocations {
         #[structopt(
             short = "e",
             long = "email",
@@ -362,7 +362,7 @@ fn real_main() -> Fallible<()> {
                 }
             }
             UserCommand::List => list_users(&ca)?,
-            UserCommand::ShowRevocation { email } => {
+            UserCommand::ShowRevocations { email } => {
                 show_revocations(&ca, &email)?;
             }
             UserCommand::ApplyRevocation { id } => {
