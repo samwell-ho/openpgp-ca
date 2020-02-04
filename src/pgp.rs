@@ -1,4 +1,4 @@
-// Copyright 2019 Heiko Schaefer heiko@schaefer.name
+// Copyright 2019-2020 Heiko Schaefer heiko@schaefer.name
 //
 // This file is part of OpenPGP CA.
 //
