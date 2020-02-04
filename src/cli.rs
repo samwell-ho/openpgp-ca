@@ -1,0 +1,207 @@
+use clap::AppSettings;
+use std::path::PathBuf;
+use structopt::StructOpt;
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "openpgp-ca",
+author = "Heiko Schäfer <heiko@schaefer.name>",
+global_settings(& [AppSettings::VersionlessSubcommands]),
+about = "OpenPGP CA is a tool for managing OpenPGP keys within organizations."
+)]
+pub struct Cli {
+    #[structopt(name = "filename", short = "d", long = "database")]
+    pub database: Option<String>,
+
+    #[structopt(subcommand)]
+    pub cmd: Command,
+}
+
+#[derive(StructOpt, Debug)]
+pub enum Command {
+    /// Manage CA
+    Ca {
+        #[structopt(subcommand)]
+        cmd: CaCommand,
+    },
+    /// Manage Users
+    User {
+        #[structopt(subcommand)]
+        cmd: UserCommand,
+    },
+    /// Manage Bridges
+    Bridge {
+        #[structopt(subcommand)]
+        cmd: BridgeCommand,
+    },
+    /// WKD
+    Wkd {
+        #[structopt(subcommand)]
+        cmd: WkdCommand,
+    },
+    //    /// Manage Directories
+    //    Directory {
+    //        #[structopt(subcommand)]
+    //        cmd: DirCommand,
+    //    },
+    //    /// Manage key-profiles
+    //    KeyProfile {},
+}
+
+#[derive(StructOpt, Debug)]
+pub enum CaCommand {
+    /// Create CA
+    New {
+        #[structopt(help = "CA domain name")]
+        domain: String,
+
+        #[structopt(short = "n", long = "name", help = "User Name")]
+        name: Option<String>,
+    },
+    /// Export CA public key
+    Export,
+    /// Import trust signature for CA Key
+    ImportTsig {
+        #[structopt(
+            short = "f",
+            long = "file",
+            help = "File that contains the tsigned CA Key"
+        )]
+        key_file: PathBuf,
+    },
+    /// Show CA
+    Show,
+}
+
+#[derive(StructOpt, Debug)]
+pub enum UserCommand {
+    /// Add User (create new Key-Pair)
+    Add {
+        #[structopt(short = "e", long = "email", help = "Email address")]
+        email: Vec<String>,
+
+        #[structopt(short = "n", long = "name", help = "User Name")]
+        name: Option<String>,
+    },
+
+    /// Add Revocation Certificate
+    AddRevocation {
+        #[structopt(
+            short = "r",
+            long = "revocation-file",
+            help = "File that contains a revocation cert"
+        )]
+        revocation_file: PathBuf,
+    },
+    /// Bulk checks on Users
+    Check {
+        #[structopt(subcommand)]
+        cmd: UserCheckSubcommand,
+    },
+    /// Import User (use existing Public Key)
+    Import {
+        #[structopt(short = "e", long = "email", help = "Email address")]
+        email: Vec<String>,
+
+        #[structopt(
+            short = "f",
+            long = "key-file",
+            help = "File that contains the User's Public Key"
+        )]
+        key_file: PathBuf,
+
+        #[structopt(short = "n", long = "name", help = "User Name")]
+        name: Option<String>,
+
+        #[structopt(
+            short = "r",
+            long = "revocation-file",
+            help = "File that contains the User's revocation cert"
+        )]
+        revocation_file: Option<PathBuf>,
+    },
+    /// Export User Public Key (bulk, if no email address is given)
+    Export {
+        #[structopt(short = "e", long = "email", help = "Email address")]
+        email: Option<String>,
+    },
+    /// List Users
+    List,
+    /// Apply a Revocation Certificate
+    ApplyRevocation {
+        #[structopt(
+            short = "i",
+            long = "id",
+            help = "Id of a revocation cert"
+        )]
+        id: i32,
+    },
+    /// Show Revocation Keys (if available)
+    ShowRevocations {
+        #[structopt(short = "e", long = "email", help = "Email address")]
+        email: String,
+    },
+}
+
+#[derive(StructOpt, Debug)]
+pub enum UserCheckSubcommand {
+    /// Check user key expiry
+    Expiry {
+        #[structopt(
+            short = "d",
+            long = "days",
+            help = "Check for keys that expire within 'days' days"
+        )]
+        days: Option<u64>,
+    },
+    /// Check signatures and trust signatures on CA key
+    Sigs,
+}
+
+#[derive(StructOpt, Debug)]
+pub enum BridgeCommand {
+    /// List Bridges
+    List,
+    /// Add New Bridge (sign existing remote CA Public Key)
+    New {
+        #[structopt(
+            short = "e",
+            long = "email",
+            help = "Bridge remote Email"
+        )]
+        email: Option<String>,
+
+        #[structopt(
+            name = "filename",
+            short = "f",
+            long = "remote-key-file",
+            help = "File that contains the remote CA's Public Key"
+        )]
+        remote_key_file: PathBuf,
+
+        #[structopt(
+            name = "domainname",
+            short = "s",
+            long = "scope",
+            help = "Scope for trust of this bridge"
+        )]
+        scope: Option<String>,
+    },
+    /// Revoke Bridge
+    Revoke {
+        #[structopt(
+            short = "e",
+            long = "email",
+            help = "Bridge remote Email"
+        )]
+        email: String,
+    },
+}
+
+#[derive(StructOpt, Debug)]
+pub enum WkdCommand {
+    /// Export WKD structure
+    Export {
+        #[structopt(help = "Filesystem directory for WKD export")]
+        path: PathBuf,
+    },
+}

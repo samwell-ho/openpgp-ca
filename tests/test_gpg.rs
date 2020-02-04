@@ -4,6 +4,7 @@ use sequoia_openpgp as openpgp;
 use openpgp_ca_lib::ca;
 
 use failure::{self, Fallible, ResultExt};
+use std::path::PathBuf;
 
 pub mod gnupg;
 
@@ -217,8 +218,8 @@ fn test_bridge() -> Fallible<()> {
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    ca1.bridge_new(&ca_other_file, None, None)?;
-    ca2.bridge_new(&ca_some_file, None, None)?;
+    ca1.bridge_new(&PathBuf::from(ca_other_file), None, None)?;
+    ca2.bridge_new(&PathBuf::from(ca_some_file), None, None)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 

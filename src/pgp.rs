@@ -34,6 +34,7 @@ use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 use std::time::SystemTime;
 
 use failure::{self, Fallible, ResultExt};
+use std::path::PathBuf;
 
 pub struct Pgp {}
 
@@ -196,7 +197,7 @@ impl Pgp {
 
     /// Load Revocation Cert from file
     pub fn load_revocation_cert(
-        revoc_file: Option<&str>,
+        revoc_file: Option<&PathBuf>,
     ) -> Fallible<Signature> {
         if let Some(filename) = revoc_file {
             let p = openpgp::Packet::from_file(filename)

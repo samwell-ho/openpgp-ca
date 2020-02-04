@@ -2,7 +2,7 @@ use failure::_core::time::Duration;
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp;
 use sequoia_openpgp::{Cert, Fingerprint, KeyID};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tokio_core::reactor::Core;
 
@@ -362,8 +362,8 @@ fn test_ca_multiple_revocations() -> Fallible<()> {
     let revoc_file3 = format!("{}/alice.revoc3", home_path);
     gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file3, 3)?;
 
-    ca.add_revocation(&revoc_file1)?;
-    ca.add_revocation(&revoc_file3)?;
+    ca.add_revocation(&PathBuf::from(revoc_file1))?;
+    ca.add_revocation(&PathBuf::from(revoc_file3))?;
 
     // check data in CA
     let usercerts = ca.get_all_usercerts()?;

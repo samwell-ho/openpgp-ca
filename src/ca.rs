@@ -17,7 +17,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::SystemTime;
 
@@ -477,7 +477,7 @@ impl Ca {
 
     // -------- revocations
 
-    pub fn add_revocation(&self, revoc_file: &str) -> Fallible<()> {
+    pub fn add_revocation(&self, revoc_file: &PathBuf) -> Fallible<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
             .context("Couldn't load revocation cert")?;
 
@@ -586,7 +586,7 @@ impl Ca {
     /// when scope is not set, it is derived from the user_id in the key_file
     pub fn bridge_new(
         &self,
-        key_file: &str,
+        key_file: &PathBuf,
         email: Option<&str>,
         scope: Option<&str>,
     ) -> Fallible<models::Bridge> {
