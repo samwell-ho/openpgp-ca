@@ -22,17 +22,17 @@ use chrono::DateTime;
 use failure::{self, Fallible};
 use std::path::PathBuf;
 use std::process::exit;
-use structopt::StructOpt;
 
-use cli::*;
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp::Pgp;
 
 fn real_main() -> Fallible<()> {
+    use cli::*;
+    use structopt::StructOpt;
+
     let cli = Cli::from_args();
 
-    let db: Option<String> = cli.database;
-    let mut ca = ca::Ca::new(db.as_deref());
+    let mut ca = ca::Ca::new(cli.database.as_deref());
 
     match cli.cmd {
         Command::User { cmd } => match cmd {
@@ -50,6 +50,7 @@ fn real_main() -> Fallible<()> {
 
             UserCommand::Check { cmd } => match cmd {
                 UserCheckSubcommand::Expiry { days } => {
+                    // FIXME: set default in structopt?
                     check_expiry(&ca, days.unwrap_or(0))?;
                 }
                 UserCheckSubcommand::Sigs => {
@@ -79,23 +80,15 @@ fn real_main() -> Fallible<()> {
                 )?;
             }
             UserCommand::Export { email } => {
-                match email {
-                    Some(email) => {
-                        for cert in ca.get_usercerts(&email)? {
-                            println!("{}", cert.pub_cert);
-                        }
-                    }
-                    None => {
-                        // bulk export
-                        for cert in ca.get_all_usercerts()? {
-                            println!("{}", cert.pub_cert);
-                        }
-                    }
-                }
+                let certs = match email {
+                    Some(email) => ca.get_usercerts(&email)?,
+                    None => ca.get_all_usercerts()?,
+                };
+                certs.iter().for_each(|cert| println!("{}", cert.pub_cert));
             }
             UserCommand::List => list_users(&ca)?,
             UserCommand::ShowRevocations { email } => {
-                show_revocations(&ca, &email)?;
+                show_revocations(&ca, &email)?
             }
             UserCommand::ApplyRevocation { id } => {
                 let rev = ca.get_revocation_by_id(id)?;
@@ -144,10 +137,10 @@ fn real_main() -> Fallible<()> {
 fn show_revocations(ca: &ca::Ca, email: &str) -> Fallible<()> {
     let usercerts = ca.get_usercerts(email)?;
     if usercerts.is_empty() {
-        println!("User not found");
+        println!("No Users found");
     } else {
         for cert in usercerts {
-            println!("revocations for {:?}", cert.name);
+            println!("Revocations for Usercert {:?}", cert.name);
             let revoc = ca.get_revocations(&cert)?;
             for r in revoc {
                 println!(" revocation id {:?}", r.id);
@@ -239,12 +232,11 @@ fn list_users(ca: &ca::Ca) -> Fallible<()> {
                 .clone()
                 .unwrap_or_else(|| "<no name>".to_string())
         );
-
         println!("fingerprint {}", usercert.fingerprint);
 
-        for email in ca.get_emails(&usercert)? {
-            println!("- email {}", email.addr);
-        }
+        ca.get_emails(&usercert)?
+            .iter()
+            .for_each(|email| println!("- email {}", email.addr));
 
         let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
         if let Some(exp) = Pgp::get_expiry(&cert)? {
@@ -263,9 +255,9 @@ fn list_users(ca: &ca::Ca) -> Fallible<()> {
 }
 
 fn list_bridges(ca: &ca::Ca) -> Fallible<()> {
-    for bridge in ca.get_bridges()? {
-        println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key);
-    }
+    ca.get_bridges()?.iter().for_each(|bridge| {
+        println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key)
+    });
     Ok(())
 }
 
@@ -281,7 +273,7 @@ fn new_bridge(
     println!("signed certificate for {} as bridge\n", bridge.email);
     println!("CAUTION:");
     println!("The fingerprint of the remote CA key is");
-    println!("{}\n", remote.fingerprint().to_string());
+    println!("{}\n", remote.fingerprint());
     println!(
         "Please verify that this key is controlled by \
          {} before disseminating the signed remote certificate",
@@ -289,8 +281,6 @@ fn new_bridge(
     );
     Ok(())
 }
-
-// -----------------
 
 fn main() {
     if let Err(e) = real_main() {
