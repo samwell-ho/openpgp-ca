@@ -24,6 +24,7 @@ use std::time::SystemTime;
 use tokio_core::reactor::Core;
 
 use failure::{self, Fallible, ResultExt};
+use sequoia_openpgp::policy::StandardPolicy;
 
 pub mod gnupg;
 
@@ -80,6 +81,8 @@ fn test_ca() -> Fallible<()> {
 
 #[test]
 fn test_update_usercert_key() -> Fallible<()> {
+    let policy = StandardPolicy::new();
+
     let now = SystemTime::now();
     let in_one_year = now.checked_add(Duration::from_secs(3600 * 24 * 365));
     let in_three_years =
@@ -121,8 +124,8 @@ fn test_update_usercert_key() -> Fallible<()> {
     // check that expiry is ~2y
     let cert = pgp::Pgp::armored_to_cert(&alice.pub_cert)?;
 
-    cert.alive(in_one_year)?;
-    assert!(cert.alive(in_three_years).is_err());
+    cert.alive(&policy, in_one_year)?;
+    assert!(cert.alive(&policy, in_three_years).is_err());
 
     // check the same with ca.usercert_expiry()
     let exp1 = ca.usercert_expiry(365)?;
@@ -155,8 +158,8 @@ fn test_update_usercert_key() -> Fallible<()> {
     // check that expiry is not ~2y but ~5y
     let cert = pgp::Pgp::armored_to_cert(&usercerts[0].pub_cert)?;
 
-    assert!(cert.alive(in_three_years).is_ok());
-    assert!(!cert.alive(in_six_years).is_ok());
+    assert!(cert.alive(&policy, in_three_years).is_ok());
+    assert!(!cert.alive(&policy, in_six_years).is_ok());
 
     // check the same with ca.usercert_expiry()
     let exp3 = ca.usercert_expiry(3 * 365)?;

@@ -34,6 +34,7 @@ use crate::models;
 use crate::pgp::Pgp;
 
 use failure::{self, Fallible, ResultExt};
+use sequoia_openpgp::policy::StandardPolicy;
 
 pub struct Ca {
     db: Db,
@@ -404,7 +405,8 @@ impl Ca {
         for usercert in usercerts {
             let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
             let exp = Pgp::get_expiry(&cert)?;
-            let alive = cert.alive(expiry_test).is_ok();
+            let alive =
+                cert.alive(&StandardPolicy::new(), expiry_test).is_ok();
 
             map.insert(usercert, (alive, exp));
         }

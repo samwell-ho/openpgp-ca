@@ -19,14 +19,13 @@ use sequoia_openpgp as openpgp;
 
 use openpgp::armor;
 use openpgp::cert;
-use openpgp::cert::components::Amalgamation;
 use openpgp::cert::ValidKeyIter;
 use openpgp::crypto::KeyPair;
 use openpgp::packet::key::SecretParts;
 use openpgp::packet::signature;
 use openpgp::packet::{Signature, UserID};
 use openpgp::parse::Parse;
-use openpgp::serialize::Serialize;
+use openpgp::serialize::{Serialize, SerializeInto};
 use openpgp::types::KeyFlags;
 use openpgp::types::{ReasonForRevocation, SignatureType};
 use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
@@ -34,6 +33,8 @@ use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 use std::time::SystemTime;
 
 use failure::{self, Fallible, ResultExt};
+use sequoia_openpgp::cert::components::Amalgamation;
+use sequoia_openpgp::policy::StandardPolicy;
 use std::path::PathBuf;
 
 pub struct Pgp {}
@@ -73,8 +74,12 @@ impl Pgp {
         let email = "openpgp-ca@".to_owned() + domainname;
         let userid = Self::user_id(&email, name);
 
-        let direct_key_sig =
-            cert.primary_key().policy(None).unwrap().binding_signature();
+        let policy = StandardPolicy::new();
+
+        let direct_key_sig = cert
+            .primary_key()
+            .set_policy(&policy, None)?
+            .binding_signature();
         let builder = signature::Builder::from(direct_key_sig.clone())
             .set_type(SignatureType::PositiveCertification)
             .set_key_flags(&KeyFlags::empty().set_certification(true))?
@@ -117,11 +122,7 @@ impl Pgp {
 
     /// make a "public key" ascii-armored representation of a Cert
     pub fn cert_to_armored(cert: &Cert) -> Fallible<String> {
-        // FIXME: currently sequoia bug, but use this later:
-        //    let v = cert.armored().to_vec().context("Cert serialize failed")?;
-
-        let mut v = Vec::new();
-        cert.armored().serialize(&mut v)?;
+        let v = cert.armored().to_vec().context("Cert serialize failed")?;
 
         Ok(String::from_utf8(v)?)
     }
@@ -144,6 +145,7 @@ impl Pgp {
             .unwrap();
 
             cert.as_tsk().serialize(&mut writer)?;
+            writer.finalize()?;
         }
 
         Ok(String::from_utf8(buffer)?)
@@ -179,6 +181,7 @@ impl Pgp {
                 armor::Writer::new(&mut buf, armor::Kind::Signature, &[][..])
                     .unwrap();
             rev.serialize(&mut writer)?;
+            writer.finalize()?;
         }
 
         Ok(String::from_utf8(buf)?)
@@ -186,7 +189,8 @@ impl Pgp {
 
     /// get expiration of cert as SystemTime
     pub fn get_expiry(cert: &Cert) -> Fallible<Option<SystemTime>> {
-        let primary = cert.primary_key().policy(None)?;
+        let policy = StandardPolicy::new();
+        let primary = cert.primary_key().set_policy(&policy, None)?;
         if let Some(duration) = primary.key_expiration_time() {
             let creation = primary.creation_time();
             Ok(creation.checked_add(duration))
@@ -410,9 +414,10 @@ impl Pgp {
 
     /// get all valid, certification capable keys with secret key material
     fn get_cert_keys(cert: &Cert) -> Fallible<Vec<KeyPair>> {
+        let policy = StandardPolicy::new();
         let keys: ValidKeyIter<SecretParts> = cert
             .keys()
-            .policy(None)
+            .set_policy(&policy, None)
             .alive()
             .revoked(false)
             .for_certification()
