@@ -19,12 +19,14 @@ use sequoia_openpgp as openpgp;
 
 use openpgp::armor;
 use openpgp::cert;
+use openpgp::cert::components::Amalgamation;
 use openpgp::cert::ValidKeyIter;
 use openpgp::crypto::KeyPair;
 use openpgp::packet::key::SecretParts;
 use openpgp::packet::signature;
 use openpgp::packet::{Signature, UserID};
 use openpgp::parse::Parse;
+use openpgp::policy::StandardPolicy;
 use openpgp::serialize::{Serialize, SerializeInto};
 use openpgp::types::KeyFlags;
 use openpgp::types::{ReasonForRevocation, SignatureType};
@@ -33,8 +35,6 @@ use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 use std::time::SystemTime;
 
 use failure::{self, Fallible, ResultExt};
-use sequoia_openpgp::cert::components::Amalgamation;
-use sequoia_openpgp::policy::StandardPolicy;
 use std::path::PathBuf;
 
 pub struct Pgp {}
