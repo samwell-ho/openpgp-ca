@@ -79,7 +79,7 @@ or
 *  create and export a keypair (and optionally a revocation certificate) for
  Alice:
 
-`gpg --quick-generate-key alice@example.org`
+`gpg --pinentry-mode=loopback --quick-generate-key alice@example.org`
 
 `gpg --export --armor alice@example.org > alice.pubkey`
 
