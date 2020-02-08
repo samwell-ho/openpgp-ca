@@ -27,6 +27,7 @@ use sequoia_openpgp as openpgp;
 
 use openpgp::packet::Signature;
 use openpgp::parse::Parse;
+use openpgp::policy::StandardPolicy;
 use openpgp::{Cert, Fingerprint, KeyID, Packet};
 
 use crate::db::Db;
@@ -34,7 +35,6 @@ use crate::models;
 use crate::pgp::Pgp;
 
 use failure::{self, Fallible, ResultExt};
-use sequoia_openpgp::policy::StandardPolicy;
 
 pub struct Ca {
     db: Db,
@@ -134,20 +134,28 @@ impl Ca {
         Ok(ca_pub)
     }
 
-    /// get all tsig(s) on user_ids in this Cert
-    fn get_tsigs(c: &Cert) -> Vec<&Signature> {
-        c.userids()
-            .flat_map(|b| b.binding().certifications())
-            .filter(|&s| s.trust_signature().is_some())
-            .collect()
+    /// get all trust sigs on user_ids in this Cert
+    fn get_trust_sigs(&self, c: &Cert) -> Fallible<Vec<Signature>> {
+        Ok(self
+            .get_third_party_sigs(c)?
+            .iter()
+            .filter(|s| s.trust_signature().is_some())
+            .cloned()
+            .collect())
     }
 
-    /// get all sig(s) in this Cert (from subkeys and user_ids)
-    fn get_sigs(c: &Cert) -> Vec<&Signature> {
-        c.userids()
-            .flat_map(|b| b.binding().certifications())
-            .chain(c.keys().flat_map(|s| s.binding().certifications()))
-            .collect()
+    /// get all third party sigs on user_ids in this Cert
+    fn get_third_party_sigs(&self, c: &Cert) -> Fallible<Vec<Signature>> {
+        let mut res = Vec::new();
+        let policy = StandardPolicy::new();
+
+        for uid in c.userids() {
+            let sigs =
+                uid.with_policy(&policy, None)?.bundle().certifications();
+            sigs.iter().for_each(|s| res.push(s.clone()));
+        }
+
+        Ok(res)
     }
 
     /// receive an armored key, find any tsigs on it,
@@ -167,11 +175,11 @@ impl Ca {
             }
 
             // get the tsig(s) from import
-            let tsigs = Self::get_tsigs(&cert_import);
+            let tsigs = self.get_trust_sigs(&cert_import)?;
 
             // add tsig(s) to our "own" version of the CA key
             let mut packets: Vec<Packet> = Vec::new();
-            tsigs.iter().for_each(|&s| packets.push(s.clone().into()));
+            tsigs.iter().for_each(|s| packets.push(s.clone().into()));
 
             let signed = ca_cert
                 .merge_packets(packets)
@@ -442,13 +450,13 @@ impl Ca {
     /// check if this usercert has been signed by the CA
     pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Fallible<bool> {
         let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
-        let sigs = Self::get_sigs(&user_cert);
+        let sigs = self.get_third_party_sigs(&user_cert)?;
 
         let ca = self.get_ca_cert()?;
 
         Ok(sigs
             .iter()
-            .any(|&s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
+            .any(|s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
     }
 
     /// check if this usercert has tsigned the CA
@@ -457,11 +465,11 @@ impl Ca {
         usercert: &models::Usercert,
     ) -> Fallible<bool> {
         let ca = self.get_ca_cert()?;
-        let tsigs = Self::get_tsigs(&ca);
+        let tsigs = self.get_trust_sigs(&ca)?;
 
         let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
 
-        Ok(tsigs.iter().any(|&t| {
+        Ok(tsigs.iter().any(|t| {
             t.issuer_fingerprint().unwrap() == &user_cert.fingerprint()
         }))
     }

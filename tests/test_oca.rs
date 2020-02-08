@@ -70,7 +70,12 @@ fn test_ca() -> Fallible<()> {
     // check that the custom name has ended up in the CA Cert
     let ca_cert = ca.get_ca_cert().unwrap();
     let uid = ca_cert.userids().find(|c| {
-        c.binding().userid().name().unwrap()
+        c.clone()
+            .with_policy(&StandardPolicy::new(), None)
+            .unwrap()
+            .userid()
+            .name()
+            .unwrap()
             == Some("Example Org OpenPGP CA Key".to_owned())
     });
 

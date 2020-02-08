@@ -20,9 +20,7 @@ use sequoia_openpgp as openpgp;
 use openpgp::armor;
 use openpgp::cert;
 use openpgp::cert::components::Amalgamation;
-use openpgp::cert::ValidKeyIter;
 use openpgp::crypto::KeyPair;
-use openpgp::packet::key::SecretParts;
 use openpgp::packet::signature;
 use openpgp::packet::{Signature, UserID};
 use openpgp::parse::Parse;
@@ -60,7 +58,7 @@ impl Pgp {
             .add_signing_subkey()
             // FIXME: set expiration from CLI
             // std::time::Duration::new(123456, 0)
-            .set_expiration(None)
+            .set_expiration_time(None)
             .generate()?;
 
         let mut keypair = cert
@@ -78,7 +76,7 @@ impl Pgp {
 
         let direct_key_sig = cert
             .primary_key()
-            .set_policy(&policy, None)?
+            .with_policy(&policy, None)?
             .binding_signature();
         let builder = signature::Builder::from(direct_key_sig.clone())
             .set_type(SignatureType::PositiveCertification)
@@ -190,7 +188,7 @@ impl Pgp {
     /// get expiration of cert as SystemTime
     pub fn get_expiry(cert: &Cert) -> Fallible<Option<SystemTime>> {
         let policy = StandardPolicy::new();
-        let primary = cert.primary_key().set_policy(&policy, None)?;
+        let primary = cert.primary_key().with_policy(&policy, None)?;
         if let Some(duration) = primary.key_expiration_time() {
             let creation = primary.creation_time();
             Ok(creation.checked_add(duration))
@@ -415,9 +413,9 @@ impl Pgp {
     /// get all valid, certification capable keys with secret key material
     fn get_cert_keys(cert: &Cert) -> Fallible<Vec<KeyPair>> {
         let policy = StandardPolicy::new();
-        let keys: ValidKeyIter<SecretParts> = cert
+        let keys = cert
             .keys()
-            .set_policy(&policy, None)
+            .with_policy(&policy, None)
             .alive()
             .revoked(false)
             .for_certification()
