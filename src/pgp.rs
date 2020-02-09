@@ -33,6 +33,7 @@ use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 use std::time::SystemTime;
 
 use failure::{self, Fallible, ResultExt};
+use sequoia_openpgp::RevocationStatus;
 use std::path::PathBuf;
 
 pub struct Pgp {}
@@ -195,6 +196,13 @@ impl Pgp {
         } else {
             Ok(None)
         }
+    }
+
+    /// is (possibly) revoked
+    pub fn is_possibly_revoked(cert: &Cert) -> bool {
+        let status = cert.revoked(&StandardPolicy::new(), None);
+
+        status == RevocationStatus::NotAsFarAsWeKnow
     }
 
     /// Load Revocation Cert from file

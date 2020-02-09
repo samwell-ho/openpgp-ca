@@ -248,6 +248,9 @@ fn list_users(ca: &ca::Ca) -> Fallible<()> {
 
         println!(" user cert (or subkey) signed by CA: {}", sig_from_ca);
         println!(" user cert has tsigned CA: {}", tsig_on_ca);
+        if Pgp::is_possibly_revoked(&cert) {
+            println!(" this certificate has (possibly) been REVOKED");
+        }
         println!();
     }
 
