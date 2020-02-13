@@ -70,7 +70,7 @@ impl Pgp {
             .into_keypair()?;
 
         // Generate a userid and a binding signature.
-        let email = "openpgp-ca@".to_owned() + domainname;
+        let email = format!("openpgp-ca@{}", domainname);
         let userid = Self::user_id(&email, name);
 
         let policy = StandardPolicy::new();
@@ -85,7 +85,7 @@ impl Pgp {
             // notation: "openpgp-ca:domain=domain1;domain2"
             .add_notation(
                 "openpgp-ca",
-                ("domain=".to_owned() + domainname).as_bytes(),
+                (format!("domain={}", domainname)).as_bytes(),
                 signature::subpacket::NotationDataFlags::default()
                     .set_human_readable(true),
                 false,
