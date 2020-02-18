@@ -93,7 +93,12 @@ pub enum CaCommand {
 pub enum UserCommand {
     /// Add User (create new Key-Pair)
     Add {
-        #[structopt(short = "e", long = "email", help = "Email address")]
+        #[structopt(
+            short = "e",
+            long = "email",
+            required = true,
+            help = "Email address"
+        )]
         email: Vec<String>,
 
         #[structopt(short = "n", long = "name", help = "User Name")]
