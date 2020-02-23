@@ -24,6 +24,7 @@ dotenv = "0.15"
 failure = "0.1"
 chrono = "0.4"
 
+chbs = "0.0.8"
 publicsuffix = "1.5"
 
 futures = "0.1"

@@ -40,8 +40,8 @@ fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
     ca.ca_new("example.org", None)?;
 
     // make CA users
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"])?;
-    ca.usercert_new(Some(&"Bob"), &["bob@example.org"])?;
+    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.usercert_new(Some(&"Bob"), &["bob@example.org"], false)?;
 
     // ---- import keys from OpenPGP CA into GnuPG ----
 
@@ -210,7 +210,7 @@ fn test_bridge() -> Fallible<()> {
 
     // make CA user
     assert!(ca1
-        .usercert_new(Some(&"Alice"), &["alice@some.org"])
+        .usercert_new(Some(&"Alice"), &["alice@some.org"], false)
         .is_ok());
 
     // ---- populate second OpenPGP CA instance ----
@@ -219,10 +219,10 @@ fn test_bridge() -> Fallible<()> {
     ca2.ca_new("other.org", None)?;
 
     // make CA user
-    ca2.usercert_new(Some(&"Bob"), &["bob@other.org"])?;
+    ca2.usercert_new(Some(&"Bob"), &["bob@other.org"], false)?;
 
     // make CA user that is out of the domain scope for ca2
-    ca2.usercert_new(Some(&"Carol"), &["carol@third.org"])?;
+    ca2.usercert_new(Some(&"Carol"), &["carol@third.org"], false)?;
 
     // ---- setup bridges: scoped trust between one.org and two.org ---
 

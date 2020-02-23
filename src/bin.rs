@@ -42,7 +42,7 @@ fn real_main() -> Fallible<()> {
                 let email: Vec<&str> =
                     email.iter().map(String::as_str).collect();
 
-                ca.usercert_new(name.as_deref(), &email[..])?;
+                ca.usercert_new(name.as_deref(), &email[..], true)?;
             }
             UserCommand::AddRevocation { revocation_file } => {
                 ca.add_revocation(&revocation_file)?

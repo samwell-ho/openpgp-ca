@@ -39,6 +39,12 @@ use std::path::PathBuf;
 pub struct Pgp {}
 
 impl Pgp {
+    fn diceware() -> String {
+        // FIXME: configurable dictionaries, ... ?
+        use chbs::passphrase;
+        passphrase()
+    }
+
     fn user_id(email: &str, name: Option<&str>) -> UserID {
         match name {
             Some(name) => UserID::from(format!("{} <{}>", name, email)),
@@ -102,7 +108,16 @@ impl Pgp {
     pub fn make_user_cert(
         emails: &[&str],
         name: Option<&str>,
-    ) -> Fallible<(Cert, Signature)> {
+        password: bool,
+    ) -> Fallible<(Cert, Signature, Option<String>)> {
+        // FIXME: use passphrase
+
+        let pass = if password {
+            Some(Self::diceware())
+        } else {
+            None
+        };
+
         let mut builder = cert::CertBuilder::new()
             .add_subkey(
                 KeyFlags::default()
@@ -112,11 +127,16 @@ impl Pgp {
             )
             .add_signing_subkey();
 
+        if let Some(pass) = &pass {
+            builder = builder.set_password(Some(pass.to_owned().into()));
+        }
+
         for email in emails {
             builder = builder.add_userid(Self::user_id(&email, name));
         }
 
-        Ok(builder.generate()?)
+        let (cert, sig) = builder.generate()?;
+        Ok((cert, sig, pass))
     }
 
     /// make a "public key" ascii-armored representation of a Cert

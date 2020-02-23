@@ -30,8 +30,9 @@ pub mod gnupg;
 
 #[test]
 fn test_pgp_wrapper() -> Fallible<()> {
-    let (cert, _) =
-        pgp::Pgp::make_user_cert(&["foo@example.org"], Some("Foo")).unwrap();
+    let (cert, _, _) =
+        pgp::Pgp::make_user_cert(&["foo@example.org"], Some("Foo"), false)
+            .unwrap();
 
     let armored = pgp::Pgp::priv_cert_to_armored(&cert)?;
 
@@ -53,7 +54,7 @@ fn test_ca() -> Fallible<()> {
     ca.ca_new("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     // make CA user
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"])?;
+    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
     let usercerts = ca.get_all_usercerts()?;
 
@@ -254,10 +255,10 @@ fn test_ca_insert_duplicate_email() -> Fallible<()> {
     assert!(ca.ca_new("example.org", None).is_ok());
 
     // make CA user
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"])?;
+    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
     // make another CA user with the same email address
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"])?;
+    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
     let usercerts = ca.get_all_usercerts()?;
 
@@ -283,8 +284,8 @@ fn test_ca_export_wkd() -> Fallible<()> {
     let mut ca = ca::Ca::new(Some(&db));
 
     ca.ca_new("example.org", None)?;
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"])?;
-    ca.usercert_new(Some(&"Bob"), &["bob@example.org"])?;
+    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.usercert_new(Some(&"Bob"), &["bob@example.org"], false)?;
 
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
@@ -442,7 +443,7 @@ fn test_ca_signatures() -> Fallible<()> {
 
     // create carol, CA will sign carol's key.
     // also, CA key gets a tsig by carol
-    ca.usercert_new(Some(&"Carol"), &["carol@example.org"])?;
+    ca.usercert_new(Some(&"Carol"), &["carol@example.org"], false)?;
 
     let sigs = ca.usercert_signatures()?;
     for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
@@ -478,7 +479,7 @@ fn test_apply_revocation() -> Fallible<()> {
     ca.ca_new("example.org", None)?;
 
     // make CA user
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"])?;
+    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
     let usercerts = ca.get_all_usercerts()?;
 
