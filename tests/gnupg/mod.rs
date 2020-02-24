@@ -456,6 +456,24 @@ pub fn create_user(ctx: &Context, user_id: &str) {
     assert!(status.success());
 }
 
+pub fn sign(ctx: &Context, user_id: &str) -> Fallible<()> {
+    let homedir =
+        String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
+
+    let cmd = format!("gpg --homedir {} --edit-key {}", homedir, user_id);
+
+    let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
+    p.exp_string("gpg>").unwrap();
+    p.send_line("sign").unwrap();
+    p.exp_string("Really sign? (y/N)").unwrap();
+    p.send_line("y").unwrap();
+    p.exp_string("gpg>").unwrap();
+    p.send_line("save").unwrap();
+    p.exp_eof().unwrap();
+
+    Ok(())
+}
+
 pub fn tsign(
     ctx: &Context,
     user_id: &str,

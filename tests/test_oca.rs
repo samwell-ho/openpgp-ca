@@ -18,13 +18,16 @@
 use failure::_core::time::Duration;
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp;
-use sequoia_openpgp::{Cert, Fingerprint, KeyID};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tokio_core::reactor::Core;
 
 use failure::{self, Fallible, ResultExt};
-use sequoia_openpgp::policy::StandardPolicy;
+
+use openpgp::policy::StandardPolicy;
+use openpgp::serialize::Serialize;
+use openpgp::{Cert, Fingerprint, KeyID};
+use sequoia_openpgp as openpgp;
 
 pub mod gnupg;
 
@@ -495,6 +498,59 @@ fn test_apply_revocation() -> Fallible<()> {
     let rev = ca.get_revocations(alice)?;
     assert_eq!(rev.len(), 1);
     assert!(rev.get(0).unwrap().published);
+
+    Ok(())
+}
+
+#[test]
+/// import a user cert that has already been signed by the CA
+fn test_import_signed_cert() -> Fallible<()> {
+    let policy = StandardPolicy::new();
+
+    let ctx = gnupg::make_context()?;
+    // ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let ca = ca::Ca::new(Some(&db));
+    ca.ca_new("example.org", None)?;
+
+    // import CA key into GnuPG
+    let ca_cert = ca.get_ca_cert()?;
+    let mut buf = Vec::new();
+    ca_cert.as_tsk().serialize(&mut buf)?;
+    gnupg::import(&ctx, &buf);
+
+    // set up, sign Alice key with gnupg
+    gnupg::create_user(&ctx, "Alice <alice@example.org>");
+    gnupg::sign(&ctx, "alice@example.org").expect("signing alice failed");
+
+    // import alice into OpenPGP CA
+    let alice_key = gnupg::export(&ctx, &"alice@example.org");
+    ca.usercert_import(
+        &alice_key,
+        None,
+        Some("Alice"),
+        &["alice@example.org"],
+    )?;
+
+    // get alice cert back from CA
+    let users = ca.get_usercerts("alice@example.org")?;
+    assert_eq!(users.len(), 1);
+
+    let alice = &users[0];
+    let cert = pgp::Pgp::armored_to_cert(&alice.pub_cert)?;
+
+    for uid in cert.userids() {
+        let sigs = uid.with_policy(&policy, None)?.bundle().certifications();
+
+        assert_eq!(
+            sigs.len(),
+            1,
+            "alice should have one third party certification (per uid)"
+        );
+    }
 
     Ok(())
 }
