@@ -67,7 +67,7 @@ pub enum Command {
 #[derive(StructOpt, Debug)]
 pub enum CaCommand {
     /// Create CA
-    New {
+    Init {
         #[structopt(help = "CA domain name")]
         domain: String,
 

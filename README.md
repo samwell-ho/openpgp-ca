@@ -60,7 +60,7 @@ or
 
 *  Set up a new CA instance and generate a new keypair for the CA:
 
-`openpgp-ca ca new example.org` 
+`openpgp-ca ca init example.org` 
 
 *  Export the CA public key, for use on client machines:
 
@@ -132,7 +132,7 @@ This should show that Alice's key has been signed by the CA and that Alice
 
 *  Set up a new CA instance and generate a new keypair for the CA:
 
-`openpgp-ca ca new example.org` 
+`openpgp-ca ca init example.org` 
 
 #### create new user
 
@@ -198,7 +198,7 @@ set up CA, create a user
 
 `export OPENPGP_CA_DB=/tmp/openpgp-ca1.sqlite`
 
-`openpgp-ca ca new some.org`
+`openpgp-ca ca init some.org`
 
 `openpgp-ca user add --email alice@some.org --name "Alice Adams"`
 
@@ -210,7 +210,7 @@ export public PGP Certificate of OpenPGP CA admin:
 
 `export OPENPGP_CA_DB=/tmp/openpgp-ca2.sqlite`
 
-`openpgp-ca ca new other.org`
+`openpgp-ca ca init other.org`
 
 `openpgp-ca user add --email bob@other.org --name "Bob Baker"`
 
@@ -296,7 +296,7 @@ Set up a new OpenPGP CA instance with two users:
 
 `export OPENPGP_CA_DB=/tmp/openpgp-ca.sqlite`
 
-`openpgp-ca ca new example.org` 
+`openpgp-ca ca init example.org` 
 
 `openpgp-ca user add --email alice@example.org --name "Alice Adams"`
 
@@ -366,7 +366,7 @@ Set up a new OpenPGP CA instance and create two users:
 
 `export OPENPGP_CA_DB=/tmp/openpgp-ca.sqlite`
 
-`openpgp-ca ca new example.org` 
+`openpgp-ca ca init example.org` 
 
 `openpgp-ca user add --email alice@example.org --name "Alice Adams"`
 
@@ -390,8 +390,8 @@ or
 ## Some usage examples using cargo to run openpgp-ca:
 
 ```
-cargo run ca new example.org
-cargo run -- -d /tmp/ca.sqlite ca new example.org
+cargo run ca init example.org
+cargo run -- -d /tmp/ca.sqlite ca init example.org
 
 cargo run user add --email alice@example.org --email a@example.org --name "Alice Adams"
 ```
@@ -413,19 +413,19 @@ docker run openpgp-ca
 You should see the help output. Running any `openpgp-ca` command is easy, just add it at the end, like so:
 
 ```
-docker run openpgp-ca ca new example.org
+docker run openpgp-ca ca init example.org
 ```
 
 However, since it's running in Docker, the database does not persist. The database is kept in `/var/run/openpgp-ca/` inside the container. Therefore, you might want to do a volume-mount:
 
 ```
-docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca new example.org
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca init example.org
 ```
 
 An example centralized workflow of creating a CA and a user would thus be:
 
 ```
-docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca new example.org
+docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca ca init example.org
 docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user add --email alice@example.org --email a@example.org --name Alicia
 docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user add --email bob@example.org
 docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user list

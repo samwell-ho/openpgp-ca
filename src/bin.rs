@@ -96,8 +96,8 @@ fn real_main() -> Fallible<()> {
             }
         },
         Command::Ca { cmd } => match cmd {
-            CaCommand::New { domain, name } => {
-                ca.ca_new(&domain, name.as_deref())?;
+            CaCommand::Init { domain, name } => {
+                ca.ca_init(&domain, name.as_deref())?;
             }
             CaCommand::Export => {
                 let ca_key = ca.get_ca_pubkey_armored()?;

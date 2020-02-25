@@ -69,7 +69,7 @@ impl Ca {
     // -------- CAs
 
     /// create a new Ca database entry (only one CA is allowed per database)
-    pub fn ca_new(
+    pub fn ca_init(
         &self,
         domainname: &str,
         name: Option<&str>,

@@ -37,7 +37,7 @@ fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
     let mut ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    ca.ca_new("example.org", None)?;
+    ca.ca_init("example.org", None)?;
 
     // make CA users
     ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
@@ -109,7 +109,7 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
     let ca = ca::Ca::new(Some(&db));
 
     // make new CA key
-    ca.ca_new("example.org", None)?;
+    ca.ca_init("example.org", None)?;
 
     let ca_key = ca.get_ca_pubkey_armored()?;
 
@@ -206,7 +206,7 @@ fn test_bridge() -> Fallible<()> {
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    ca1.ca_new("some.org", None)?;
+    ca1.ca_init("some.org", None)?;
 
     // make CA user
     assert!(ca1
@@ -216,7 +216,7 @@ fn test_bridge() -> Fallible<()> {
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    ca2.ca_new("other.org", None)?;
+    ca2.ca_init("other.org", None)?;
 
     // make CA user
     ca2.usercert_new(Some(&"Bob"), &["bob@other.org"], false)?;
