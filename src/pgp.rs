@@ -380,12 +380,28 @@ impl Pgp {
         user_cert: &Cert,
         emails_filter: Option<&[&str]>,
     ) -> Fallible<Cert> {
+        let policy = StandardPolicy::new();
+
         let mut cert_keys = Self::get_cert_keys(&ca_cert)
             .context("filtered for unencrypted secret keys above")?;
+
+        let fp_ca = ca_cert.fingerprint();
 
         let mut packets: Vec<Packet> = Vec::new();
 
         'uid: for uid in user_cert.userids() {
+            // check if this uid already has a signature by ca_cert.
+            // if yes, don't add another one.
+            let sigs = uid
+                .clone()
+                .with_policy(&policy, None)?
+                .bundle()
+                .certifications();
+            if sigs.iter().any(|s| s.issuer_fingerprint() == Some(&fp_ca)) {
+                // there is already a signature by ca_cert on this uid - skip
+                continue;
+            }
+
             for signer in &mut cert_keys {
                 let userid = uid.userid();
 
