@@ -219,7 +219,7 @@ impl Ca {
             .context("make_user failed")?;
 
         // sign user key with CA key
-        let certified = Pgp::sign_user(&ca_cert, user.clone())
+        let certified = Pgp::sign_user_emails(&ca_cert, &user, Some(emails))
             .context("sign_user failed")?;
 
         // user tsigns CA key
@@ -320,7 +320,7 @@ impl Ca {
 
             // sign only the userids that have been specified
             let certified =
-                Pgp::sign_user_emails(&ca_cert, &user_cert, emails)?;
+                Pgp::sign_user_emails(&ca_cert, &user_cert, Some(emails))?;
 
             // use name from userids, if no name was passed
             let name = match name {

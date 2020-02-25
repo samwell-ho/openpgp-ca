@@ -374,44 +374,18 @@ impl Pgp {
         Ok((revocation_sig, revoked))
     }
 
-    /// CA signs all userids of Cert
-    pub fn sign_user(ca_cert: &Cert, user: Cert) -> Fallible<Cert> {
-        // sign Cert with CA key
-
-        let mut cert_keys = Self::get_cert_keys(&ca_cert)
-            .context("filtered for unencrypted secret keys above")?;
-
-        let mut sigs = Vec::new();
-
-        // FIXME: do we want to sign all uids?
-        // (right now, this fn is only called for keys that the CA makes, so
-        // that probably makes sense?)
-
-        for uidb in user.userids() {
-            for signer in &mut cert_keys {
-                let uid = uidb.userid();
-
-                let sig = uid.certify(signer, &user, None, None, None)?;
-
-                sigs.push(sig.into());
-            }
-        }
-
-        let certified = user.merge_packets(sigs)?;
-
-        Ok(certified)
-    }
-
+    /// CA signs all, or a specified list of userids of Cert
     pub fn sign_user_emails(
         ca_cert: &Cert,
         user_cert: &Cert,
-        emails: &[&str],
+        emails_filter: Option<&[&str]>,
     ) -> Fallible<Cert> {
-        let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
+        let mut cert_keys = Self::get_cert_keys(&ca_cert)
+            .context("filtered for unencrypted secret keys above")?;
 
         let mut packets: Vec<Packet> = Vec::new();
 
-        for uid in user_cert.userids() {
+        'uid: for uid in user_cert.userids() {
             for signer in &mut cert_keys {
                 let userid = uid.userid();
 
@@ -419,14 +393,20 @@ impl Pgp {
                     .email_normalized()?
                     .expect("email normalization failed");
 
-                // Sign this userid if email has been given for this import call
-                if emails.contains(&uid_addr.as_str()) {
-                    // certify this userid
-                    let sig = userid
-                        .certify(signer, &user_cert, None, None, None)?;
-
-                    packets.push(sig.into());
+                // did we get a filter-list for email addresses?
+                if let Some(emails) = emails_filter {
+                    // if so, don't process this userid if the email is
+                    // not in the list
+                    if !emails.contains(&uid_addr.as_str()) {
+                        // don't certify this userid
+                        continue 'uid;
+                    }
                 }
+
+                let sig =
+                    userid.certify(signer, &user_cert, None, None, None)?;
+
+                packets.push(sig.into());
 
                 // FIXME: complain about emails that have been specified but
                 // haven't been found in the userids?
@@ -434,8 +414,7 @@ impl Pgp {
             }
         }
 
-        let result = user_cert.clone().merge_packets(packets)?;
-        Ok(result)
+        Ok(user_cert.clone().merge_packets(packets)?)
     }
 
     /// get all valid, certification capable keys with secret key material
