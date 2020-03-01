@@ -18,6 +18,7 @@
 use failure::_core::time::Duration;
 use openpgp_ca_lib::ca;
 use openpgp_ca_lib::pgp;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tokio_core::reactor::Core;
@@ -278,8 +279,8 @@ fn test_ca_insert_duplicate_email() -> Fallible<()> {
 
 #[test]
 fn test_ca_export_wkd() -> Fallible<()> {
-    let ctx = gnupg::make_context()?;
-    //    ctx.leak_tempdir();
+    let mut ctx = gnupg::make_context()?;
+    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -288,12 +289,25 @@ fn test_ca_export_wkd() -> Fallible<()> {
 
     ca.ca_init("example.org", None)?;
     ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
-    ca.usercert_new(Some(&"Bob"), &["bob@example.org"], false)?;
+    ca.usercert_new(
+        Some(&"Bob"),
+        &["bob@example.org", "bob@other.org"],
+        false,
+    )?;
+    ca.usercert_new(Some(&"Carol"), &["carol@other.org"], false)?;
 
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
     ca.export_wkd("example.org", &wkd_path)?;
+
+    // expect 3 exported keys (carol should not be in the export)
+    let test_path = wkd_path.join(
+        "openpgpkey.example.org/.well-known/openpgpkey/example.org\
+         /hu/",
+    );
+    let paths: Vec<_> = fs::read_dir(test_path)?.collect();
+    assert_eq!(paths.len(), 3);
 
     // check that both user keys have been written to files
     let test_path = wkd_path.join(

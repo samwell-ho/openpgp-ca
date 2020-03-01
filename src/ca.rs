@@ -723,6 +723,23 @@ impl Ca {
         self.db.list_bridges()
     }
 
+    /// is any uid of this cert for an email address in "domain"?
+    fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Fallible<bool> {
+        for uid in c.userids() {
+            // is any uid in domain
+            let email = uid.email()?;
+            if let Some(email) = email {
+                let split: Vec<_> = email.split('@').collect();
+                assert_eq!(split.len(), 2);
+                if split[1] == domain {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
     /// export all user keys + CA key into a wkd directory structure
     /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
     pub fn export_wkd(&self, domain: &str, path: &Path) -> Fallible<()> {
@@ -733,7 +750,10 @@ impl Ca {
 
         for uc in self.get_all_usercerts()? {
             let c = Pgp::armored_to_cert(&uc.pub_cert)?;
-            wkd::insert(&path, domain, None, &c)?;
+
+            if Self::cert_has_uid_in_domain(&c, domain)? {
+                wkd::insert(&path, domain, None, &c)?;
+            }
         }
 
         Ok(())
