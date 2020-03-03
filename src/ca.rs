@@ -134,7 +134,7 @@ impl Ca {
         Ok(ca_pub)
     }
 
-    /// get all trust sigs on user_ids in this Cert
+    /// get all trust sigs on User IDs in this Cert
     fn get_trust_sigs(&self, c: &Cert) -> Fallible<Vec<Signature>> {
         Ok(self
             .get_third_party_sigs(c)?
@@ -144,7 +144,7 @@ impl Ca {
             .collect())
     }
 
-    /// get all third party sigs on user_ids in this Cert
+    /// get all third party sigs on User IDs in this Cert
     fn get_third_party_sigs(&self, c: &Cert) -> Fallible<Vec<Signature>> {
         let mut res = Vec::new();
         let policy = StandardPolicy::new();
@@ -318,11 +318,11 @@ impl Ca {
 
             let ca_cert = self.get_ca_cert().unwrap();
 
-            // sign only the userids that have been specified
+            // sign only the User IDs that have been specified
             let certified =
                 Pgp::sign_user_emails(&ca_cert, &user_cert, Some(emails))?;
 
-            // use name from userids, if no name was passed
+            // use name from User IDs, if no name was passed
             let name = match name {
                 Some(name) => Some(name.to_owned()),
                 None => {
@@ -336,7 +336,7 @@ impl Ca {
                 }
             };
 
-            // use emails from userids, if no emails were passed
+            // use emails from User IDs, if no emails were passed
             let emails = if !emails.is_empty() {
                 emails.iter().map(|&s| s.to_owned()).collect()
             } else {
@@ -600,7 +600,7 @@ impl Ca {
         Ok(format!("<[^>]+[@.]{}>$", escaped_domain))
     }
 
-    /// when scope is not set, it is derived from the user_id in the key_file
+    /// when scope is not set, it is derived from the User ID in the key_file
     pub fn bridge_new(
         &self,
         key_file: &PathBuf,
@@ -610,47 +610,52 @@ impl Ca {
         let remote_ca_cert =
             Cert::from_file(key_file).context("Failed to read key")?;
 
-        // derive an email and domain from the user_id in the remote cert
-        let (cert_email, cert_domain) = {
-            let uids: Vec<_> = remote_ca_cert.userids().collect();
-            assert_eq!(
-                uids.len(),
-                1,
-                "Expected exactly one userid in remote CA Cert"
-            );
+        let remote_uids: Vec<_> = remote_ca_cert.userids().collect();
 
-            let remote_uid = uids[0].userid();
-            let remote_email = remote_uid.email()?;
+        // expect exactly one User ID in remote CA key (otherwise fail)
+        if remote_uids.len() != 1 {
+            return Err(failure::err_msg(
+                "Expected exactly one User ID in remote CA Cert",
+            ));
+        }
 
-            assert!(
-                remote_email.is_some(),
-                "Couldn't get email from remote CA Cert"
-            );
+        let remote_uid = remote_uids[0].userid();
 
-            let remote_email = remote_email.unwrap();
+        // derive an email and domain from the User ID in the remote cert
+        let (remote_email, remote_domain) = {
+            if let Some(remote_email) = remote_uid.email()? {
+                let split: Vec<_> = remote_email.split('@').collect();
 
-            let split: Vec<_> = remote_email.split('@').collect();
-            assert_eq!(split.len(), 2);
+                // expect remote email address with localpart "openpgp-ca"
+                if split.len() != 2 || split[0] != "openpgp-ca" {
+                    return Err(failure::err_msg(format!(
+                        "Unexpected remote email {}",
+                        remote_email
+                    )));
+                }
 
-            assert_eq!(split[0], "openpgp-ca");
-
-            let domain: &str = split[1];
-            (remote_email.to_owned(), domain.to_owned())
+                let domain = split[1];
+                (remote_email.to_owned(), domain.to_owned())
+            } else {
+                return Err(failure::err_msg(
+                    "Couldn't get email from remote CA Cert",
+                ));
+            }
         };
 
         let scope = match scope {
             Some(scope) => {
                 // if scope and domain don't match, warn/error?
-                // (FIXME: unless --force parameter has been given?!)
-                assert_eq!(scope, cert_domain);
+                // (FIXME: error, unless --force parameter has been given?!)
+                assert_eq!(scope, remote_domain);
 
                 scope
             }
-            None => &cert_domain,
+            None => &remote_domain,
         };
 
         let email = match email {
-            None => cert_email,
+            None => remote_email,
             Some(email) => email.to_owned(),
         };
 
@@ -658,35 +663,24 @@ impl Ca {
 
         let regexes = vec![regex];
 
-        let ca_cert = self.get_ca_cert().unwrap();
+        let bridged = Pgp::bridge_to_remote_ca(
+            self.get_ca_cert()?,
+            remote_ca_cert,
+            regexes,
+        )?;
 
-        // expect exactly one userid in remote CA key (otherwise fail)
-        assert_eq!(
-            remote_ca_cert.userids().len(),
-            1,
-            "remote CA should have exactly one userid, but has {}",
-            remote_ca_cert.userids().len()
-        );
-
-        let bridged =
-            Pgp::bridge_to_remote_ca(ca_cert, remote_ca_cert, regexes)?;
-
-        // store in DB
+        // store new bridge in DB
         let (ca_db, _) =
             self.db.get_ca().context("Couldn't find CA")?.unwrap();
-
-        let pub_key = &Pgp::cert_to_armored(&bridged)?;
 
         let new_bridge = models::NewBridge {
             email: &email,
             scope,
-            pub_key,
+            pub_key: &Pgp::cert_to_armored(&bridged)?,
             cas_id: ca_db.id,
         };
 
-        let bridge = self.db.insert_bridge(new_bridge)?;
-
-        Ok(bridge)
+        Ok(self.db.insert_bridge(new_bridge)?)
     }
 
     pub fn bridge_revoke(&self, email: &str) -> Fallible<()> {
