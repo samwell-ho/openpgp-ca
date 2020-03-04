@@ -23,8 +23,7 @@ use failure::{self, Fallible};
 use std::path::PathBuf;
 use std::process::exit;
 
-use openpgp_ca_lib::ca;
-use openpgp_ca_lib::pgp::Pgp;
+use openpgp_ca_lib::ca::Ca;
 
 fn real_main() -> Fallible<()> {
     use cli::*;
@@ -32,7 +31,7 @@ fn real_main() -> Fallible<()> {
 
     let cli = Cli::from_args();
 
-    let mut ca = ca::Ca::new(cli.database.as_deref());
+    let mut ca = Ca::new(cli.database.as_deref());
 
     match cli.cmd {
         Command::User { cmd } => match cmd {
@@ -134,7 +133,7 @@ fn real_main() -> Fallible<()> {
     Ok(())
 }
 
-fn show_revocations(ca: &ca::Ca, email: &str) -> Fallible<()> {
+fn show_revocations(ca: &Ca, email: &str) -> Fallible<()> {
     let usercerts = ca.get_usercerts(email)?;
     if usercerts.is_empty() {
         println!("No Users found");
@@ -155,7 +154,7 @@ fn show_revocations(ca: &ca::Ca, email: &str) -> Fallible<()> {
     Ok(())
 }
 
-fn check_sigs(ca: &ca::Ca) -> Fallible<()> {
+fn check_sigs(ca: &Ca) -> Fallible<()> {
     let mut count_ok = 0;
 
     let sigs_status = ca.usercert_signatures()?;
@@ -193,7 +192,7 @@ fn check_sigs(ca: &ca::Ca) -> Fallible<()> {
     Ok(())
 }
 
-fn check_expiry(ca: &ca::Ca, exp_days: u64) -> Fallible<()> {
+fn check_expiry(ca: &Ca, exp_days: u64) -> Fallible<()> {
     let expiries = ca.usercert_expiry(exp_days)?;
 
     for (usercert, (alive, expiry)) in expiries {
@@ -223,7 +222,7 @@ fn check_expiry(ca: &ca::Ca, exp_days: u64) -> Fallible<()> {
     Ok(())
 }
 
-fn list_users(ca: &ca::Ca) -> Fallible<()> {
+fn list_users(ca: &Ca) -> Fallible<()> {
     for (usercert, (sig_from_ca, tsig_on_ca)) in ca.usercert_signatures()? {
         println!(
             "usercert for '{}'",
@@ -238,8 +237,7 @@ fn list_users(ca: &ca::Ca) -> Fallible<()> {
             .iter()
             .for_each(|email| println!("- email {}", email.addr));
 
-        let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
-        if let Some(exp) = Pgp::get_expiry(&cert)? {
+        if let Some(exp) = Ca::usercert_expiration(&usercert)? {
             let datetime: DateTime<Utc> = exp.into();
             println!(" expires: {}", datetime.format("%d/%m/%Y"));
         } else {
@@ -248,7 +246,7 @@ fn list_users(ca: &ca::Ca) -> Fallible<()> {
 
         println!(" user cert (or subkey) signed by CA: {}", sig_from_ca);
         println!(" user cert has tsigned CA: {}", tsig_on_ca);
-        if Pgp::is_possibly_revoked(&cert) {
+        if Ca::cert_possibly_revoked(&usercert)? {
             println!(" this certificate has (possibly) been REVOKED");
         }
         println!();
@@ -257,7 +255,7 @@ fn list_users(ca: &ca::Ca) -> Fallible<()> {
     Ok(())
 }
 
-fn list_bridges(ca: &ca::Ca) -> Fallible<()> {
+fn list_bridges(ca: &Ca) -> Fallible<()> {
     ca.get_bridges()?.iter().for_each(|bridge| {
         println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key)
     });
@@ -265,18 +263,17 @@ fn list_bridges(ca: &ca::Ca) -> Fallible<()> {
 }
 
 fn new_bridge(
-    ca: &ca::Ca,
+    ca: &Ca,
     email: Option<&str>,
     key_file: &PathBuf,
     scope: Option<&str>,
 ) -> Fallible<()> {
-    let bridge = ca.bridge_new(key_file, email, scope)?;
-    let remote = Pgp::armored_to_cert(&bridge.pub_key)?;
+    let (bridge, fingerprint) = ca.bridge_new(key_file, email, scope)?;
 
     println!("signed certificate for {} as bridge\n", bridge.email);
     println!("CAUTION:");
     println!("The fingerprint of the remote CA key is");
-    println!("{}\n", remote.fingerprint());
+    println!("{}\n", fingerprint);
     println!(
         "Please verify that this key is controlled by \
          {} before disseminating the signed remote certificate",

@@ -18,7 +18,7 @@
 use openpgp::serialize::Serialize;
 use sequoia_openpgp as openpgp;
 
-use openpgp_ca_lib::ca;
+use openpgp_ca_lib::ca::Ca;
 
 use failure::{self, Fallible, ResultExt};
 use std::path::PathBuf;
@@ -34,7 +34,7 @@ fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
 
     // ---- use OpenPGP CA to make a set of keys ----
 
-    let mut ca = ca::Ca::new(Some(&db));
+    let mut ca = Ca::new(Some(&db));
 
     // make new CA key
     ca.ca_init("example.org", None)?;
@@ -106,7 +106,7 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
     let db = format!("{}/ca.sqlite", home_path_ca);
 
     // ---- init OpenPGP CA key ----
-    let ca = ca::Ca::new(Some(&db));
+    let ca = Ca::new(Some(&db));
 
     // make new CA key
     ca.ca_init("example.org", None)?;
@@ -200,8 +200,8 @@ fn test_bridge() -> Fallible<()> {
     let db1 = format!("{}/ca1.sqlite", home_path);
     let db2 = format!("{}/ca2.sqlite", home_path);
 
-    let mut ca1 = ca::Ca::new(Some(&db1));
-    let mut ca2 = ca::Ca::new(Some(&db2));
+    let mut ca1 = Ca::new(Some(&db1));
+    let mut ca2 = Ca::new(Some(&db2));
 
     // ---- populate first OpenPGP CA instance ----
 

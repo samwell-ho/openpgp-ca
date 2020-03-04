@@ -403,6 +403,20 @@ impl Ca {
         )
     }
 
+    pub fn usercert_expiration(
+        usercert: &models::Usercert,
+    ) -> Fallible<Option<SystemTime>> {
+        let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+        Ok(Pgp::get_expiry(&cert)?)
+    }
+
+    pub fn cert_possibly_revoked(
+        usercert: &models::Usercert,
+    ) -> Fallible<bool> {
+        let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+        Ok(Pgp::is_possibly_revoked(&cert))
+    }
+
     /// which usercerts will be expired in 'days' days?
     pub fn usercert_expiry(
         &self,
@@ -454,6 +468,11 @@ impl Ca {
         Ok(map)
     }
 
+    /// get Cert representation of usercert
+    pub fn usercert_to_cert(usercert: &models::Usercert) -> Fallible<Cert> {
+        Pgp::armored_to_cert(&usercert.pub_cert)
+    }
+
     /// check if this usercert has been signed by the CA
     pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Fallible<bool> {
         let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
@@ -464,6 +483,11 @@ impl Ca {
         Ok(sigs
             .iter()
             .any(|s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
+    }
+
+    /// get the armored representation of a Cert
+    pub fn cert_to_armored(cert: &Cert) -> Fallible<String> {
+        Pgp::cert_to_armored(cert)
     }
 
     /// check if this usercert has tsigned the CA
@@ -607,7 +631,7 @@ impl Ca {
         key_file: &PathBuf,
         email: Option<&str>,
         scope: Option<&str>,
-    ) -> Fallible<models::Bridge> {
+    ) -> Fallible<(models::Bridge, Fingerprint)> {
         let remote_ca_cert =
             Cert::from_file(key_file).context("Failed to read key")?;
 
@@ -681,7 +705,7 @@ impl Ca {
             cas_id: ca_db.id,
         };
 
-        Ok(self.db.insert_bridge(new_bridge)?)
+        Ok((self.db.insert_bridge(new_bridge)?, bridged.fingerprint()))
     }
 
     pub fn bridge_revoke(&self, email: &str) -> Fallible<()> {

@@ -15,6 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
+//! This crate provides OpenPGP CA functionality as both a library and a
+//! command line tool.
+
 #[macro_use]
 extern crate diesel;
 
@@ -22,7 +25,7 @@ extern crate diesel;
 extern crate diesel_migrations;
 
 pub mod ca;
-pub mod db;
-pub mod models;
-pub mod pgp;
-pub mod schema;
+mod db;
+mod models;
+mod pgp;
+mod schema;
