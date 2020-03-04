@@ -204,7 +204,7 @@ impl Ca {
         })
     }
 
-    // -------- usercertss
+    // -------- usercerts
 
     /// create a new usercert in the database
     pub fn usercert_new(
@@ -516,6 +516,23 @@ impl Ca {
         self.db.get_usercerts(email)
     }
 
+    /// is any uid of this cert for an email address in "domain"?
+    fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Fallible<bool> {
+        for uid in c.userids() {
+            // is any uid in domain
+            let email = uid.email()?;
+            if let Some(email) = email {
+                let split: Vec<_> = email.split('@').collect();
+                assert_eq!(split.len(), 2);
+                if split[1] == domain {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
     // -------- revocations
 
     pub fn add_revocation(&self, revoc_file: &PathBuf) -> Fallible<()> {
@@ -742,22 +759,7 @@ impl Ca {
         self.db.list_bridges()
     }
 
-    /// is any uid of this cert for an email address in "domain"?
-    fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Fallible<bool> {
-        for uid in c.userids() {
-            // is any uid in domain
-            let email = uid.email()?;
-            if let Some(email) = email {
-                let split: Vec<_> = email.split('@').collect();
-                assert_eq!(split.len(), 2);
-                if split[1] == domain {
-                    return Ok(true);
-                }
-            }
-        }
-
-        Ok(false)
-    }
+    // --------- wkd
 
     /// export all user keys + CA key into a wkd directory structure
     /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
