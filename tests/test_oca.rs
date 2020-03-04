@@ -51,7 +51,7 @@ fn test_ca() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = OpenpgpCa::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
 
     // make new CA key
     ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
@@ -252,7 +252,7 @@ fn test_ca_insert_duplicate_email() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = OpenpgpCa::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
 
     // make new CA key
     assert!(ca.ca_init("example.org", None).is_ok());
@@ -284,7 +284,7 @@ fn test_ca_export_wkd() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = OpenpgpCa::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
 
     ca.ca_init("example.org", None)?;
     ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
@@ -435,7 +435,7 @@ fn test_ca_signatures() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = OpenpgpCa::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
     ca.ca_init("example.org", None)?;
 
     // create/import alice, CA signs alice's key
@@ -491,7 +491,7 @@ fn test_apply_revocation() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = OpenpgpCa::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
     ca.ca_init("example.org", None)?;
 
     // make CA user

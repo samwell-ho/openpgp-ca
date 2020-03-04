@@ -34,7 +34,7 @@ fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
 
     // ---- use OpenPGP CA to make a set of keys ----
 
-    let mut ca = OpenpgpCa::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
 
     // make new CA key
     ca.ca_init("example.org", None)?;
@@ -200,8 +200,8 @@ fn test_bridge() -> Fallible<()> {
     let db1 = format!("{}/ca1.sqlite", home_path);
     let db2 = format!("{}/ca2.sqlite", home_path);
 
-    let mut ca1 = OpenpgpCa::new(Some(&db1));
-    let mut ca2 = OpenpgpCa::new(Some(&db2));
+    let ca1 = OpenpgpCa::new(Some(&db1));
+    let ca2 = OpenpgpCa::new(Some(&db2));
 
     // ---- populate first OpenPGP CA instance ----
 

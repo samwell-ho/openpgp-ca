@@ -211,7 +211,7 @@ impl OpenpgpCa {
 
     /// create a new usercert in the database
     pub fn usercert_new(
-        &mut self,
+        &self,
         name: Option<&str>,
         emails: &[&str],
         password: bool,
