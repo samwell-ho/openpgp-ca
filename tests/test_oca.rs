@@ -25,6 +25,7 @@ use tokio_core::reactor::Core;
 
 use failure::{self, Fallible, ResultExt};
 
+use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
 use openpgp::{Cert, Fingerprint, KeyID};

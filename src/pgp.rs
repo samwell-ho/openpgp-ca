@@ -19,21 +19,20 @@ use sequoia_openpgp as openpgp;
 
 use openpgp::armor;
 use openpgp::cert;
-use openpgp::cert::components::Amalgamation;
+use openpgp::cert::amalgamation::{ValidAmalgamation, ValidateAmalgamation};
 use openpgp::crypto::KeyPair;
-use openpgp::packet::signature;
-use openpgp::packet::{Signature, UserID};
+use openpgp::packet::{signature, Signature, UserID};
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::{Serialize, SerializeInto};
-use openpgp::types::KeyFlags;
-use openpgp::types::{ReasonForRevocation, SignatureType};
+use openpgp::types::{
+    KeyFlags, ReasonForRevocation, RevocationStatus, SignatureType,
+};
 use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
 use std::time::SystemTime;
 
 use failure::{self, Fallible, ResultExt};
-use sequoia_openpgp::RevocationStatus;
 use std::path::PathBuf;
 
 pub struct Pgp {}
@@ -124,6 +123,7 @@ impl Pgp {
                     .set_transport_encryption(true)
                     .set_storage_encryption(true),
                 None,
+                None,
             )
             .add_signing_subkey();
 
@@ -210,12 +210,7 @@ impl Pgp {
     pub fn get_expiry(cert: &Cert) -> Fallible<Option<SystemTime>> {
         let policy = StandardPolicy::new();
         let primary = cert.primary_key().with_policy(&policy, None)?;
-        if let Some(duration) = primary.key_expiration_time() {
-            let creation = primary.creation_time();
-            Ok(creation.checked_add(duration))
-        } else {
-            Ok(None)
-        }
+        Ok(primary.key_expiration_time())
     }
 
     /// is (possibly) revoked

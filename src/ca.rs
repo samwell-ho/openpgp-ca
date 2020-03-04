@@ -25,6 +25,7 @@ use publicsuffix;
 
 use sequoia_openpgp as openpgp;
 
+use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::packet::Signature;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
