@@ -27,7 +27,7 @@ use openpgp::serialize::Serialize;
 use openpgp::{Cert, Fingerprint, KeyID};
 use sequoia_openpgp as openpgp;
 
-use openpgp_ca_lib::ca::Ca;
+use openpgp_ca_lib::ca::OpenpgpCa;
 
 pub mod gnupg;
 
@@ -51,7 +51,7 @@ fn test_ca() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = Ca::new(Some(&db));
+    let mut ca = OpenpgpCa::new(Some(&db));
 
     // make new CA key
     ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
@@ -106,7 +106,7 @@ fn test_update_usercert_key() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let ca = Ca::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
 
     // make new CA key
     ca.ca_init("example.org", None)?;
@@ -131,7 +131,7 @@ fn test_update_usercert_key() -> Fallible<()> {
     let alice = &usercerts[0];
 
     // check that expiry is ~2y
-    let cert = Ca::usercert_to_cert(alice)?;
+    let cert = OpenpgpCa::usercert_to_cert(alice)?;
 
     cert.alive(&policy, in_one_year)?;
     assert!(cert.alive(&policy, in_three_years).is_err());
@@ -165,7 +165,7 @@ fn test_update_usercert_key() -> Fallible<()> {
     assert_eq!(usercerts.len(), 1);
 
     // check that expiry is not ~2y but ~5y
-    let cert = Ca::usercert_to_cert(&usercerts[0])?;
+    let cert = OpenpgpCa::usercert_to_cert(&usercerts[0])?;
 
     assert!(cert.alive(&policy, in_three_years).is_ok());
     assert!(!cert.alive(&policy, in_six_years).is_ok());
@@ -191,7 +191,7 @@ fn test_update_user_cert() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let ca = Ca::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
 
     // make new CA key
     ca.ca_init("example.org", None)?;
@@ -252,7 +252,7 @@ fn test_ca_insert_duplicate_email() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = Ca::new(Some(&db));
+    let mut ca = OpenpgpCa::new(Some(&db));
 
     // make new CA key
     assert!(ca.ca_init("example.org", None).is_ok());
@@ -284,7 +284,7 @@ fn test_ca_export_wkd() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = Ca::new(Some(&db));
+    let mut ca = OpenpgpCa::new(Some(&db));
 
     ca.ca_init("example.org", None)?;
     ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
@@ -349,17 +349,17 @@ fn test_ca_export_wkd_sequoia() -> Fallible<()> {
 
     let j = Fingerprint::from_hex("CBCD8F030588653EEDD7E2659B7DD433F254904A")?;
     let justus: Cert = core.run(hagrid.get(&KeyID::from(j)))?;
-    let justus_key = Ca::cert_to_armored(&justus)?;
+    let justus_key = OpenpgpCa::cert_to_armored(&justus)?;
 
     let n = Fingerprint::from_hex("8F17777118A33DDA9BA48E62AACB3243630052D9")?;
     let neal: Cert = core.run(hagrid.get(&KeyID::from(n)))?;
-    let neal_key = Ca::cert_to_armored(&neal)?;
+    let neal_key = OpenpgpCa::cert_to_armored(&neal)?;
 
     // -- import keys into CA
 
     let db = format!("{}/ca.sqlite", home_path);
 
-    let ca = Ca::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
 
     ca.ca_init("sequoia-pgp.org", None)?;
 
@@ -385,7 +385,7 @@ fn test_ca_multiple_revocations() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let ca = Ca::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
 
     // make new CA key
     ca.ca_init("example.org", None)?;
@@ -435,7 +435,7 @@ fn test_ca_signatures() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = Ca::new(Some(&db));
+    let mut ca = OpenpgpCa::new(Some(&db));
     ca.ca_init("example.org", None)?;
 
     // create/import alice, CA signs alice's key
@@ -491,7 +491,7 @@ fn test_apply_revocation() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let mut ca = Ca::new(Some(&db));
+    let mut ca = OpenpgpCa::new(Some(&db));
     ca.ca_init("example.org", None)?;
 
     // make CA user
@@ -526,7 +526,7 @@ fn test_import_signed_cert() -> Fallible<()> {
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let ca = Ca::new(Some(&db));
+    let ca = OpenpgpCa::new(Some(&db));
     ca.ca_init("example.org", None)?;
 
     // import CA key into GnuPG
@@ -553,7 +553,7 @@ fn test_import_signed_cert() -> Fallible<()> {
     assert_eq!(users.len(), 1);
 
     let alice = &users[0];
-    let cert = Ca::usercert_to_cert(&alice)?;
+    let cert = OpenpgpCa::usercert_to_cert(&alice)?;
 
     for uid in cert.userids() {
         let sigs = uid.with_policy(&policy, None)?.bundle().certifications();

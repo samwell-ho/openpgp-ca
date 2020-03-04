@@ -270,7 +270,7 @@ impl Db {
                 // -> there can be more than one "active" cert,
                 // as well as even more "inactive" certs.
                 assert_eq!(ca_certs.len(), 1);
-                let ca_cert: Cacert = ca_certs[0].clone();
+                let ca_cert = ca_certs[0].clone();
 
                 Ok(Some((ca, ca_cert)))
             }

@@ -37,11 +37,11 @@ use crate::pgp::Pgp;
 
 use failure::{self, Fallible, ResultExt};
 
-pub struct Ca {
+pub struct OpenpgpCa {
     db: Db,
 }
 
-impl Ca {
+impl OpenpgpCa {
     /// instantiate a new Ca object
     ///
     /// the sqlite backend can be configured explicitly via
@@ -64,7 +64,7 @@ impl Ca {
         let db = Db::new(db_url.as_deref());
         db.migrations();
 
-        Ca { db }
+        OpenpgpCa { db }
     }
 
     // -------- CAs
