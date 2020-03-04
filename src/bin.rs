@@ -63,7 +63,7 @@ fn real_main() -> Fallible<()> {
                 revocation_file,
             } => {
                 let key = std::fs::read_to_string(key_file)?;
-                let revoc = match revocation_file {
+                let revoc_certs = match revocation_file {
                     Some(filename) => Some(std::fs::read_to_string(filename)?),
                     None => None,
                 };
@@ -73,7 +73,7 @@ fn real_main() -> Fallible<()> {
 
                 ca.usercert_import(
                     &key,
-                    revoc.as_deref(),
+                    revoc_certs.as_deref(),
                     name.as_deref(),
                     &email[..],
                 )?;

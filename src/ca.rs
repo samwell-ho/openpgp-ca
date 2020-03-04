@@ -68,10 +68,10 @@ pub struct OpenpgpCa {
 }
 
 impl OpenpgpCa {
-    /// instantiate a new Ca object
+    /// Instantiate a new OpenpgpCa object.
     ///
-    /// the sqlite backend can be configured explicitly via
-    /// - the database parameter,
+    /// The sqlite backend can be configured:
+    /// - explicitly via the db_url parameter,
     /// - the environment variable OPENPGP_CA_DB, or
     /// - the .env DATABASE_URL
     pub fn new(db_url: Option<&str>) -> Self {
@@ -95,7 +95,7 @@ impl OpenpgpCa {
 
     // -------- CAs
 
-    /// create a new Ca database entry (only one CA is allowed per database)
+    /// Create a new Ca database entry (only one CA is allowed per database)
     pub fn ca_init(
         &self,
         domainname: &str,
@@ -128,12 +128,12 @@ impl OpenpgpCa {
         Ok(())
     }
 
-    /// get the Ca and Cacert objects from the database
+    /// Get the Ca and Cacert objects from the database
     pub fn ca_get(&self) -> Fallible<Option<(models::Ca, models::Cacert)>> {
         self.db.get_ca()
     }
 
-    /// get the Cert object for the Ca from the database
+    /// Get the Cert object for the Ca from the database
     pub fn ca_get_cert(&self) -> Fallible<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
@@ -141,7 +141,7 @@ impl OpenpgpCa {
         }
     }
 
-    /// print information about the Ca
+    /// Print information about the Ca to stdout
     pub fn ca_show(&self) -> Fallible<()> {
         let (ca, ca_cert) = self
             .db
@@ -152,36 +152,13 @@ impl OpenpgpCa {
         Ok(())
     }
 
-    /// returns the pubkey of the Ca as armored String
+    /// Returns the pubkey of the Ca Admin as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Fallible<String> {
         let cert = self.ca_get_cert()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
             .context("failed to transform CA key to armored pubkey")?;
 
         Ok(ca_pub)
-    }
-
-    /// get all trust sigs on User IDs in this Cert
-    fn get_trust_sigs(c: &Cert) -> Fallible<Vec<Signature>> {
-        Ok(Self::get_third_party_sigs(c)?
-            .iter()
-            .filter(|s| s.trust_signature().is_some())
-            .cloned()
-            .collect())
-    }
-
-    /// get all third party sigs on User IDs in this Cert
-    fn get_third_party_sigs(c: &Cert) -> Fallible<Vec<Signature>> {
-        let mut res = Vec::new();
-        let policy = StandardPolicy::new();
-
-        for uid in c.userids() {
-            let sigs =
-                uid.with_policy(&policy, None)?.bundle().certifications();
-            sigs.iter().for_each(|s| res.push(s.clone()));
-        }
-
-        Ok(res)
     }
 
     /// receive an armored key, find any tsigs on it,
@@ -292,7 +269,7 @@ impl OpenpgpCa {
     fn usercert_import_update_or_create(
         &self,
         key: &str,
-        revoc: Option<&str>,
+        revoc_certs: Option<&str>,
         name: Option<&str>,
         emails: &[&str],
         updates_id: Option<i32>,
@@ -327,7 +304,7 @@ impl OpenpgpCa {
 
             // this "update" workflow is not handling revocation certs for now
             assert!(
-                revoc.is_none(),
+                revoc_certs.is_none(),
                 "not expecting a revocation cert on key update"
             );
 
@@ -380,7 +357,7 @@ impl OpenpgpCa {
             // load revocation certificate
             let mut revocs: Vec<String> = Vec::new();
 
-            if let Some(rev) = revoc {
+            if let Some(rev) = revoc_certs {
                 revocs.push(rev.to_owned());
             }
 
@@ -403,11 +380,17 @@ impl OpenpgpCa {
     pub fn usercert_import(
         &self,
         key: &str,
-        revoc: Option<&str>,
+        revoc_certs: Option<&str>,
         name: Option<&str>,
         emails: &[&str],
     ) -> Fallible<()> {
-        self.usercert_import_update_or_create(key, revoc, name, emails, None)
+        self.usercert_import_update_or_create(
+            key,
+            revoc_certs,
+            name,
+            emails,
+            None,
+        )
     }
 
     /// import a usercert that is an update for an existing usercert
@@ -544,23 +527,6 @@ impl OpenpgpCa {
         self.db.get_usercerts(email)
     }
 
-    /// is any uid of this cert for an email address in "domain"?
-    fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Fallible<bool> {
-        for uid in c.userids() {
-            // is any uid in domain
-            let email = uid.email()?;
-            if let Some(email) = email {
-                let split: Vec<_> = email.split('@').collect();
-                assert_eq!(split.len(), 2);
-                if split[1] == domain {
-                    return Ok(true);
-                }
-            }
-        }
-
-        Ok(false)
-    }
-
     // -------- revocations
 
     pub fn revocation_add(&self, revoc_file: &PathBuf) -> Fallible<()> {
@@ -654,9 +620,11 @@ impl OpenpgpCa {
 
     // -------- bridges
 
-    // FIXME: does this imply "subdomain allowed"?
-    // "other.org" => "<[^>]+[@.]other\\.org>$"
+    /// make regex for trust signature from domain-name
     fn domain_to_regex(domain: &str) -> Fallible<String> {
+        // "other.org" => "<[^>]+[@.]other\\.org>$"
+        // FIXME: does this imply "subdomain allowed"?
+
         // syntax check domain
         if !publicsuffix::Domain::has_valid_syntax(domain) {
             return Err(failure::err_msg(
@@ -870,5 +838,47 @@ impl OpenpgpCa {
         self.db.update_usercert(&updated)?;
 
         Ok(())
+    }
+
+    // -------- helper functions
+
+    /// is any uid of this cert for an email address in "domain"?
+    fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Fallible<bool> {
+        for uid in c.userids() {
+            // is any uid in domain
+            let email = uid.email()?;
+            if let Some(email) = email {
+                let split: Vec<_> = email.split('@').collect();
+                assert_eq!(split.len(), 2);
+                if split[1] == domain {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Get all trust sigs on User IDs in this Cert
+    fn get_trust_sigs(c: &Cert) -> Fallible<Vec<Signature>> {
+        Ok(Self::get_third_party_sigs(c)?
+            .iter()
+            .filter(|s| s.trust_signature().is_some())
+            .cloned()
+            .collect())
+    }
+
+    /// get all third party sigs on User IDs in this Cert
+    fn get_third_party_sigs(c: &Cert) -> Fallible<Vec<Signature>> {
+        let mut res = Vec::new();
+        let policy = StandardPolicy::new();
+
+        for uid in c.userids() {
+            let sigs =
+                uid.with_policy(&policy, None)?.bundle().certifications();
+            sigs.iter().for_each(|s| res.push(s.clone()));
+        }
+
+        Ok(res)
     }
 }

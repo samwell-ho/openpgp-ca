@@ -286,7 +286,7 @@ impl Db {
         name: Option<&str>,
         (pub_cert, fingerprint): (&str, &str),
         emails: &[&str],
-        revocs: &[String],
+        revocation_certs: &[String],
         ca_cert_tsigned: Option<&str>,
         updates_cert_id: Option<i32>,
     ) -> Fallible<Usercert> {
@@ -315,7 +315,7 @@ impl Db {
             let c = self.insert_usercert(newcert)?;
 
             // Revocations
-            for revocation in revocs {
+            for revocation in revocation_certs {
                 self.insert_revocation(NewRevocation {
                     revocation,
                     usercert_id: c.id,
