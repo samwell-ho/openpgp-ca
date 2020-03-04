@@ -59,20 +59,20 @@ fn test_ca() -> Fallible<()> {
     // make CA user
     ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let usercerts = ca.get_all_usercerts()?;
+    let usercerts = ca.usercerts_get_all()?;
 
     assert_eq!(usercerts.len(), 1);
 
     let usercert = &usercerts[0];
-    let emails = ca.get_emails(usercert)?;
+    let emails = ca.emails_get(usercert)?;
 
     assert_eq!(emails.len(), 1);
 
-    let revocs = ca.get_revocations(usercert)?;
+    let revocs = ca.revocations_get(usercert)?;
     assert_eq!(revocs.len(), 1);
 
     // check that the custom name has ended up in the CA Cert
-    let ca_cert = ca.get_ca_cert().unwrap();
+    let ca_cert = ca.ca_get_cert().unwrap();
     let uid = ca_cert.userids().find(|c| {
         c.clone()
             .with_policy(&StandardPolicy::new(), None)
@@ -124,7 +124,7 @@ fn test_update_usercert_key() -> Fallible<()> {
     .context("import Alice 1 to CA failed")?;
 
     // check the state of CA data
-    let usercerts = ca.get_all_usercerts()?;
+    let usercerts = ca.usercerts_get_all()?;
 
     assert_eq!(usercerts.len(), 1);
 
@@ -152,7 +152,7 @@ fn test_update_usercert_key() -> Fallible<()> {
     let alice2_key = gnupg::export(&ctx, &"alice@example.org");
 
     // get usercert for alice
-    let usercerts = ca.get_usercerts("alice@example.org")?;
+    let usercerts = ca.usercerts_get("alice@example.org")?;
     assert_eq!(usercerts.len(), 1);
     let alice = &usercerts[0];
 
@@ -160,7 +160,7 @@ fn test_update_usercert_key() -> Fallible<()> {
     ca.usercert_import_update(&alice2_key, alice)?;
 
     // check the state of CA data
-    let usercerts = ca.get_all_usercerts()?;
+    let usercerts = ca.usercerts_get_all()?;
 
     assert_eq!(usercerts.len(), 1);
 
@@ -215,7 +215,7 @@ fn test_update_user_cert() -> Fallible<()> {
     let alice2_key = gnupg::export(&ctx_alice2, &"alice@example.org");
 
     // get usercert for alice
-    let usercerts = ca.get_usercerts("alice@example.org")?;
+    let usercerts = ca.usercerts_get("alice@example.org")?;
 
     assert_eq!(usercerts.len(), 1);
 
@@ -225,7 +225,7 @@ fn test_update_user_cert() -> Fallible<()> {
     ca.usercert_import_update(&alice2_key, alice)?;
 
     // check the state of CA data
-    let usercerts = ca.get_all_usercerts()?;
+    let usercerts = ca.usercerts_get_all()?;
 
     assert_eq!(usercerts.len(), 2);
 
@@ -263,13 +263,13 @@ fn test_ca_insert_duplicate_email() -> Fallible<()> {
     // make another CA user with the same email address
     ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let usercerts = ca.get_all_usercerts()?;
+    let usercerts = ca.usercerts_get_all()?;
 
     assert_eq!(usercerts.len(), 2);
 
     // ca cert should be tsigned by all usercerts
     for uc in &usercerts {
-        let tsig = ca.check_ca_has_tsig(&uc)?;
+        let tsig = ca.usercert_check_tsig_on_ca(&uc)?;
         assert!(tsig);
     }
 
@@ -298,7 +298,7 @@ fn test_ca_export_wkd() -> Fallible<()> {
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
-    ca.export_wkd("example.org", &wkd_path)?;
+    ca.wkd_export("example.org", &wkd_path)?;
 
     // expect 3 exported keys (carol should not be in the export)
     let test_path = wkd_path.join(
@@ -371,7 +371,7 @@ fn test_ca_export_wkd_sequoia() -> Fallible<()> {
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
-    ca.export_wkd("sequoia-pgp.org", &wkd_path)?;
+    ca.wkd_export("sequoia-pgp.org", &wkd_path)?;
 
     Ok(())
 }
@@ -404,11 +404,11 @@ fn test_ca_multiple_revocations() -> Fallible<()> {
     let revoc_file3 = format!("{}/alice.revoc3", home_path);
     gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file3, 3)?;
 
-    ca.add_revocation(&PathBuf::from(revoc_file1))?;
-    ca.add_revocation(&PathBuf::from(revoc_file3))?;
+    ca.revocation_add(&PathBuf::from(revoc_file1))?;
+    ca.revocation_add(&PathBuf::from(revoc_file3))?;
 
     // check data in CA
-    let usercerts = ca.get_all_usercerts()?;
+    let usercerts = ca.usercerts_get_all()?;
 
     // check that name/email has been autodetected on CA import from the pubkey
     assert_eq!(usercerts.len(), 1);
@@ -416,12 +416,12 @@ fn test_ca_multiple_revocations() -> Fallible<()> {
 
     assert_eq!(alice.name, Some("Alice".to_string()));
 
-    let emails = ca.get_emails(alice)?;
+    let emails = ca.emails_get(alice)?;
     assert_eq!(emails.len(), 1);
     assert_eq!(emails[0].addr, "alice@example.org");
 
     // check for both revocation certs
-    let revocs = ca.get_revocations(alice)?;
+    let revocs = ca.revocations_get(alice)?;
 
     assert_eq!(revocs.len(), 2);
 
@@ -497,18 +497,18 @@ fn test_apply_revocation() -> Fallible<()> {
     // make CA user
     ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let usercerts = ca.get_all_usercerts()?;
+    let usercerts = ca.usercerts_get_all()?;
 
     assert_eq!(usercerts.len(), 1);
 
     let alice = &usercerts[0];
 
-    let rev = ca.get_revocations(alice)?;
+    let rev = ca.revocations_get(alice)?;
     assert_eq!(rev.len(), 1);
 
-    ca.apply_revocation(rev[0].clone())?;
+    ca.revocation_apply(rev[0].clone())?;
 
-    let rev = ca.get_revocations(alice)?;
+    let rev = ca.revocations_get(alice)?;
     assert_eq!(rev.len(), 1);
     assert!(rev.get(0).unwrap().published);
 
@@ -530,7 +530,7 @@ fn test_import_signed_cert() -> Fallible<()> {
     ca.ca_init("example.org", None)?;
 
     // import CA key into GnuPG
-    let ca_cert = ca.get_ca_cert()?;
+    let ca_cert = ca.ca_get_cert()?;
     let mut buf = Vec::new();
     ca_cert.as_tsk().serialize(&mut buf)?;
     gnupg::import(&ctx, &buf);
@@ -549,7 +549,7 @@ fn test_import_signed_cert() -> Fallible<()> {
     )?;
 
     // get alice cert back from CA
-    let users = ca.get_usercerts("alice@example.org")?;
+    let users = ca.usercerts_get("alice@example.org")?;
     assert_eq!(users.len(), 1);
 
     let alice = &users[0];

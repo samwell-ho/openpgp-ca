@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
+//! OpenPGP CA as a library
+
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -37,6 +39,8 @@ use crate::pgp::Pgp;
 
 use failure::{self, Fallible, ResultExt};
 
+/// OpenpgpCa exposes the functionality of OpenPGP CA as a library
+/// (the command line utility 'openpgp-ca' is built on top of this library)
 pub struct OpenpgpCa {
     db: Db,
 }
@@ -103,12 +107,12 @@ impl OpenpgpCa {
     }
 
     /// get the Ca and Cacert objects from the database
-    pub fn get_ca(&self) -> Fallible<Option<(models::Ca, models::Cacert)>> {
+    pub fn ca_get(&self) -> Fallible<Option<(models::Ca, models::Cacert)>> {
         self.db.get_ca()
     }
 
     /// get the Cert object for the Ca from the database
-    pub fn get_ca_cert(&self) -> Fallible<Cert> {
+    pub fn ca_get_cert(&self) -> Fallible<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
             _ => panic!("get_ca_cert() failed"),
@@ -116,7 +120,7 @@ impl OpenpgpCa {
     }
 
     /// print information about the Ca
-    pub fn show_ca(&self) -> Fallible<()> {
+    pub fn ca_show(&self) -> Fallible<()> {
         let (ca, ca_cert) = self
             .db
             .get_ca()
@@ -127,8 +131,8 @@ impl OpenpgpCa {
     }
 
     /// returns the pubkey of the Ca as armored String
-    pub fn get_ca_pubkey_armored(&self) -> Fallible<String> {
-        let cert = self.get_ca_cert()?;
+    pub fn ca_get_pubkey_armored(&self) -> Fallible<String> {
+        let cert = self.ca_get_cert()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
             .context("failed to transform CA key to armored pubkey")?;
 
@@ -136,9 +140,8 @@ impl OpenpgpCa {
     }
 
     /// get all trust sigs on User IDs in this Cert
-    fn get_trust_sigs(&self, c: &Cert) -> Fallible<Vec<Signature>> {
-        Ok(self
-            .get_third_party_sigs(c)?
+    fn get_trust_sigs(c: &Cert) -> Fallible<Vec<Signature>> {
+        Ok(Self::get_third_party_sigs(c)?
             .iter()
             .filter(|s| s.trust_signature().is_some())
             .cloned()
@@ -146,7 +149,7 @@ impl OpenpgpCa {
     }
 
     /// get all third party sigs on User IDs in this Cert
-    fn get_third_party_sigs(&self, c: &Cert) -> Fallible<Vec<Signature>> {
+    fn get_third_party_sigs(c: &Cert) -> Fallible<Vec<Signature>> {
         let mut res = Vec::new();
         let policy = StandardPolicy::new();
 
@@ -161,10 +164,10 @@ impl OpenpgpCa {
 
     /// receive an armored key, find any tsigs on it,
     /// then merge those into "our" copy of the CA key
-    pub fn import_tsig_for_ca(&self, key: &str) -> Fallible<()> {
+    pub fn ca_import_tsig(&self, key: &str) -> Fallible<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
-            let ca_cert = self.get_ca_cert().unwrap();
+            let ca_cert = self.ca_get_cert().unwrap();
 
             let cert_import = Pgp::armored_to_cert(key)?;
 
@@ -176,7 +179,7 @@ impl OpenpgpCa {
             }
 
             // get the tsig(s) from import
-            let tsigs = self.get_trust_sigs(&cert_import)?;
+            let tsigs = Self::get_trust_sigs(&cert_import)?;
 
             // add tsig(s) to our "own" version of the CA key
             let mut packets: Vec<Packet> = Vec::new();
@@ -213,7 +216,7 @@ impl OpenpgpCa {
         emails: &[&str],
         password: bool,
     ) -> Fallible<()> {
-        let ca_cert = self.get_ca_cert().unwrap();
+        let ca_cert = self.ca_get_cert().unwrap();
 
         // make user key (signed by CA)
         let (user, revoc, pass) = Pgp::make_user_cert(emails, name, password)
@@ -317,7 +320,7 @@ impl OpenpgpCa {
         } else {
             // no - this is a new usercert that we need to create in the DB
 
-            let ca_cert = self.get_ca_cert().unwrap();
+            let ca_cert = self.ca_get_cert().unwrap();
 
             // sign only the User IDs that have been specified
             let certified =
@@ -410,7 +413,7 @@ impl OpenpgpCa {
         Ok(Pgp::get_expiry(&cert)?)
     }
 
-    pub fn cert_possibly_revoked(
+    pub fn usercert_possibly_revoked(
         usercert: &models::Usercert,
     ) -> Fallible<bool> {
         let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
@@ -428,7 +431,7 @@ impl OpenpgpCa {
         let expiry_test = SystemTime::now().checked_add(days).unwrap();
 
         let usercerts = self
-            .get_all_usercerts()
+            .usercerts_get_all()
             .context("couldn't load usercerts")?;
 
         for usercert in usercerts {
@@ -450,16 +453,16 @@ impl OpenpgpCa {
         let mut map = HashMap::new();
 
         let usercerts = self
-            .get_all_usercerts()
+            .usercerts_get_all()
             .context("couldn't load usercerts")?;
 
         for usercert in usercerts {
             let sig_from_ca = self
-                .check_ca_sig(&usercert)
+                .usercert_check_ca_sig(&usercert)
                 .context("Failed while checking CA sig")?;
 
             let tsig_on_ca = self
-                .check_ca_has_tsig(&usercert)
+                .usercert_check_tsig_on_ca(&usercert)
                 .context("Failed while checking tsig on CA")?;
 
             map.insert(usercert, (sig_from_ca, tsig_on_ca));
@@ -474,11 +477,14 @@ impl OpenpgpCa {
     }
 
     /// check if this usercert has been signed by the CA
-    pub fn check_ca_sig(&self, usercert: &models::Usercert) -> Fallible<bool> {
+    pub fn usercert_check_ca_sig(
+        &self,
+        usercert: &models::Usercert,
+    ) -> Fallible<bool> {
         let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
-        let sigs = self.get_third_party_sigs(&user_cert)?;
+        let sigs = Self::get_third_party_sigs(&user_cert)?;
 
-        let ca = self.get_ca_cert()?;
+        let ca = self.ca_get_cert()?;
 
         Ok(sigs
             .iter()
@@ -491,12 +497,12 @@ impl OpenpgpCa {
     }
 
     /// check if this usercert has tsigned the CA
-    pub fn check_ca_has_tsig(
+    pub fn usercert_check_tsig_on_ca(
         &self,
         usercert: &models::Usercert,
     ) -> Fallible<bool> {
-        let ca = self.get_ca_cert()?;
-        let tsigs = self.get_trust_sigs(&ca)?;
+        let ca = self.ca_get_cert()?;
+        let tsigs = Self::get_trust_sigs(&ca)?;
 
         let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
 
@@ -505,11 +511,11 @@ impl OpenpgpCa {
         }))
     }
 
-    pub fn get_all_usercerts(&self) -> Fallible<Vec<models::Usercert>> {
+    pub fn usercerts_get_all(&self) -> Fallible<Vec<models::Usercert>> {
         self.db.get_all_usercerts()
     }
 
-    pub fn get_usercerts(
+    pub fn usercerts_get(
         &self,
         email: &str,
     ) -> Fallible<Vec<models::Usercert>> {
@@ -535,7 +541,7 @@ impl OpenpgpCa {
 
     // -------- revocations
 
-    pub fn add_revocation(&self, revoc_file: &PathBuf) -> Fallible<()> {
+    pub fn revocation_add(&self, revoc_file: &PathBuf) -> Fallible<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
             .context("Couldn't load revocation cert")?;
 
@@ -563,14 +569,14 @@ impl OpenpgpCa {
         }
     }
 
-    pub fn get_revocations(
+    pub fn revocations_get(
         &self,
         cert: &models::Usercert,
     ) -> Fallible<Vec<models::Revocation>> {
         self.db.get_revocations(cert)
     }
 
-    pub fn get_revocation_by_id(
+    pub fn revocation_get_by_id(
         &self,
         id: i32,
     ) -> Fallible<models::Revocation> {
@@ -581,7 +587,7 @@ impl OpenpgpCa {
         }
     }
 
-    pub fn apply_revocation(&self, revoc: models::Revocation) -> Fallible<()> {
+    pub fn revocation_apply(&self, revoc: models::Revocation) -> Fallible<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
             let usercert = self.db.get_usercert_by_id(revoc.usercert_id)?;
@@ -617,7 +623,7 @@ impl OpenpgpCa {
 
     // -------- emails
 
-    pub fn get_emails(
+    pub fn emails_get(
         &self,
         usercert: &models::Usercert,
     ) -> Fallible<Vec<models::Email>> {
@@ -706,7 +712,7 @@ impl OpenpgpCa {
         let regexes = vec![regex];
 
         let bridged = Pgp::bridge_to_remote_ca(
-            self.get_ca_cert()?,
+            self.ca_get_cert()?,
             remote_ca_cert,
             regexes,
         )?;
@@ -755,7 +761,7 @@ impl OpenpgpCa {
         Ok(())
     }
 
-    pub fn get_bridges(&self) -> Fallible<Vec<models::Bridge>> {
+    pub fn bridges_get(&self) -> Fallible<Vec<models::Bridge>> {
         self.db.list_bridges()
     }
 
@@ -763,13 +769,13 @@ impl OpenpgpCa {
 
     /// export all user keys + CA key into a wkd directory structure
     /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
-    pub fn export_wkd(&self, domain: &str, path: &Path) -> Fallible<()> {
+    pub fn wkd_export(&self, domain: &str, path: &Path) -> Fallible<()> {
         use sequoia_net::wkd;
 
-        let ca_cert = self.get_ca_cert()?;
+        let ca_cert = self.ca_get_cert()?;
         wkd::insert(&path, domain, None, &ca_cert)?;
 
-        for uc in self.get_all_usercerts()? {
+        for uc in self.usercerts_get_all()? {
             let c = Pgp::armored_to_cert(&uc.pub_cert)?;
 
             if Self::cert_has_uid_in_domain(&c, domain)? {
@@ -791,7 +797,7 @@ impl OpenpgpCa {
         use sequoia_net::wkd;
         use tokio_core::reactor::Core;
 
-        let emails = self.get_emails(&usercert)?;
+        let emails = self.emails_get(&usercert)?;
 
         let mut merge = Pgp::armored_to_cert(&usercert.pub_cert)?;
 

@@ -46,7 +46,7 @@ fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
     // ---- import keys from OpenPGP CA into GnuPG ----
 
     // get Cert for CA
-    let ca_cert = ca.get_ca_cert()?;
+    let ca_cert = ca.ca_get_cert()?;
 
     // import CA key into GnuPG
     let mut buf = Vec::new();
@@ -54,7 +54,7 @@ fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
     gnupg::import(&ctx, &buf);
 
     // import CA users into GnuPG
-    let usercerts = ca.get_all_usercerts()?;
+    let usercerts = ca.usercerts_get_all()?;
 
     assert_eq!(usercerts.len(), 2);
 
@@ -111,14 +111,14 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
     // make new CA key
     ca.ca_init("example.org", None)?;
 
-    let ca_key = ca.get_ca_pubkey_armored()?;
+    let ca_key = ca.ca_get_pubkey_armored()?;
 
     // ---- import CA key from OpenPGP CA into GnuPG instances ----
     gnupg::import(&ctx_alice, ca_key.as_bytes());
     gnupg::import(&ctx_bob, ca_key.as_bytes());
 
     // get Cert for CA
-    let ca_cert = ca.get_ca_cert()?;
+    let ca_cert = ca.ca_get_cert()?;
 
     let ca_keyid = ca_cert.keyid().to_hex();
 
@@ -134,9 +134,9 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
     let alice_ca_key = gnupg::export(&ctx_alice, &"openpgp-ca@example.org");
     let bob_ca_key = gnupg::export(&ctx_bob, &"openpgp-ca@example.org");
 
-    ca.import_tsig_for_ca(&alice_ca_key)
+    ca.ca_import_tsig(&alice_ca_key)
         .context("import CA tsig from Alice failed")?;
-    ca.import_tsig_for_ca(&bob_ca_key)
+    ca.ca_import_tsig(&bob_ca_key)
         .context("import CA tsig from Bob failed")?;
 
     // get public keys for alice and bob from their gnupg contexts
@@ -156,8 +156,8 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
         .context("import Bob to CA failed")?;
 
     // export bob, CA-key from CA
-    let ca_key = ca.get_ca_pubkey_armored()?;
-    let usercerts = ca.get_usercerts(&"bob@example.org")?;
+    let ca_key = ca.ca_get_pubkey_armored()?;
+    let usercerts = ca.usercerts_get(&"bob@example.org")?;
     let bob = usercerts.first().unwrap();
 
     // import bob+CA key into alice's GnuPG context
@@ -229,8 +229,8 @@ fn test_bridge() -> Fallible<()> {
     let ca_some_file = format!("{}/ca1.pubkey", home_path);
     let ca_other_file = format!("{}/ca2.pubkey", home_path);
 
-    let pub_ca1 = ca1.get_ca_pubkey_armored()?;
-    let pub_ca2 = ca2.get_ca_pubkey_armored()?;
+    let pub_ca1 = ca1.ca_get_pubkey_armored()?;
+    let pub_ca2 = ca2.ca_get_pubkey_armored()?;
 
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
@@ -243,14 +243,14 @@ fn test_bridge() -> Fallible<()> {
     // get Cert for ca1 from ca2 bridge
     // (this has the signed version of the ca1 pubkey)
 
-    let bridges2 = ca2.get_bridges()?;
+    let bridges2 = ca2.bridges_get()?;
     assert_eq!(bridges2.len(), 1);
 
     let ca1_cert = &bridges2[0].pub_key;
 
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)
-    let bridges1 = ca1.get_bridges()?;
+    let bridges1 = ca1.bridges_get()?;
     assert_eq!(bridges1.len(), 1);
 
     let ca2_cert = &bridges1[0].pub_key;
@@ -260,7 +260,7 @@ fn test_bridge() -> Fallible<()> {
     gnupg::import(&ctx, ca2_cert.as_bytes());
 
     // import CA1 users into GnuPG
-    let usercerts1 = ca1.get_all_usercerts()?;
+    let usercerts1 = ca1.usercerts_get_all()?;
 
     assert_eq!(usercerts1.len(), 1);
 
@@ -269,7 +269,7 @@ fn test_bridge() -> Fallible<()> {
     }
 
     // import CA2 users into GnuPG
-    let usercerts2 = ca2.get_all_usercerts()?;
+    let usercerts2 = ca2.usercerts_get_all()?;
 
     assert_eq!(usercerts2.len(), 2);
 

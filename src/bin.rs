@@ -44,7 +44,7 @@ fn real_main() -> Fallible<()> {
                 ca.usercert_new(name.as_deref(), &email[..], true)?;
             }
             UserCommand::AddRevocation { revocation_file } => {
-                ca.add_revocation(&revocation_file)?
+                ca.revocation_add(&revocation_file)?
             }
 
             UserCommand::Check { cmd } => match cmd {
@@ -80,8 +80,8 @@ fn real_main() -> Fallible<()> {
             }
             UserCommand::Export { email } => {
                 let certs = match email {
-                    Some(email) => ca.get_usercerts(&email)?,
-                    None => ca.get_all_usercerts()?,
+                    Some(email) => ca.usercerts_get(&email)?,
+                    None => ca.usercerts_get_all()?,
                 };
                 certs.iter().for_each(|cert| println!("{}", cert.pub_cert));
             }
@@ -90,8 +90,8 @@ fn real_main() -> Fallible<()> {
                 show_revocations(&ca, &email)?
             }
             UserCommand::ApplyRevocation { id } => {
-                let rev = ca.get_revocation_by_id(id)?;
-                ca.apply_revocation(rev)?;
+                let rev = ca.revocation_get_by_id(id)?;
+                ca.revocation_apply(rev)?;
             }
         },
         Command::Ca { cmd } => match cmd {
@@ -99,14 +99,14 @@ fn real_main() -> Fallible<()> {
                 ca.ca_init(&domain, name.as_deref())?;
             }
             CaCommand::Export => {
-                let ca_key = ca.get_ca_pubkey_armored()?;
+                let ca_key = ca.ca_get_pubkey_armored()?;
                 println!("{}", ca_key);
             }
             CaCommand::ImportTsig { key_file } => {
                 let key = std::fs::read_to_string(key_file)?;
-                ca.import_tsig_for_ca(&key)?;
+                ca.ca_import_tsig(&key)?;
             }
-            CaCommand::Show => ca.show_ca()?,
+            CaCommand::Show => ca.ca_show()?,
         },
         Command::Bridge { cmd } => match cmd {
             BridgeCommand::New {
@@ -124,8 +124,8 @@ fn real_main() -> Fallible<()> {
         },
         Command::Wkd { cmd } => match cmd {
             WkdCommand::Export { path } => {
-                let (db_ca, _) = ca.get_ca()?.unwrap();
-                ca.export_wkd(&db_ca.domainname, &path)?;
+                let (db_ca, _) = ca.ca_get()?.unwrap();
+                ca.wkd_export(&db_ca.domainname, &path)?;
             }
         },
     }
@@ -134,13 +134,13 @@ fn real_main() -> Fallible<()> {
 }
 
 fn show_revocations(ca: &OpenpgpCa, email: &str) -> Fallible<()> {
-    let usercerts = ca.get_usercerts(email)?;
+    let usercerts = ca.usercerts_get(email)?;
     if usercerts.is_empty() {
         println!("No Users found");
     } else {
         for cert in usercerts {
             println!("Revocations for Usercert {:?}", cert.name);
-            let revoc = ca.get_revocations(&cert)?;
+            let revoc = ca.revocations_get(&cert)?;
             for r in revoc {
                 println!(" revocation id {:?}", r.id);
                 if r.published {
@@ -233,7 +233,7 @@ fn list_users(ca: &OpenpgpCa) -> Fallible<()> {
         );
         println!("fingerprint {}", usercert.fingerprint);
 
-        ca.get_emails(&usercert)?
+        ca.emails_get(&usercert)?
             .iter()
             .for_each(|email| println!("- email {}", email.addr));
 
@@ -246,7 +246,7 @@ fn list_users(ca: &OpenpgpCa) -> Fallible<()> {
 
         println!(" user cert (or subkey) signed by CA: {}", sig_from_ca);
         println!(" user cert has tsigned CA: {}", tsig_on_ca);
-        if OpenpgpCa::cert_possibly_revoked(&usercert)? {
+        if OpenpgpCa::usercert_possibly_revoked(&usercert)? {
             println!(" this certificate has (possibly) been REVOKED");
         }
         println!();
@@ -256,7 +256,7 @@ fn list_users(ca: &OpenpgpCa) -> Fallible<()> {
 }
 
 fn list_bridges(ca: &OpenpgpCa) -> Fallible<()> {
-    ca.get_bridges()?.iter().for_each(|bridge| {
+    ca.bridges_get()?.iter().for_each(|bridge| {
         println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key)
     });
     Ok(())
