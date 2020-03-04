@@ -461,7 +461,7 @@ fn test_ca_signatures() -> Fallible<()> {
     // also, CA key gets a tsig by carol
     ca.usercert_new(Some(&"Carol"), &["carol@example.org"], false)?;
 
-    let sigs = ca.usercert_signatures()?;
+    let sigs = ca.usercert_check_signatures()?;
     for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
         match usercert.name.as_deref() {
             Some("Alice") => {

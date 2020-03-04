@@ -157,7 +157,7 @@ fn show_revocations(ca: &OpenpgpCa, email: &str) -> Fallible<()> {
 fn check_sigs(ca: &OpenpgpCa) -> Fallible<()> {
     let mut count_ok = 0;
 
-    let sigs_status = ca.usercert_signatures()?;
+    let sigs_status = ca.usercert_check_signatures()?;
     for (usercert, (sig_from_ca, tsig_on_ca)) in &sigs_status {
         let ok = if *sig_from_ca {
             true
@@ -223,7 +223,9 @@ fn check_expiry(ca: &OpenpgpCa, exp_days: u64) -> Fallible<()> {
 }
 
 fn list_users(ca: &OpenpgpCa) -> Fallible<()> {
-    for (usercert, (sig_from_ca, tsig_on_ca)) in ca.usercert_signatures()? {
+    for (usercert, (sig_by_ca, tsig_on_ca)) in
+        ca.usercert_check_signatures()?
+    {
         println!(
             "usercert for '{}'",
             usercert
@@ -244,7 +246,7 @@ fn list_users(ca: &OpenpgpCa) -> Fallible<()> {
             println!(" cert doesn't expire");
         }
 
-        println!(" user cert (or subkey) signed by CA: {}", sig_from_ca);
+        println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
         println!(" user cert has tsigned CA: {}", tsig_on_ca);
         if OpenpgpCa::usercert_possibly_revoked(&usercert)? {
             println!(" this certificate has (possibly) been REVOKED");
