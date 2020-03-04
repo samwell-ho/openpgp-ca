@@ -16,6 +16,28 @@
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
 //! OpenPGP CA as a library
+//!
+//! Example usage:
+//! ```
+//! # use openpgp_ca_lib::ca::OpenpgpCa;
+//! # use tempfile;
+//! // all state of an OpenPGP CA instance is persisted in one SQLite database
+//! let db_filename = "/tmp/openpgp-ca.sqlite";
+//! # // for Doc-tests we need a random database filename
+//! # let file = tempfile::NamedTempFile::new().unwrap();
+//! # let db_filename = file.path().to_str().unwrap();
+//!
+//! // start a new OpenPGP CA instance (implicitely creates the database file)
+//! let openpgp_ca = OpenpgpCa::new(Some(db_filename));
+//!
+//! // initialize the CA Admin (with domainname and a symbolic name)
+//! openpgp_ca.ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
+//!
+//! // create a new user, with all signatures
+//! // (the private key is printed to stdout and needs to be manually
+//! // processed from there)
+//! openpgp_ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false).unwrap();
+//! ```
 
 use std::collections::{HashMap, HashSet};
 use std::env;
