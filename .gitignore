@@ -3,3 +3,5 @@
 **/*.rs.bk
 openpgp-ca.iml
 Cargo.lock
+doc/book/
+
