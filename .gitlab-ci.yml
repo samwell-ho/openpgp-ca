@@ -33,7 +33,7 @@ cargo-clippy:
 
 pages:
   script:
-    - mdbook build
+    - mdbook build doc/
   artifacts:
     paths:
       - public
