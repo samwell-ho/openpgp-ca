@@ -1,7 +1,7 @@
 # Summary
 
 - [README](README.md)
-  - [about](ABOUT.md)
+  - [about](about.md)
 - [Usage](usage.md)
   - [Installation](INSTALL.md)
   - [Run from Cargo](cargo.md)
