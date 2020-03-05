@@ -31,12 +31,14 @@ cargo-clippy:
   allow_failure: true
 
 pages:
-  image: rust:buster
-#  stage: deploy
+  image: node:10
+  #  stage: deploy
   before_script:
-    - cargo install mdbook
+    - npm install gitbook-cli -g # install gitbook
+    - gitbook fetch 3.2.3 # fetch final stable version
+    - gitbook install # add any requested plugins in book.json
   script:
-    - mdbook build doc/
+    - gitbook build doc/ public
   artifacts:
     paths:
       - public
