@@ -1,6 +1,6 @@
 # Summary
 
-- [README](README.md)
+- [OpenPGP CA](README.md)
   - [about](about.md)
 - [Usage](usage.md)
   - [Installation](INSTALL.md)
