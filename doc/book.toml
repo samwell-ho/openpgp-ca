@@ -1,0 +1,7 @@
+[book]
+authors = ["hkos"]
+language = "en"
+multilingual = false
+src = "src"
+title = "OpenPGP CA documentation"
+
