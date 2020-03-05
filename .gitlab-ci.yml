@@ -38,7 +38,7 @@ pages:
     - gitbook fetch 3.2.3 # fetch final stable version
     - gitbook install # add any requested plugins in book.json
   script:
-    - gitbook build doc/ public
+    - gitbook build doc/src/ public
   artifacts:
     paths:
       - public
