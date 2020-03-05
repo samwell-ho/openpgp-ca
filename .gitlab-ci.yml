@@ -32,7 +32,7 @@ cargo-clippy:
 
 pages:
   image: rust:buster
-  stage: deploy
+#  stage: deploy
   before_script:
     - cargo install mdbook
   script:
