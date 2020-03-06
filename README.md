@@ -27,14 +27,14 @@ lives in this single file).
 The `ca init` call then creates a new OpenPGP Key for the CA Admin (the
 private Key is stored in OpenPGP CA and will be used to sign user keys).
 
-After that, we call `user add` to create OpenPGP Keys for our two users:
-Alice and Bob.
+After that, we call `user add` to create a new OpenPGP Keys for each of our
+users.
+The private key material for those users is *not* stored in OpenPGP CA - it
+is only printed to stdout (the admin needs to take appropriate steps to get
+those keys to the users' machines).
 
-The private key material for those users is printed to stdout (the admin
-needs to take appropriate steps to get those keys to the users' machines).
-
-These users can automatically authenticate each other, as soon as the
-users' OpenPGP implementations have copies of the user keys and the OpenPGP
+These users can automatically authenticate each other as soon as the
+their OpenPGP implementations have copies of the user keys and the OpenPGP
 CA admin's key.
 
 For more details and more workflows - including decentralized key
