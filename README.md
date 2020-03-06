@@ -27,7 +27,7 @@ lives in this single file).
 The `ca init` call then creates a new OpenPGP Key for the CA Admin (the
 private Key is stored in OpenPGP CA and will be used to sign user keys).
 
-After that, we call `user add` to create a new OpenPGP Keys for each of our
+After that, we call `user add` to create new OpenPGP Keys for each of our
 users.
 The private key material for those users is *not* stored in OpenPGP CA - it
 is only printed to stdout (the admin needs to take appropriate steps to get
