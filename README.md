@@ -20,12 +20,12 @@ openpgp-ca user add --email alice@example.org --name "Alice Adams"
 openpgp-ca user add --email bob@example.org --name "Bob Baker"
 ```
 
-At first we configure the sqlite database that all of OpenPGP CA's state
-will be stored in (all persisted data of OpenPGP CA lives inside this single
-file) by setting an environment variable.
+First we configure an environment variable for the SQLite database in which
+all of OpenPGP CA's state will be stored (all persisted data of OpenPGP CA
+lives in this single file).
 
-The `ca init` call then creates an OpenPGP Key for the CA Admin (this
-Key is stored in OpenPGP CA).
+The `ca init` call then creates a new OpenPGP Key for the CA Admin (the
+private Key is stored in OpenPGP CA and will be used to sign user keys).
 
 After that, we call `user add` to create OpenPGP Keys for our two users:
 Alice and Bob.
@@ -33,7 +33,7 @@ Alice and Bob.
 The private key material for those users is printed to stdout (the admin
 needs to take appropriate steps to get those keys to the users' machines).
 
-These users can then automatically authenticate each other, as soon as the
+These users can automatically authenticate each other, as soon as the
 users' OpenPGP implementations have copies of the user keys and the OpenPGP
 CA admin's key.
 
