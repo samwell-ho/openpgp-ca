@@ -231,15 +231,6 @@ impl Db {
         })
     }
 
-    pub fn update_ca(&self, ca: &Ca) -> Fallible<()> {
-        diesel::update(ca)
-            .set(ca)
-            .execute(&self.conn)
-            .context("Error updating CA")?;
-
-        Ok(())
-    }
-
     pub fn update_cacert(&self, cacert: &Cacert) -> Fallible<()> {
         assert!(Pgp::armored_to_cert(&cacert.cert).is_ok());
 
