@@ -22,7 +22,6 @@ diesel_migrations = "1.4"
 lazy_static = "1.4"
 dotenv = "0.15"
 failure = "0.1"
-quote = "=1.0.2" # workaround for failure build problem
 chrono = "0.4"
 
 chbs = "0.0.8"
