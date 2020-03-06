@@ -115,7 +115,7 @@ fn test_update_usercert_key() -> Fallible<()> {
     gnupg::create_user(&ctx, "alice@example.org");
     let alice1_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import(
+    ca.usercert_import_new(
         &alice1_key,
         None,
         Some("Alice"),
@@ -201,7 +201,7 @@ fn test_update_user_cert() -> Fallible<()> {
     gnupg::create_user(&ctx_alice1, "alice@example.org");
     let alice1_key = gnupg::export(&ctx_alice1, &"alice@example.org");
 
-    ca.usercert_import(
+    ca.usercert_import_new(
         &alice1_key,
         None,
         Some("Alice"),
@@ -363,8 +363,13 @@ fn test_ca_export_wkd_sequoia() -> Fallible<()> {
 
     ca.ca_init("sequoia-pgp.org", None)?;
 
-    ca.usercert_import(&justus_key, None, None, &["justus@sequoia-pgp.org"])?;
-    ca.usercert_import(&neal_key, None, None, &["neal@sequoia-pgp.org"])?;
+    ca.usercert_import_new(
+        &justus_key,
+        None,
+        None,
+        &["justus@sequoia-pgp.org"],
+    )?;
+    ca.usercert_import_new(&neal_key, None, None, &["neal@sequoia-pgp.org"])?;
 
     // -- export as WKD
 
@@ -395,7 +400,7 @@ fn test_ca_multiple_revocations() -> Fallible<()> {
 
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import(&alice_key, None, None, &[])?;
+    ca.usercert_import_new(&alice_key, None, None, &[])?;
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
@@ -442,7 +447,7 @@ fn test_ca_signatures() -> Fallible<()> {
     gnupg::create_user(&ctx, "alice@example.org");
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import(
+    ca.usercert_import_new(
         &alice_key,
         None,
         Some("Alice"),
@@ -454,7 +459,7 @@ fn test_ca_signatures() -> Fallible<()> {
     gnupg::create_user(&ctx, "bob@example.org");
     let bob_key = gnupg::export(&ctx, &"bob@example.org");
 
-    ca.usercert_import(&bob_key, None, Some("Bob"), &[])
+    ca.usercert_import_new(&bob_key, None, Some("Bob"), &[])
         .context("import Alice 1 to CA failed")?;
 
     // create carol, CA will sign carol's key.
@@ -541,7 +546,7 @@ fn test_import_signed_cert() -> Fallible<()> {
 
     // import alice into OpenPGP CA
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
-    ca.usercert_import(
+    ca.usercert_import_new(
         &alice_key,
         None,
         Some("Alice"),

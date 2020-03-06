@@ -95,7 +95,15 @@ impl OpenpgpCa {
 
     // -------- CAs
 
-    /// Create a new Ca database entry (only one CA is allowed per database)
+    /// Initialize OpenPGP CA Admin database entry.
+    ///
+    /// This generates a new OpenPGP Key for the Admin role and stores the
+    /// private Key in the OpenPGP CA database.
+    ///
+    /// `domainname` is the domain that this CA Admin is in charge of,
+    /// `name` is a descriptive name for the CA Admin
+    ///
+    /// Only one CA Admin can be configured per database.
     pub fn ca_init(
         &self,
         domainname: &str,
@@ -129,11 +137,23 @@ impl OpenpgpCa {
     }
 
     /// Get the Ca and Cacert objects from the database
+    ///
+    /// The Ca object is permanent and shouldn't change after initial
+    /// creation.
+    ///
+    /// The Cacert contains the Key material for the CA Admin.
+    /// When the CA Cert gets updated (e.g. it gets signed by a CA user), the
+    /// Cert in the database will be updated.
+    ///
+    /// If a new Cert gets created for the CA Admin, a new Cacert row is
+    /// inserted into the database.
     pub fn ca_get(&self) -> Fallible<Option<(models::Ca, models::Cacert)>> {
         self.db.get_ca()
     }
 
-    /// Get the Cert object for the Ca from the database
+    /// Get a sequoia `Cert` object for the CA Admin from the database.
+    ///
+    /// This is the "private" OpenPGP Cert of the CA Admin.
     pub fn ca_get_cert(&self) -> Fallible<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
@@ -141,18 +161,23 @@ impl OpenpgpCa {
         }
     }
 
-    /// Print information about the Ca to stdout
+    /// Print information about the Ca to stdout.
+    ///
+    /// This shows the domainname of this OpenPGP CA instance and the
+    /// private Cert of the CA Admin.
     pub fn ca_show(&self) -> Fallible<()> {
         let (ca, ca_cert) = self
             .db
             .get_ca()
             .context("failed to load CA from database")?
             .unwrap();
-        println!("\n{}\n\n{}", ca.domainname, ca_cert.cert);
+        println!("\nOpenPGP CA for Domain: {}", ca.domainname);
+        println!();
+        println!("{}", ca_cert.cert);
         Ok(())
     }
 
-    /// Returns the pubkey of the Ca Admin as an armored String
+    /// Returns the public key of the CA Admin as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Fallible<String> {
         let cert = self.ca_get_cert()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
@@ -161,8 +186,11 @@ impl OpenpgpCa {
         Ok(ca_pub)
     }
 
-    /// receive an armored key, find any tsigs on it,
-    /// then merge those into "our" copy of the CA key
+    /// Add trust-signature(s) from CA users to the CA Admin's Cert.
+    ///
+    /// This receives an armored version of the CA Admin's public key, finds
+    /// any trust-signatures on it and merges those into "our" local copy of
+    /// the CA key.
     pub fn ca_import_tsig(&self, key: &str) -> Fallible<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
@@ -208,7 +236,17 @@ impl OpenpgpCa {
 
     // -------- usercerts
 
-    /// create a new usercert in the database
+    /// Create a new OpenPGP CA User.
+    ///
+    /// The CA Admin Cert is automatically trust-signed with this new user
+    /// Cert and the user Cert is signed by the CA Admin. This is the
+    /// "Centralized key creation workflow"
+    ///
+    /// This generates a new OpenPGP Cert for the new User.
+    /// The private Cert material is printed to stdout and NOT stored
+    /// in OpenPGP CA.
+    ///
+    /// The public Cert is stored in the OpenPGP CA database.
     pub fn usercert_new(
         &self,
         name: Option<&str>,
@@ -269,7 +307,7 @@ impl OpenpgpCa {
     fn usercert_import_update_or_create(
         &self,
         key: &str,
-        revoc_certs: Option<&str>,
+        revoc_cert: Option<&str>,
         name: Option<&str>,
         emails: &[&str],
         updates_id: Option<i32>,
@@ -304,7 +342,7 @@ impl OpenpgpCa {
 
             // this "update" workflow is not handling revocation certs for now
             assert!(
-                revoc_certs.is_none(),
+                revoc_cert.is_none(),
                 "not expecting a revocation cert on key update"
             );
 
@@ -357,7 +395,7 @@ impl OpenpgpCa {
             // load revocation certificate
             let mut revocs: Vec<String> = Vec::new();
 
-            if let Some(rev) = revoc_certs {
+            if let Some(rev) = revoc_cert {
                 revocs.push(rev.to_owned());
             }
 
@@ -376,20 +414,26 @@ impl OpenpgpCa {
         Ok(())
     }
 
-    /// Import a usercert that isn't an update for an existing usercert
-    pub fn usercert_import(
+    /// Import an existing OpenPGP public Cert a new OpenPGP CA user.
+    ///
+    /// The `key` is expected as an armored public key.
+    ///
+    /// A symbolic `name` and a list of `emails` for this User can
+    /// optionally be supplied. If those are not set, emails are taken from
+    /// the list of userids in the public key. Alsi, if the
+    /// key has exactly one userid, the symbolic name is taken from that
+    /// userid.
+    ///
+    /// Optionally a revocation certificate can be supplied.
+    pub fn usercert_import_new(
         &self,
         key: &str,
-        revoc_certs: Option<&str>,
+        revoc_cert: Option<&str>,
         name: Option<&str>,
         emails: &[&str],
     ) -> Fallible<()> {
         self.usercert_import_update_or_create(
-            key,
-            revoc_certs,
-            name,
-            emails,
-            None,
+            key, revoc_cert, name, emails, None,
         )
     }
 

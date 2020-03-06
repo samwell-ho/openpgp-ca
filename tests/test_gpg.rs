@@ -144,7 +144,7 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
     let bob_key = gnupg::export(&ctx_bob, &"bob@example.org");
 
     // import public keys for alice and bob into CA
-    ca.usercert_import(
+    ca.usercert_import_new(
         &alice_key,
         None,
         Some("Alice"),
@@ -152,7 +152,7 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
     )
     .context("import Alice to CA failed")?;
 
-    ca.usercert_import(&bob_key, None, Some("Bob"), &["bob@example.org"])
+    ca.usercert_import_new(&bob_key, None, Some("Bob"), &["bob@example.org"])
         .context("import Bob to CA failed")?;
 
     // export bob, CA-key from CA

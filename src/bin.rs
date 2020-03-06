@@ -71,7 +71,7 @@ fn real_main() -> Fallible<()> {
                 let email: Vec<&str> =
                     email.iter().map(String::as_str).collect();
 
-                ca.usercert_import(
+                ca.usercert_import_new(
                     &key,
                     revoc_certs.as_deref(),
                     name.as_deref(),
