@@ -437,12 +437,16 @@ impl OpenpgpCa {
         )
     }
 
-    /// Import a usercert that is an update for an existing usercert
+    /// Import an updated public Key for an existing usercert
     pub fn usercert_import_update(
         &self,
         key: &str,
         usercert: &models::Usercert,
     ) -> Fallible<()> {
+        // FIXME: If the fingerprint is the same, key data is merged.
+        // FIXME: Is a new usercert created if the fingerprint differs?
+        //         -> what should happen!?
+
         let emails = self.db.get_emails_by_usercert(usercert)?;
         let emails: Vec<_> = emails.iter().map(|e| e.addr.as_str()).collect();
 
@@ -455,7 +459,7 @@ impl OpenpgpCa {
         )
     }
 
-    /// Get the SystemTime for when a Usercert will expire
+    /// Get the SystemTime for when the specified Usercert will expire
     pub fn usercert_expiration(
         usercert: &models::Usercert,
     ) -> Fallible<Option<SystemTime>> {
@@ -464,7 +468,7 @@ impl OpenpgpCa {
     }
 
     /// Which usercerts will be expired in 'days' days?
-    pub fn usercert_expiry(
+    pub fn usercerts_expired(
         &self,
         days: u64,
     ) -> Fallible<HashMap<models::Usercert, (bool, Option<SystemTime>)>> {
@@ -489,7 +493,7 @@ impl OpenpgpCa {
         Ok(map)
     }
 
-    /// Check if a usercert is possibly revoked
+    /// Check if a usercert is "possibly revoked"
     pub fn usercert_possibly_revoked(
         usercert: &models::Usercert,
     ) -> Fallible<bool> {
@@ -497,12 +501,12 @@ impl OpenpgpCa {
         Ok(Pgp::is_possibly_revoked(&cert))
     }
 
-    /// Get a map 'usercert -> (sig_from_ca, tsig_on_ca)'
+    /// For each user Cert, check if:
+    /// - the user's Cert has been signed by the CA Admin, and
+    /// - the CA Admin key has a trust-signature from the user's Cert
     ///
-    /// For each usercert check if:
-    /// - this user's Cert has been signed by the CA Key,
-    /// - this user's Cert has tsigned the CA Key
-    pub fn usercert_check_signatures(
+    /// Returns a map 'usercert -> (sig_from_ca, tsig_on_ca)'
+    pub fn usercerts_check_signatures(
         &self,
     ) -> Fallible<HashMap<models::Usercert, (bool, bool)>> {
         let mut map = HashMap::new();
@@ -556,7 +560,7 @@ impl OpenpgpCa {
         }))
     }
 
-    /// Get Cert representation of a Usercert
+    /// Get sequoia Cert representation of a Usercert
     pub fn usercert_to_cert(usercert: &models::Usercert) -> Fallible<Cert> {
         Pgp::armored_to_cert(&usercert.pub_cert)
     }
@@ -612,12 +616,12 @@ impl OpenpgpCa {
         }
     }
 
-    /// Get a list of all Revocations
+    /// Get a list of all Revocations for a usercert
     pub fn revocations_get(
         &self,
-        cert: &models::Usercert,
+        usercert: &models::Usercert,
     ) -> Fallible<Vec<models::Revocation>> {
-        self.db.get_revocations(cert)
+        self.db.get_revocations(usercert)
     }
 
     /// Get a Revocation by revocation id
@@ -634,8 +638,7 @@ impl OpenpgpCa {
 
     /// Apply a revocation.
     ///
-    /// This means that the revocation is merged into the OpenPGP
-    /// Certificate of the user.
+    /// The revocation is merged into the OpenPGP Cert of the Usercert.
     pub fn revocation_apply(&self, revoc: models::Revocation) -> Fallible<()> {
         use diesel::prelude::*;
         self.db.get_conn().transaction::<_, failure::Error, _>(|| {
@@ -791,7 +794,11 @@ impl OpenpgpCa {
         Ok((self.db.insert_bridge(new_bridge)?, bridged.fingerprint()))
     }
 
-    /// Create a revocation Certificate for a Bridge
+    /// Create a revocation Certificate for a Bridge and apply it the our
+    /// copy of the remote CA Admin's public key.
+    ///
+    /// Both the revoked remote public key and the revocation cert are
+    /// printed to stdout.
     pub fn bridge_revoke(&self, email: &str) -> Fallible<()> {
         let bridge = self.db.search_bridge(email)?;
         assert!(bridge.is_some(), "bridge not found");

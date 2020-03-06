@@ -137,12 +137,12 @@ fn test_update_usercert_key() -> Fallible<()> {
     assert!(cert.alive(&policy, in_three_years).is_err());
 
     // check the same with ca.usercert_expiry()
-    let exp1 = ca.usercert_expiry(365)?;
+    let exp1 = ca.usercerts_expired(365)?;
     assert_eq!(exp1.len(), 1);
     let (_, (alive, _)) = exp1.iter().next().unwrap();
     assert!(alive);
 
-    let exp3 = ca.usercert_expiry(3 * 365).unwrap();
+    let exp3 = ca.usercerts_expired(3 * 365).unwrap();
     assert_eq!(exp3.len(), 1);
     let (_, (alive, _)) = exp3.iter().next().unwrap();
     assert!(!alive);
@@ -171,12 +171,12 @@ fn test_update_usercert_key() -> Fallible<()> {
     assert!(!cert.alive(&policy, in_six_years).is_ok());
 
     // check the same with ca.usercert_expiry()
-    let exp3 = ca.usercert_expiry(3 * 365)?;
+    let exp3 = ca.usercerts_expired(3 * 365)?;
     assert_eq!(exp3.len(), 1);
     let (_, (alive, _)) = exp3.iter().next().unwrap();
     assert!(alive);
 
-    let exp5 = ca.usercert_expiry(5 * 365)?;
+    let exp5 = ca.usercerts_expired(5 * 365)?;
     assert_eq!(exp5.len(), 1);
     let (_, (alive, _)) = exp5.iter().next().unwrap();
     assert!(!alive);
@@ -466,7 +466,7 @@ fn test_ca_signatures() -> Fallible<()> {
     // also, CA key gets a tsig by carol
     ca.usercert_new(Some(&"Carol"), &["carol@example.org"], false)?;
 
-    let sigs = ca.usercert_check_signatures()?;
+    let sigs = ca.usercerts_check_signatures()?;
     for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
         match usercert.name.as_deref() {
             Some("Alice") => {

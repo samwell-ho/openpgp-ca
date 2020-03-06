@@ -157,7 +157,7 @@ fn show_revocations(ca: &OpenpgpCa, email: &str) -> Fallible<()> {
 fn check_sigs(ca: &OpenpgpCa) -> Fallible<()> {
     let mut count_ok = 0;
 
-    let sigs_status = ca.usercert_check_signatures()?;
+    let sigs_status = ca.usercerts_check_signatures()?;
     for (usercert, (sig_from_ca, tsig_on_ca)) in &sigs_status {
         let ok = if *sig_from_ca {
             true
@@ -193,7 +193,7 @@ fn check_sigs(ca: &OpenpgpCa) -> Fallible<()> {
 }
 
 fn check_expiry(ca: &OpenpgpCa, exp_days: u64) -> Fallible<()> {
-    let expiries = ca.usercert_expiry(exp_days)?;
+    let expiries = ca.usercerts_expired(exp_days)?;
 
     for (usercert, (alive, expiry)) in expiries {
         println!(
@@ -224,7 +224,7 @@ fn check_expiry(ca: &OpenpgpCa, exp_days: u64) -> Fallible<()> {
 
 fn list_users(ca: &OpenpgpCa) -> Fallible<()> {
     for (usercert, (sig_by_ca, tsig_on_ca)) in
-        ca.usercert_check_signatures()?
+        ca.usercerts_check_signatures()?
     {
         println!(
             "usercert for '{}'",
