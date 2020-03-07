@@ -1,2 +1,7 @@
 This document has moved to
+
+doc/src/about.md
+
+or
+
 https://openpgp-ca.gitlab.io/openpgp-ca/about.html
