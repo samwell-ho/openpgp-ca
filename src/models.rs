@@ -1,6 +1,7 @@
 // Copyright 2019-2020 Heiko Schaefer heiko@schaefer.name
 //
-// This file is part of OpenPGP CA.
+// This file is part of OpenPGP CA
+// https://gitlab.com/openpgp-ca/openpgp-ca
 //
 // OpenPGP CA is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
