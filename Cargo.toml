@@ -1,7 +1,14 @@
 [package]
 name = "openpgp-ca"
 version = "0.1.3"
+description = "OpenPGP CA is a tool for managing OpenPGP keys within organizations"
 authors = ["Heiko Schaefer <heiko.schaefer@posteo.de>"]
+license = "GPL-3.0-or-later"
+categories = ["cryptography", "email"]
+keywords = ["OpenPGP", "Sequoia", "PGP"]
+homepage = "https://gitlab.com/openpgp-ca/openpgp-ca"
+repository = "https://gitlab.com/openpgp-ca/openpgp-ca"
+documentation = "https://openpgp-ca.gitlab.io/openpgp-ca/"
 edition = "2018"
 
 [lib]
