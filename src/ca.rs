@@ -593,8 +593,7 @@ impl OpenpgpCa {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
             .context("Couldn't load revocation cert")?;
 
-        let sig_fingerprint =
-            &Pgp::get_revoc_fingerprint(&revoc_cert).to_hex();
+        let sig_fingerprint = &Pgp::get_revoc_issuer_fp(&revoc_cert).to_hex();
 
         let cert = self.db.get_usercert(sig_fingerprint)?;
 
@@ -606,13 +605,28 @@ impl OpenpgpCa {
                 let cert_fingerprint = &c.fingerprint;
                 assert_eq!(sig_fingerprint, cert_fingerprint);
 
-                // update sig in DB
-                let armored = Pgp::sig_to_armored(&revoc_cert)
-                    .context("couldn't armor revocation cert")?;
+                let cert = Pgp::armored_to_cert(&c.pub_cert)?;
 
-                self.db.add_revocation(&armored, &c)?;
+                let key = cert.primary_key().key().clone();
 
-                Ok(())
+                // verify that revocation certificate validates with cert
+                if revoc_cert.verify_primary_key_revocation(&key, &key).is_ok()
+                {
+                    // update sig in DB
+                    let armored = Pgp::sig_to_armored(&revoc_cert)
+                        .context("couldn't armor revocation cert")?;
+
+                    self.db.add_revocation(&armored, &c)?;
+
+                    Ok(())
+                } else {
+                    let msg = format!(
+                        "revocation couldn't be matched to a usercert: {:?}",
+                        revoc_cert
+                    );
+
+                    Err(failure::err_msg(msg))
+                }
             }
         }
     }

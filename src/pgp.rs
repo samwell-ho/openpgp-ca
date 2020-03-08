@@ -240,7 +240,7 @@ impl Pgp {
         Err(failure::err_msg("Couldn't load revocation from file"))
     }
 
-    pub fn get_revoc_fingerprint(revoc_cert: &Signature) -> Fingerprint {
+    pub fn get_revoc_issuer_fp(revoc_cert: &Signature) -> Fingerprint {
         let keyhandles = revoc_cert.get_issuers();
         let sig_fingerprints: Vec<_> = keyhandles
             .iter()
