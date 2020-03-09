@@ -657,13 +657,30 @@ impl OpenpgpCa {
         Ok(revoc_cert.verify_primary_key_revocation(key, key).is_ok())
     }
 
-    /// search all usercerts for any that `revoc` can revoke
+    /// Search all usercerts for the one that `revoc` can revoke.
+    ///
+    /// This assumes that the Signature has no issuer fingerprint.
+    /// So if the Signature also has no issuer KeyID, it fails to find a
+    /// usercert.
     fn search_revocable_usercert(
         &self,
         revoc: &Signature,
     ) -> Fallible<Option<models::Usercert>> {
+        let r_keyid = revoc.issuer();
+        if r_keyid.is_none() {
+            return Err(failure::err_msg("Signature has no issuer KeyID"));
+        }
+        let r_keyid = r_keyid.unwrap();
+
         for usercert in self.usercerts_get_all()? {
             let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+
+            // require that keyid of cert and Signature issuer match
+            let c_keyid = cert.keyid();
+            if &c_keyid != r_keyid {
+                continue;
+            }
+
             if Self::validate_revocation(&cert, &revoc)? {
                 return Ok(Some(usercert));
             }
