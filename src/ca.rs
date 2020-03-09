@@ -586,49 +586,89 @@ impl OpenpgpCa {
 
     // -------- revocations
 
-    /// Add a revocation certificate (from a file)
+    /// Add a revocation certificate to the OpenPGP CA database (from a file).
     ///
-    /// The relevant usercert is looked up by OpenPGP Fingerprint
+    /// The matching usercert is looked up by issuer Fingerprint, if
+    /// possible - or by exhaustive search otherwise.
+    ///
+    /// Verifies that applying the revocation cert can be validated by the
+    /// usercert. Only if this is successful is the revocation stored.
     pub fn revocation_add(&self, revoc_file: &PathBuf) -> Fallible<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
             .context("Couldn't load revocation cert")?;
 
-        let sig_fingerprint = &Pgp::get_revoc_issuer_fp(&revoc_cert).to_hex();
+        // find the matching usercert for this revocation certificate
+        let mut usercert = None;
+        // - search by fingerprint, if possible
+        if let Some(sig_fingerprint) = Pgp::get_revoc_issuer_fp(&revoc_cert) {
+            usercert = self.db.get_usercert(&sig_fingerprint.to_hex())?;
+        }
+        // - if match by fingerprint failed: test all usercerts
+        if usercert.is_none() {
+            usercert = self.search_revocable_usercert(&revoc_cert)?;
+        }
 
-        let cert = self.db.get_usercert(sig_fingerprint)?;
+        if let Some(usercert) = usercert {
+            let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
 
-        match cert {
-            None => Err(failure::err_msg(
-                "couldn't find cert for this fingerprint",
-            )),
-            Some(c) => {
-                let cert_fingerprint = &c.fingerprint;
-                assert_eq!(sig_fingerprint, cert_fingerprint);
+            // verify that revocation certificate validates with cert
+            if Self::validate_revocation(&cert, &revoc_cert)? {
+                // update sig in DB
+                let armored = Pgp::sig_to_armored(&revoc_cert)
+                    .context("couldn't armor revocation cert")?;
 
-                let cert = Pgp::armored_to_cert(&c.pub_cert)?;
+                self.db.add_revocation(&armored, &usercert)?;
 
-                let key = cert.primary_key().key().clone();
+                Ok(())
+            } else {
+                let msg = format!(
+                    "revocation couldn't be matched to a usercert: {:?}",
+                    revoc_cert
+                );
 
-                // verify that revocation certificate validates with cert
-                if revoc_cert.verify_primary_key_revocation(&key, &key).is_ok()
-                {
-                    // update sig in DB
-                    let armored = Pgp::sig_to_armored(&revoc_cert)
-                        .context("couldn't armor revocation cert")?;
+                Err(failure::err_msg(msg))
+            }
+        } else {
+            Err(failure::err_msg("couldn't find cert for this fingerprint"))
+        }
+    }
 
-                    self.db.add_revocation(&armored, &c)?;
+    /// verify that applying `revoc_cert` to `cert` yields a new validated
+    /// self revocation
+    fn validate_revocation(
+        cert: &Cert,
+        revoc_cert: &Signature,
+    ) -> Fallible<bool> {
+        let before = cert.primary_key().self_revocations().len();
 
-                    Ok(())
-                } else {
-                    let msg = format!(
-                        "revocation couldn't be matched to a usercert: {:?}",
-                        revoc_cert
-                    );
+        let revoked = cert
+            .to_owned()
+            .merge_packets(vec![revoc_cert.to_owned().into()])?;
 
-                    Err(failure::err_msg(msg))
-                }
+        let after = revoked.primary_key().self_revocations().len();
+
+        // expecting an additional self_revocation after merging revoc_cert
+        if before + 1 != after {
+            return Ok(false);
+        }
+
+        // does the self revocation verify?
+        let key = revoked.primary_key().key();
+        Ok(revoc_cert.verify_primary_key_revocation(key, key).is_ok())
+    }
+
+    /// search all usercerts for any that `revoc` can revoke
+    fn search_revocable_usercert(
+        &self,
+        revoc: &Signature,
+    ) -> Fallible<Option<models::Usercert>> {
+        for usercert in self.usercerts_get_all()? {
+            let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
+            if Self::validate_revocation(&cert, &revoc)? {
+                return Ok(Some(usercert));
             }
         }
+        Ok(None)
     }
 
     /// Get a list of all Revocations for a usercert

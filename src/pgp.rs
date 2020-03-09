@@ -240,7 +240,7 @@ impl Pgp {
         Err(failure::err_msg("Couldn't load revocation from file"))
     }
 
-    pub fn get_revoc_issuer_fp(revoc_cert: &Signature) -> Fingerprint {
+    pub fn get_revoc_issuer_fp(revoc_cert: &Signature) -> Option<Fingerprint> {
         let keyhandles = revoc_cert.get_issuers();
         let sig_fingerprints: Vec<_> = keyhandles
             .iter()
@@ -255,12 +255,11 @@ impl Pgp {
             .map(|fp| fp.unwrap())
             .collect();
 
-        assert_eq!(
-            sig_fingerprints.len(),
-            1,
-            "expected exactly one Fingerprint in revocation cert"
-        );
-        sig_fingerprints[0].clone()
+        match sig_fingerprints.len() {
+            0 => None,
+            1 => Some(sig_fingerprints[0].clone()),
+            _ => panic!("expected 0 or 1 issuer fingerprint in revocation"),
+        }
     }
 
     /// user tsigns CA key
