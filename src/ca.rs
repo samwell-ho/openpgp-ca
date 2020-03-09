@@ -728,6 +728,11 @@ impl OpenpgpCa {
         })
     }
 
+    /// Get an armored representation of a Signature
+    pub fn sig_to_armored(sig: &Signature) -> Fallible<String> {
+        Pgp::sig_to_armored(sig)
+    }
+
     // -------- emails
 
     /// Get all Emails for a Usercert

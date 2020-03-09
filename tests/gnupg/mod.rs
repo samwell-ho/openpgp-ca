@@ -323,6 +323,29 @@ pub fn export(ctx: &Context, search: &str) -> String {
     out
 }
 
+pub fn export_secret(ctx: &Context, search: &str) -> String {
+    let mut out = String::new();
+
+    let mut gpg = Command::new("gpg")
+        .stdout(Stdio::piped())
+        .arg("--homedir")
+        .arg(ctx.directory("homedir").unwrap())
+        .arg("--armor")
+        .arg("--export-secret-keys")
+        .arg(search)
+        .spawn()
+        .expect("failed to start gpg");
+    let status = gpg.wait().unwrap();
+    gpg.stdout
+        .as_mut()
+        .unwrap()
+        .read_to_string(&mut out)
+        .unwrap();
+    assert!(status.success());
+
+    out
+}
+
 pub fn list_keys(ctx: &Context) -> Fallible<HashMap<String, String>> {
     let res = list_keys_raw(&ctx).unwrap();
 
