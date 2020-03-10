@@ -78,10 +78,11 @@ impl Db {
             .values(&cert)
             .execute(&self.conn)?;
 
-        assert_eq!(
-            inserted_count, 1,
-            "insert_usercert: couldn't insert usercert"
-        );
+        if inserted_count != 1 {
+            return Err(failure::err_msg(
+                "insert_usercert: insert should return count '1'",
+            ));
+        }
 
         let c: Vec<Usercert> = usercerts::table
             .order(usercerts::id.desc())
@@ -91,9 +92,13 @@ impl Db {
             .rev()
             .collect();
 
-        assert_eq!(c.len(), 1);
-
-        Ok(c[0].clone())
+        if c.len() == 1 {
+            Ok(c[0].clone())
+        } else {
+            Err(failure::err_msg(
+                "insert_usercert: unexpected insert failure",
+            ))
+        }
     }
 
     fn insert_revocation(&self, revoc: NewRevocation) -> Fallible<Revocation> {
@@ -101,10 +106,11 @@ impl Db {
             .values(&revoc)
             .execute(&self.conn)?;
 
-        assert_eq!(
-            inserted_count, 1,
-            "insert_revocation: couldn't insert revocation"
-        );
+        if inserted_count != 1 {
+            return Err(failure::err_msg(
+                "insert_revocation: insert should return count '1'",
+            ));
+        }
 
         let r: Vec<Revocation> = revocations::table
             .order(revocations::id.desc())
@@ -114,9 +120,13 @@ impl Db {
             .rev()
             .collect();
 
-        assert_eq!(r.len(), 1);
-
-        Ok(r[0].clone())
+        if r.len() == 1 {
+            Ok(r[0].clone())
+        } else {
+            Err(failure::err_msg(
+                "insert_revocation: unexpected insert failure",
+            ))
+        }
     }
 
     fn insert_or_link_email(
@@ -134,10 +144,11 @@ impl Db {
                 .execute(&self.conn)
                 .context("Error saving new certs_emails")?;
 
-            assert_eq!(
-                inserted_count, 1,
-                "insert_email: couldn't insert certs_emails"
-            );
+            if inserted_count != 1 {
+                return Err(failure::err_msg(
+                    "insert_or_link_email: insert should return count '1'",
+                ));
+            }
 
             Ok(e)
         } else {
@@ -171,7 +182,11 @@ impl Db {
             .execute(&self.conn)
             .context("Error saving new email")?;
 
-        assert_eq!(inserted_count, 1, "insert_email: couldn't insert email");
+        if inserted_count != 1 {
+            return Err(failure::err_msg(
+                "insert_email: insert should return count '1'",
+            ));
+        }
 
         let e: Vec<Email> = emails::table
             .order(emails::id.desc())
@@ -181,7 +196,11 @@ impl Db {
             .rev()
             .collect();
 
-        assert_eq!(e.len(), 1);
+        if e.len() != 1 {
+            return Err(failure::err_msg(
+                "insert_email: unexpected insert failure [emails]",
+            ));
+        }
 
         let e = e[0].clone();
 
@@ -194,10 +213,11 @@ impl Db {
             .execute(&self.conn)
             .context("Error saving new certs_emails")?;
 
-        assert_eq!(
-            inserted_count, 1,
-            "insert_email: couldn't insert certs_emails"
-        );
+        if inserted_count != 1 {
+            return Err(failure::err_msg(
+                "insert_email: unexpected insert failure [certs_emails]",
+            ));
+        }
 
         Ok(e)
     }
@@ -205,8 +225,6 @@ impl Db {
     // --- public ---
 
     pub fn insert_ca(&self, ca: NewCa, ca_key: &str) -> Fallible<()> {
-        assert!(Pgp::armored_to_cert(ca_key).is_ok());
-
         self.conn.transaction::<_, failure::Error, _>(|| {
             diesel::insert_into(cas::table)
                 .values(&ca)
@@ -233,8 +251,6 @@ impl Db {
     }
 
     pub fn update_cacert(&self, cacert: &Cacert) -> Fallible<()> {
-        assert!(Pgp::armored_to_cert(&cacert.cert).is_ok());
-
         diesel::update(cacert)
             .set(cacert)
             .execute(&self.conn)
@@ -258,18 +274,20 @@ impl Db {
                     .load::<Cacert>(&self.conn)
                     .context("Error loading CA Certs")?;
 
-                // FIXME: which cert(s) should be returned?
-                // -> there can be more than one "active" cert,
-                // as well as even more "inactive" certs.
-                assert_eq!(ca_certs.len(), 1);
-                let ca_cert = ca_certs[0].clone();
-
-                Ok(Some((ca, ca_cert)))
+                match ca_certs.len() {
+                    0 => Ok(None),
+                    1 => Ok(Some((ca, ca_certs[0].to_owned()))),
+                    _ => {
+                        // FIXME: which cert(s) should be returned?
+                        // -> there can be more than one "active" cert,
+                        // as well as even more "inactive" certs.
+                        unimplemented!("get_ca: more than one ca_cert in DB");
+                    }
+                }
             }
-            _ => panic!(
-                "found more than 1 CA in database. this should \
-                 never happen"
-            ),
+            _ => Err(failure::err_msg(
+                "more than 1 CA in database. this should never happen",
+            )),
         }
     }
 
@@ -363,11 +381,12 @@ impl Db {
             .load::<Usercert>(&self.conn)
             .context("Error loading UserCert by fingerprint")?;
 
-        assert!(u.len() <= 1);
-        if u.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(u[0].clone()))
+        match u.len() {
+            0 => Ok(None),
+            1 => Ok(Some(u[0].clone())),
+            _ => {
+                Err(failure::err_msg("get_usercert: expected 0 or 1 usercert"))
+            }
         }
     }
 
@@ -446,7 +465,11 @@ impl Db {
             .execute(&self.conn)
             .context("Error saving new bridge")?;
 
-        assert_eq!(inserted_count, 1, "insert_user: couldn't insert bridge");
+        if inserted_count != 1 {
+            return Err(failure::err_msg(
+                "insert_user: insert should return count '1'",
+            ));
+        }
 
         let b: Vec<Bridge> = bridges::table
             .order(bridges::id.desc())
@@ -456,9 +479,11 @@ impl Db {
             .rev()
             .collect();
 
-        assert_eq!(b.len(), 1);
-
-        Ok(b[0].clone())
+        if b.len() == 1 {
+            Ok(b[0].clone())
+        } else {
+            Err(failure::err_msg("insert_user: unexpected insert failure"))
+        }
     }
 
     pub fn update_bridge(&self, bridge: &Bridge) -> Fallible<()> {
@@ -479,12 +504,12 @@ impl Db {
         match res.len() {
             0 => Ok(None),
             1 => Ok(Some(res[0].clone())),
-            _ => panic!(
-                "search_bridge for {} found {} Fallibles, expected 1. \
+            _ => Err(failure::err_msg(format!(
+                "search_bridge for {} found {} results, expected <=1. \
                  (Database constraints should make this impossible)",
                 email,
                 res.len()
-            ),
+            ))),
         }
     }
 
