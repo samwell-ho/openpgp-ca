@@ -605,7 +605,7 @@ impl OpenpgpCa {
         }
         // - if match by fingerprint failed: test all usercerts
         if usercert.is_none() {
-            usercert = self.search_revocable_usercert(&revoc_cert)?;
+            usercert = self.search_revocable_usercert_by_keyid(&revoc_cert)?;
         }
 
         if let Some(usercert) = usercert {
@@ -662,7 +662,7 @@ impl OpenpgpCa {
     /// This assumes that the Signature has no issuer fingerprint.
     /// So if the Signature also has no issuer KeyID, it fails to find a
     /// usercert.
-    fn search_revocable_usercert(
+    fn search_revocable_usercert_by_keyid(
         &self,
         revoc: &Signature,
     ) -> Fallible<Option<models::Usercert>> {
@@ -678,9 +678,11 @@ impl OpenpgpCa {
             // require that keyid of cert and Signature issuer match
             let c_keyid = cert.keyid();
             if &c_keyid != r_keyid {
+                // ignore usercerts with non-matching KeyID
                 continue;
             }
 
+            // if KeyID matches, check if revocation validates
             if Self::validate_revocation(&cert, &revoc)? {
                 return Ok(Some(usercert));
             }
