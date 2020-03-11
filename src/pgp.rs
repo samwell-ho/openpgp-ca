@@ -296,12 +296,13 @@ impl Pgp {
         // FIXME: do we want to support a tsig without any scope regex?
         // -> or force users to explicitly set a catchall regex, then.
 
-        // there should be exactly one userid
-        assert_eq!(
-            remote_ca_cert.userids().len(),
-            1,
-            "expect CA cert to have exactly one user_id"
-        );
+        // there should be exactly one userid in the remote CA Cert
+        if remote_ca_cert.userids().len() != 1 {
+            return Err(failure::err_msg(
+                "expect remote CA cert to have exactly one user_id",
+            ));
+        }
+
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
@@ -335,20 +336,25 @@ impl Pgp {
         remote_ca_cert: &Cert,
         ca_cert: &Cert,
     ) -> Fallible<(Signature, Cert)> {
-        // there should be exactly one userid!
-        assert_eq!(
-            remote_ca_cert.userids().len(),
-            1,
-            "expect CA cert to have exactly one user_id"
-        );
+        // there should be exactly one userid in the remote CA Cert
+        if remote_ca_cert.userids().len() != 1 {
+            return Err(failure::err_msg(
+                "expect remote CA cert to have exactly one user_id",
+            ));
+        }
+
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
         // set_trust_signature, set_regular_expression(s), expiration
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
 
-        // the CA should have exactly one key that can certify
-        assert_eq!(cert_keys.len(), 1);
+        // this CA should have exactly one key that can certify
+        if cert_keys.len() != 1 {
+            return Err(failure::err_msg(
+                "this CA should have exactly one key that can certify",
+            ));
+        }
 
         let signer = &mut cert_keys[0];
 
