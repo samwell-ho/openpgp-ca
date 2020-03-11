@@ -322,10 +322,11 @@ impl OpenpgpCa {
         if let Some(mut existing) = existing {
             // yes - update existing Usercert in DB
 
-            assert!(
-                updates_id.is_none() || Some(existing.id) == updates_id,
-                "updates_id was specified, but is inconsistent for key update"
-            );
+            if updates_id.is_some() && updates_id.unwrap() != existing.id {
+                return Err(failure::err_msg(
+                    "updates_id was specified, but is inconsistent for key update"
+                ));
+            }
 
             // set of email addresses should be the same
             let existing_emails: HashSet<_> = self
@@ -336,16 +337,19 @@ impl OpenpgpCa {
                 .collect();
             let emails: HashSet<_> =
                 emails.iter().map(|&s| s.to_string()).collect();
-            assert!(
-                emails.eq(&existing_emails),
-                "expecting the same set of email addresses on key update"
-            );
+
+            if emails != existing_emails {
+                return Err(failure::err_msg(
+                    "expecting the same set of email addresses on key update",
+                ));
+            }
 
             // this "update" workflow is not handling revocation certs for now
-            assert!(
-                revoc_cert.is_none(),
-                "not expecting a revocation cert on key update"
-            );
+            if revoc_cert.is_some() {
+                return Err(failure::err_msg(
+                    "not expecting a revocation cert on key update",
+                ));
+            }
 
             // merge existing and new public key, update in DB usercert
             let c1 = Pgp::armored_to_cert(&existing.pub_cert)?;
@@ -837,7 +841,11 @@ impl OpenpgpCa {
             Some(scope) => {
                 // if scope and domain don't match, warn/error?
                 // (FIXME: error, unless --force parameter has been given?!)
-                assert_eq!(scope, remote_cert_domain);
+                if scope != remote_cert_domain {
+                    return Err(failure::err_msg(
+                        "scope and domain don't match, currently unsupported",
+                    ));
+                }
 
                 scope
             }
@@ -880,7 +888,9 @@ impl OpenpgpCa {
     /// printed to stdout.
     pub fn bridge_revoke(&self, email: &str) -> Fallible<()> {
         let bridge = self.db.search_bridge(email)?;
-        assert!(bridge.is_some(), "bridge not found");
+        if bridge.is_none() {
+            return Err(failure::err_msg("bridge not found"));
+        }
 
         let mut bridge = bridge.unwrap();
 
@@ -1009,7 +1019,11 @@ impl OpenpgpCa {
             let email = uid.email()?;
             if let Some(email) = email {
                 let split: Vec<_> = email.split('@').collect();
-                assert_eq!(split.len(), 2);
+
+                if split.len() != 2 {
+                    return Err(failure::err_msg("unexpected email format"));
+                }
+
                 if split[1] == domain {
                     return Ok(true);
                 }
