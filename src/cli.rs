@@ -23,7 +23,8 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "openpgp-ca",
 author = "Heiko Schäfer <heiko@schaefer.name>",
-global_settings(&[AppSettings::VersionlessSubcommands,AppSettings::DisableHelpSubcommand]),
+global_settings(&[AppSettings::VersionlessSubcommands,
+AppSettings::DisableHelpSubcommand,AppSettings::DeriveDisplayOrder]),
 about = "OpenPGP CA is a tool for managing OpenPGP keys within organizations."
 )]
 pub struct Cli {
