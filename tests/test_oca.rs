@@ -611,7 +611,7 @@ fn test_revocation_no_fingerprint() -> Fallible<()> {
 
         println!("signature: {:#?}", &s);
 
-        let mut b: Builder = s.clone().into();
+        let mut b: Builder = s.into();
 
         b.remove_all(SubpacketTag::IssuerFingerprint);
 
