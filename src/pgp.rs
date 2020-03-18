@@ -90,7 +90,7 @@ impl Pgp {
             .set_key_flags(&KeyFlags::empty().set_certification(true))?
             // notation: "openpgp-ca:domain=domain1;domain2"
             .add_notation(
-                "openpgp-ca",
+                "openpgp-ca@sequoia-pgp.org",
                 (format!("domain={}", domainname)).as_bytes(),
                 signature::subpacket::NotationDataFlags::default()
                     .set_human_readable(true),
