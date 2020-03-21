@@ -26,6 +26,12 @@ use std::path::PathBuf;
 pub mod gnupg;
 
 #[test]
+/// Create a new CA. Create user certs for Alice and Bob in OpenPGP CA.
+///
+/// Export all keys to a gnupg instance, set ownertrust for Alice to
+/// "ultimate".
+///
+/// Check that gnupg considers Bob and the CA admin as "full"ly trusted.
 fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
     let ctx = gnupg::make_context()?;
 
@@ -90,12 +96,20 @@ fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
 }
 
 #[test]
-/// Alice and Bob create their own keys locally,
-/// then those keys get imported into the CA.
+/// A new CA instance is created. The CA Admin's public key is exported (for
+/// Alice and Bob).
 ///
-/// TSigning the CA key is done in user GnuPG contexts,
-/// signing of user keys in the CA.
-/// Alice imports Bob's key from CA and checks if she can authenticate Bob.
+/// Alice and Bob create their own keys locally in two seperate gnupg
+/// instances, and tsign the CA Admin Key, respectively.
+///
+/// Their keys plus the signatures on the CA Admin key get imported into the
+/// CA.
+///
+/// Export Bob and the CA Admin's key from OpenPGP CA and import into
+/// Alice's gnupg instance.
+///
+/// Expect gnupg in Alice's instance to consider both the CA Admin key and
+/// Bob and "full"ly trusted.
 fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
     let ctx_alice = gnupg::make_context()?;
     let ctx_bob = gnupg::make_context()?;
@@ -189,6 +203,14 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
 }
 
 #[test]
+/// Set up two OpenPGP CA instances for the domains "some.org" and "other.org"
+///
+/// Create users in each CA, set up a bridge between the two OpenPGP CA
+/// instances. Export all keys from both CA instances and import them into
+/// one gnupg instance. Set ownertrust on one of the users to "ultimate".
+///
+/// Check that trust of all other keys is "full" (except for the user Carol
+/// whose userid is in an external domain)
 fn test_bridge() -> Fallible<()> {
     let ctx = gnupg::make_context()?;
 
