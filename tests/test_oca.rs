@@ -533,6 +533,9 @@ fn test_ca_signatures() -> Fallible<()> {
 }
 
 #[test]
+/// Create a CA and a user. Apply the user's revocation.
+///
+/// Check that the revocation has been published to the user's cert.
 fn test_apply_revocation() -> Fallible<()> {
     let ctx = gnupg::make_context()?;
     //    ctx.leak_tempdir();
@@ -638,8 +641,8 @@ fn test_import_signed_cert() -> Fallible<()> {
 
 #[test]
 /// Create a new CA, add two users.
-/// Then import an unusual revocation certificate: the revocation doesn't
-/// contain an issuer_fingerprint.
+/// Then import a revocation certificate without an issuer_fingerprint.
+/// (The certificate only has a KeyID)
 ///
 /// OpenPGP CA needs to match this revocation to the correct cert.
 ///
