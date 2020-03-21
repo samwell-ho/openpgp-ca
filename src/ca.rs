@@ -425,7 +425,7 @@ impl OpenpgpCa {
     ///
     /// A symbolic `name` and a list of `emails` for this User can
     /// optionally be supplied. If those are not set, emails are taken from
-    /// the list of userids in the public key. Alsi, if the
+    /// the list of userids in the public key. Also, if the
     /// key has exactly one userid, the symbolic name is taken from that
     /// userid.
     ///
