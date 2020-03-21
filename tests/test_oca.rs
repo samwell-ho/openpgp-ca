@@ -34,20 +34,11 @@ use openpgp_ca_lib::ca::OpenpgpCa;
 
 pub mod gnupg;
 
-// #[test]
-// fn test_pgp_wrapper() -> Fallible<()> {
-//     let (cert, _, _) =
-//         pgp::Pgp::make_user_cert(&["foo@example.org"], Some("Foo"), false)
-//             .unwrap();
-//
-//     let armored = pgp::Pgp::priv_cert_to_armored(&cert)?;
-//
-//     assert!(!armored.is_empty());
-//
-//     Ok(())
-// }
-
 #[test]
+/// Creates a CA (with a custom name) and a user.
+///
+/// Checks that CA (with custom name) and one user (with one revocation) are
+/// visible via CA API.
 fn test_ca() -> Fallible<()> {
     let ctx = gnupg::make_context()?;
 
@@ -92,6 +83,16 @@ fn test_ca() -> Fallible<()> {
 }
 
 #[test]
+/// Create a CA, then externally create a user cert and import it.
+/// Check that the expiry of that cert is as expected.
+///
+/// Update the user cert externally (set later expiration).
+/// Re-Import the user cert, check that the CA API still shows only one
+/// user cert (i.e. an update took place, as opposed to a new user got
+/// created).
+/// Check that the updated user cert has the expected expiry duration.
+///
+/// This test also exercises the OpenpgpCa::usercerts_expired() function.
 fn test_update_usercert_key() -> Fallible<()> {
     let policy = StandardPolicy::new();
 
@@ -179,15 +180,21 @@ fn test_update_usercert_key() -> Fallible<()> {
     let (_, (alive, _)) = exp3.iter().next().unwrap();
     assert!(alive);
 
-    let exp5 = ca.usercerts_expired(5 * 365)?;
-    assert_eq!(exp5.len(), 1);
-    let (_, (alive, _)) = exp5.iter().next().unwrap();
+    let exp6 = ca.usercerts_expired(6 * 365)?;
+    assert_eq!(exp6.len(), 1);
+    let (_, (alive, _)) = exp6.iter().next().unwrap();
     assert!(!alive);
 
     Ok(())
 }
 
 #[test]
+/// Create a CA, then externally create a user cert and import it.
+/// Externally create a new user cert for the same email, then import that
+/// cert as an update for the OpenPGP CA usercert.
+///
+/// Expected outcome: Two usercerts exist in OpenPGP CA, the newer one
+/// points to the older one with the "updates_cert_id" field.
 fn test_update_user_cert() -> Fallible<()> {
     let ctx = gnupg::make_context()?;
 
@@ -232,20 +239,25 @@ fn test_update_user_cert() -> Fallible<()> {
 
     assert_eq!(usercerts.len(), 2);
 
-    // FIXME: add method to filter for "current" usercerts, or similar?!
+    // test that the "new" usercert points to the "old" usercert via
+    // the updates_cert_id database field
+    for uc in usercerts {
+        match uc.id {
+            1 => assert_eq!(uc.updates_cert_id, None),
+            2 => assert_eq!(uc.updates_cert_id, Some(1)),
+            _ => panic!("only ID 1 and 2 should exist"),
+        }
+    }
 
-    //    let certs = ca.get_user_certs(&usercerts[0]);
-    //    assert!(certs.is_ok());
-    //
-    //    let certs = certs.unwrap();
-    //
-    //    // expect to find both user certs
-    //    assert_eq!(certs.len(), 2);
+    // FIXME: add method to filter for "current" usercerts, or similar?!
 
     Ok(())
 }
 
 #[test]
+/// Create a new CA and two usercerts with the same email.
+///
+/// Expected outcome: two independent usercerts got created.
 fn test_ca_insert_duplicate_email() -> Fallible<()> {
     // two usercerts with the same email are considered distinct certs
     // (e.g. "normal cert" vs "code signing cert")
@@ -270,16 +282,26 @@ fn test_ca_insert_duplicate_email() -> Fallible<()> {
 
     assert_eq!(usercerts.len(), 2);
 
-    // ca cert should be tsigned by all usercerts
+    // ca cert should be tsigned by all usercerts.
     for uc in &usercerts {
         let tsig = ca.usercert_check_tsig_on_ca(&uc)?;
         assert!(tsig);
+
+        // "updates_cert_id" should be None for all usercerts.
+        assert_eq!(uc.updates_cert_id, None);
     }
 
     Ok(())
 }
 
 #[test]
+/// create a CA for "example.org" and three users.
+/// two of these users have emails in the "example.org" domain, the third
+/// doesn't.
+/// Export CA to wkd.
+///
+/// Expected outcome: the WKD contains three keys (CA + 2x user).
+/// Check that the expected filenames exist in the WKD data.
 fn test_ca_export_wkd() -> Fallible<()> {
     let mut ctx = gnupg::make_context()?;
     ctx.leak_tempdir();
@@ -336,6 +358,8 @@ fn test_ca_export_wkd() -> Fallible<()> {
 
 #[test]
 #[ignore]
+/// Get sequoia-pgp.org keys for Justus and Neal from Hagrid.
+/// Import into a fresh CA instance, then export as WKD.
 fn test_ca_export_wkd_sequoia() -> Fallible<()> {
     let ctx = gnupg::make_context()?;
     //    ctx.leak_tempdir();
@@ -385,6 +409,10 @@ fn test_ca_export_wkd_sequoia() -> Fallible<()> {
 }
 
 #[test]
+/// Create a CA instance. Externally create a user cert and two revocations.
+/// Import user cert and both revocations.
+///
+/// Check that CA API shows one usercert with two revocations.
 fn test_ca_multiple_revocations() -> Fallible<()> {
     // create two different revocation certificates for one key and import them
 
@@ -437,6 +465,17 @@ fn test_ca_multiple_revocations() -> Fallible<()> {
 }
 
 #[test]
+/// Create new CA. Set up three users:
+/// - Alice is imported, and signed by the CA key
+/// - Bob is imported, but not signed by the CA key
+/// - Carol is created with OpenPGP CA, so their cert is signed by and tsigns
+///   the CA cert.
+///
+/// Check the output of OpenpgpCa::usercerts_check_signatures().
+/// Expected:
+/// - Alice is signed but hasn't tsigned the CA,
+/// - Bob is not signed and hasn't tsigned the CA,
+/// - Carol is signed and has tsigned the CA.
 fn test_ca_signatures() -> Fallible<()> {
     let ctx = gnupg::make_context()?;
 
@@ -456,14 +495,16 @@ fn test_ca_signatures() -> Fallible<()> {
         Some("Alice"),
         &["alice@example.org"],
     )
-    .context("import Alice 1 to CA failed")?;
+    .context("import Alice to CA failed")?;
 
-    // create/import bob, CA does not signs bob's key
+    // create/import bob
     gnupg::create_user(&ctx, "bob@example.org");
     let bob_key = gnupg::export(&ctx, &"bob@example.org");
 
+    // CA does not signs bob's key because the "email" parameter is empty.
+    // Only userids that are supplied in `email` are signed by the CA.
     ca.usercert_import_new(&bob_key, None, Some("Bob"), &[])
-        .context("import Alice 1 to CA failed")?;
+        .context("import Bob to CA failed")?;
 
     // create carol, CA will sign carol's key.
     // also, CA key gets a tsig by carol
@@ -524,7 +565,10 @@ fn test_apply_revocation() -> Fallible<()> {
 }
 
 #[test]
-/// import a user cert that has already been signed by the CA
+/// Create a CA. Create a user cert externally that is already signed by
+/// the CA key. Import this already signed key.
+///
+/// Check that the imported key only has one signature.
 fn test_import_signed_cert() -> Fallible<()> {
     let policy = StandardPolicy::new();
 
@@ -563,6 +607,9 @@ fn test_import_signed_cert() -> Fallible<()> {
     let alice = &users[0];
     let cert = OpenpgpCa::usercert_to_cert(&alice)?;
 
+    assert_eq!(cert.userids().len(), 1);
+
+    // check number of signatures on alice userids
     for uid in cert.userids() {
         let sigs = uid.with_policy(&policy, None)?.bundle().certifications();
 
@@ -573,10 +620,31 @@ fn test_import_signed_cert() -> Fallible<()> {
         );
     }
 
+    // check signature status via OpenpgpCa::usercerts_check_signatures()
+    let sigs = ca.usercerts_check_signatures()?;
+    assert_eq!(sigs.len(), 1);
+    for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
+        match usercert.name.as_deref() {
+            Some("Alice") => {
+                assert!(sig_from_ca);
+                assert!(!tsig_on_ca);
+            }
+            _ => panic!(),
+        }
+    }
+
     Ok(())
 }
 
 #[test]
+/// Create a new CA, add two users.
+/// Then import an unusual revocation certificate: the revocation doesn't
+/// contain an issuer_fingerprint.
+///
+/// OpenPGP CA needs to match this revocation to the correct cert.
+///
+/// Check that the user certs have the expected number of revocations
+/// associated.
 fn test_revocation_no_fingerprint() -> Fallible<()> {
     // create two different revocation certificates for one key and import them
 
