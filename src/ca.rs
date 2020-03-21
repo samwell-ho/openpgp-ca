@@ -344,6 +344,8 @@ impl OpenpgpCa {
                 ));
             }
 
+            // FIXME: should the CA sign this cert?
+
             // this "update" workflow is not handling revocation certs for now
             if revoc_cert.is_some() {
                 return Err(failure::err_msg(
@@ -422,6 +424,8 @@ impl OpenpgpCa {
     /// Import an existing OpenPGP public Cert a new OpenPGP CA user.
     ///
     /// The `key` is expected as an armored public key.
+    ///
+    /// userids that correspond to `emails` will be signed by the CA.
     ///
     /// A symbolic `name` and a list of `emails` for this User can
     /// optionally be supplied. If those are not set, emails are taken from
