@@ -164,8 +164,7 @@ fn print_sigs_status(ca: &OpenpgpCa) -> Fallible<()> {
             true
         } else {
             println!(
-                "missing signature by CA for \
-                 user {:?} fingerprint {}",
+                "missing signature by CA for user {:?} fingerprint {}",
                 usercert.name, usercert.fingerprint
             );
             false
@@ -173,8 +172,7 @@ fn print_sigs_status(ca: &OpenpgpCa) -> Fallible<()> {
             true
         } else {
             println!(
-                "CA Cert has not been tsigned \
-                 by user {:?}",
+                "CA Cert has not been tsigned by user {:?}",
                 usercert.name
             );
             false
