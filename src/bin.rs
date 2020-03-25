@@ -51,10 +51,10 @@ fn real_main() -> Fallible<()> {
             UserCommand::Check { cmd } => match cmd {
                 UserCheckSubcommand::Expiry { days } => {
                     // FIXME: set default in structopt?
-                    check_expiry(&ca, days.unwrap_or(0))?;
+                    print_expiry_status(&ca, days.unwrap_or(0))?;
                 }
                 UserCheckSubcommand::Sigs => {
-                    check_sigs(&ca)?;
+                    print_sigs_status(&ca)?;
                 }
             },
             UserCommand::Import {
@@ -86,9 +86,9 @@ fn real_main() -> Fallible<()> {
                 };
                 certs.iter().for_each(|cert| println!("{}", cert.pub_cert));
             }
-            UserCommand::List => list_users(&ca)?,
+            UserCommand::List => print_users(&ca)?,
             UserCommand::ShowRevocations { email } => {
-                show_revocations(&ca, &email)?
+                print_revocations(&ca, &email)?
             }
             UserCommand::ApplyRevocation { id } => {
                 let rev = ca.revocation_get_by_id(id)?;
@@ -121,7 +121,7 @@ fn real_main() -> Fallible<()> {
                 scope.as_deref(),
             )?,
             BridgeCommand::Revoke { email } => ca.bridge_revoke(&email)?,
-            BridgeCommand::List => list_bridges(&ca)?,
+            BridgeCommand::List => print_bridges(&ca)?,
         },
         Command::Wkd { cmd } => match cmd {
             WkdCommand::Export { path } => {
@@ -134,7 +134,7 @@ fn real_main() -> Fallible<()> {
     Ok(())
 }
 
-fn show_revocations(ca: &OpenpgpCa, email: &str) -> Fallible<()> {
+fn print_revocations(ca: &OpenpgpCa, email: &str) -> Fallible<()> {
     let usercerts = ca.usercerts_get(email)?;
     if usercerts.is_empty() {
         println!("No Users found");
@@ -155,7 +155,7 @@ fn show_revocations(ca: &OpenpgpCa, email: &str) -> Fallible<()> {
     Ok(())
 }
 
-fn check_sigs(ca: &OpenpgpCa) -> Fallible<()> {
+fn print_sigs_status(ca: &OpenpgpCa) -> Fallible<()> {
     let mut count_ok = 0;
 
     let sigs_status = ca.usercerts_check_signatures()?;
@@ -193,7 +193,7 @@ fn check_sigs(ca: &OpenpgpCa) -> Fallible<()> {
     Ok(())
 }
 
-fn check_expiry(ca: &OpenpgpCa, exp_days: u64) -> Fallible<()> {
+fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Fallible<()> {
     let expiries = ca.usercerts_expired(exp_days)?;
 
     for (usercert, (alive, expiry)) in expiries {
@@ -223,7 +223,7 @@ fn check_expiry(ca: &OpenpgpCa, exp_days: u64) -> Fallible<()> {
     Ok(())
 }
 
-fn list_users(ca: &OpenpgpCa) -> Fallible<()> {
+fn print_users(ca: &OpenpgpCa) -> Fallible<()> {
     for (usercert, (sig_by_ca, tsig_on_ca)) in
         ca.usercerts_check_signatures()?
     {
@@ -258,7 +258,7 @@ fn list_users(ca: &OpenpgpCa) -> Fallible<()> {
     Ok(())
 }
 
-fn list_bridges(ca: &OpenpgpCa) -> Fallible<()> {
+fn print_bridges(ca: &OpenpgpCa) -> Fallible<()> {
     ca.bridges_get()?.iter().for_each(|bridge| {
         println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key)
     });
