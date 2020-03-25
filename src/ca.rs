@@ -29,7 +29,7 @@
 //! # let db_filename = file.path().to_str().unwrap();
 //!
 //! // start a new OpenPGP CA instance (implicitely creates the database file)
-//! let openpgp_ca = OpenpgpCa::new(Some(db_filename));
+//! let openpgp_ca = OpenpgpCa::new(Some(db_filename)).expect("Failed to set up CA");
 //!
 //! // initialize the CA Admin (with domainname and a symbolic name)
 //! openpgp_ca.ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
@@ -75,7 +75,7 @@ impl OpenpgpCa {
     /// - explicitly via the db_url parameter,
     /// - the environment variable OPENPGP_CA_DB, or
     /// - the .env DATABASE_URL
-    pub fn new(db_url: Option<&str>) -> Self {
+    pub fn new(db_url: Option<&str>) -> Fallible<Self> {
         let db_url = if let Some(s) = db_url {
             Some(s.to_owned())
         } else if let Ok(database) = env::var("OPENPGP_CA_DB") {
@@ -88,10 +88,10 @@ impl OpenpgpCa {
             Some(env::var("DATABASE_URL").unwrap())
         };
 
-        let db = Db::new(db_url.as_deref());
+        let db = Db::new(db_url.as_deref())?;
         db.migrations();
 
-        OpenpgpCa { db }
+        Ok(OpenpgpCa { db })
     }
 
     // -------- CAs

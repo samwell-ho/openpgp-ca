@@ -32,7 +32,7 @@ fn real_main() -> Fallible<()> {
 
     let cli = Cli::from_args();
 
-    let ca = OpenpgpCa::new(cli.database.as_deref());
+    let ca = OpenpgpCa::new(cli.database.as_deref())?;
 
     match cli.cmd {
         Command::User { cmd } => match cmd {

@@ -23,33 +23,24 @@ use crate::models::*;
 use crate::pgp::Pgp;
 use crate::schema::*;
 
-fn get_conn(db_url: Option<&str>) -> Fallible<SqliteConnection> {
-    match db_url {
-        None => Err(failure::err_msg("no database has been set")),
-        Some(db_url) => {
-            let conn = SqliteConnection::establish(&db_url)
-                .context(format!("Error connecting to {}", db_url))?;
-
-            // enable handling of foreign key constraints in sqlite
-            diesel::sql_query("PRAGMA foreign_keys=1;")
-                .execute(&conn)
-                .context("Couldn't set 'PRAGMA foreign_keys=1;'")?;
-
-            Ok(conn)
-        }
-    }
-}
-
 pub struct Db {
     conn: SqliteConnection,
 }
 
 impl Db {
-    pub fn new(db_url: Option<&str>) -> Self {
-        match get_conn(db_url) {
-            Ok(conn) => Db { conn },
-            Err(e) => {
-                panic!(format!("couldn't get database connection: {}", e))
+    pub fn new(db_url: Option<&str>) -> Fallible<Self> {
+        match db_url {
+            None => Err(failure::err_msg("no database has been set")),
+            Some(db_url) => {
+                let conn = SqliteConnection::establish(&db_url)
+                    .context(format!("Error connecting to {}", db_url))?;
+
+                // enable handling of foreign key constraints in sqlite
+                diesel::sql_query("PRAGMA foreign_keys=1;")
+                    .execute(&conn)
+                    .context("Couldn't set 'PRAGMA foreign_keys=1;'")?;
+
+                Ok(Db { conn })
             }
         }
     }
