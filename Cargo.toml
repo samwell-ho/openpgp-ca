@@ -23,7 +23,7 @@ path = "src/bin.rs"
 structopt = "0.3"
 clap = "2.33"
 
-diesel = { version = "1.4", features = ["sqlite","r2d2"] }
+diesel = { version = "1.4", features = ["sqlite"] }
 diesel_migrations = "1.4"
 
 lazy_static = "1.4"

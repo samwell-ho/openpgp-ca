@@ -17,57 +17,44 @@
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use failure::{self, Fallible, ResultExt};
 
 use crate::models::*;
 use crate::pgp::Pgp;
 use crate::schema::*;
 
-// FIXME: or keep a Connection as lazy_static? or just make new Connections?!
-fn get_conn(
-    db_url: Option<&str>,
-) -> Fallible<PooledConnection<ConnectionManager<SqliteConnection>>> {
-    // bulk insert doesn't currently work with sqlite and r2d2:
-    // https://github.com/diesel-rs/diesel/issues/1822
+fn get_conn(db_url: Option<&str>) -> Fallible<SqliteConnection> {
+    match db_url {
+        None => Err(failure::err_msg("no database has been set")),
+        Some(db_url) => {
+            let conn = SqliteConnection::establish(&db_url)
+                .context(format!("Error connecting to {}", db_url))?;
 
-    // setup DB
-    let db_url = db_url.expect("no database has been set");
+            // enable handling of foreign key constraints in sqlite
+            diesel::sql_query("PRAGMA foreign_keys=1;")
+                .execute(&conn)
+                .context("Couldn't set 'PRAGMA foreign_keys=1;'")?;
 
-    let manager = ConnectionManager::<SqliteConnection>::new(db_url);
-    let pool = Pool::builder().build(manager).unwrap();
-
-    // --
-
-    let conn = pool.get()?;
-
-    // enable handling of foreign key constraints in sqlite
-    let enable_foreign_key_constraints =
-        diesel::sql_query("PRAGMA foreign_keys=1;").execute(&conn);
-
-    // throw error if foreign keys are not supported
-    if enable_foreign_key_constraints.is_err() {
-        panic!("Couldn't set 'PRAGMA foreign_keys=1;'");
+            Ok(conn)
+        }
     }
-
-    Ok(conn)
 }
 
 pub struct Db {
-    conn: PooledConnection<ConnectionManager<SqliteConnection>>,
+    conn: SqliteConnection,
 }
 
 impl Db {
     pub fn new(db_url: Option<&str>) -> Self {
         match get_conn(db_url) {
             Ok(conn) => Db { conn },
-            _ => panic!("couldn't get database connection"),
+            Err(e) => {
+                panic!(format!("couldn't get database connection: {}", e))
+            }
         }
     }
 
-    pub fn get_conn(
-        &self,
-    ) -> &PooledConnection<ConnectionManager<SqliteConnection>> {
+    pub fn get_conn(&self) -> &SqliteConnection {
         &self.conn
     }
 
