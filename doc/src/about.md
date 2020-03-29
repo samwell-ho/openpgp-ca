@@ -2,7 +2,7 @@
 
 OpenPGP CA's primary goal is to make it trivial for end users to
 authenticate OpenPGP keys for users in their organization or in an
-adjacent organization.  Since people primarily communicate with people
+affiliated organization.  Since people primarily communicate with people
 in the same organization or one of a few related organizations, this
 means that in the great majority of cases users in an OpenPGP CA-using
 organization can authenticate their communication partners with no

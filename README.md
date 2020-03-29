@@ -3,7 +3,7 @@
 OpenPGP CA is a tool for managing OpenPGP keys within an organization.
 
 The primary goal is to make it trivial for end users to authenticate
-OpenPGP keys of other users in their organization (or in adjacent
+OpenPGP keys of other users in their organization (or in affiliated
 organizations).
 
 ## Quick intro
