@@ -1,20 +1,21 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
+use std::fmt;
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;
 
+use anyhow::{Context, Result};
 use csv;
 use csv::StringRecord;
-use failure::{Fail, Fallible, ResultExt};
 use rexpect;
 use tempfile;
 
-pub fn make_context() -> Fallible<Context> {
-    let ctx = Context::ephemeral().context(
+pub fn make_context() -> Result<Ctx> {
+    let ctx = Ctx::ephemeral().context(
         "SKIP: Failed to create GnuPG context. Is GnuPG installed?",
     )?;
 
@@ -27,7 +28,7 @@ pub fn make_context() -> Fallible<Context> {
 
 /// A GnuPG context.
 #[derive(Debug)]
-pub struct Context {
+pub struct Ctx {
     homedir: Option<PathBuf>,
     components: BTreeMap<String, PathBuf>,
     directories: BTreeMap<String, PathBuf>,
@@ -36,9 +37,9 @@ pub struct Context {
     ephemeral: Option<tempfile::TempDir>,
 }
 
-impl Context {
+impl Ctx {
     /// Creates a new context for the default GnuPG home directory.
-    pub fn new() -> Fallible<Self> {
+    pub fn new() -> Result<Self> {
         Self::make(None, None)
     }
 
@@ -48,7 +49,7 @@ impl Context {
     }
 
     /// Creates a new context for the given GnuPG home directory.
-    pub fn with_homedir<P>(homedir: P) -> Fallible<Self>
+    pub fn with_homedir<P>(homedir: P) -> Result<Self>
     where
         P: AsRef<Path>,
     {
@@ -59,7 +60,7 @@ impl Context {
     ///
     /// The created home directory will be deleted once this object is
     /// dropped.
-    pub fn ephemeral() -> Fallible<Self> {
+    pub fn ephemeral() -> Result<Self> {
         Self::make(None, Some(tempfile::tempdir()?))
     }
 
@@ -77,7 +78,7 @@ impl Context {
     fn make(
         homedir: Option<&Path>,
         ephemeral: Option<tempfile::TempDir>,
-    ) -> Fallible<Self> {
+    ) -> Result<Self> {
         let mut components: BTreeMap<String, PathBuf> = Default::default();
         let mut directories: BTreeMap<String, PathBuf> = Default::default();
         let mut sockets: BTreeMap<String, PathBuf> = Default::default();
@@ -115,7 +116,7 @@ impl Context {
             }
         }
 
-        Ok(Context {
+        Ok(Ctx {
             homedir,
             components,
             directories,
@@ -128,7 +129,7 @@ impl Context {
         homedir: &Option<PathBuf>,
         arguments: &[&str],
         nfields: usize,
-    ) -> Fallible<Vec<Vec<Vec<u8>>>> {
+    ) -> Result<Vec<Vec<Vec<u8>>>> {
         let nl = |&c: &u8| c as char == '\n';
         let colon = |&c: &u8| c as char == ':';
 
@@ -143,8 +144,8 @@ impl Context {
         for argument in arguments {
             gpgconf.arg(argument);
         }
-        let output = gpgconf.output().map_err(|e| -> failure::Error {
-            Error::GPGConf(e.to_string()).into()
+        let output = gpgconf.output().map_err(|e| -> anyhow::Error {
+            GnupgError::GPGConf(e.to_string()).into()
         })?;
 
         if output.status.success() {
@@ -161,7 +162,7 @@ impl Context {
                     .collect::<Vec<_>>();
 
                 if fields.len() != nfields {
-                    return Err(Error::GPGConf(format!(
+                    return Err(GnupgError::GPGConf(format!(
                         "Malformed response, expected {} fields, \
                          on line: {:?}",
                         nfields, line
@@ -173,7 +174,7 @@ impl Context {
             }
             Ok(result)
         } else {
-            Err(Error::GPGConf(
+            Err(GnupgError::GPGConf(
                 String::from_utf8_lossy(&output.stderr).into_owned(),
             )
             .into())
@@ -181,7 +182,7 @@ impl Context {
     }
 
     /// Returns the path to a GnuPG component.
-    pub fn component<C>(&self, component: C) -> Fallible<&Path>
+    pub fn component<C>(&self, component: C) -> Result<&Path>
     where
         C: AsRef<str>,
     {
@@ -189,7 +190,7 @@ impl Context {
             .get(component.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                Error::GPGConf(format!(
+                GnupgError::GPGConf(format!(
                     "No such component {:?}",
                     component.as_ref()
                 ))
@@ -198,7 +199,7 @@ impl Context {
     }
 
     /// Returns the path to a GnuPG directory.
-    pub fn directory<C>(&self, directory: C) -> Fallible<&Path>
+    pub fn directory<C>(&self, directory: C) -> Result<&Path>
     where
         C: AsRef<str>,
     {
@@ -206,7 +207,7 @@ impl Context {
             .get(directory.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                Error::GPGConf(format!(
+                GnupgError::GPGConf(format!(
                     "No such directory {:?}",
                     directory.as_ref()
                 ))
@@ -215,7 +216,7 @@ impl Context {
     }
 
     /// Returns the path to a GnuPG socket.
-    pub fn socket<C>(&self, socket: C) -> Fallible<&Path>
+    pub fn socket<C>(&self, socket: C) -> Result<&Path>
     where
         C: AsRef<str>,
     {
@@ -223,13 +224,16 @@ impl Context {
             .get(socket.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                Error::GPGConf(format!("No such socket {:?}", socket.as_ref()))
-                    .into()
+                GnupgError::GPGConf(format!(
+                    "No such socket {:?}",
+                    socket.as_ref()
+                ))
+                .into()
             })
     }
 
     /// Creates directories for RPC communication.
-    pub fn create_socket_dir(&self) -> Fallible<()> {
+    pub fn create_socket_dir(&self) -> Result<()> {
         Self::gpgconf(&self.homedir, &["--create-socketdir"], 1)?;
         Ok(())
     }
@@ -238,31 +242,31 @@ impl Context {
     ///
     /// Note: This will stop all servers once they note that their
     /// socket is gone.
-    pub fn remove_socket_dir(&self) -> Fallible<()> {
+    pub fn remove_socket_dir(&self) -> Result<()> {
         Self::gpgconf(&self.homedir, &["--remove-socketdir"], 1)?;
         Ok(())
     }
 
     /// Starts a GnuPG component.
-    pub fn start(&self, component: &str) -> Fallible<()> {
+    pub fn start(&self, component: &str) -> Result<()> {
         self.create_socket_dir()?;
         Self::gpgconf(&self.homedir, &["--launch", component], 1)?;
         Ok(())
     }
 
     /// Stops a GnuPG component.
-    pub fn stop(&self, component: &str) -> Fallible<()> {
+    pub fn stop(&self, component: &str) -> Result<()> {
         Self::gpgconf(&self.homedir, &["--kill", component], 1)?;
         Ok(())
     }
 
     /// Stops all GnuPG components.
-    pub fn stop_all(&self) -> Fallible<()> {
+    pub fn stop_all(&self) -> Result<()> {
         self.stop("all")
     }
 }
 
-impl Drop for Context {
+impl Drop for Ctx {
     fn drop(&mut self) {
         if self.ephemeral.is_some() {
             let _ = self.stop_all();
@@ -271,23 +275,36 @@ impl Drop for Context {
     }
 }
 
-#[derive(Fail, Debug)]
+impl std::error::Error for GnupgError {}
+
+impl fmt::Display for GnupgError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GnupgError::GPGConf(s) => write!(f, "gpgconf: {}", s),
+            GnupgError::OperationFailed(s) => {
+                write!(f, "Operation failed: {}", s)
+            }
+            GnupgError::ProtocolError(s) => {
+                write!(f, "Protocol violation: {}", s)
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
 /// Errors used in this module.
-pub enum Error {
+pub enum GnupgError {
     /// Errors related to `gpgconf`.
-    #[fail(display = "gpgconf: {}", _0)]
     GPGConf(String),
 
     /// The remote operation failed.
-    #[fail(display = "Operation failed: {}", _0)]
     OperationFailed(String),
 
     /// The remote party violated the protocol.
-    #[fail(display = "Protocol violation: {}", _0)]
     ProtocolError(String),
 }
 
-pub fn import(ctx: &Context, what: &[u8]) {
+pub fn import(ctx: &Ctx, what: &[u8]) {
     let mut gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir")
@@ -300,7 +317,7 @@ pub fn import(ctx: &Context, what: &[u8]) {
     assert!(status.success());
 }
 
-pub fn export(ctx: &Context, search: &str) -> String {
+pub fn export(ctx: &Ctx, search: &str) -> String {
     let mut out = String::new();
 
     let mut gpg = Command::new("gpg")
@@ -323,7 +340,7 @@ pub fn export(ctx: &Context, search: &str) -> String {
     out
 }
 
-pub fn export_secret(ctx: &Context, search: &str) -> String {
+pub fn export_secret(ctx: &Ctx, search: &str) -> String {
     let mut out = String::new();
 
     let mut gpg = Command::new("gpg")
@@ -346,7 +363,7 @@ pub fn export_secret(ctx: &Context, search: &str) -> String {
     out
 }
 
-pub fn list_keys(ctx: &Context) -> Fallible<HashMap<String, String>> {
+pub fn list_keys(ctx: &Ctx) -> Result<HashMap<String, String>> {
     let res = list_keys_raw(&ctx).unwrap();
 
     // filter: keep only the "uid" lines
@@ -363,7 +380,7 @@ pub fn list_keys(ctx: &Context) -> Fallible<HashMap<String, String>> {
         .collect())
 }
 
-fn list_keys_raw(ctx: &Context) -> Fallible<Vec<StringRecord>> {
+fn list_keys_raw(ctx: &Ctx) -> Result<Vec<StringRecord>> {
     let gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir")
@@ -385,7 +402,7 @@ fn list_keys_raw(ctx: &Context) -> Fallible<Vec<StringRecord>> {
     Ok(rdr.records().map(|rec| rec.unwrap()).collect())
 }
 
-pub fn edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Fallible<()> {
+pub fn edit_trust(ctx: &Ctx, user_id: &str, trust: u8) -> Result<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
@@ -409,11 +426,11 @@ pub fn edit_trust(ctx: &Context, user_id: &str, trust: u8) -> Fallible<()> {
 }
 
 pub fn make_revocation(
-    ctx: &Context,
+    ctx: &Ctx,
     user_id: &str,
     filename: &str,
     reason: u8,
-) -> Fallible<()> {
+) -> Result<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
@@ -437,11 +454,7 @@ pub fn make_revocation(
     Ok(())
 }
 
-pub fn edit_expire(
-    ctx: &Context,
-    user_id: &str,
-    expires: &str,
-) -> Fallible<()> {
+pub fn edit_expire(ctx: &Ctx, user_id: &str, expires: &str) -> Result<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
@@ -463,7 +476,7 @@ pub fn edit_expire(
     Ok(())
 }
 
-pub fn create_user(ctx: &Context, user_id: &str) {
+pub fn create_user(ctx: &Ctx, user_id: &str) {
     let mut gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir")
@@ -479,7 +492,7 @@ pub fn create_user(ctx: &Context, user_id: &str) {
     assert!(status.success());
 }
 
-pub fn sign(ctx: &Context, user_id: &str) -> Fallible<()> {
+pub fn sign(ctx: &Ctx, user_id: &str) -> Result<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 
@@ -497,12 +510,7 @@ pub fn sign(ctx: &Context, user_id: &str) -> Fallible<()> {
     Ok(())
 }
 
-pub fn tsign(
-    ctx: &Context,
-    user_id: &str,
-    level: u8,
-    trust: u8,
-) -> Fallible<()> {
+pub fn tsign(ctx: &Ctx, user_id: &str, level: u8, trust: u8) -> Result<()> {
     let homedir =
         String::from(ctx.directory("homedir").unwrap().to_str().unwrap());
 

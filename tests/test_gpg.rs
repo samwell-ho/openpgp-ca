@@ -20,7 +20,7 @@ use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
 
-use failure::{self, Fallible, ResultExt};
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 
 pub mod gnupg;
@@ -32,7 +32,7 @@ pub mod gnupg;
 /// "ultimate".
 ///
 /// Check that gnupg considers Bob and the CA admin as "full"ly trusted.
-fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
+fn test_alice_authenticates_bob_centralized() -> Result<()> {
     let ctx = gnupg::make_context()?;
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
@@ -110,7 +110,7 @@ fn test_alice_authenticates_bob_centralized() -> Fallible<()> {
 ///
 /// Expect gnupg in Alice's instance to consider both the CA Admin key and
 /// Bob and "full"ly trusted.
-fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
+fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let ctx_alice = gnupg::make_context()?;
     let ctx_bob = gnupg::make_context()?;
 
@@ -134,7 +134,7 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
     // get Cert for CA
     let ca_cert = ca.ca_get_cert()?;
 
-    let ca_keyid = ca_cert.keyid().to_hex();
+    let ca_keyid = format!("{:X}", ca_cert.keyid());
 
     // create users in their respective GnuPG contexts
     gnupg::create_user(&ctx_alice, "Alice <alice@example.org>");
@@ -211,7 +211,7 @@ fn test_alice_authenticates_bob_decentralized() -> Fallible<()> {
 ///
 /// Check that trust of all other keys is "full" (except for the user Carol
 /// whose userid is in an external domain)
-fn test_bridge() -> Fallible<()> {
+fn test_bridge() -> Result<()> {
     let ctx = gnupg::make_context()?;
 
     // don't delete home dir (for manual inspection)

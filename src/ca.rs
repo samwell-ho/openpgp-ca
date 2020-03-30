@@ -60,7 +60,7 @@ use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
 
-use failure::{self, Fallible, ResultExt};
+use anyhow::{anyhow, Context, Result};
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
@@ -75,7 +75,7 @@ impl OpenpgpCa {
     /// - explicitly via the db_url parameter,
     /// - the environment variable OPENPGP_CA_DB, or
     /// - the .env DATABASE_URL
-    pub fn new(db_url: Option<&str>) -> Fallible<Self> {
+    pub fn new(db_url: Option<&str>) -> Result<Self> {
         let db_url = if let Some(s) = db_url {
             Some(s.to_owned())
         } else if let Ok(database) = env::var("OPENPGP_CA_DB") {
@@ -105,22 +105,14 @@ impl OpenpgpCa {
     /// `name` is a descriptive name for the CA Admin
     ///
     /// Only one CA Admin can be configured per database.
-    pub fn ca_init(
-        &self,
-        domainname: &str,
-        name: Option<&str>,
-    ) -> Fallible<()> {
+    pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
         if self.db.get_ca()?.is_some() {
-            return Err(failure::err_msg(
-                "ERROR: CA has already been created",
-            ));
+            return Err(anyhow!("ERROR: CA has already been created",));
         }
 
         // domainname syntax check
         if !publicsuffix::Domain::has_valid_syntax(domainname) {
-            return Err(failure::err_msg(
-                "Parameter is not a valid domainname",
-            ));
+            return Err(anyhow!("Parameter is not a valid domainname",));
         }
 
         let name = match name {
@@ -148,14 +140,14 @@ impl OpenpgpCa {
     ///
     /// If a new Cert gets created for the CA Admin, a new Cacert row is
     /// inserted into the database.
-    pub fn ca_get(&self) -> Fallible<Option<(models::Ca, models::Cacert)>> {
+    pub fn ca_get(&self) -> Result<Option<(models::Ca, models::Cacert)>> {
         self.db.get_ca()
     }
 
     /// Get a sequoia `Cert` object for the CA Admin from the database.
     ///
     /// This is the "private" OpenPGP Cert of the CA Admin.
-    pub fn ca_get_cert(&self) -> Fallible<Cert> {
+    pub fn ca_get_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
             _ => panic!("get_ca_cert() failed"),
@@ -166,7 +158,7 @@ impl OpenpgpCa {
     ///
     /// This shows the domainname of this OpenPGP CA instance and the
     /// private Cert of the CA Admin.
-    pub fn ca_show(&self) -> Fallible<()> {
+    pub fn ca_show(&self) -> Result<()> {
         let (ca, ca_cert) = self
             .db
             .get_ca()
@@ -179,7 +171,7 @@ impl OpenpgpCa {
     }
 
     /// Returns the public key of the CA Admin as an armored String
-    pub fn ca_get_pubkey_armored(&self) -> Fallible<String> {
+    pub fn ca_get_pubkey_armored(&self) -> Result<String> {
         let cert = self.ca_get_cert()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
             .context("failed to transform CA key to armored pubkey")?;
@@ -192,16 +184,16 @@ impl OpenpgpCa {
     /// This receives an armored version of the CA Admin's public key, finds
     /// any trust-signatures on it and merges those into "our" local copy of
     /// the CA key.
-    pub fn ca_import_tsig(&self, key: &str) -> Fallible<()> {
+    pub fn ca_import_tsig(&self, key: &str) -> Result<()> {
         use diesel::prelude::*;
-        self.db.get_conn().transaction::<_, failure::Error, _>(|| {
+        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
             let ca_cert = self.ca_get_cert().unwrap();
 
             let cert_import = Pgp::armored_to_cert(key)?;
 
             // make sure the keys have the same Fingerprint
             if ca_cert.fingerprint() != cert_import.fingerprint() {
-                return Err(failure::err_msg(
+                return Err(anyhow!(
                     "The imported cert has an unexpected Fingerprint",
                 ));
             }
@@ -253,7 +245,7 @@ impl OpenpgpCa {
         name: Option<&str>,
         emails: &[&str],
         password: bool,
-    ) -> Fallible<()> {
+    ) -> Result<()> {
         let ca_cert = self.ca_get_cert().unwrap();
 
         // make user key (signed by CA)
@@ -275,7 +267,7 @@ impl OpenpgpCa {
 
         let res = self.db.add_usercert(
             name,
-            (pub_key, &user.fingerprint().to_hex()),
+            (pub_key, &format!("{:X}", &user.fingerprint())),
             emails,
             &[revoc],
             Some(&tsigned_ca_armored),
@@ -284,7 +276,7 @@ impl OpenpgpCa {
 
         if res.is_err() {
             eprint!("{:?}", res);
-            return Err(failure::err_msg("Couldn't insert user"));
+            return Err(anyhow!("Couldn't insert user"));
         }
 
         // the private key needs to be handed over to the user, print for now
@@ -312,18 +304,19 @@ impl OpenpgpCa {
         name: Option<&str>,
         emails: &[&str],
         updates_id: Option<i32>,
-    ) -> Fallible<()> {
+    ) -> Result<()> {
         let user_cert = Pgp::armored_to_cert(&key)?;
 
-        let existing =
-            self.db.get_usercert(&user_cert.fingerprint().to_hex())?;
+        let existing = self
+            .db
+            .get_usercert(&format!("{:X}", user_cert.fingerprint()))?;
 
         // check if a usercert with this fingerprint already exists?
         if let Some(mut existing) = existing {
             // yes - update existing Usercert in DB
 
             if updates_id.is_some() && updates_id.unwrap() != existing.id {
-                return Err(failure::err_msg(
+                return Err(anyhow!(
                     "updates_id was specified, but is inconsistent for key update"
                 ));
             }
@@ -339,7 +332,7 @@ impl OpenpgpCa {
                 emails.iter().map(|&s| s.to_string()).collect();
 
             if emails != existing_emails {
-                return Err(failure::err_msg(
+                return Err(anyhow!(
                     "expecting the same set of email addresses on key update",
                 ));
             }
@@ -348,7 +341,7 @@ impl OpenpgpCa {
 
             // this "update" workflow is not handling revocation certs for now
             if revoc_cert.is_some() {
-                return Err(failure::err_msg(
+                return Err(anyhow!(
                     "not expecting a revocation cert on key update",
                 ));
             }
@@ -410,7 +403,7 @@ impl OpenpgpCa {
 
             self.db.add_usercert(
                 name.as_deref(),
-                (pub_key, &certified.fingerprint().to_hex()),
+                (pub_key, &format!("{:X}", &certified.fingerprint())),
                 &emails[..],
                 &revocs,
                 None,
@@ -440,7 +433,7 @@ impl OpenpgpCa {
         revoc_cert: Option<&str>,
         name: Option<&str>,
         emails: &[&str],
-    ) -> Fallible<()> {
+    ) -> Result<()> {
         self.usercert_import_update_or_create(
             key, revoc_cert, name, emails, None,
         )
@@ -451,7 +444,7 @@ impl OpenpgpCa {
         &self,
         key: &str,
         usercert: &models::Usercert,
-    ) -> Fallible<()> {
+    ) -> Result<()> {
         // FIXME: If the fingerprint is the same, key data is merged.
         // FIXME: Is a new usercert created if the fingerprint differs?
         //         -> what should happen!?
@@ -471,7 +464,7 @@ impl OpenpgpCa {
     /// Get the SystemTime for when the specified Usercert will expire
     pub fn usercert_expiration(
         usercert: &models::Usercert,
-    ) -> Fallible<Option<SystemTime>> {
+    ) -> Result<Option<SystemTime>> {
         let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
         Ok(Pgp::get_expiry(&cert)?)
     }
@@ -480,7 +473,7 @@ impl OpenpgpCa {
     pub fn usercerts_expired(
         &self,
         days: u64,
-    ) -> Fallible<HashMap<models::Usercert, (bool, Option<SystemTime>)>> {
+    ) -> Result<HashMap<models::Usercert, (bool, Option<SystemTime>)>> {
         let mut map = HashMap::new();
 
         let days = Duration::new(60 * 60 * 24 * days, 0);
@@ -505,7 +498,7 @@ impl OpenpgpCa {
     /// Check if a usercert is "possibly revoked"
     pub fn usercert_possibly_revoked(
         usercert: &models::Usercert,
-    ) -> Fallible<bool> {
+    ) -> Result<bool> {
         let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
         Ok(Pgp::is_possibly_revoked(&cert))
     }
@@ -517,7 +510,7 @@ impl OpenpgpCa {
     /// Returns a map 'usercert -> (sig_from_ca, tsig_on_ca)'
     pub fn usercerts_check_signatures(
         &self,
-    ) -> Fallible<HashMap<models::Usercert, (bool, bool)>> {
+    ) -> Result<HashMap<models::Usercert, (bool, bool)>> {
         let mut map = HashMap::new();
 
         let usercerts = self
@@ -543,7 +536,7 @@ impl OpenpgpCa {
     pub fn usercert_check_ca_sig(
         &self,
         usercert: &models::Usercert,
-    ) -> Fallible<bool> {
+    ) -> Result<bool> {
         let user_cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
         let sigs = Self::get_third_party_sigs(&user_cert)?;
 
@@ -558,7 +551,7 @@ impl OpenpgpCa {
     pub fn usercert_check_tsig_on_ca(
         &self,
         usercert: &models::Usercert,
-    ) -> Fallible<bool> {
+    ) -> Result<bool> {
         let ca = self.ca_get_cert()?;
         let tsigs = Self::get_trust_sigs(&ca)?;
 
@@ -570,25 +563,22 @@ impl OpenpgpCa {
     }
 
     /// Get sequoia Cert representation of a Usercert
-    pub fn usercert_to_cert(usercert: &models::Usercert) -> Fallible<Cert> {
+    pub fn usercert_to_cert(usercert: &models::Usercert) -> Result<Cert> {
         Pgp::armored_to_cert(&usercert.pub_cert)
     }
 
     /// Get the armored "public key" representation of a Cert
-    pub fn cert_to_armored(cert: &Cert) -> Fallible<String> {
+    pub fn cert_to_armored(cert: &Cert) -> Result<String> {
         Pgp::cert_to_armored(cert)
     }
 
     /// Get a list of all Usercerts
-    pub fn usercerts_get_all(&self) -> Fallible<Vec<models::Usercert>> {
+    pub fn usercerts_get_all(&self) -> Result<Vec<models::Usercert>> {
         self.db.get_all_usercerts()
     }
 
     /// Get a list of the Usercerts that are associated with `email`
-    pub fn usercerts_get(
-        &self,
-        email: &str,
-    ) -> Fallible<Vec<models::Usercert>> {
+    pub fn usercerts_get(&self, email: &str) -> Result<Vec<models::Usercert>> {
         self.db.get_usercerts(email)
     }
 
@@ -601,7 +591,7 @@ impl OpenpgpCa {
     ///
     /// Verifies that applying the revocation cert can be validated by the
     /// usercert. Only if this is successful is the revocation stored.
-    pub fn revocation_add(&self, revoc_file: &PathBuf) -> Fallible<()> {
+    pub fn revocation_add(&self, revoc_file: &PathBuf) -> Result<()> {
         let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
             .context("Couldn't load revocation cert")?;
 
@@ -609,7 +599,8 @@ impl OpenpgpCa {
         let mut usercert = None;
         // - search by fingerprint, if possible
         if let Some(sig_fingerprint) = Pgp::get_revoc_issuer_fp(&revoc_cert) {
-            usercert = self.db.get_usercert(&sig_fingerprint.to_hex())?;
+            usercert =
+                self.db.get_usercert(&format!("{:X}", sig_fingerprint))?;
         }
         // - if match by fingerprint failed: test all usercerts
         if usercert.is_none() {
@@ -634,10 +625,10 @@ impl OpenpgpCa {
                     revoc_cert
                 );
 
-                Err(failure::err_msg(msg))
+                Err(anyhow!(msg))
             }
         } else {
-            Err(failure::err_msg("couldn't find cert for this fingerprint"))
+            Err(anyhow!("couldn't find cert for this fingerprint"))
         }
     }
 
@@ -646,7 +637,7 @@ impl OpenpgpCa {
     fn validate_revocation(
         cert: &Cert,
         revoc_cert: &Signature,
-    ) -> Fallible<bool> {
+    ) -> Result<bool> {
         let before = cert.primary_key().self_revocations().len();
 
         let revoked = cert
@@ -673,10 +664,10 @@ impl OpenpgpCa {
     fn search_revocable_usercert_by_keyid(
         &self,
         revoc: &Signature,
-    ) -> Fallible<Option<models::Usercert>> {
+    ) -> Result<Option<models::Usercert>> {
         let r_keyid = revoc.issuer();
         if r_keyid.is_none() {
-            return Err(failure::err_msg("Signature has no issuer KeyID"));
+            return Err(anyhow!("Signature has no issuer KeyID"));
         }
         let r_keyid = r_keyid.unwrap();
 
@@ -702,28 +693,25 @@ impl OpenpgpCa {
     pub fn revocations_get(
         &self,
         usercert: &models::Usercert,
-    ) -> Fallible<Vec<models::Revocation>> {
+    ) -> Result<Vec<models::Revocation>> {
         self.db.get_revocations(usercert)
     }
 
     /// Get a Revocation by revocation id
-    pub fn revocation_get_by_id(
-        &self,
-        id: i32,
-    ) -> Fallible<models::Revocation> {
+    pub fn revocation_get_by_id(&self, id: i32) -> Result<models::Revocation> {
         if let Some(rev) = self.db.get_revocation_by_id(id)? {
             Ok(rev)
         } else {
-            Err(failure::err_msg("no revocation found"))
+            Err(anyhow!("no revocation found"))
         }
     }
 
     /// Apply a revocation.
     ///
     /// The revocation is merged into the OpenPGP Cert of the Usercert.
-    pub fn revocation_apply(&self, revoc: models::Revocation) -> Fallible<()> {
+    pub fn revocation_apply(&self, revoc: models::Revocation) -> Result<()> {
         use diesel::prelude::*;
-        self.db.get_conn().transaction::<_, failure::Error, _>(|| {
+        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
             let usercert = self.db.get_usercert_by_id(revoc.usercert_id)?;
 
             if let Some(mut usercert) = usercert {
@@ -748,15 +736,13 @@ impl OpenpgpCa {
 
                 Ok(())
             } else {
-                Err(failure::err_msg(
-                    "Couldn't find usercert for apply_revocation",
-                ))
+                Err(anyhow!("Couldn't find usercert for apply_revocation",))
             }
         })
     }
 
     /// Get an armored representation of a Signature
-    pub fn sig_to_armored(sig: &Signature) -> Fallible<String> {
+    pub fn sig_to_armored(sig: &Signature) -> Result<String> {
         Pgp::sig_to_armored(sig)
     }
 
@@ -766,22 +752,20 @@ impl OpenpgpCa {
     pub fn emails_get(
         &self,
         usercert: &models::Usercert,
-    ) -> Fallible<Vec<models::Email>> {
+    ) -> Result<Vec<models::Email>> {
         self.db.get_emails_by_usercert(usercert)
     }
 
     // -------- bridges
 
     /// Make regex for trust signature from domain-name
-    fn domain_to_regex(domain: &str) -> Fallible<String> {
+    fn domain_to_regex(domain: &str) -> Result<String> {
         // "other.org" => "<[^>]+[@.]other\\.org>$"
         // FIXME: does this imply "subdomain allowed"?
 
         // syntax check domain
         if !publicsuffix::Domain::has_valid_syntax(domain) {
-            return Err(failure::err_msg(
-                "Parameter is not a valid domainname",
-            ));
+            return Err(anyhow!("Parameter is not a valid domainname",));
         }
 
         // transform domain to regex
@@ -804,7 +788,7 @@ impl OpenpgpCa {
         remote_key_file: &PathBuf,
         remote_email: Option<&str>,
         remote_scope: Option<&str>,
-    ) -> Fallible<(models::Bridge, Fingerprint)> {
+    ) -> Result<(models::Bridge, Fingerprint)> {
         let remote_ca_cert =
             Cert::from_file(remote_key_file).context("Failed to read key")?;
 
@@ -812,7 +796,7 @@ impl OpenpgpCa {
 
         // expect exactly one User ID in remote CA key (otherwise fail)
         if remote_uids.len() != 1 {
-            return Err(failure::err_msg(
+            return Err(anyhow!(
                 "Expected exactly one User ID in remote CA Cert",
             ));
         }
@@ -826,7 +810,7 @@ impl OpenpgpCa {
 
                 // expect remote email address with localpart "openpgp-ca"
                 if split.len() != 2 || split[0] != "openpgp-ca" {
-                    return Err(failure::err_msg(format!(
+                    return Err(anyhow!(format!(
                         "Unexpected remote email {}",
                         remote_email
                     )));
@@ -835,9 +819,9 @@ impl OpenpgpCa {
                 let domain = split[1];
                 (remote_email.to_owned(), domain.to_owned())
             } else {
-                return Err(failure::err_msg(
-                    "Couldn't get email from remote CA Cert",
-                ));
+                return Err(
+                    anyhow!("Couldn't get email from remote CA Cert",),
+                );
             }
         };
 
@@ -846,7 +830,7 @@ impl OpenpgpCa {
                 // if scope and domain don't match, warn/error?
                 // (FIXME: error, unless --force parameter has been given?!)
                 if scope != remote_cert_domain {
-                    return Err(failure::err_msg(
+                    return Err(anyhow!(
                         "scope and domain don't match, currently unsupported",
                     ));
                 }
@@ -890,10 +874,10 @@ impl OpenpgpCa {
     ///
     /// Both the revoked remote public key and the revocation cert are
     /// printed to stdout.
-    pub fn bridge_revoke(&self, email: &str) -> Fallible<()> {
+    pub fn bridge_revoke(&self, email: &str) -> Result<()> {
         let bridge = self.db.search_bridge(email)?;
         if bridge.is_none() {
-            return Err(failure::err_msg("bridge not found"));
+            return Err(anyhow!("bridge not found"));
         }
 
         let mut bridge = bridge.unwrap();
@@ -923,7 +907,7 @@ impl OpenpgpCa {
     }
 
     /// Get a list of Bridges
-    pub fn bridges_get(&self) -> Fallible<Vec<models::Bridge>> {
+    pub fn bridges_get(&self) -> Result<Vec<models::Bridge>> {
         self.db.list_bridges()
     }
 
@@ -933,7 +917,7 @@ impl OpenpgpCa {
     /// into a wkd directory structure
     ///
     /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
-    pub fn wkd_export(&self, domain: &str, path: &Path) -> Fallible<()> {
+    pub fn wkd_export(&self, domain: &str, path: &Path) -> Result<()> {
         use sequoia_net::wkd;
 
         let ca_cert = self.ca_get_cert()?;
@@ -954,10 +938,7 @@ impl OpenpgpCa {
 
     /// Pull a key from WKD and merge any updates into our local version of
     /// this key
-    pub fn update_from_wkd(
-        &self,
-        usercert: &models::Usercert,
-    ) -> Fallible<()> {
+    pub fn update_from_wkd(&self, usercert: &models::Usercert) -> Result<()> {
         use sequoia_net::wkd;
         use tokio_core::reactor::Core;
 
@@ -970,7 +951,8 @@ impl OpenpgpCa {
             let certs = core.run(wkd::get(&email.addr)).unwrap();
 
             for cert in certs {
-                if cert.fingerprint().to_hex() == usercert.fingerprint {
+                if format!("{:X}", cert.fingerprint()) == usercert.fingerprint
+                {
                     merge = merge.merge(cert)?;
                 }
             }
@@ -989,7 +971,7 @@ impl OpenpgpCa {
     pub fn update_from_hagrid(
         &self,
         usercert: &models::Usercert,
-    ) -> Fallible<()> {
+    ) -> Result<()> {
         use tokio_core::reactor::Core;
 
         let mut merge = Pgp::armored_to_cert(&usercert.pub_cert)?;
@@ -1017,7 +999,7 @@ impl OpenpgpCa {
     // -------- helper functions
 
     /// Is any uid of this cert for an email address in "domain"?
-    fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Fallible<bool> {
+    fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Result<bool> {
         for uid in c.userids() {
             // is any uid in domain
             let email = uid.email()?;
@@ -1025,7 +1007,7 @@ impl OpenpgpCa {
                 let split: Vec<_> = email.split('@').collect();
 
                 if split.len() != 2 {
-                    return Err(failure::err_msg("unexpected email format"));
+                    return Err(anyhow!("unexpected email format"));
                 }
 
                 if split[1] == domain {
@@ -1038,7 +1020,7 @@ impl OpenpgpCa {
     }
 
     /// Get all trust sigs on User IDs in this Cert
-    fn get_trust_sigs(c: &Cert) -> Fallible<Vec<Signature>> {
+    fn get_trust_sigs(c: &Cert) -> Result<Vec<Signature>> {
         Ok(Self::get_third_party_sigs(c)?
             .iter()
             .filter(|s| s.trust_signature().is_some())
@@ -1047,7 +1029,7 @@ impl OpenpgpCa {
     }
 
     /// Get all third party sigs on User IDs in this Cert
-    fn get_third_party_sigs(c: &Cert) -> Fallible<Vec<Signature>> {
+    fn get_third_party_sigs(c: &Cert) -> Result<Vec<Signature>> {
         let mut res = Vec::new();
         let policy = StandardPolicy::new();
 

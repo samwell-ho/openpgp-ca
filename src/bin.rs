@@ -18,15 +18,14 @@
 
 pub mod cli;
 
+use anyhow::Result;
 use chrono::offset::Utc;
 use chrono::DateTime;
-use failure::{self, Fallible};
 use std::path::PathBuf;
-use std::process::exit;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
 
-fn real_main() -> Fallible<()> {
+fn main() -> Result<()> {
     use cli::*;
     use structopt::StructOpt;
 
@@ -134,7 +133,7 @@ fn real_main() -> Fallible<()> {
     Ok(())
 }
 
-fn print_revocations(ca: &OpenpgpCa, email: &str) -> Fallible<()> {
+fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
     let usercerts = ca.usercerts_get(email)?;
     if usercerts.is_empty() {
         println!("No Users found");
@@ -155,7 +154,7 @@ fn print_revocations(ca: &OpenpgpCa, email: &str) -> Fallible<()> {
     Ok(())
 }
 
-fn print_sigs_status(ca: &OpenpgpCa) -> Fallible<()> {
+fn print_sigs_status(ca: &OpenpgpCa) -> Result<()> {
     let mut count_ok = 0;
 
     let sigs_status = ca.usercerts_check_signatures()?;
@@ -191,7 +190,7 @@ fn print_sigs_status(ca: &OpenpgpCa) -> Fallible<()> {
     Ok(())
 }
 
-fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Fallible<()> {
+fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Result<()> {
     let expiries = ca.usercerts_expired(exp_days)?;
 
     for (usercert, (alive, expiry)) in expiries {
@@ -221,7 +220,7 @@ fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Fallible<()> {
     Ok(())
 }
 
-fn print_users(ca: &OpenpgpCa) -> Fallible<()> {
+fn print_users(ca: &OpenpgpCa) -> Result<()> {
     for (usercert, (sig_by_ca, tsig_on_ca)) in
         ca.usercerts_check_signatures()?
     {
@@ -256,7 +255,7 @@ fn print_users(ca: &OpenpgpCa) -> Fallible<()> {
     Ok(())
 }
 
-fn print_bridges(ca: &OpenpgpCa) -> Fallible<()> {
+fn print_bridges(ca: &OpenpgpCa) -> Result<()> {
     ca.bridges_get()?.iter().for_each(|bridge| {
         println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key)
     });
@@ -268,7 +267,7 @@ fn new_bridge(
     email: Option<&str>,
     key_file: &PathBuf,
     scope: Option<&str>,
-) -> Fallible<()> {
+) -> Result<()> {
     let (bridge, fingerprint) = ca.bridge_new(key_file, email, scope)?;
 
     println!("signed certificate for {} as bridge\n", bridge.email);
@@ -281,17 +280,4 @@ fn new_bridge(
         bridge.email
     );
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = real_main() {
-        let mut cause = e.as_fail();
-        eprint!("ERROR: {}", cause);
-        while let Some(c) = cause.cause() {
-            eprint!(":\n  {}", c);
-            cause = c;
-        }
-        eprintln!();
-        exit(2);
-    }
 }

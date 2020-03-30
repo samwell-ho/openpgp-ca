@@ -31,10 +31,10 @@ use openpgp::types::{
 };
 use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
+use std::path::PathBuf;
 use std::time::SystemTime;
 
-use failure::{self, Fallible, ResultExt};
-use std::path::PathBuf;
+use anyhow::{anyhow, Context, Result};
 
 pub struct Pgp {}
 
@@ -56,7 +56,7 @@ impl Pgp {
     pub fn make_ca_cert(
         domainname: &str,
         name: Option<&str>,
-    ) -> Fallible<(Cert, Signature)> {
+    ) -> Result<(Cert, Signature)> {
         // FIXME: should not be encryption capable (?)
         // FIXME: should not have subkeys
 
@@ -109,7 +109,7 @@ impl Pgp {
         emails: &[&str],
         name: Option<&str>,
         password: bool,
-    ) -> Fallible<(Cert, Signature, Option<String>)> {
+    ) -> Result<(Cert, Signature, Option<String>)> {
         // FIXME: use passphrase
 
         let pass = if password {
@@ -141,14 +141,14 @@ impl Pgp {
     }
 
     /// make a "public key" ascii-armored representation of a Cert
-    pub fn cert_to_armored(cert: &Cert) -> Fallible<String> {
+    pub fn cert_to_armored(cert: &Cert) -> Result<String> {
         let v = cert.armored().to_vec().context("Cert serialize failed")?;
 
         Ok(String::from_utf8(v)?)
     }
 
     /// make a "private key" ascii-armored representation of a Cert
-    pub fn priv_cert_to_armored(cert: &Cert) -> Fallible<String> {
+    pub fn priv_cert_to_armored(cert: &Cert) -> Result<String> {
         let mut buffer = vec![];
         {
             let headers = cert.armor_headers();
@@ -172,7 +172,7 @@ impl Pgp {
     }
 
     /// make a Cert from an ascii armored key
-    pub fn armored_to_cert(armored: &str) -> Fallible<Cert> {
+    pub fn armored_to_cert(armored: &str) -> Result<Cert> {
         let cert =
             Cert::from_bytes(armored).context("Cert::from_bytes failed")?;
 
@@ -180,19 +180,19 @@ impl Pgp {
     }
 
     /// make a Signature from an ascii armored signature
-    pub fn armored_to_signature(armored: &str) -> Fallible<Signature> {
+    pub fn armored_to_signature(armored: &str) -> Result<Signature> {
         let p = openpgp::Packet::from_bytes(armored)
             .context("Input could not be parsed")?;
 
         if let Packet::Signature(s) = p {
             Ok(s)
         } else {
-            Err(failure::err_msg("Couldn't convert to Signature"))
+            Err(anyhow!("Couldn't convert to Signature"))
         }
     }
 
     /// make an ascii-armored representation of a Signature
-    pub fn sig_to_armored(sig: &Signature) -> Fallible<String> {
+    pub fn sig_to_armored(sig: &Signature) -> Result<String> {
         let mut buf = vec![];
         {
             let rev = Packet::Signature(sig.clone());
@@ -208,7 +208,7 @@ impl Pgp {
     }
 
     /// get expiration of cert as SystemTime
-    pub fn get_expiry(cert: &Cert) -> Fallible<Option<SystemTime>> {
+    pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
         let policy = StandardPolicy::new();
         let primary = cert.primary_key().with_policy(&policy, None)?;
         Ok(primary.key_expiration_time())
@@ -224,7 +224,7 @@ impl Pgp {
     /// Load Revocation Cert from file
     pub fn load_revocation_cert(
         revoc_file: Option<&PathBuf>,
-    ) -> Fallible<Signature> {
+    ) -> Result<Signature> {
         if let Some(filename) = revoc_file {
             let p = openpgp::Packet::from_file(filename)
                 .context("Input could not be parsed")?;
@@ -232,12 +232,10 @@ impl Pgp {
             if let Packet::Signature(s) = p {
                 return Ok(s);
             } else {
-                return Err(failure::err_msg(
-                    "Couldn't convert to revocation",
-                ));
+                return Err(anyhow!("Couldn't convert to revocation",));
             }
         };
-        Err(failure::err_msg("Couldn't load revocation from file"))
+        Err(anyhow!("Couldn't load revocation from file"))
     }
 
     pub fn get_revoc_issuer_fp(revoc_cert: &Signature) -> Option<Fingerprint> {
@@ -263,7 +261,7 @@ impl Pgp {
     }
 
     /// user tsigns CA key
-    pub fn tsign_ca(ca_cert: Cert, user: &Cert) -> Fallible<Cert> {
+    pub fn tsign_ca(ca_cert: Cert, user: &Cert) -> Result<Cert> {
         let mut cert_keys = Self::get_cert_keys(&user)
             .context("filtered for unencrypted secret keys above")?;
 
@@ -292,13 +290,13 @@ impl Pgp {
         ca_cert: Cert,
         remote_ca_cert: Cert,
         scope_regexes: Vec<String>,
-    ) -> Fallible<Cert> {
+    ) -> Result<Cert> {
         // FIXME: do we want to support a tsig without any scope regex?
         // -> or force users to explicitly set a catchall regex, then.
 
         // there should be exactly one userid in the remote CA Cert
         if remote_ca_cert.userids().len() != 1 {
-            return Err(failure::err_msg(
+            return Err(anyhow!(
                 "expect remote CA cert to have exactly one user_id",
             ));
         }
@@ -335,10 +333,10 @@ impl Pgp {
     pub fn bridge_revoke(
         remote_ca_cert: &Cert,
         ca_cert: &Cert,
-    ) -> Fallible<(Signature, Cert)> {
+    ) -> Result<(Signature, Cert)> {
         // there should be exactly one userid in the remote CA Cert
         if remote_ca_cert.userids().len() != 1 {
-            return Err(failure::err_msg(
+            return Err(anyhow!(
                 "expect remote CA cert to have exactly one user_id",
             ));
         }
@@ -351,7 +349,7 @@ impl Pgp {
 
         // this CA should have exactly one key that can certify
         if cert_keys.len() != 1 {
-            return Err(failure::err_msg(
+            return Err(anyhow!(
                 "this CA should have exactly one key that can certify",
             ));
         }
@@ -380,7 +378,7 @@ impl Pgp {
         ca_cert: &Cert,
         user_cert: &Cert,
         emails_filter: Option<&[&str]>,
-    ) -> Fallible<Cert> {
+    ) -> Result<Cert> {
         let policy = StandardPolicy::new();
 
         let mut cert_keys = Self::get_cert_keys(&ca_cert)
@@ -435,7 +433,7 @@ impl Pgp {
     }
 
     /// get all valid, certification capable keys with secret key material
-    fn get_cert_keys(cert: &Cert) -> Fallible<Vec<KeyPair>> {
+    fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair>> {
         let policy = StandardPolicy::new();
         let keys = cert
             .keys()

@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
-use failure::{self, Fallible, ResultExt};
+use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
@@ -39,7 +39,7 @@ pub mod gnupg;
 ///
 /// Checks that CA (with custom name) and one user (with one revocation) are
 /// visible via CA API.
-fn test_ca() -> Fallible<()> {
+fn test_ca() -> Result<()> {
     let ctx = gnupg::make_context()?;
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
@@ -93,7 +93,7 @@ fn test_ca() -> Fallible<()> {
 /// Check that the updated user cert has the expected expiry duration.
 ///
 /// This test also exercises the OpenpgpCa::usercerts_expired() function.
-fn test_update_usercert_key() -> Fallible<()> {
+fn test_update_usercert_key() -> Result<()> {
     let policy = StandardPolicy::new();
 
     let now = SystemTime::now();
@@ -195,7 +195,7 @@ fn test_update_usercert_key() -> Fallible<()> {
 ///
 /// Expected outcome: Two usercerts exist in OpenPGP CA, the newer one
 /// points to the older one with the "updates_cert_id" field.
-fn test_update_user_cert() -> Fallible<()> {
+fn test_update_user_cert() -> Result<()> {
     let ctx = gnupg::make_context()?;
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
@@ -258,7 +258,7 @@ fn test_update_user_cert() -> Fallible<()> {
 /// Create a new CA and two usercerts with the same email.
 ///
 /// Expected outcome: two independent usercerts got created.
-fn test_ca_insert_duplicate_email() -> Fallible<()> {
+fn test_ca_insert_duplicate_email() -> Result<()> {
     // two usercerts with the same email are considered distinct certs
     // (e.g. "normal cert" vs "code signing cert")
 
@@ -302,9 +302,9 @@ fn test_ca_insert_duplicate_email() -> Fallible<()> {
 ///
 /// Expected outcome: the WKD contains three keys (CA + 2x user).
 /// Check that the expected filenames exist in the WKD data.
-fn test_ca_export_wkd() -> Fallible<()> {
-    let mut ctx = gnupg::make_context()?;
-    ctx.leak_tempdir();
+fn test_ca_export_wkd() -> Result<()> {
+    let ctx = gnupg::make_context()?;
+    // ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -326,29 +326,26 @@ fn test_ca_export_wkd() -> Fallible<()> {
     ca.wkd_export("example.org", &wkd_path)?;
 
     // expect 3 exported keys (carol should not be in the export)
-    let test_path = wkd_path.join(
-        "openpgpkey.example.org/.well-known/openpgpkey/example.org\
-         /hu/",
-    );
+    let test_path = wkd_path.join(".well-known/openpgpkey/example.org/hu/");
     let paths: Vec<_> = fs::read_dir(test_path)?.collect();
     assert_eq!(paths.len(), 3);
 
     // check that both user keys have been written to files
     let test_path = wkd_path.join(
-        "openpgpkey.example.org/.well-known/openpgpkey/example.org\
+        ".well-known/openpgpkey/example.org\
          /hu/jycbiujnsxs47xrkethgtj69xuunurok",
     );
     assert!(test_path.is_file());
 
     let test_path = wkd_path.join(
-        "openpgpkey.example.org/.well-known/openpgpkey/example.org\
+        ".well-known/openpgpkey/example.org\
          /hu/kei1q4tipxxu1yj79k9kfukdhfy631xe",
     );
     assert!(test_path.is_file());
 
     // check that CA key has been written to file
     let test_path = wkd_path.join(
-        "openpgpkey.example.org/.well-known/openpgpkey/example.org\
+        ".well-known/openpgpkey/example.org\
          /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t",
     );
     assert!(test_path.is_file());
@@ -360,7 +357,7 @@ fn test_ca_export_wkd() -> Fallible<()> {
 #[ignore]
 /// Get sequoia-pgp.org keys for Justus and Neal from Hagrid.
 /// Import into a fresh CA instance, then export as WKD.
-fn test_ca_export_wkd_sequoia() -> Fallible<()> {
+fn test_ca_export_wkd_sequoia() -> Result<()> {
     let ctx = gnupg::make_context()?;
     //    ctx.leak_tempdir();
 
@@ -413,7 +410,7 @@ fn test_ca_export_wkd_sequoia() -> Fallible<()> {
 /// Import user cert and both revocations.
 ///
 /// Check that CA API shows one usercert with two revocations.
-fn test_ca_multiple_revocations() -> Fallible<()> {
+fn test_ca_multiple_revocations() -> Result<()> {
     // create two different revocation certificates for one key and import them
 
     let ctx = gnupg::make_context()?;
@@ -476,7 +473,7 @@ fn test_ca_multiple_revocations() -> Fallible<()> {
 /// - Alice is signed but hasn't tsigned the CA,
 /// - Bob is not signed and hasn't tsigned the CA,
 /// - Carol is signed and has tsigned the CA.
-fn test_ca_signatures() -> Fallible<()> {
+fn test_ca_signatures() -> Result<()> {
     let ctx = gnupg::make_context()?;
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
@@ -536,7 +533,7 @@ fn test_ca_signatures() -> Fallible<()> {
 /// Create a CA and a user. Apply the user's revocation.
 ///
 /// Check that the revocation has been published to the user's cert.
-fn test_apply_revocation() -> Fallible<()> {
+fn test_apply_revocation() -> Result<()> {
     let ctx = gnupg::make_context()?;
     //    ctx.leak_tempdir();
 
@@ -572,7 +569,7 @@ fn test_apply_revocation() -> Fallible<()> {
 /// the CA key. Import this already signed key.
 ///
 /// Check that the imported key only has one signature.
-fn test_import_signed_cert() -> Fallible<()> {
+fn test_import_signed_cert() -> Result<()> {
     let policy = StandardPolicy::new();
 
     let ctx = gnupg::make_context()?;
@@ -648,7 +645,7 @@ fn test_import_signed_cert() -> Fallible<()> {
 ///
 /// Check that the user certs have the expected number of revocations
 /// associated.
-fn test_revocation_no_fingerprint() -> Fallible<()> {
+fn test_revocation_no_fingerprint() -> Result<()> {
     // create two different revocation certificates for one key and import them
 
     let ctx = gnupg::make_context()?;

@@ -28,7 +28,7 @@ diesel_migrations = "1.4"
 
 lazy_static = "1.4"
 dotenv = "0.15"
-failure = "0.1"
+anyhow  = "1.0"
 chrono = "0.4"
 
 chbs = "0.0.8"
@@ -37,13 +37,13 @@ publicsuffix = "1.5"
 futures = "0.1"
 tokio-core = "0.1"
 
-sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.15.0" }
-sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.15.0" }
-sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.15.0" }
+#sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.15.0" }
+#sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.15.0" }
+#sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.15.0" }
 
-#sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "2293401c" }
-#sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "2293401c" }
-#sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "2293401c" }
+sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "d377ef00" }
+sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "d377ef00" }
+sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "d377ef00" }
 
 # tests
 tempfile = "3.0"
