@@ -371,11 +371,13 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     let mut core = Core::new()?;
 
-    let j = Fingerprint::from_hex("CBCD8F030588653EEDD7E2659B7DD433F254904A")?;
+    let j =
+        "CBCD8F030588653EEDD7E2659B7DD433F254904A".parse::<Fingerprint>()?;
     let justus: Cert = core.run(hagrid.get(&KeyID::from(j)))?;
     let justus_key = OpenpgpCa::cert_to_armored(&justus)?;
 
-    let n = Fingerprint::from_hex("8F17777118A33DDA9BA48E62AACB3243630052D9")?;
+    let n =
+        "8F17777118A33DDA9BA48E62AACB3243630052D9".parse::<Fingerprint>()?;
     let neal: Cert = core.run(hagrid.get(&KeyID::from(n)))?;
     let neal_key = OpenpgpCa::cert_to_armored(&neal)?;
 
@@ -690,7 +692,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
             .primary_key()
             .key()
             .clone()
-            .mark_parts_secret()?
+            .parts_into_secret()?
             .into_keypair()?;
 
         let sig = b.sign_direct_key(&mut keypair)?;

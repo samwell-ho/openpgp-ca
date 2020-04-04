@@ -982,7 +982,7 @@ impl OpenpgpCa {
 
         let mut core = Core::new().unwrap();
 
-        let f = Fingerprint::from_hex(&usercert.fingerprint)?;
+        let f = (usercert.fingerprint).parse::<Fingerprint>()?;
         let cert = core.run(hagrid.get(&KeyID::from(f)))?;
 
         // update in DB

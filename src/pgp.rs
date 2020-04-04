@@ -72,7 +72,7 @@ impl Pgp {
             .primary_key()
             .key()
             .clone()
-            .mark_parts_secret()?
+            .parts_into_secret()?
             .into_keypair()?;
 
         // Generate a userid and a binding signature.
