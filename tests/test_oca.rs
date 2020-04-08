@@ -371,13 +371,11 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     let mut core = Core::new()?;
 
-    let j =
-        "CBCD8F030588653EEDD7E2659B7DD433F254904A".parse::<Fingerprint>()?;
+    let j: Fingerprint = "CBCD8F030588653EEDD7E2659B7DD433F254904A".parse()?;
     let justus: Cert = core.run(hagrid.get(&KeyID::from(j)))?;
     let justus_key = OpenpgpCa::cert_to_armored(&justus)?;
 
-    let n =
-        "8F17777118A33DDA9BA48E62AACB3243630052D9".parse::<Fingerprint>()?;
+    let n: Fingerprint = "8F17777118A33DDA9BA48E62AACB3243630052D9".parse()?;
     let neal: Cert = core.run(hagrid.get(&KeyID::from(n)))?;
     let neal_key = OpenpgpCa::cert_to_armored(&neal)?;
 
