@@ -37,13 +37,13 @@ publicsuffix = "1.5"
 futures = "0.1"
 tokio-core = "0.1"
 
-sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.16.0" }
-sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.16.0" }
-sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.16.0" }
+#sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.16.0" }
+#sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.16.0" }
+#sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.16.0" }
 
-#sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "d377ef00" }
-#sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "d377ef00" }
-#sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "d377ef00" }
+sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "4ec978c1" }
+sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "4ec978c1" }
+sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "4ec978c1" }
 
 # tests
 tempfile = "3.0"

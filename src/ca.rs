@@ -46,8 +46,6 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::SystemTime;
 
-use publicsuffix;
-
 use sequoia_openpgp as openpgp;
 
 use openpgp::cert::amalgamation::ValidateAmalgamation;
@@ -267,7 +265,7 @@ impl OpenpgpCa {
 
         let res = self.db.add_usercert(
             name,
-            (pub_key, &format!("{:X}", &user.fingerprint())),
+            (pub_key, &user.fingerprint().to_hex()),
             emails,
             &[revoc],
             Some(&tsigned_ca_armored),
@@ -307,9 +305,8 @@ impl OpenpgpCa {
     ) -> Result<()> {
         let user_cert = Pgp::armored_to_cert(&key)?;
 
-        let existing = self
-            .db
-            .get_usercert(&format!("{:X}", user_cert.fingerprint()))?;
+        let existing =
+            self.db.get_usercert(&user_cert.fingerprint().to_hex())?;
 
         // check if a usercert with this fingerprint already exists?
         if let Some(mut existing) = existing {
@@ -403,7 +400,7 @@ impl OpenpgpCa {
 
             self.db.add_usercert(
                 name.as_deref(),
-                (pub_key, &format!("{:X}", &certified.fingerprint())),
+                (pub_key, &certified.fingerprint().to_hex()),
                 &emails[..],
                 &revocs,
                 None,
@@ -486,8 +483,11 @@ impl OpenpgpCa {
         for usercert in usercerts {
             let cert = Pgp::armored_to_cert(&usercert.pub_cert)?;
             let exp = Pgp::get_expiry(&cert)?;
-            let alive =
-                cert.alive(&StandardPolicy::new(), expiry_test).is_ok();
+            let alive = cert
+                .with_policy(&StandardPolicy::new(), expiry_test)?
+                .alive()
+                .is_ok();
+            // cert.alive(&StandardPolicy::new(), expiry_test).is_ok();
 
             map.insert(usercert, (alive, exp));
         }
@@ -599,8 +599,7 @@ impl OpenpgpCa {
         let mut usercert = None;
         // - search by fingerprint, if possible
         if let Some(sig_fingerprint) = Pgp::get_revoc_issuer_fp(&revoc_cert) {
-            usercert =
-                self.db.get_usercert(&format!("{:X}", sig_fingerprint))?;
+            usercert = self.db.get_usercert(&sig_fingerprint.to_hex())?;
         }
         // - if match by fingerprint failed: test all usercerts
         if usercert.is_none() {
@@ -640,9 +639,7 @@ impl OpenpgpCa {
     ) -> Result<bool> {
         let before = cert.primary_key().self_revocations().len();
 
-        let revoked = cert
-            .to_owned()
-            .merge_packets(vec![revoc_cert.to_owned().into()])?;
+        let revoked = cert.to_owned().merge_packets(revoc_cert.to_owned())?;
 
         let after = revoked.primary_key().self_revocations().len();
 
@@ -951,8 +948,7 @@ impl OpenpgpCa {
             let certs = core.run(wkd::get(&email.addr)).unwrap();
 
             for cert in certs {
-                if format!("{:X}", cert.fingerprint()) == usercert.fingerprint
-                {
+                if cert.fingerprint().to_hex() == usercert.fingerprint {
                     merge = merge.merge(cert)?;
                 }
             }

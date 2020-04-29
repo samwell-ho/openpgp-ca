@@ -23,7 +23,6 @@ use tokio_core::reactor::Core;
 
 use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::packet::signature::subpacket::SubpacketTag;
-use openpgp::packet::signature::Builder;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
@@ -31,6 +30,7 @@ use openpgp::{Cert, Fingerprint, KeyID};
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
+use sequoia_openpgp::packet::signature::SignatureBuilder;
 
 pub mod gnupg;
 
@@ -137,8 +137,8 @@ fn test_update_usercert_key() -> Result<()> {
     // check that expiry is ~2y
     let cert = OpenpgpCa::usercert_to_cert(alice)?;
 
-    cert.alive(&policy, in_one_year)?;
-    assert!(cert.alive(&policy, in_three_years).is_err());
+    cert.with_policy(&policy, in_one_year)?.alive()?;
+    assert!(cert.with_policy(&policy, in_three_years)?.alive().is_err());
 
     // check the same with ca.usercert_expiry()
     let exp1 = ca.usercerts_expired(365)?;
@@ -171,8 +171,8 @@ fn test_update_usercert_key() -> Result<()> {
     // check that expiry is not ~2y but ~5y
     let cert = OpenpgpCa::usercert_to_cert(&usercerts[0])?;
 
-    assert!(cert.alive(&policy, in_three_years).is_ok());
-    assert!(!cert.alive(&policy, in_six_years).is_ok());
+    assert!(cert.with_policy(&policy, in_three_years)?.alive().is_ok());
+    assert!(!cert.with_policy(&policy, in_six_years)?.alive().is_ok());
 
     // check the same with ca.usercert_expiry()
     let exp3 = ca.usercerts_expired(3 * 365)?;
@@ -679,7 +679,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
 
         println!("signature: {:#?}", &s);
 
-        let mut b: Builder = s.into();
+        let mut b: SignatureBuilder = s.into();
 
         b.remove_all(SubpacketTag::IssuerFingerprint);
 

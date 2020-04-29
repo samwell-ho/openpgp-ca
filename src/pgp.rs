@@ -85,21 +85,23 @@ impl Pgp {
             .primary_key()
             .with_policy(&policy, None)?
             .binding_signature();
-        let builder = signature::Builder::from(direct_key_sig.clone())
-            .set_type(SignatureType::PositiveCertification)
-            .set_key_flags(&KeyFlags::empty().set_certification(true))?
-            // notation: "openpgp-ca:domain=domain1;domain2"
-            .add_notation(
-                "openpgp-ca@sequoia-pgp.org",
-                (format!("domain={}", domainname)).as_bytes(),
-                signature::subpacket::NotationDataFlags::default()
-                    .set_human_readable(true),
-                false,
-            )?;
+        let builder =
+            signature::SignatureBuilder::from(direct_key_sig.clone())
+                .set_type(SignatureType::PositiveCertification)
+                .set_key_flags(&KeyFlags::empty().set_certification(true))?
+                // notation: "openpgp-ca:domain=domain1;domain2"
+                .add_notation(
+                    "openpgp-ca@sequoia-pgp.org",
+                    (format!("domain={}", domainname)).as_bytes(),
+                    signature::subpacket::NotationDataFlags::default()
+                        .set_human_readable(true),
+                    false,
+                )?;
         let binding = userid.bind(&mut keypair, &cert, builder)?;
 
         // Now merge the userid and binding signature into the Cert.
-        let cert = cert.merge_packets(vec![userid.into(), binding.into()])?;
+        let cert =
+            cert.merge_packets(vec![Packet::from(userid), binding.into()])?;
 
         Ok((cert, sig))
     }
@@ -157,10 +159,10 @@ impl Pgp {
                 .map(|value| ("Comment", value.as_str()))
                 .collect();
 
-            let mut writer = armor::Writer::new(
+            let mut writer = armor::Writer::with_headers(
                 &mut buffer,
                 armor::Kind::SecretKey,
-                &headers,
+                headers,
             )
             .unwrap();
 
@@ -198,8 +200,7 @@ impl Pgp {
             let rev = Packet::Signature(sig.clone());
 
             let mut writer =
-                armor::Writer::new(&mut buf, armor::Kind::Signature, &[][..])
-                    .unwrap();
+                armor::Writer::new(&mut buf, armor::Kind::Signature).unwrap();
             rev.serialize(&mut writer)?;
             writer.finalize()?;
         }
@@ -216,7 +217,7 @@ impl Pgp {
 
     /// is (possibly) revoked
     pub fn is_possibly_revoked(cert: &Cert) -> bool {
-        let status = cert.revoked(&StandardPolicy::new(), None);
+        let status = cert.revocation_status(&StandardPolicy::new(), None);
 
         status == RevocationStatus::NotAsFarAsWeKnow
     }
@@ -265,18 +266,18 @@ impl Pgp {
         let mut cert_keys = Self::get_cert_keys(&user)
             .context("filtered for unencrypted secret keys above")?;
 
-        let mut sigs = Vec::new();
+        let mut sigs: Vec<Signature> = Vec::new();
 
         // create a TSIG for each UserID
         for ca_uidb in ca_cert.userids() {
             for signer in &mut cert_keys {
-                let builder = signature::Builder::new(
+                let builder = signature::SignatureBuilder::new(
                     SignatureType::GenericCertification,
                 )
                 .set_trust_signature(255, 120)?;
 
                 let tsig = ca_uidb.userid().bind(signer, &ca_cert, builder)?;
-                sigs.push(tsig.into());
+                sigs.push(tsig);
             }
         }
 
@@ -310,7 +311,7 @@ impl Pgp {
         // create one TSIG for each regex
         for regex in scope_regexes {
             for signer in &mut cert_keys {
-                let builder = signature::Builder::new(
+                let builder = signature::SignatureBuilder::new(
                     SignatureType::GenericCertification,
                 )
                 .set_trust_signature(255, 120)?
