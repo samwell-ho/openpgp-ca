@@ -32,7 +32,7 @@ with the creation and signing of key material. They are all mechanisms
 for distributing key material.
 
 
-# 2. Web of Trust Details (background and terminology)
+# 2. Web of Trust Details
 
 OpenPGP provides a powerful mechanism to authenticate keys, the
 so-called web of trust. The web of trust is built on certifications. A
@@ -51,16 +51,13 @@ key.
 OpenPGP certifications are extremely powerful.  For instance, Bob could
 indicate that he not only believes that Carol controls key 0xCCCC, but
 that he considers Carol to be a trusted introducer, i.e., a certificate
-authority (CA).  In OpenPGP speak, this is done using a trust signature.
+authority (CA).  In OpenPGP speak, this is done using a
+[trust signature](https://tools.ietf.org/html/rfc4880#section-5.2.3.13).
 
-    https://tools.ietf.org/html/rfc4880#section-5.2.3.13
-
-Trust signatures provide nuance.  For instance, it is possible to scope
-the trust using regular expressions over the User ID.  For instance,
+Trust signatures provide nuance.  For instance, it is possible to [scope
+the trust using regular expressions](https://tools.ietf.org/html/rfc4880#section-5.2.3.14) over the User ID.  For instance,
 Carol may trust Dave from the NSA to certify users within his own
 organization, but not other people.
-
-    https://tools.ietf.org/html/rfc4880#section-5.2.3.14
 
 These mechanisms are standard OpenPGP mechanisms, which all OpenPGP
 implementations support.
@@ -68,7 +65,7 @@ implementations support.
 
 # 3. OpenPGP CA: Benefits for users and administrators
 
-## a) user perspective
+## a) User perspective
 
    In OpenPGP CA, the CA administrator typically provisions users with a
 key (although advanced users may bring their own key).  In addition to
@@ -90,7 +87,7 @@ perform correctly with existing tooling that no one uses this type of
 setup.
 
 
-## b) admin perspective
+## b) Admin perspective
 
    OpenPGP CA vastly improves the capabilities of the administrator by
 giving them tooling to model *existing* trust relationships in their
@@ -112,7 +109,7 @@ doesn't require modifying existing software or translating formats.
 
 OpenPGP CA models trust in the following ways.
 
-## a) authentication of individual user keys by the CA
+## a) Authentication of individual user keys by the CA
 
 In OpenPGP CA, the CA key signs the keys of all of the users in the
 organization using normal OpenPGP certifications.
@@ -121,7 +118,7 @@ This is equivalent to "Keylist's" authenticated keylists, but is
 natively understood by OpenPGP implementations.
 
 
-## b) authentication between users within an organization
+## b) Authentication between users within an organization
 
 OpenPGP CA uses trust signatures to make it easy for users within an
 organization to authenticate keys for other users in the same
@@ -129,7 +126,7 @@ organization: all users create a trust signature over their
 organization's CA key.  (This is equivalent to marking the CA key as
 fully trusted in GnuPG.)
 
-## c) gateways into organizations
+## c) Gateways into organizations
 
 An added bonus of using a trust signature is that anyone who considers
 someone at an OpenPGP CA-using organization to be a trusted introducer
@@ -137,7 +134,7 @@ can also automatically authenticate everyone else in the organization.
 There is no equivalent to this in "Keylist".
 
 
-## d) bridges between organizations
+## d) Bridges between organizations
 
 On top of that, OpenPGP CA will support creating "bridges" between
 organizations: This concept is meant for cases where organizations
