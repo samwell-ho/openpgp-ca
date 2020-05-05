@@ -5,8 +5,8 @@ the commandline utility directly from cargo (without building and using
 the `openpgp-ca` binary that is usually run):
 
 ```
-cargo run ca init example.org
-cargo run -- -d /tmp/ca.sqlite ca init example.org
+$ cargo run ca init example.org
+$ cargo run -- -d /tmp/ca.sqlite ca init example.org
 
-cargo run user add --email alice@example.org --email a@example.org --name "Alice Adams"
+$ cargo run user add --email alice@example.org --email a@example.org --name "Alice Adams"
 ```
