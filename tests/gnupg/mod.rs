@@ -9,10 +9,7 @@ use std::process::Command;
 use std::process::Stdio;
 
 use anyhow::{Context, Result};
-use csv;
 use csv::StringRecord;
-use rexpect;
-use tempfile;
 
 pub fn make_context() -> Result<Ctx> {
     let ctx = Ctx::ephemeral().context(
