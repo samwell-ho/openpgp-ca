@@ -8,4 +8,4 @@ OpenPGP CA requires:
 
 Then run `cargo build --release` - the resulting binary is at `target/release/openpgp-ca`  
 
-It's possible to run OpenPGP CA in Docker, [see below](#running-in-docker).
+It's possible to run OpenPGP CA in Docker, [see below](docker.md).
