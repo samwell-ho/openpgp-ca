@@ -206,11 +206,17 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
 /// Set up two OpenPGP CA instances for the domains "some.org" and "other.org"
 ///
 /// Create users in each CA, set up a bridge between the two OpenPGP CA
-/// instances. Export all keys from both CA instances and import them into
+/// instances.
+///
+/// Export all keys from both CA instances and import them into
 /// one gnupg instance. Set ownertrust on one of the users to "ultimate".
 ///
-/// Check that trust of all other keys is "full" (except for the user Carol
-/// whose userid is in an external domain)
+/// Check that trust of all other keys is "full".
+///
+/// Except for the user Carol whose userid is in an external domain.
+/// Users of CA2 trust Carol, because CA2 signed Carol's key.
+/// However, users of CA1 will not, because their trust of keys that CA2
+/// signed is scoped to the main domain of CA2's organization.
 fn test_bridge() -> Result<()> {
     let ctx = gnupg::make_context()?;
 
