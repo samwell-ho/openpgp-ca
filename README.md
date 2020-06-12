@@ -6,6 +6,11 @@ The primary goal is to make it trivial for end users to authenticate
 OpenPGP keys of other users in their organization (or in affiliated
 organizations).
 
+This means that users get roughly the same benefits as if they had verified
+and signed the keys of everyone they regularly communicate with, but
+without the overhead of having to manually authenticate all of those keys. 
+
+
 ## Quick intro
 
 When using OpenPGP CA's centralized key creation workflow, generating
