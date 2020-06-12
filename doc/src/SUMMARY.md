@@ -1,6 +1,6 @@
 # Summary
 
-- [What it is](README.md)
+- [High level overview](README.md)
 - [How it works](details.md)
 - [Decisions before deployment](ch3.md)
 - [Getting started](start.md)
