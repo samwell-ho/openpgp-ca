@@ -309,7 +309,7 @@ OpenPGP CA can be rolled out gradually within an organization.
 
 While OpenPGP CA prescribes some aspects of how OpenPGP keys and
 certifications should be handled, our approach offers [some degrees of
-freedom](ch3.md), so that security specialists in organizations can tailor
+freedom](tradeoffs.md), so that security specialists in organizations can tailor
 their use to their specific needs.
 That said, our framework/paradigm makes OpenPGP key management less ad-hoc and
 more systematic.

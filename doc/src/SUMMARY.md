@@ -1,8 +1,8 @@
 # Summary
 
 - [High level overview](README.md)
-- [How it works](details.md)
-- [Decisions before deployment](ch3.md)
+- [Technical details](details.md)
+- [Security/usability tradeoffs](tradeoffs.md)
 - [Getting started](start.md)
   - [Installation](INSTALL.md)
   - [Run from Cargo](cargo.md)
