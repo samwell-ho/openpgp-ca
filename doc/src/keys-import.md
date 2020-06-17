@@ -2,7 +2,7 @@
  
 User keys get generated on user machines, not by OpenPGP CA
 
-## (1) OpenPGP CA: set up, export CA public key
+## Part 1: OpenPGP CA admin: set up, export CA public key
 
 *  Set environment variable to configure where the database is stored:
  
@@ -16,7 +16,7 @@ User keys get generated on user machines, not by OpenPGP CA
 
 `$ openpgp-ca ca export > ca.pubkey` 
 
-## (2) On user machine using gpg: import CA public key, create new user
+## Part 2: On user machine, using GnuPG: import CA public key, create new user
 
 *  Set up a gpg test environment and import the CA public key:
 
@@ -47,7 +47,7 @@ enter `tsign`, `2`, `250`, no domain (so just hit `Enter`), `y`, `save`.
 
 `$ gpg --export --armor openpgp-ca@example.org > ca-tsigned.pubkey`
 
-## (3) OpenPGP CA: import newly created user
+## Part 3: OpenPGP CA admin imports the newly created user
 
 *  copy the files `ca-tsigned.pubkey`, `alice.pubkey` and
  `alice-revocation.asc` so they are accessible for OpenPGP CA 
