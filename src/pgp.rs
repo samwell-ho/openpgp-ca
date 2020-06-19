@@ -34,7 +34,7 @@ use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 
 pub struct Pgp {}
 
@@ -189,7 +189,7 @@ impl Pgp {
         if let Packet::Signature(s) = p {
             Ok(s)
         } else {
-            Err(anyhow!("Couldn't convert to Signature"))
+            Err(anyhow::anyhow!("Couldn't convert to Signature"))
         }
     }
 
@@ -233,10 +233,10 @@ impl Pgp {
             if let Packet::Signature(s) = p {
                 return Ok(s);
             } else {
-                return Err(anyhow!("Couldn't convert to revocation",));
+                return Err(anyhow::anyhow!("Couldn't convert to revocation"));
             }
         };
-        Err(anyhow!("Couldn't load revocation from file"))
+        Err(anyhow::anyhow!("Couldn't load revocation from file"))
     }
 
     pub fn get_revoc_issuer_fp(revoc_cert: &Signature) -> Option<Fingerprint> {
@@ -297,7 +297,7 @@ impl Pgp {
 
         // there should be exactly one userid in the remote CA Cert
         if remote_ca_cert.userids().len() != 1 {
-            return Err(anyhow!(
+            return Err(anyhow::anyhow!(
                 "expect remote CA cert to have exactly one user_id",
             ));
         }
@@ -337,7 +337,7 @@ impl Pgp {
     ) -> Result<(Signature, Cert)> {
         // there should be exactly one userid in the remote CA Cert
         if remote_ca_cert.userids().len() != 1 {
-            return Err(anyhow!(
+            return Err(anyhow::anyhow!(
                 "expect remote CA cert to have exactly one user_id",
             ));
         }
@@ -350,7 +350,7 @@ impl Pgp {
 
         // this CA should have exactly one key that can certify
         if cert_keys.len() != 1 {
-            return Err(anyhow!(
+            return Err(anyhow::anyhow!(
                 "this CA should have exactly one key that can certify",
             ));
         }

@@ -58,7 +58,7 @@ use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
@@ -105,12 +105,16 @@ impl OpenpgpCa {
     /// Only one CA Admin can be configured per database.
     pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
         if self.db.get_ca()?.is_some() {
-            return Err(anyhow!("ERROR: CA has already been created",));
+            return Err(
+                anyhow::anyhow!("ERROR: CA has already been created",),
+            );
         }
 
         // domainname syntax check
         if !publicsuffix::Domain::has_valid_syntax(domainname) {
-            return Err(anyhow!("Parameter is not a valid domainname",));
+            return Err(anyhow::anyhow!(
+                "Parameter is not a valid domainname",
+            ));
         }
 
         let name = match name {
@@ -191,7 +195,7 @@ impl OpenpgpCa {
 
             // make sure the keys have the same Fingerprint
             if ca_cert.fingerprint() != cert_import.fingerprint() {
-                return Err(anyhow!(
+                return Err(anyhow::anyhow!(
                     "The imported cert has an unexpected Fingerprint",
                 ));
             }
@@ -274,7 +278,7 @@ impl OpenpgpCa {
 
         if res.is_err() {
             eprint!("{:?}", res);
-            return Err(anyhow!("Couldn't insert user"));
+            return Err(anyhow::anyhow!("Couldn't insert user"));
         }
 
         // the private key needs to be handed over to the user, print for now
@@ -313,7 +317,7 @@ impl OpenpgpCa {
             // yes - update existing Usercert in DB
 
             if updates_id.is_some() && updates_id.unwrap() != existing.id {
-                return Err(anyhow!(
+                return Err(anyhow::anyhow!(
                     "updates_id was specified, but is inconsistent for key update"
                 ));
             }
@@ -329,7 +333,7 @@ impl OpenpgpCa {
                 emails.iter().map(|&s| s.to_string()).collect();
 
             if emails != existing_emails {
-                return Err(anyhow!(
+                return Err(anyhow::anyhow!(
                     "expecting the same set of email addresses on key update",
                 ));
             }
@@ -338,7 +342,7 @@ impl OpenpgpCa {
 
             // this "update" workflow is not handling revocation certs for now
             if revoc_cert.is_some() {
-                return Err(anyhow!(
+                return Err(anyhow::anyhow!(
                     "not expecting a revocation cert on key update",
                 ));
             }
@@ -624,10 +628,10 @@ impl OpenpgpCa {
                     revoc_cert
                 );
 
-                Err(anyhow!(msg))
+                Err(anyhow::anyhow!(msg))
             }
         } else {
-            Err(anyhow!("couldn't find cert for this fingerprint"))
+            Err(anyhow::anyhow!("couldn't find cert for this fingerprint"))
         }
     }
 
@@ -664,7 +668,7 @@ impl OpenpgpCa {
     ) -> Result<Option<models::Usercert>> {
         let r_keyid = revoc.issuer();
         if r_keyid.is_none() {
-            return Err(anyhow!("Signature has no issuer KeyID"));
+            return Err(anyhow::anyhow!("Signature has no issuer KeyID"));
         }
         let r_keyid = r_keyid.unwrap();
 
@@ -699,7 +703,7 @@ impl OpenpgpCa {
         if let Some(rev) = self.db.get_revocation_by_id(id)? {
             Ok(rev)
         } else {
-            Err(anyhow!("no revocation found"))
+            Err(anyhow::anyhow!("no revocation found"))
         }
     }
 
@@ -733,7 +737,9 @@ impl OpenpgpCa {
 
                 Ok(())
             } else {
-                Err(anyhow!("Couldn't find usercert for apply_revocation",))
+                Err(anyhow::anyhow!(
+                    "Couldn't find usercert for apply_revocation"
+                ))
             }
         })
     }
@@ -762,7 +768,9 @@ impl OpenpgpCa {
 
         // syntax check domain
         if !publicsuffix::Domain::has_valid_syntax(domain) {
-            return Err(anyhow!("Parameter is not a valid domainname",));
+            return Err(anyhow::anyhow!(
+                "Parameter is not a valid domainname"
+            ));
         }
 
         // transform domain to regex
@@ -793,7 +801,7 @@ impl OpenpgpCa {
 
         // expect exactly one User ID in remote CA key (otherwise fail)
         if remote_uids.len() != 1 {
-            return Err(anyhow!(
+            return Err(anyhow::anyhow!(
                 "Expected exactly one User ID in remote CA Cert",
             ));
         }
@@ -807,7 +815,7 @@ impl OpenpgpCa {
 
                 // expect remote email address with localpart "openpgp-ca"
                 if split.len() != 2 || split[0] != "openpgp-ca" {
-                    return Err(anyhow!(format!(
+                    return Err(anyhow::anyhow!(format!(
                         "Unexpected remote email {}",
                         remote_email
                     )));
@@ -816,9 +824,9 @@ impl OpenpgpCa {
                 let domain = split[1];
                 (remote_email.to_owned(), domain.to_owned())
             } else {
-                return Err(
-                    anyhow!("Couldn't get email from remote CA Cert",),
-                );
+                return Err(anyhow::anyhow!(
+                    "Couldn't get email from remote CA Cert"
+                ));
             }
         };
 
@@ -827,8 +835,8 @@ impl OpenpgpCa {
                 // if scope and domain don't match, warn/error?
                 // (FIXME: error, unless --force parameter has been given?!)
                 if scope != remote_cert_domain {
-                    return Err(anyhow!(
-                        "scope and domain don't match, currently unsupported",
+                    return Err(anyhow::anyhow!(
+                        "scope and domain don't match, currently unsupported"
                     ));
                 }
 
@@ -874,7 +882,7 @@ impl OpenpgpCa {
     pub fn bridge_revoke(&self, email: &str) -> Result<()> {
         let bridge = self.db.search_bridge(email)?;
         if bridge.is_none() {
-            return Err(anyhow!("bridge not found"));
+            return Err(anyhow::anyhow!("bridge not found"));
         }
 
         let mut bridge = bridge.unwrap();
@@ -1003,7 +1011,7 @@ impl OpenpgpCa {
                 let split: Vec<_> = email.split('@').collect();
 
                 if split.len() != 2 {
-                    return Err(anyhow!("unexpected email format"));
+                    return Err(anyhow::anyhow!("unexpected email format"));
                 }
 
                 if split[1] == domain {
