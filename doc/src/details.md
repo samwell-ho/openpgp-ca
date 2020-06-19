@@ -38,7 +38,7 @@ Carol's key.  If she has access to Bob's certification she has evidence that
 certification as much as she trusts Bob to correctly certify Alice's
 key.
 
-![Image](certification.jpg "Bob certified Carol's Key")
+![Image](certification.png "Bob certified Carol's Key")
 
 ## Trust signatures
 
@@ -168,12 +168,12 @@ organization, as shown here:
 There are two different ways in which user keys may be created in an organization that uses OpenPGP CA:
 
 1. Key creation for users can be [performed by the OpenPGP CA
-admin](flow-central.md).  In this case,  because the OpenPGP CA
+admin](keys-create.md).  In this case,  because the OpenPGP CA
 creates the user's key, it can also generate all of the required
 certifications on its own.  OpenPGP CA never saves the secret key material
 to disk.  But, this method is still more risky than the alternative.
 
-2. The alternative is that users [create their own keys](flow-decentral.md).
+2. The alternative is that users [create their own keys](keys-import.md).
 In this workflow, the user sends their public key to  the OpenPGP
 CA admin, who, after authenticating it, adds it to the database.  
 To get all of the benefits of OpenPGP CA, the user also needs to

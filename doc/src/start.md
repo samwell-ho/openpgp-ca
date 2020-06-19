@@ -1,5 +1,4 @@
-
-Now that we've looked at the concepts of OpenPGP CA, let's get started
+Now that we've looked at OpenPGP CA's concepts, let's get started
 using it.
 
 # Installation
@@ -16,60 +15,75 @@ As prerequisites, we need to install:
    (see ["Building Sequoia"](https://gitlab.com/sequoia-pgp/sequoia))
 
 Then we get the
-[OpenPGP-CA source-code](https://gitlab.com/openpgp-ca/openpgp-ca).
+[OpenPGP CA's source code](https://gitlab.com/openpgp-ca/openpgp-ca):
+
+`$ git clone https://gitlab.com/openpgp-ca/openpgp-ca.git`
 
 With all of the above in place, we can build the OpenPGP CA binary by
-running the following command in the openpgp-ca source folder:
+running the following command in the `openpgp-ca` source folder, which the `git clone` command created:
  
+`$ cd openpgp-ca`
 `$ cargo build --release`
  
-The resulting binary is generated at `target/release/openpgp-ca`.  
+To make sure everything is working right, you should also run the test suite.
+Note: the integration tests call out to GnuPG to check that the data structures that
+OpenPGP CA creates actually do what they are supposed to do.  Thus, you'll
+need to have GnuPG installed to run the integration tests.
 
-You can simply copy (or symlink) this binary into a directory that is in
-$PATH. With that, you can now run, for example:
+`$ cargo test`
+
+Assuming the complication suceeded, the resulting binary will be called `target/release/openpgp-ca`.  
+
+You can copy (or symlink) this binary to a directory that is in your
+`$PATH`. If you do that, then you should be able to use OpenPGP CA as follows:
 
 `$ openpgp-ca --help`
 
 
 # Database
 
-OpenPGP CA uses an SQLite database to keep all of its state.
-This database is the only file that OpenPGP CA modifies.
+OpenPGP CA uses an SQLite database to keep track of its state.
+This database is the only file that OpenPGP CA modifies, and the only file
+that you need to backup to backup your CA.
 
 You need to configure where this file is stored in the filesystem (there is
 no default location). There are two ways to configure the database file:
 
-1. Usually, you'll want to set the `OPENPGP_CA_DB` environment variable.
-2. Alternatively, the parameter "-d" sets the database file explicitly (this
+1. You can set the `OPENPGP_CA_DB` environment variable.
+2. Alternatively, the parameter `-d` sets the database file explicitly (this
    overrides the environment variable).
+   
+We're going to use the latter method in our examples.
 
-If the configured database file doesn't exist, it will get created
-implicitly, and the schema will be generated in the database.
+If the configured database file doesn't exist, it will be created
+implicitly.
 
 ## Multiple instances
 
 If you operate multiple instances of OpenPGP CA, you can easily use
-separate SQLite files, one per instance. You can then switch between
+separate SQLite files: you just need one file per instance. You can then switch between
 instances by setting the `OPENPGP_CA_DB` environment variable to
-point to the correct database file for each instance (or you can use the
-explicit "-d" parameter).
+point to the correct database file for each instance or you can use the
+explicit `-d` parameter.
 
 ## Offline instances, encryption
 
-The OpenPGP CA database contains very valuable and sensitive data: it
-contains information about our users, it can contain revocation
+The OpenPGP CA database contains sensitive data: in particular, it
+contains information about the users, it can contain revocation
 certificates - and, most importantly, the private OpenPGP key of the
 OpenPGP CA admin.
 
-Because of this, the database file(s) needs to be secured. Depending on the
-needs of your organization, this might mean running OpenPGP CA on encrypted
-storage, and/or running OpenPGP CA on an airgapped machine (that is not
- connected to any network at all). 
+Because of this, the database file(s) needs to be protected. Depending on the
+needs of your organization, this might mean storing the OpenPGP CA database
+on encrypted storage, and/or running OpenPGP CA on an airgapped machine (that is,
+one that is not connected to a network).  
+OpenPGP CA's workflows have not yet been optimized for offline operation.
+But, we intend to add support for this in the future.
 
 
 # Help
 
-The parameter "--help" will give information on any command level, e.g.
+If you're stuck, then you can use the "--help" option to get information about any command or subcommand, for instance:
 
 `$ openpgp-ca --help`
 
@@ -80,4 +94,3 @@ or
 or
 
 `$ openpgp-ca user import --help`
-
