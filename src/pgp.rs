@@ -35,6 +35,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
+use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
 
 pub struct Pgp {}
 
@@ -262,9 +263,15 @@ impl Pgp {
     }
 
     /// user tsigns CA key
-    pub fn tsign_ca(ca_cert: Cert, user: &Cert) -> Result<Cert> {
-        let mut cert_keys = Self::get_cert_keys(&user)
+    pub fn tsign_ca(
+        ca_cert: Cert,
+        user: &Cert,
+        pass: Option<&str>,
+    ) -> Result<Cert> {
+        let mut cert_keys = Self::get_cert_keys(&user, pass)
             .context("filtered for unencrypted secret keys above")?;
+
+        assert!(cert_keys.len() > 0, "Can't find usable user key");
 
         let mut sigs: Vec<Signature> = Vec::new();
 
@@ -304,7 +311,7 @@ impl Pgp {
 
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
-        let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
+        let mut cert_keys = Self::get_cert_keys(&ca_cert, None)?;
 
         let mut packets: Vec<Packet> = Vec::new();
 
@@ -346,7 +353,7 @@ impl Pgp {
 
         // set_trust_signature, set_regular_expression(s), expiration
 
-        let mut cert_keys = Self::get_cert_keys(&ca_cert)?;
+        let mut cert_keys = Self::get_cert_keys(&ca_cert, None)?;
 
         // this CA should have exactly one key that can certify
         if cert_keys.len() != 1 {
@@ -382,7 +389,7 @@ impl Pgp {
     ) -> Result<Cert> {
         let policy = StandardPolicy::new();
 
-        let mut cert_keys = Self::get_cert_keys(&ca_cert)
+        let mut cert_keys = Self::get_cert_keys(&ca_cert, None)
             .context("filtered for unencrypted secret keys above")?;
 
         let fp_ca = ca_cert.fingerprint();
@@ -434,7 +441,10 @@ impl Pgp {
     }
 
     /// get all valid, certification capable keys with secret key material
-    fn get_cert_keys(cert: &Cert) -> Result<Vec<KeyPair>> {
+    fn get_cert_keys(
+        cert: &Cert,
+        password: Option<&str>,
+    ) -> Result<Vec<KeyPair>> {
         let policy = StandardPolicy::new();
         let keys = cert
             .keys()
@@ -445,7 +455,15 @@ impl Pgp {
             .secret();
 
         Ok(keys
-            .filter_map(|ka| ka.key().clone().into_keypair().ok())
+            .filter_map(|ka: ValidKeyAmalgamation<_, _, _>| {
+                let mut ka = ka.key().clone();
+
+                if let Some(password) = password {
+                    ka = ka.decrypt_secret(&password.into()).ok()?
+                }
+
+                ka.into_keypair().ok()
+            })
             .collect())
     }
 }

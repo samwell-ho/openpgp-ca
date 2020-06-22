@@ -729,3 +729,33 @@ fn test_revocation_no_fingerprint() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+/// Create a CA and a user with password.
+///
+/// Check that the CA admin key is signed by the user (even with password
+/// encrypted user key)
+fn test_create_user_with_pw() -> Result<()> {
+    let ctx = gnupg::make_context()?;
+    //    ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let ca = OpenpgpCa::new(Some(&db))?;
+    ca.ca_init("example.org", None)?;
+
+    // make CA user
+    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], true)?;
+
+    let usercerts = ca.usercerts_get_all()?;
+    assert_eq!(usercerts.len(), 1);
+    let alice = &usercerts[0];
+
+    assert!(
+        ca.usercert_check_tsig_on_ca(alice)?,
+        "CA cert is not signed by Alice"
+    );
+
+    Ok(())
+}

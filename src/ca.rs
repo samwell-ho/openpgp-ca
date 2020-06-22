@@ -259,8 +259,8 @@ impl OpenpgpCa {
             .context("sign_user failed")?;
 
         // user tsigns CA key
-        let tsigned_ca =
-            Pgp::tsign_ca(ca_cert, &user).context("failed: user tsigns CA")?;
+        let tsigned_ca = Pgp::tsign_ca(ca_cert, &user, pass.as_deref())
+            .context("failed: user tsigns CA")?;
 
         let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
 
