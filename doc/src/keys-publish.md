@@ -1,4 +1,4 @@
-# Export keys to a Web Key Directory (WKD)
+# Publish keys to a Web Key Directory (WKD)
 
 OpenPGP CA can export keys in
 [Web Key Directory (WKD)](https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08)
@@ -17,7 +17,7 @@ $ openpgp-ca -d example.oca user add --email bob@example.org --name "Bob Baker"
 
 ## Export keys into a WKD structure:
 
-Now that we have an OpenPGP CA instance with two users, we can export
+Now that we have an OpenPGP CA instance with two users, we can export the
 WKD data for our organization to the filesystem into the path `/tmp/wkd/`:
 
 `$ openpgp-ca -d example.oca wkd export /tmp/wkd/`
@@ -29,7 +29,8 @@ conform to the WKD specification, and https must be set up.
 
 ## Testing WKD
 
-When we've set up a WKD server, we can retrieve key from it using an OpenPGP client.
+When we've set up a WKD server, we can retrieve keys from it using an
+OpenPGP client.
 
 For example with GnuPG:
 

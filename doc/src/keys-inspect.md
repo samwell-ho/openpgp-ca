@@ -20,17 +20,19 @@ To output the public key of the OpenPGP CA admin:
 
 `$ openpgp-ca -d example.oca ca export`
 
-### Checking certifications and expiry
+### Checking certifications
 
 To check if all keys are mutually certified (all user keys tsigned the
 CA key, and the CA key has certified all user keys), and report the results:
 
 `$ openpgp-ca -d example.oca user check sigs`
+
+### Checking expiry of user keys
  
-To check if any keys have expired and report the results:
+To check if any user keys have expired and report the results:
  
 `$ openpgp-ca -d example.oca user check expiry`
 
-To check if any keys will expire within a specified number of days:
+To check if any user keys will expire within a specified number of days:
  
 `$ openpgp-ca -d example.oca user check expiry --days 60`

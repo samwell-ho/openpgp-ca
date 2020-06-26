@@ -1,12 +1,12 @@
 This example shows how to set up a "bridge" between two OpenPGP CA using
 organizations. The purpose of bridging is that users between organizations
-automatically are mutually authenticated.
+are automatically mutually authenticated.
 Any user at one organization sees the OpenPGP keys of users at the other
-organization as verified - the authentication that is done by the OpenPGP
-CA admin at each organization is shared between both organizations.
+organization as verified. The authentications that are performed by the
+OpenPGP CA admin at each organization are shared between both organizations.
 
-Such a bridge is configured when the CA Admins at both organizations are
-satisfied that the CA Admin of the other organization is following good
+Such a bridge is configured when the CA admins at both organizations are
+satisfied that the CA admin of the other organization is following good
 procedures in signing keys of users within their organization.
 
 The end result is that users can seamlessly authenticate users in the
