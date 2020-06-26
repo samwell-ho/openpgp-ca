@@ -7,7 +7,7 @@ However, creating the user key on the admin's machine is a tradeoff which
 is not ideal for every use case.  
 For example, in some organizations, the CA admin may want to avoid ever
 having access to users' private key material, so they can never be coerced
-into hading those keys over to a third party.
+into handing those keys over to a third party.
 
 ## Part 1: Tasks on the OpenPGP CA admin machine
 
@@ -38,7 +38,7 @@ database).
 
 The new user's private key is sent to `stdout` by this command; it is not
 stored. By default, the new key is protected with a diceware password,
-which is sent to `stdout`.
+which is also sent to `stdout`.
 
 So the output of creating a new user looks like this:
 

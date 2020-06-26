@@ -1,32 +1,36 @@
-# Inspecting user certificates in OpenPGP CA
+This chapter shows some ways of inspecting data in the OpenPGP CA
+ database 
 
-We can inspect the state of the users in OpenPGP CA like this:
+### Inspecting and exporting keys
 
-`$ openpgp-ca user list`
+We can inspect the state of all users in OpenPGP CA like this:
 
-Exporting an individual user certificate (the armorded certificate will be
-printed on stdout):
+`$ openpgp-ca -d example.oca user list`
 
-`$ openpgp-ca user export -e alice@example.org`
+Export an individual user key (the public key is
+printed to stdout):
 
-To output all public certificates from OpenPGP:
+`$ openpgp-ca -d example.oca user export -e alice@example.org`
 
-`$ openpgp-ca user export`
+To output all public keys in OpenPGP CA to stdout:
 
-To output the public certificate of the OpenPGP CA admin:
+`$ openpgp-ca -d example.oca user export`
 
-`$ openpgp-ca ca export`
+To output the public key of the OpenPGP CA admin:
 
-OpenPGP CA can check if all keys are mutually signed (user keys tsigned the
- CA key, and the CA key has signed the user key), and report the results:
+`$ openpgp-ca -d example.oca ca export`
+
+### Checking certifications and expiry
+
+To check if all keys are mutually certified (all user keys tsigned the
+CA key, and the CA key has certified all user keys), and report the results:
+
+`$ openpgp-ca -d example.oca user check sigs`
  
-`$ openpgp-ca user check sigs`
+To check if any keys have expired and report the results:
  
-OpenPGP CA can check if any keys have expired, and report the results:
- 
-`$ openpgp-ca user check expiry`
+`$ openpgp-ca -d example.oca user check expiry`
 
-OpenPGP CA can also check if any keys have expired a specified number of
- days in the future and report the results:
+To check if any keys will expire within a specified number of days:
  
-`$ openpgp-ca user check expiry --days 60`
+`$ openpgp-ca -d example.oca user check expiry --days 60`
