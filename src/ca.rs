@@ -136,19 +136,19 @@ impl OpenpgpCa {
     /// The Ca object is permanent and shouldn't change after initial
     /// creation.
     ///
-    /// The Cacert contains the Key material for the CA Admin.
+    /// The Cacert contains the Key material for the CA.
     /// When the CA Cert gets updated (e.g. it gets signed by a CA user), the
     /// Cert in the database will be updated.
     ///
-    /// If a new Cert gets created for the CA Admin, a new Cacert row is
+    /// If a new Cert gets created for the CA, a new Cacert row is
     /// inserted into the database.
     pub fn ca_get(&self) -> Result<Option<(models::Ca, models::Cacert)>> {
         self.db.get_ca()
     }
 
-    /// Get a sequoia `Cert` object for the CA Admin from the database.
+    /// Get a sequoia `Cert` object for the CA from the database.
     ///
-    /// This is the "private" OpenPGP Cert of the CA Admin.
+    /// This is the "private" OpenPGP Cert of the CA.
     pub fn ca_get_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
@@ -159,7 +159,7 @@ impl OpenpgpCa {
     /// Print information about the Ca to stdout.
     ///
     /// This shows the domainname of this OpenPGP CA instance and the
-    /// private Cert of the CA Admin.
+    /// private Cert of the CA.
     pub fn ca_show(&self) -> Result<()> {
         let (ca, ca_cert) = self
             .db
@@ -172,7 +172,7 @@ impl OpenpgpCa {
         Ok(())
     }
 
-    /// Returns the public key of the CA Admin as an armored String
+    /// Returns the public key of the CA as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
         let cert = self.ca_get_cert()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
@@ -181,9 +181,9 @@ impl OpenpgpCa {
         Ok(ca_pub)
     }
 
-    /// Add trust-signature(s) from CA users to the CA Admin's Cert.
+    /// Add trust-signature(s) from CA users to the CA's Cert.
     ///
-    /// This receives an armored version of the CA Admin's public key, finds
+    /// This receives an armored version of the CA's public key, finds
     /// any trust-signatures on it and merges those into "our" local copy of
     /// the CA key.
     pub fn ca_import_tsig(&self, key: &str) -> Result<()> {
@@ -233,8 +233,8 @@ impl OpenpgpCa {
 
     /// Create a new OpenPGP CA User.
     ///
-    /// The CA Admin Cert is automatically trust-signed with this new user
-    /// Cert and the user Cert is signed by the CA Admin. This is the
+    /// The CA Cert is automatically trust-signed with this new user
+    /// Cert and the user Cert is signed by the CA. This is the
     /// "Centralized key creation workflow"
     ///
     /// This generates a new OpenPGP Cert for the new User.
@@ -508,8 +508,8 @@ impl OpenpgpCa {
     }
 
     /// For each user Cert, check if:
-    /// - the user's Cert has been signed by the CA Admin, and
-    /// - the CA Admin key has a trust-signature from the user's Cert
+    /// - the user's Cert has been signed by the CA, and
+    /// - the CA key has a trust-signature from the user's Cert
     ///
     /// Returns a map 'usercert -> (sig_from_ca, tsig_on_ca)'
     pub fn usercerts_check_signatures(
@@ -875,7 +875,7 @@ impl OpenpgpCa {
     }
 
     /// Create a revocation Certificate for a Bridge and apply it the our
-    /// copy of the remote CA Admin's public key.
+    /// copy of the remote CA's public key.
     ///
     /// Both the revoked remote public key and the revocation cert are
     /// printed to stdout.
