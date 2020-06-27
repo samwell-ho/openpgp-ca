@@ -271,7 +271,7 @@ impl Pgp {
         let mut cert_keys = Self::get_cert_keys(&user, pass)
             .context("filtered for unencrypted secret keys above")?;
 
-        assert!(cert_keys.len() > 0, "Can't find usable user key");
+        assert!(!cert_keys.is_empty(), "Can't find usable user key");
 
         let mut sigs: Vec<Signature> = Vec::new();
 
