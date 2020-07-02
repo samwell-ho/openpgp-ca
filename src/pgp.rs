@@ -218,9 +218,8 @@ impl Pgp {
 
     /// is (possibly) revoked
     pub fn is_possibly_revoked(cert: &Cert) -> bool {
-        let status = cert.revocation_status(&StandardPolicy::new(), None);
-
-        status == RevocationStatus::NotAsFarAsWeKnow
+        RevocationStatus::NotAsFarAsWeKnow
+            != cert.revocation_status(&StandardPolicy::new(), None)
     }
 
     /// Load Revocation Cert from file
