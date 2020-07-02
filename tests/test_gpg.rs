@@ -160,14 +160,19 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     // import public keys for alice and bob into CA
     ca.usercert_import_new(
         &alice_key,
-        None,
+        vec![],
         Some("Alice"),
         &["alice@example.org"],
     )
     .context("import Alice to CA failed")?;
 
-    ca.usercert_import_new(&bob_key, None, Some("Bob"), &["bob@example.org"])
-        .context("import Bob to CA failed")?;
+    ca.usercert_import_new(
+        &bob_key,
+        vec![],
+        Some("Bob"),
+        &["bob@example.org"],
+    )
+    .context("import Bob to CA failed")?;
 
     // export bob, CA-key from CA
     let ca_key = ca.ca_get_pubkey_armored()?;

@@ -141,7 +141,7 @@ pub enum UserCommand {
             long = "revocation-file",
             help = "File that contains the User's revocation cert"
         )]
-        revocation_file: Option<PathBuf>,
+        revocation_file: Vec<PathBuf>,
     },
     /// Export User Public Key (bulk, if no email address is given)
     Export {

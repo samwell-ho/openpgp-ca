@@ -121,7 +121,7 @@ fn test_update_usercert_key() -> Result<()> {
 
     ca.usercert_import_new(
         &alice1_key,
-        None,
+        vec![],
         Some("Alice"),
         &["alice@example.org"],
     )
@@ -213,7 +213,7 @@ fn test_update_user_cert() -> Result<()> {
 
     ca.usercert_import_new(
         &alice1_key,
-        None,
+        vec![],
         Some("Alice"),
         &["alice@example.org"],
     )
@@ -389,11 +389,16 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     ca.usercert_import_new(
         &justus_key,
-        None,
+        vec![],
         None,
         &["justus@sequoia-pgp.org"],
     )?;
-    ca.usercert_import_new(&neal_key, None, None, &["neal@sequoia-pgp.org"])?;
+    ca.usercert_import_new(
+        &neal_key,
+        vec![],
+        None,
+        &["neal@sequoia-pgp.org"],
+    )?;
 
     // -- export as WKD
 
@@ -428,7 +433,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
 
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import_new(&alice_key, None, None, &[])?;
+    ca.usercert_import_new(&alice_key, vec![], None, &[])?;
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
@@ -488,7 +493,7 @@ fn test_ca_signatures() -> Result<()> {
 
     ca.usercert_import_new(
         &alice_key,
-        None,
+        vec![],
         Some("Alice"),
         &["alice@example.org"],
     )
@@ -500,7 +505,7 @@ fn test_ca_signatures() -> Result<()> {
 
     // CA does not signs bob's key because the "email" parameter is empty.
     // Only userids that are supplied in `email` are signed by the CA.
-    ca.usercert_import_new(&bob_key, None, Some("Bob"), &[])
+    ca.usercert_import_new(&bob_key, vec![], Some("Bob"), &[])
         .context("import Bob to CA failed")?;
 
     // create carol, CA will sign carol's key.
@@ -595,7 +600,7 @@ fn test_import_signed_cert() -> Result<()> {
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
     ca.usercert_import_new(
         &alice_key,
-        None,
+        vec![],
         Some("Alice"),
         &["alice@example.org"],
     )?;
@@ -664,7 +669,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     // gpg: make key for Bob
     gnupg::create_user(&ctx, "Bob <bob@example.org>");
     let bob_key = gnupg::export(&ctx, &"bob@example.org");
-    ca.usercert_import_new(&bob_key, None, None, &[])?;
+    ca.usercert_import_new(&bob_key, vec![], None, &[])?;
 
     // make a revocation certificate for bob ...
     let revoc_file = format!("{}/bob.revoc", home_path);

@@ -302,7 +302,7 @@ impl OpenpgpCa {
     fn usercert_import_update_or_create(
         &self,
         key: &str,
-        revoc_cert: Option<&str>,
+        revoc_certs: Vec<String>,
         name: Option<&str>,
         emails: &[&str],
         updates_id: Option<i32>,
@@ -341,7 +341,7 @@ impl OpenpgpCa {
             // FIXME: should the CA sign this cert?
 
             // this "update" workflow is not handling revocation certs for now
-            if revoc_cert.is_some() {
+            if !revoc_certs.is_empty() {
                 return Err(anyhow::anyhow!(
                     "not expecting a revocation cert on key update",
                 ));
@@ -393,20 +393,13 @@ impl OpenpgpCa {
             // map Vec<String> -> Vec<&str>
             let emails: Vec<&str> = emails.iter().map(|s| &**s).collect();
 
-            // load revocation certificate
-            let mut revocs: Vec<String> = Vec::new();
-
-            if let Some(rev) = revoc_cert {
-                revocs.push(rev.to_owned());
-            }
-
             let pub_key = &Pgp::cert_to_armored(&certified)?;
 
             self.db.add_usercert(
                 name.as_deref(),
                 (pub_key, &certified.fingerprint().to_hex()),
                 &emails[..],
-                &revocs,
+                &revoc_certs,
                 None,
                 updates_id,
             )?;
@@ -431,12 +424,16 @@ impl OpenpgpCa {
     pub fn usercert_import_new(
         &self,
         key: &str,
-        revoc_cert: Option<&str>,
+        revoc_certs: Vec<String>,
         name: Option<&str>,
         emails: &[&str],
     ) -> Result<()> {
         self.usercert_import_update_or_create(
-            key, revoc_cert, name, emails, None,
+            key,
+            revoc_certs,
+            name,
+            emails,
+            None,
         )
     }
 
@@ -455,7 +452,7 @@ impl OpenpgpCa {
 
         self.usercert_import_update_or_create(
             key,
-            None,
+            vec![],
             usercert.name.as_deref(),
             &emails[..],
             Some(usercert.id),

@@ -16,14 +16,15 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenPGP CA.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod cli;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use chrono::offset::Utc;
 use chrono::DateTime;
-use std::path::PathBuf;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
+
+pub mod cli;
 
 fn main() -> Result<()> {
     use cli::*;
@@ -63,17 +64,18 @@ fn main() -> Result<()> {
                 revocation_file,
             } => {
                 let key = std::fs::read_to_string(key_file)?;
-                let revoc_certs = match revocation_file {
-                    Some(filename) => Some(std::fs::read_to_string(filename)?),
-                    None => None,
-                };
+                let mut revoc_certs: Vec<String> = Vec::new();
+                for filename in revocation_file {
+                    let rev = std::fs::read_to_string(filename)?;
+                    revoc_certs.push(rev);
+                }
 
                 let email: Vec<&str> =
                     email.iter().map(String::as_str).collect();
 
                 ca.usercert_import_new(
                     &key,
-                    revoc_certs.as_deref(),
+                    revoc_certs,
                     name.as_deref(),
                     &email[..],
                 )?;
