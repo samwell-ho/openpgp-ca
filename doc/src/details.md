@@ -170,7 +170,7 @@ There are two different ways in which user keys may be created in an organizatio
 1. Key creation for users can be [performed by the OpenPGP CA
 admin](keys-create.md).  In this case,  because the OpenPGP CA
 creates the user's key, it can also generate all of the required
-certifications on its own.  OpenPGP CA never saves the secret key material
+certifications on its own.  OpenPGP CA never saves the private key material
 to disk.  But, this method is still more risky than the alternative.
 
 2. The alternative is that users [create their own keys](keys-import.md).
@@ -205,7 +205,7 @@ key servers.
 
 The user then imports their new private key and sets it to
 be "ultimately" trusted (i.e., they tell their OpenPGP implementation that this is
-their own key), and they import the CA admin's public key.
+their own key), and they import the CA's public key.
 
 Following this, the user has an OpenPGP setup where their OpenPGP software
 can automatically find the keys
@@ -222,9 +222,9 @@ having new keys generated centrally by the CA admin.
 
 This workflow is slightly more complex to perform:
 
-- The user needs to obtain the CA admin's public key,
+- The user needs to obtain the CA's public key,
 - generate their own new key,
-- generate a "trust signature" certification for the CA admin's key.
+- generate a "trust signature" certification for the CA's key.
 - This certification and the user's public key need to be transferred to
  the CA admin.
 - The CA admin then needs to import this new user key into OpenPGP CA, which
@@ -246,8 +246,8 @@ certifications between the users and the CA admin.
 - Further, OpenPGP CA's database also optionally contains [revocation
 certificates](#revocation-certificates) for user keys.
 
-- Finally, the CA admin's private OpenPGP key is in the database - it is used
+- Finally, the CA's private OpenPGP key is in the database - it is used
 to generate the certifications, and as such needs to be kept safe.
 
-OpenPGP CA 2.0 will support exporting user as well as the CA admin's public
+OpenPGP CA 2.0 will support exporting user as well as the CA's public
 keys to key servers, to WKD servers, or as a GPG Sync-style Keylist.

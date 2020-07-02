@@ -209,7 +209,7 @@ not a significant change to users' threat models, and does not undermine
 OpenPGP's decentralized nature.
  
 
-**Risks when a CA Admin makes mistakes**
+**Risks when a CA admin makes mistakes**
 
 The role of the CA admin centralizes tasks 
 that would otherwise be the responsibility of individual users.
@@ -291,9 +291,11 @@ is done using existing OpenPGP mechanisms.  Specitically, by matching on the ema
 
 ## No key escrow
 
-Centrally storing users' secret key material has legitimate uses - however, it also comes with massive risks.
+Centrally storing users' private key material has legitimate uses - however,
+it also comes with massive risks.
 
-OpenPGP CA does not do key escrow - that is, even when OpenPGP CA generates keys for users, the secret key material
+OpenPGP CA does not do key escrow - that is, even when OpenPGP CA
+generates keys for users, the private key material
 is never stored in the OpenPGP CA database.
 
 

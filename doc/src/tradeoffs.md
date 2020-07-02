@@ -5,9 +5,9 @@ OpenPGP CA prescribes some aspects of how to use OpenPGP within an organization.
 
 ## Does my organization need an offline OpenPGP CA, or is an online instance okay?
 
-The OpenPGP CA database currently contains the private key of the CA admin.
+The OpenPGP CA database currently contains the private key of the CA.
 This key can create certifications that all users in the organization trust
-implicitly. If an attacker can get control of the CA admin key, they can
+implicitly. If an attacker can get control of the CA key, they can
 certify keys to perform man-in-the-middle attacks on users.
 
 If this scenario is an unacceptable risk, OpenPGP CA can be
