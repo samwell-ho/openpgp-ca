@@ -140,7 +140,7 @@ fn test_update_usercert_key() -> Result<()> {
     cert.with_policy(&policy, in_one_year)?.alive()?;
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_err());
 
-    // check the same with ca.usercert_expiry()
+    // check the same with ca.usercert_expired()
     let exp1 = ca.usercerts_expired(365)?;
     assert_eq!(exp1.len(), 1);
     let (_, (alive, _)) = exp1.iter().next().unwrap();
@@ -174,7 +174,7 @@ fn test_update_usercert_key() -> Result<()> {
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_ok());
     assert!(!cert.with_policy(&policy, in_six_years)?.alive().is_ok());
 
-    // check the same with ca.usercert_expiry()
+    // check the same with ca.usercert_expired()
     let exp3 = ca.usercerts_expired(3 * 365)?;
     assert_eq!(exp3.len(), 1);
     let (_, (alive, _)) = exp3.iter().next().unwrap();
