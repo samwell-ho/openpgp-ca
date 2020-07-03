@@ -209,11 +209,11 @@ fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Result<()> {
             let datetime: DateTime<Utc> = exp.into();
             println!(" expires: {}", datetime.format("%d/%m/%Y"));
         } else {
-            println!(" cert doesn't expire");
+            println!(" no expiration date is set for this certificate");
         }
 
         if !alive {
-            println!(" user cert EXPIRED/EXPIRING: {:?}", usercert.name);
+            println!(" user cert EXPIRED/EXPIRING!");
         }
 
         println!();
