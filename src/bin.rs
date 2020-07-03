@@ -243,7 +243,7 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
             let datetime: DateTime<Utc> = exp.into();
             println!(" expires: {}", datetime.format("%d/%m/%Y"));
         } else {
-            println!(" cert doesn't expire");
+            println!(" no expiration date is set for this certificate");
         }
 
         println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
