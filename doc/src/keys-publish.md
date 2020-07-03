@@ -1,3 +1,7 @@
+OpenPGP CA serves as a repository of user keys within our organization.
+So when we want to publish OpenPGP keys for our organization, exporting
+those keys from OpenPGP CA is a convenient possibility. 
+
 # Publish keys to a Web Key Directory (WKD)
 
 OpenPGP CA can export keys in

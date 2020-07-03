@@ -1,13 +1,18 @@
-This example shows how the OpenPGP CA admin can create keys on behalf of
-their users. We call this workflow "centralized key creation", because
+There are two ways to manage user keys with OpenPGP CA.
+The simplest way for both the admin and users is to have OpenPGP CA create
+keys on behalf of the user.  This allows OpenPGP CA to automatically create
+all of the necessary auxiliary data structures (the certifications and
+revocation certificates).
+
+We call this workflow "centralized key creation", because
 OpenPGP keys get created centrally by the OpenPGP CA admin.
 
-This workflow is very streamlined, both for the admin and for users.
-However, creating the user key on the admin's machine is a tradeoff which
-is not ideal for every use case.  
-For example, in some organizations, the CA admin may want to avoid ever
-having access to users' private key material, so they can never be coerced
-into handing those keys over to a third party.
+The disadvantage to this approach is that OpenPGP CA has access to the
+user's private key material.  Although OpenPGP CA does not store it to
+disk (it is only printed to stdout), the fact that the admin had access to the
+keys is a potential security concern.  If this is a problem for you, then
+the [next chapter](keys-import.md) describes how to import user-created keys
+into OpenPGP CA.
 
 ## Part 1: Tasks on the OpenPGP CA admin machine
 
@@ -17,7 +22,7 @@ To start, if we don't already have an instance of OpenPGP CA, we need to set up 
 new one.
 
 Then, we initialize a new OpenPGP CA instance for the domain (in this case,
-we'll use `example.org`) and generate a new keypair for the OpenPGP CA admin:
+we'll use `example.org`) and generate a new key for OpenPGP CA:
 
 `$ openpgp-ca -d example.oca ca init example.org` 
 
@@ -64,14 +69,14 @@ done by:
   - ...
 
 The user then needs to import it into their OpenPGP keystore.  In the
-following examples, we assume that the password-protected secret key has been
-transferred as a file called `alice.privatekey`.
+following examples, we assume that the password-protected private key has been
+transferred as a file called `alice.priv`.
 
 ### Exporting the OpenPGP CA public key
 
 Alice also needs a copy of CA public key.  It can be exported as follows:
 
-`$ openpgp-ca -d example.oca ca export > ca.pubkey` 
+`$ openpgp-ca -d example.oca ca export > ca.pub` 
 
 The CA's key has already been tsigned by Alice's key.  This happened
 automatically when OpenPGP CA generated the key.
@@ -90,9 +95,10 @@ the CA's public key.
 For testing purposes, you'll want to create a separate test environment.
 Using GnuPG, this can be done as follows:
 
-`$ mkdir /tmp/test/ && chmod 0700 /tmp/test`
-
-`$ export GNUPGHOME=/tmp/test/`
+```
+$ export GNUPGHOME=$(mktemp -d)
+$ chmod 0700 $GNUPGHOME
+```
 
 ### Importing Alice's private key
 
@@ -101,7 +107,7 @@ In GnuPG, this is done by setting the so-called `ownertrust` to `Ultimate`.
 
 Importing the key:
 
-`$ gpg --import alice.privatekey`
+`$ gpg --import alice.priv`
 
 The user needs to enter the diceware password of the key at this point.
 This password needs to be transferred to the user through a sufficiently
@@ -134,7 +140,7 @@ ssb   cv25519 2020-06-19 [E]
 
 To import the CA's public key, run the following:
 
-`$ gpg --import ca.pubkey`
+`$ gpg --import ca.pub`
 
 Because Alice tsigned the CA's key, the CA's key should be fully trusted.  You can
 confirm this by running:
