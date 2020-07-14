@@ -91,8 +91,8 @@ fn main() -> Result<()> {
             UserCommand::ShowRevocations { email } => {
                 print_revocations(&ca, &email)?
             }
-            UserCommand::ApplyRevocation { id } => {
-                let rev = ca.revocation_get_by_id(id)?;
+            UserCommand::ApplyRevocation { hash } => {
+                let rev = ca.revocation_get_by_hash(&hash)?;
                 ca.revocation_apply(rev)?;
             }
         },
@@ -144,7 +144,7 @@ fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
             println!("Revocations for Usercert {:?}", cert.name);
             let revoc = ca.revocations_get(&cert)?;
             for r in revoc {
-                println!(" revocation id {:?}", r.id);
+                println!(" revocation id {:?}", r.hash);
                 if r.published {
                     println!(" this revocation has been PUBLISHED");
                 }

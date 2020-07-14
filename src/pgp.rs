@@ -36,6 +36,7 @@ use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
+use sha2::Digest;
 
 pub struct Pgp {}
 
@@ -259,6 +260,25 @@ impl Pgp {
             1 => Some(sig_fingerprints[0].clone()),
             _ => panic!("expected 0 or 1 issuer fingerprint in revocation"),
         }
+    }
+
+    /// Generate a 64 bit sized hash of a revocation certificate.
+    /// There hashes are used as shorthand identifiers to refer to
+    /// revocations from the CLI.
+    pub fn revocation_to_hash(revoc: &str) -> Result<String> {
+        let sig = Pgp::armored_to_signature(revoc)?;
+        let normalized = Pgp::sig_to_armored(&sig)?;
+
+        use sha2::Sha256;
+
+        let mut hasher = Sha256::new();
+        hasher.update(normalized.as_bytes());
+        let hash64 = &hasher.finalize()[0..8];
+
+        let foo: Vec<String> =
+            hash64.iter().map(|d| format!("{:02X}", d)).collect();
+
+        Ok(foo.concat())
     }
 
     /// user tsigns CA key

@@ -48,6 +48,7 @@ CREATE TABLE certs_emails (
 -- revocations for user certs, user_ids, ...
 CREATE TABLE revocations (
   id INTEGER NOT NULL PRIMARY KEY,
+  hash VARCHAR NOT NULL,
   revocation VARCHAR NOT NULL,
   published BOOLEAN NOT NULL,
   -- uid/keyid? -- FIXME

@@ -112,6 +112,7 @@ pub struct NewCertEmail {
 #[belongs_to(Usercert)]
 pub struct Revocation {
     pub id: i32,
+    pub hash: String,
     pub revocation: String,
     pub published: bool,
     // FIXME - https://docs.diesel.rs/diesel/associations/index.html
@@ -121,6 +122,7 @@ pub struct Revocation {
 #[derive(Insertable, Debug)]
 #[table_name = "revocations"]
 pub struct NewRevocation<'a> {
+    pub hash: &'a str,
     pub revocation: &'a str,
     pub published: bool,
     pub usercert_id: i32,

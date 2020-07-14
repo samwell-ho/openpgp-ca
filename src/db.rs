@@ -304,7 +304,9 @@ impl Db {
 
             // Revocations
             for revocation in revocation_certs {
+                let hash = &Pgp::revocation_to_hash(revocation)?;
                 self.insert_revocation(NewRevocation {
+                    hash,
                     revocation,
                     usercert_id: c.id,
                     published: false,
@@ -395,18 +397,29 @@ impl Db {
         revocation: &str,
         cert: &Usercert,
     ) -> Result<Revocation> {
+        let hash = &Pgp::revocation_to_hash(revocation)?;
+
         self.insert_revocation(NewRevocation {
+            hash,
             revocation,
             usercert_id: cert.id,
             published: false,
         })
     }
 
-    pub fn get_revocation_by_id(&self, id: i32) -> Result<Option<Revocation>> {
+    pub fn get_revocation_by_hash(
+        &self,
+        hash: &str,
+    ) -> Result<Option<Revocation>> {
         let db: Vec<Revocation> = revocations::table
-            .filter(revocations::id.eq(id))
+            .filter(revocations::hash.eq(hash))
             .load::<Revocation>(&self.conn)
-            .context("Error loading Revocation by id")?;
+            .context("Error loading Revocation by hash")?;
+
+        assert!(
+            db.len() <= 1,
+            "unexpected duplicate hash in revocations table"
+        );
 
         if let Some(revocation) = db.get(0) {
             Ok(Some(revocation.clone()))

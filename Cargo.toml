@@ -34,6 +34,8 @@ chrono = "0.4"
 chbs = "0.0.8"
 publicsuffix = "1.5"
 
+sha2 = "0.9"
+
 futures = "0.1"
 tokio-core = "0.1"
 

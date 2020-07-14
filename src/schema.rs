@@ -41,6 +41,7 @@ table! {
 table! {
     revocations (id) {
         id -> Integer,
+        hash -> Text,
         revocation -> Text,
         published -> Bool,
         usercert_id -> Integer,

@@ -695,9 +695,12 @@ impl OpenpgpCa {
         self.db.get_revocations(usercert)
     }
 
-    /// Get a Revocation by revocation id
-    pub fn revocation_get_by_id(&self, id: i32) -> Result<models::Revocation> {
-        if let Some(rev) = self.db.get_revocation_by_id(id)? {
+    /// Get a Revocation by hash
+    pub fn revocation_get_by_hash(
+        &self,
+        hash: &str,
+    ) -> Result<models::Revocation> {
+        if let Some(rev) = self.db.get_revocation_by_hash(hash)? {
             Ok(rev)
         } else {
             Err(anyhow::anyhow!("no revocation found"))

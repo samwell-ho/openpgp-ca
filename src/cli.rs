@@ -157,7 +157,7 @@ pub enum UserCommand {
             long = "id",
             help = "Id of a revocation cert"
         )]
-        id: i32,
+        hash: String,
     },
     /// Show Revocation Keys (if available)
     ShowRevocations {
