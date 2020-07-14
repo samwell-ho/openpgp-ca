@@ -263,7 +263,10 @@ impl Pgp {
     }
 
     /// Generate a 64 bit sized hash of a revocation certificate.
-    /// There hashes are used as shorthand identifiers to refer to
+    /// The armored revocation certificate is normalized using sequoia
+    /// before hashing.
+    ///
+    /// These hashes are used as shorthand identifiers to refer to
     /// revocations from the CLI.
     pub fn revocation_to_hash(revoc: &str) -> Result<String> {
         let sig = Pgp::armored_to_signature(revoc)?;
@@ -275,10 +278,13 @@ impl Pgp {
         hasher.update(normalized.as_bytes());
         let hash64 = &hasher.finalize()[0..8];
 
-        let foo: Vec<String> =
-            hash64.iter().map(|d| format!("{:02X}", d)).collect();
+        let hex = hash64
+            .iter()
+            .map(|d| format!("{:02X}", d))
+            .collect::<Vec<_>>()
+            .concat();
 
-        Ok(foo.concat())
+        Ok(hex)
     }
 
     /// user tsigns CA key
