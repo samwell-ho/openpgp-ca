@@ -141,14 +141,24 @@ fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
         println!("No Users found");
     } else {
         for cert in usercerts {
-            println!("Revocations for Usercert {:?}", cert.name);
+            println!(
+                "Revocations for Usercert {:?}",
+                cert.name.clone().unwrap_or_else(|| "<no name>".to_string())
+            );
             let revoc = ca.revocations_get(&cert)?;
             for r in revoc {
-                println!(" revocation id {:?}", r.hash);
+                let (reason, time) = ca.revocation_details(&r)?;
+                let time = if let Some(time) = time {
+                    let datetime: DateTime<Utc> = time.into();
+                    format!("{}", datetime.format("%d/%m/%Y"))
+                } else {
+                    "".to_string()
+                };
+                println!(" - revocation id {}: {} ({})", r.hash, reason, time);
                 if r.published {
-                    println!(" this revocation has been PUBLISHED");
+                    println!("   this revocation has been APPLIED");
                 }
-                println!("{}", r.revocation);
+
                 println!();
             }
         }

@@ -58,6 +58,7 @@ use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
 
+use crate::models::Revocation;
 use anyhow::{Context, Result};
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
@@ -693,6 +694,23 @@ impl OpenpgpCa {
         usercert: &models::Usercert,
     ) -> Result<Vec<models::Revocation>> {
         self.db.get_revocations(usercert)
+    }
+
+    /// Get reason and creation time for a Revocation
+    pub fn revocation_details(
+        &self,
+        revocation: &Revocation,
+    ) -> Result<(String, Option<SystemTime>)> {
+        let rev = Pgp::armored_to_signature(&revocation.revocation)?;
+
+        let creation = rev.signature_creation_time();
+
+        if let Some((code, reason)) = rev.reason_for_revocation() {
+            let reason = String::from_utf8(reason.to_vec())?;
+            Ok((format!("{} ({})", code.to_string(), reason), creation))
+        } else {
+            Ok(("Revocation reason unknown".to_string(), creation))
+        }
     }
 
     /// Get a Revocation by hash
