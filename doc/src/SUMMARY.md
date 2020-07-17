@@ -10,4 +10,4 @@
 - [Publishing keys](keys-publish.md)
 - [Revoking keys](keys-revocation.md)
 - [Bridging OpenPGP CA instances](bridging.md)
-- [Running OpenPGP CA in Docker](docker.md)
+- [Usage in Docker](docker.md)
