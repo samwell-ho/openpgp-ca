@@ -934,6 +934,15 @@ impl OpenpgpCa {
         self.db.list_bridges()
     }
 
+    /// Get a specific Bridge
+    pub fn bridges_search(&self, email: &str) -> Result<models::Bridge> {
+        if let Some(bridge) = self.db.search_bridge(email)? {
+            Ok(bridge)
+        } else {
+            return Err(anyhow::anyhow!("bridge not found"));
+        }
+    }
+
     // --------- wkd
 
     /// Export all user keys (that have a userid in `domain`) and the CA key
@@ -1019,6 +1028,15 @@ impl OpenpgpCa {
     }
 
     // -------- helper functions
+
+    pub fn print_cert_info(armored: &str) -> Result<()> {
+        let c = Pgp::armored_to_cert(&armored)?;
+        for uid in c.userids() {
+            println!("User ID: {}", uid.userid());
+        }
+        println!("Fingerprint '{}'", c);
+        Ok(())
+    }
 
     /// Is any uid of this cert for an email address in "domain"?
     fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Result<bool> {

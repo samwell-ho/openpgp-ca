@@ -123,6 +123,7 @@ fn main() -> Result<()> {
             )?,
             BridgeCommand::Revoke { email } => ca.bridge_revoke(&email)?,
             BridgeCommand::List => print_bridges(&ca)?,
+            BridgeCommand::Export { email } => export_bridges(&ca, email)?,
         },
         Command::Wkd { cmd } => match cmd {
             WkdCommand::Export { path } => {
@@ -130,6 +131,10 @@ fn main() -> Result<()> {
                 ca.wkd_export(&db_ca.domainname, &path)?;
             }
         },
+        Command::InspectKey { key_file } => {
+            let key = std::fs::read_to_string(key_file)?;
+            OpenpgpCa::print_cert_info(&key)?;
+        }
     }
 
     Ok(())
@@ -269,8 +274,21 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
 
 fn print_bridges(ca: &OpenpgpCa) -> Result<()> {
     ca.bridges_get()?.iter().for_each(|bridge| {
-        println!("Bridge '{}':\n\n{}", bridge.email, bridge.pub_key)
+        println!("Bridge to '{}', (scope: '{}'", bridge.email, bridge.scope)
     });
+    Ok(())
+}
+
+fn export_bridges(ca: &OpenpgpCa, email: Option<String>) -> Result<()> {
+    let bridges = if let Some(email) = email {
+        vec![ca.bridges_search(&email)?]
+    } else {
+        ca.bridges_get()?
+    };
+
+    bridges
+        .iter()
+        .for_each(|bridge| println!("{}", bridge.pub_key));
     Ok(())
 }
 

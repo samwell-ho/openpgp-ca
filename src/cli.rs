@@ -57,6 +57,11 @@ pub enum Command {
         #[structopt(subcommand)]
         cmd: WkdCommand,
     },
+    /// Inspect a key
+    InspectKey {
+        #[structopt(help = "Filename for public key")]
+        key_file: PathBuf,
+    },
     //    /// Manage Directories
     //    Directory {
     //        #[structopt(subcommand)]
@@ -185,6 +190,16 @@ pub enum UserCheckSubcommand {
 pub enum BridgeCommand {
     /// List Bridges
     List,
+    /// Export Bridge Public Key (bulk, if no domain name is given)
+    Export {
+        #[structopt(
+            short = "e",
+            long = "email",
+            help = "Remote CA Email address"
+        )]
+        email: Option<String>,
+    },
+
     /// Add New Bridge (sign existing remote CA Public Key)
     New {
         #[structopt(
