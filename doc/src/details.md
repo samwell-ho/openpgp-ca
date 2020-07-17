@@ -14,8 +14,6 @@ it describes some relevant points of OpenPGP CAs implementation.
 
 OpenPGP provides a powerful mechanism to authenticate keys: the
 ["web of trust"](https://en.wikipedia.org/wiki/Web_of_trust).
-It's so powerful, in fact, that the authentication system used by TLS
-can be fully expressed using OpenPGP mechanisms. {Does the comparison with TLS add useful information here? Seems like a distraction to me}
 
 The web of trust is built on certifications. A certification is a
 machine-readable vouch, which asserts that an
@@ -48,7 +46,7 @@ that he considers Carol to be a trusted introducer, i.e., a certificate
 authority (CA).  In OpenPGP speak, this is done using a type of
 certification called a
 ["trust signature"](https://tools.ietf.org/html/rfc4880#section-5.2.3.13).
-This is also sometimes just referred to as a *tsig*.
+This term is sometimes abbreviated as *tsig*.
 
 Trust signatures provide nuance.  For instance, it is possible to [scope
 the trust using regular expressions](https://tools.ietf.org/html/rfc4880#section-5.2.3.14) over the User ID.  For instance,
@@ -60,9 +58,8 @@ organization, but not other people.
 Our approach to authentication is built using the existing and well-established
 OpenPGP "web of trust" mechanisms.
 Because these mechanisms are part of the OpenPGP
-specification, all OpenPGP implementations understand them. Thus deploying
-OpenPGP CA doesn't require modifying existing OpenPGP implementations (such
-as GnuPG). {Thus OpenPGP CA works out of the box with existing OpenPGP implementations, such as GnuPG.}
+specification, all OpenPGP implementations understand them. Thus OpenPGP CA
+works out of the box with existing OpenPGP implementations, such as GnuPG.
 
 ## Authentication within an organization
 
