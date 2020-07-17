@@ -15,7 +15,12 @@ distribution of the revocation certificate.
 There are different reasons why we might want to revoke a user's OpenPGP
 key. For example, the user's key might have been compromised, or the user has
 left our organization. Revocation certificates contain information about
-the reason why the affected OpenPGP key has been revoked.
+the reason why the affected key has been revoked. OpenPGP
+implementations can use this information to determine how to treat
+existing artifacts.  For instance, if a key has been compromised, the
+attacker could create backdated signatures.  Thus, all signatures should
+be considered suspect.  But, if a user simple switched to a new key, old
+signatures may still be considered valid.
 
 # Managing Revocations
 
