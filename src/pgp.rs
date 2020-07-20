@@ -26,6 +26,7 @@ use openpgp::packet::{signature, Signature, UserID};
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
+use openpgp::serialize::SerializeInto;
 use openpgp::types::{
     KeyFlags, ReasonForRevocation, RevocationStatus, SignatureType,
 };
@@ -36,7 +37,6 @@ use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
-use sequoia_openpgp::serialize::MarshalInto;
 use sha2::Digest;
 
 pub struct Pgp {}
@@ -272,10 +272,13 @@ impl Pgp {
     pub fn revocation_to_hash(revoc: &str) -> Result<String> {
         let sig = Pgp::armored_to_signature(revoc)?;
 
+        let p: Packet = sig.into();
+        let bits = p.to_vec()?;
+
         use sha2::Sha256;
 
         let mut hasher = Sha256::new();
-        hasher.update(sig.to_vec()?);
+        hasher.update(bits);
         let hash64 = &hasher.finalize()[0..8];
 
         let hex = hash64
