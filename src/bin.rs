@@ -263,6 +263,10 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
 
         println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
         println!(" user cert has tsigned CA: {}", tsig_on_ca);
+
+        let revs = ca.revocations_get(&usercert)?;
+        println!(" {} revocation certificate(s) available", revs.len());
+
         if OpenpgpCa::usercert_possibly_revoked(&usercert)? {
             println!(" this certificate has (possibly) been REVOKED");
         }

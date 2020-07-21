@@ -17,6 +17,7 @@ fingerprint F27CB2E92C3E01DA1C656FB21758251C75E25DDD
  no expiration date is set for this certificate
  user cert (or subkey) signed by CA: true
  user cert has tsigned CA: true
+ 1 revocation certificate(s) available
 
 usercert for 'Bob Baker'
 fingerprint 0EE935F56AC4381E007370E956A10EB1ABED2321
@@ -24,6 +25,7 @@ fingerprint 0EE935F56AC4381E007370E956A10EB1ABED2321
  expires: 12/08/2020
  user cert (or subkey) signed by CA: true
  user cert has tsigned CA: true
+ 1 revocation certificate(s) available
 ```
 
 ### Exporting keys

@@ -275,6 +275,7 @@ fingerprint A0A61C7554B3316009C8D3C74FBA1B7EF003F9FA
  expires: 02/07/2022
  user cert (or subkey) signed by CA: true
  user cert has tsigned CA: true
+ 3 revocation certificate(s) available
 ```
 
 This should show that Alice's key has been signed by the CA and that Alice
