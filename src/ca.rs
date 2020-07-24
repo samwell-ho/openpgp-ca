@@ -939,7 +939,7 @@ impl OpenpgpCa {
         if let Some(bridge) = self.db.search_bridge(email)? {
             Ok(bridge)
         } else {
-            return Err(anyhow::anyhow!("bridge not found"));
+            Err(anyhow::anyhow!("bridge not found"))
         }
     }
 
