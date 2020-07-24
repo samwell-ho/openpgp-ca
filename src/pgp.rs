@@ -263,12 +263,10 @@ impl Pgp {
         }
     }
 
-    /// Generate a 64 bit sized hash of a revocation certificate.
-    /// The armored revocation certificate is normalized using sequoia
-    /// before hashing.
+    /// Generate a 64 bit sized hash of a revocation certificate
+    /// (represented as 16 character hex strings).
     ///
-    /// These hashes are used as shorthand identifiers to refer to
-    /// revocations from the CLI.
+    /// These hashes can be used to refer to specific revocations.
     pub fn revocation_to_hash(revoc: &str) -> Result<String> {
         let sig = Pgp::armored_to_signature(revoc)?;
 
