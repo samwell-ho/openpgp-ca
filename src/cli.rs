@@ -187,11 +187,7 @@ pub enum BridgeCommand {
     List,
     /// Export Bridge Public Key (bulk, if no domain name is given)
     Export {
-        #[structopt(
-            short = "e",
-            long = "email",
-            help = "Remote CA Email address"
-        )]
+        #[structopt(help = "Remote CA Email address")]
         email: Option<String>,
     },
 

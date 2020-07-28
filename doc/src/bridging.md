@@ -164,7 +164,7 @@ includes the bridging trust signature by us.
 For the purpose of this tutorial, we export our newly signed version of the
 public key of OpenPGP CA at `beta.org` into a file:
 
-`$ openpgp-ca -d alpha.oca bridge export --email openpgp-ca@beta.org > beta.signed`
+`$ openpgp-ca -d alpha.oca bridge export openpgp-ca@beta.org > beta.signed`
 
 To automatically receive updates such as this additional signature on the
 `beta.org` OpenPGP CA key, users should ideally have a mechanism
@@ -216,7 +216,7 @@ B40B 4A74 45A4 2522 CE33  90C0 EF2C 4DD0 AD96 4FAF
 As above, we export the public key of the CA at `alpha.org` that now includes
 the certification we just created:
 
-`$ openpgp-ca -d beta.oca bridge export --email openpgp-ca@alpha.org > alpha.signed`
+`$ openpgp-ca -d beta.oca bridge export openpgp-ca@alpha.org > alpha.signed`
 
 As above, this key - including our newly created certification - now needs
 to be published, e.g. on a WKD server at `alpha.org` - or using Keylist.
