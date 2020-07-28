@@ -115,11 +115,13 @@ fn main() -> Result<()> {
                 email,
                 scope,
                 remote_key_file,
+                commit,
             } => new_bridge(
                 &ca,
                 email.as_deref(),
                 &remote_key_file,
                 scope.as_deref(),
+                commit,
             )?,
             BridgeCommand::Revoke { email } => ca.bridge_revoke(&email)?,
             BridgeCommand::List => print_bridges(&ca)?,
@@ -131,10 +133,6 @@ fn main() -> Result<()> {
                 ca.wkd_export(&db_ca.domainname, &path)?;
             }
         },
-        Command::InspectKey { key_file } => {
-            let key = std::fs::read_to_string(key_file)?;
-            OpenpgpCa::print_cert_info(&key)?;
-        }
     }
 
     Ok(())
@@ -301,17 +299,33 @@ fn new_bridge(
     email: Option<&str>,
     key_file: &PathBuf,
     scope: Option<&str>,
+    commit: bool,
 ) -> Result<()> {
-    let (bridge, fingerprint) = ca.bridge_new(key_file, email, scope)?;
+    if commit {
+        let (bridge, fingerprint) = ca.bridge_new(key_file, email, scope)?;
 
-    println!("signed certificate for {} as bridge\n", bridge.email);
-    println!("CAUTION:");
-    println!("The fingerprint of the remote CA key is");
-    println!("{}\n", fingerprint);
-    println!(
-        "Please verify that this key is controlled by \
-         {} before disseminating the signed remote certificate",
-        bridge.email
-    );
+        println!("signed certificate for {} as bridge\n", bridge.email);
+        println!("The fingerprint of the remote CA key is");
+        println!("{}\n", fingerprint);
+    } else {
+        println!("Bridge creation DRY RUN.");
+        println!();
+
+        println!(
+            "Please verify that this is the correct fingerprint for the \
+            remote CA admin before continuing:"
+        );
+        println!();
+
+        let key = std::fs::read_to_string(key_file)?;
+        OpenpgpCa::print_cert_info(&key)?;
+
+        println!();
+        println!(
+            "When you've confirmed that the remote key is correct, repeat \
+            this command with the additional parameter '--commit' \
+            to commit the OpenPGP CA bridge to the database."
+        );
+    }
     Ok(())
 }

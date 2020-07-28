@@ -57,11 +57,6 @@ pub enum Command {
         #[structopt(subcommand)]
         cmd: WkdCommand,
     },
-    /// Inspect a key
-    InspectKey {
-        #[structopt(help = "Filename for public key")]
-        key_file: PathBuf,
-    },
     //    /// Manage Directories
     //    Directory {
     //        #[structopt(subcommand)]
@@ -210,11 +205,13 @@ pub enum BridgeCommand {
         email: Option<String>,
 
         #[structopt(
-            name = "filename",
-            short = "f",
-            long = "remote-key-file",
-            help = "File that contains the remote CA's Public Key"
+            short = "c",
+            long = "commit",
+            help = "Commit Bridge certification"
         )]
+        commit: bool,
+
+        #[structopt(help = "File that contains the remote CA's Public Key")]
         remote_key_file: PathBuf,
 
         #[structopt(
