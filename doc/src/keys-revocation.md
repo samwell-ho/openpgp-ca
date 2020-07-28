@@ -56,7 +56,7 @@ The results show an ID for each individual revocation certificate.
 When we've determined which revocation certificate we want to apply, we can
 apply that revocation to the user's key:
 
-`$ openpgp-ca -d example.oca user apply-revocation --id 90E28DFB6D501AB7`
+`$ openpgp-ca -d example.oca user apply-revocation 90E28DFB6D501AB7`
 
 Afterwards, "show-revocations" will display the additional note: "this
 revocation has been APPLIED", and the user's public key contains the

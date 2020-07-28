@@ -23,8 +23,8 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "openpgp-ca",
 author = "Heiko Schäfer <heiko@schaefer.name>",
-global_settings(&[AppSettings::VersionlessSubcommands,
-AppSettings::DisableHelpSubcommand,AppSettings::DeriveDisplayOrder]),
+global_settings(& [AppSettings::VersionlessSubcommands,
+AppSettings::DisableHelpSubcommand, AppSettings::DeriveDisplayOrder]),
 about = "OpenPGP CA is a tool for managing OpenPGP keys within organizations."
 )]
 pub struct Cli {
@@ -73,18 +73,18 @@ pub enum CaCommand {
         #[structopt(help = "CA domain name")]
         domain: String,
 
-        #[structopt(short = "n", long = "name", help = "User Name")]
+        #[structopt(
+            short = "n",
+            long = "name",
+            help = "Descriptive User Name"
+        )]
         name: Option<String>,
     },
     /// Export CA public key
     Export,
     /// Import trust signature for CA Key
     ImportTsig {
-        #[structopt(
-            short = "f",
-            long = "file",
-            help = "File that contains the tsigned CA Key"
-        )]
+        #[structopt(help = "File that contains the tsigned CA Key")]
         key_file: PathBuf,
     },
     /// Show CA
@@ -103,17 +103,17 @@ pub enum UserCommand {
         )]
         email: Vec<String>,
 
-        #[structopt(short = "n", long = "name", help = "User Name")]
+        #[structopt(
+            short = "n",
+            long = "name",
+            help = "Descriptive User Name"
+        )]
         name: Option<String>,
     },
 
     /// Add Revocation Certificate
     AddRevocation {
-        #[structopt(
-            short = "r",
-            long = "revocation-file",
-            help = "File that contains a revocation cert"
-        )]
+        #[structopt(help = "File that contains a revocation cert")]
         revocation_file: PathBuf,
     },
     /// Bulk checks on Users
@@ -133,13 +133,17 @@ pub enum UserCommand {
         )]
         key_file: PathBuf,
 
-        #[structopt(short = "n", long = "name", help = "User Name")]
+        #[structopt(
+            short = "n",
+            long = "name",
+            help = "Descriptive User Name"
+        )]
         name: Option<String>,
 
         #[structopt(
             short = "r",
             long = "revocation-file",
-            help = "File that contains the User's revocation cert"
+            help = "File that contains a revocation cert for this user"
         )]
         revocation_file: Vec<PathBuf>,
     },
@@ -152,11 +156,7 @@ pub enum UserCommand {
     List,
     /// Apply a Revocation Certificate
     ApplyRevocation {
-        #[structopt(
-            short = "i",
-            long = "id",
-            help = "Id of a revocation cert"
-        )]
+        #[structopt(help = "Id of a revocation cert")]
         hash: String,
     },
     /// Show Revocation Keys (if available)

@@ -240,7 +240,7 @@ database:
 
 `$ openpgp-ca -d example.oca user import --name "Alice Adams" --email alice@example.org --key-file alice.pub --revocation-file alice-revocation-compromised.asc --revocation-file alice-revocation-superseded.asc --revocation-file alice-revocation-nolongerused.asc`
 
-`$ openpgp-ca -d example.oca ca import-tsig --file ca-tsigned.pub`
+`$ openpgp-ca -d example.oca ca import-tsig ca-tsigned.pub`
 
 ### Export Alice's public key (including the signature by the CA)
 
