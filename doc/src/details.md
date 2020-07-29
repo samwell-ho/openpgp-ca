@@ -159,7 +159,7 @@ message.
 The OpenPGP CA admin makes sure that certifications exist between keys in the
 organization, as shown here:
 
-![Image](certifications.jpg "Certifications in OpenPGP CA")
+![Image](oca-cert-structure.png "Certifications in OpenPGP CA")
 
 There are two different ways in which user keys may be created in an organization that uses OpenPGP CA:
 
