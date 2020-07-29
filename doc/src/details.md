@@ -85,7 +85,7 @@ n other words, there should be two certifications between each user's key and th
   trust scertifications that the CA key makes on other keys: Alice trusts
   the CA to authenticate third parties on her behalf.
 
-![Image](o-ca-certs1.jpg "Certifications between Alice, Bob and the CA Key")
+![Image](oca-certs.png "Certifications between Alice, Bob and the CA Key")
 
 These mutual certifications between each user and the CA mean that all
 members of the organization have a verified path to each other.  And this
@@ -96,7 +96,7 @@ So, if Alice wants to authenticate Bob, her OpenPGP implementation can use
 two certifications to do the authentication: the trust signature she made on the CA's key, and
 the certification that the CA made on Bob's key.
 
-![Image](o-ca-certs2.jpg "Alice authenticates Bob using OpenPGP CA certifications")
+![Image](oca-auth.png "Alice authenticates Bob using OpenPGP CA certifications")
 
 
 ## Authentication between organizations: Bridges
@@ -121,8 +121,7 @@ user ids would give the remote CA admin much too much power.
 Now, members of each organization can
 authenticate members of the other organization.
 
-![Image](bridge1.jpg "Bridge between two organizations")
-{^ add domainnames to diagram}
+![Image](bridge.png "Bridge between two organizations")
 
 
 ## Gateways into organizations
@@ -165,7 +164,7 @@ organization, as shown here:
 There are two different ways in which user keys may be created in an organization that uses OpenPGP CA:
 
 1. Key creation for users can be [performed by the OpenPGP CA
-admin](keys-create.md).  In this case,  because the OpenPGP CA
+admin](keys-create.md).  In this case, because OpenPGP CA
 creates the user's key, it can also generate all of the required
 certifications on its own.  OpenPGP CA never saves the private key material
 to disk.  But, this method is still more risky than the alternative.

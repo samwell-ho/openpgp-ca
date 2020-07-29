@@ -24,7 +24,8 @@ instance, Alice Adams' email address is `alice@example.org` and this is a copy o
 her OpenPGP public key.  This is the authentication aspect.  
 The tooling also facilitates key discovery, by making it easy for the admin to
 publish keys in places that OpenPGP software normally looks for them (e.g., key
-servers and [WKD](https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-09)s).
+servers {?} and [WKD](https://tools.ietf.org/html/draft-koch-openpgp-webkey
+-service-09)s).
 And, it makes it easier to keep those directories up to date.
 Finally, OpenPGP CA simplifies managing keys by storing revocation certificates,
 and making it easy to publish one, if and when that is necessary.
@@ -51,14 +52,14 @@ neglected based on the perception that
 ## Authentication
 
 The overarching goal of OpenPGP CA is that users can be certain
-they are using the correct OpenPGP keys for most of their communication partners.
+they are using the correct OpenPGP keys for their communication partners.
 This is called
 [authentication](https://en.wikipedia.org/wiki/Authentication):
 ascertaining that a key is indeed the correct key for the other party.  (A closely
 related goal is key discovery, which OpenPGP CA also simplifies.)
 
 Imagine that we're sending an email to Alice. When authentication works, our
-email client will show up a green icon, or something similar when we have the
+email client will show a green icon, or something similar when we have the
 right key for Alice.
 
 {+ screenshot(s) of thunderbird - with/without authentication}
@@ -76,7 +77,7 @@ to confirm that the fingerprint we have is the correct one. Or, the person
 might have given us a business card that includes their fingerprint.
 These approaches are time consuming, and often not possible (what if you never
 meet the person in real life?).  OpenPGP CA simplifies authentication by
-non-exclusively delegating it to a trusted person.
+non-exclusively delegating that task to a trusted party.
 
 ### The importance of authentication
 
@@ -90,7 +91,8 @@ of attacks, including:
 - send us a seemingly correctly signed email (which might lead to false
 confidence in the origin of a piece of email - such attacks are called [phishing](https://en.wikipedia.org/wiki/Phishing) or [spear-phishing](https://en.wikipedia.org/wiki/Phishing#Spear_phishing)), or
 
-- intercept the communication that we intended to secure using a
+- intercepting our attempts to securely communicate with Alice through an
+encrypted channel
 (["man-in-the-middle attack"](https://en.wikipedia.org/wiki/Man-in-the-middle_attack)).
 
 
@@ -99,7 +101,7 @@ confidence in the origin of a piece of email - such attacks are called [phishing
 People often mainly communicate with others in the same
 organization - and with people in one of a few affiliated organizations. 
 
-![Image](emails.jpg "Patterns of email between users of two organizations")
+![Image](emails.png "Patterns of email between users of two organizations")
 
 With OpenPGP CA, when communication follows this type of pattern, users'
 OpenPGP software will be able to authenticate their most common
