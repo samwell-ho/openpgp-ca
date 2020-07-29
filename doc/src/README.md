@@ -101,13 +101,17 @@ encrypted channel
 People often mainly communicate with others in the same
 organization - and with people in one of a few affiliated organizations. 
 
+For example, imagine two organizations `alpha.org` and `beta.org`. Each
+organization has a number users, some of whom exchange lots of email, others
+only infrequently. Some users might have email contacts outside of these
+two organizations.
+
 ![Image](emails.png "Patterns of email between users of two organizations")
 
 With OpenPGP CA, when communication follows this type of pattern, users'
 OpenPGP software will be able to authenticate their most common
 communication partners without any extra effort from the user.
-
-The consequence is that members of the organization automatically have
+Members of the organization automatically have
 authenticated paths to the people they communicate with most: people
 within their organization, and their usual external collaborators.
 
@@ -125,21 +129,23 @@ informal group, a commercial organization, or any other form - such as:
 - Informal groups of activists
 - A company or a department at a company
 
-OpenPGP CA's approach is based on the observation that in organizations, users already trust their administrators 
-with access to their data (including email) and the integrity of their systems.  So,
-asking them to also maintain a directory of users and keys does require placing additional trust in them.
+OpenPGP CA's approach is based on the observation that in organizations,
+users already trust their administrators with access to their data
+(including email) and the integrity of their systems.  So, asking them to
+also maintain a directory of users and keys does not require placing
+additional trust in them.
 
 
 ## Users need to learn fewer skills
 
 Implementing any new security practice requires educating users about its operational
-aspects.  The difficulty is making sure users are not overwhelmed
+aspects.  The difficulty is making sure users are not overwhelmed,
 as that undermines the security goals.
 
 Traditionally, users of OpenPGP have had to learn many technical details.
 These details are necessary to achieve the security goals.  OpenPGP CA
 doesn't remove these details, but shifts them to a new actor, the OpenPGP CA admin.
-This greatly simplifies the burden placed on normal users
+This greatly lessens the burden placed on normal users,
 who are more interested in getting their job done than understanding the technical
 minutiae.
 
@@ -149,7 +155,8 @@ get significant value from OpenPGP:
 - encrypt and sign email, as well as
 - how to recognize encrypted and signed email.
 
-OpenPGP CA alleviates unsophisticated users from having to learn many low-level tasks, such as:
+OpenPGP CA alleviates non-technical users from having to learn many low-level
+tasks, such as:
 
 - doing key discovery,
 - checking that a key belong to the intended party (authentication and certification), and
@@ -158,10 +165,13 @@ OpenPGP CA alleviates unsophisticated users from having to learn many low-level 
 This allows users to focus on the indispensable high-level concerns
 and reduces the risk of user errors.
 
-This setup has several advantages for users. By delegating authentication to an in-house CA, the cognitive burden placed on users is significantly reduced: users don't have to compare
-fingerprints or even understand keys or certifications to effectively use OpenPGP.  And, because OpenPGP CA
-uses OpenPGP's existing mechanisms, users with special needs can still use
-other solutions, e.g., directly verifying someone's key in the customary manner.
+This setup has several advantages for users. By delegating authentication
+to an in-house CA, the cognitive burden placed on users is significantly
+reduced: users don't have to compare fingerprints or even understand keys
+or certifications to effectively use OpenPGP.
+At the same time, because OpenPGP CA uses OpenPGP's existing mechanisms,
+users with special needs can still use other solutions, e.g., directly
+verifying someone's key in the customary manner.
 
 
 ## The OpenPGP CA admin role
@@ -232,20 +242,24 @@ may be better than creating a false sense of security.
 ## Comparing the OpenPGP CA admin role with CAs for TLS server certificates
 
 The concept of a certificate authority (CA) is well known in the context of
-[TLS server certificates](https://en.wikipedia.org/wiki/Public_key_certificate#TLS/SSL_server_certificate).
+[TLS server certificates](https://en.wikipedia.org/wiki/Public_key_certificate#TLS/SSL_server_certificate),
+which are used for authenticated and encrypted communication on the web.
 
 TLS certificates claim an identity (the domain name of a website). This
 identity is verified and cryptographically vouched for by a CA. CAs
 for TLS server certificates act as a group of globally trusted
 verifiers of identity (often, but not always, for-profit).
-For organizations that use TLS certificates, these CAs are external actors.
+To organizations that use TLS certificates, these CAs are external actors.
 
 While TLS server certificates of course bring massive benefits for
 secure communication on the web, there are also problems:  
 The interests of CAs in the TLS space are not aligned with the interests
 of their users.
 - For-profit CAs are driven by profit, not by the needs of users.
-- Law enforcement might interact with these CAs in ways that are contrary (and opaque) to the users of the certificates and detrimental to their goals.  CA's agree to help, because they don't want to cause trouble with law enforcement, which would 
+- Law enforcement might interact with these CAs in ways that are contrary
+  (and opaque) to the users of the certificates and detrimental to their
+  goals.  CAs agree to help, because they don't want to cause trouble
+  with law enforcement.
 
 These risks are real.  TLS CAs have been known to be [sloppy](https://en.wikipedia.org/wiki/NortonLifeLock#Google_and_Symantec_clash_on_website_security_checks) and [potentially malicious](https://en.wikipedia.org/wiki/China_Internet_Network_Information_Center#Fraudulent_certificates).
 And, the authentication that the CAs perform is often extremely weak.
@@ -278,18 +292,19 @@ Affiliated organizations that use OpenPGP CA can easily set up a
 so-called bridge between their respective CAs.
 Creating a bridge creates authenticated paths between all users in the two
 organizations - users in each organizations can authenticate
-keys from users in the other without any additional effort.
+keys of users in the other without any additional effort.
 
 This makes sense when the CA admins believe that the other organization's
 CA admin does a good job authenticating their user's keys in OpenPGP CA.
 
 As usual, we want to exploit existing trust boundaries.  When an organization
 creates a bridge to another organization, the latter organization's CA admin
-is only trusted to authentication users in their own organization.  This
+is only trusted to authenticate users in their own organization.  This
 is done by scoping the trust: when the CA admin from organization
 A authentictes the CA admin from organization B, they indicate that B should
 only be trusted to authenticate users in the same organization.  This
-is done using existing OpenPGP mechanisms.  Specitically, by matching on the email's domain name.
+is done using existing OpenPGP mechanisms.  Specifically, by matching on
+the email's domain name.
 
 ## No key escrow
 
@@ -303,7 +318,8 @@ is never stored in the OpenPGP CA database.
 
 ## Complements existing OpenPGP usage
 
-Because OpenPGP CA works within the existing OpenPGP framework, i.e., it doesn't require any modifying to existing OpenPGP software,
+Because OpenPGP CA works within the existing OpenPGP framework, i.e., it
+doesn't require any modification of existing OpenPGP software,
 users do not need any new software to take advantage of OpenPGP CA.
 Concretely, they can continue to use existing email clients and encryption
 plugins. Further, OpenPGP CA can co-exist with other authentication
