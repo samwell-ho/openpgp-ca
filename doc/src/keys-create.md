@@ -61,12 +61,13 @@ feQnksqX3SRInBSvbCYBAMV3XC2AJX9mXuG4GWNw7z+FsfOI/knVggHTADuMerkK
 password for this key: 'Unshackle empower mangy Habitual buddhism'
 ```
 
-It is up to the admin to transfer the key to the user.  This can be
-done by:
+It is up to the admin to transfer the key to the user.  This can, for
+example, be done by email or using a USB drive.
 
-  - by email with a long diceware password
-  - saved to an encrypted USB drive
-  - ...
+It doesn't hurt to keep the key encrypted while in transit, but it is not
+essential, as the key is protected with a strong password. Safely getting
+this password to the user, however, is crucial. The admin needs to devise a
+secure method to communicate the password to the user.
 
 The user then needs to import it into their OpenPGP keystore.  In the
 following examples, we assume that the password-protected private key has been
@@ -74,7 +75,8 @@ transferred as a file called `alice.priv`.
 
 ### Exporting the OpenPGP CA public key
 
-Alice also needs a copy of CA public key.  It can be exported as follows:
+Alice also needs a copy of the CA's public key.  It can be exported as
+follows:
 
 `$ openpgp-ca -d example.oca ca export > ca.pub` 
 
@@ -92,7 +94,7 @@ the CA's public key.
 
 ### Setting up a GnuPG test environment
 
-For testing purposes, you'll want to create a separate test environment.
+For testing purposes, we create a separate test environment.
 Using GnuPG, this can be done as follows:
 
 ```
@@ -142,8 +144,8 @@ To import the CA's public key, run the following:
 
 `$ gpg --import ca.pub`
 
-Because Alice tsigned the CA's key, the CA's key should be fully trusted.  You can
-confirm this by running:
+Because Alice tsigned the CA's key, it should be shown as fully trusted.
+You can confirm this by running:
 
 ```
 $ gpg -k openpgp-ca@example.org

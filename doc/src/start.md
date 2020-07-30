@@ -23,6 +23,7 @@ With all of the above in place, we can build the OpenPGP CA binary by
 running the following command in the `openpgp-ca` source folder, which the `git clone` command created:
  
 `$ cd openpgp-ca`
+
 `$ cargo build --release`
  
 To make sure everything is working right, you should also run the test suite.
@@ -32,7 +33,8 @@ need to have GnuPG installed to run the integration tests.
 
 `$ cargo test`
 
-Assuming the complication suceeded, the resulting binary will be called `target/release/openpgp-ca`.  
+Assuming the compilation succeeded, the resulting binary will be called
+`target/release/openpgp-ca`.  
 
 You can copy (or symlink) this binary to a directory that is in your
 `$PATH`. If you do that, then you should be able to use OpenPGP CA as follows:
@@ -43,11 +45,14 @@ You can copy (or symlink) this binary to a directory that is in your
 # Database
 
 OpenPGP CA uses an SQLite database to keep track of its state.
-This database is the only file that OpenPGP CA modifies, and the only file
-that you need to backup to backup your CA.
+This database is stored in a single file in the filesystem. This file
+is the only element of the filesystem that OpenPGP CA  modifies - and it is
+the only file that you need to backup to have a copy of the full state of your
+OpenPGP CA instance.
 
-You need to configure where this file is stored in the filesystem (there is
-no default location). There are two ways to configure the database file:
+To use OpenPGP CA, you need to specify where the database file is stored
+(there is no default location). There are two methods to configure the
+database file:
 
 1. You can set the `OPENPGP_CA_DB` environment variable.
 2. Alternatively, the parameter `-d` sets the database file explicitly (this
@@ -63,15 +68,14 @@ implicitly.
 If you operate multiple instances of OpenPGP CA, you can easily use
 separate SQLite files: you just need one file per instance. You can then switch between
 instances by setting the `OPENPGP_CA_DB` environment variable to
-point to the correct database file for each instance or you can use the
+point to the correct database file for each instance, or you can use the
 explicit `-d` parameter.
 
 ## Offline instances, encryption
 
 The OpenPGP CA database contains sensitive data: in particular, it
 contains information about the users, it can contain revocation
-certificates - and, most importantly, the private OpenPGP key of the
-OpenPGP CA admin.
+certificates - and, most importantly, the private key of OpenPGP CA.
 
 Because of this, the database file(s) needs to be protected. Depending on the
 needs of your organization, this might mean storing the OpenPGP CA database

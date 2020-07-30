@@ -13,8 +13,11 @@ certify keys to perform man-in-the-middle attacks on users.
 If this scenario is an unacceptable risk, OpenPGP CA can be
 run on an airgapped ("offline") system.
 
-- is the CA key password protected?
-- or the DB?
+The OpenPGP CA database itself is not encrypted or otherwise protected, and
+the CA key is not currently password protected. This means that the
+database file needs to be protected appropriately (e.g. stored on
+removable encrypted storage).
+
 
 ## Should my organization use the centralized or decentralized workflows?
   
@@ -25,12 +28,11 @@ This means that if the CA admin machine is compromised, an attacker may get
 access to new users' private key material.
 
 This workflow also opens the possibility that law enforcement (or other
-actors) could coerce an admin to disclose private key material. 
+actors) could coerce the CA admin to disclose private key material. 
 
 If a third party has access to the private key material of a user, they can
-messages that are encrypted to the user, as well as forge
+read messages that are encrypted to the user, as well as forge
 signatures and certifications. 
-
 
 The decentralized workflow avoids these pitfalls, but makes adding new users
 more cumbersome: not only the key, but also the certifications and the
