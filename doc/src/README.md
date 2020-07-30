@@ -102,9 +102,9 @@ People often mainly communicate with others in the same
 organization - and with people in one of a few affiliated organizations. 
 
 For example, imagine two organizations `alpha.org` and `beta.org`. Each
-organization has a number users, some of whom exchange lots of email, others
-only infrequently. Some users might have email contacts outside of these
-two organizations.
+organization has a number of users, some of whom exchange lots of email,
+others only infrequently. Some users might in addition have regular email
+contacts outside of the two organizations.
 
 ![Image](emails.png "Patterns of email between users of two organizations")
 

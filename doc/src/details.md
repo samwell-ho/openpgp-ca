@@ -1,18 +1,18 @@
 This chapter describes how OpenPGP CA works at a technical level.
-First, it describes the OpenPGP data structures that it uses.  Then
-it describes some relevant points of OpenPGP CAs implementation.
+First, we describe the OpenPGP data structures that it uses.  Then
+we describe some relevant points of OpenPGP CAs implementation.
 
 # What is OpenPGP CA
 
 - OpenPGP CA is a CLI tool for use by the admin
   - implemented as a library (reusable for other frontends)
 - written in Rust
-- the backend for persistent data is a database (SQLite)
 - OpenPGP CA uses the [Sequoia](https://sequoia-pgp.org/) OpenPGP implementation
+- All state is persisted in a single file (using the SQLite database)
 
 # How authentication works in the OpenPGP web of trust
 
-OpenPGP provides a powerful mechanism to authenticate keys: the
+The OpenPGP standard provides a powerful mechanism to authenticate keys: the
 ["web of trust"](https://en.wikipedia.org/wiki/Web_of_trust).
 
 The web of trust is built on certifications. A certification is a
@@ -45,10 +45,10 @@ indicate that he not only believes that Carol controls key `0xCCCC`, but
 that he considers Carol to be a trusted introducer, i.e., a certificate
 authority (CA).  In OpenPGP speak, this is done using a type of
 certification called a
-["trust signature"](https://tools.ietf.org/html/rfc4880#section-5.2.3.13).
-This term is sometimes abbreviated as *tsig*.
+["trust signature"](https://tools.ietf.org/html/rfc4880#section-5.2.3.13)
+(this term is sometimes abbreviated as *tsig*).
 
-Trust signatures provide nuance.  For instance, it is possible to [scope
+Trust signatures provide nuance.  It is possible to [scope
 the trust using regular expressions](https://tools.ietf.org/html/rfc4880#section-5.2.3.14) over the User ID.  For instance,
 Carol may trust Dave from the NSA to certify users within his own
 organization, but not other people.
@@ -63,16 +63,18 @@ works out of the box with existing OpenPGP implementations, such as GnuPG.
 
 ## Authentication within an organization
 
-In OpenPGP CA, the CA key certifies the keys of all of the users in the
+With OpenPGP CA, the CA key certifies the keys of all of the users in the
 organization using normal OpenPGP certifications.  To take advantage of this,
-users in the organization need to set the admin's key to be a trusted introducer.
+users in the organization need to set the CA's key to be a trusted introducer.
 There are two main ways to do this.  In GnuPG, for instance, the ownertrust of
 the CA key can be set to 'Fully'.  Alternatively, the user can sign the CA's
-key.  The latter mechanism is the prefer mechanism, as if someone outside
+key.  The latter mechanism is the preferred mechanism (as if someone outside
 the organization sets someone inside the organization as a trust introducer,
-they automatically have an authenticated path to anyone in the organization.
+they automatically have an authenticated path to anyone in the organization).
 
-n other words, there should be two certifications between each user's key and the CA key.  Consider, for instance, Alice whose email address is `alice@example.org`:
+In other words, there should be two certifications between each user's key
+and the CA key.  Consider, for instance, Alice whose email address is
+`alice@example.org`:
 
 - The CA key certifies the `alice@example.org` user id on Alice's key.  This
   certification means that the CA has verified that the key is indeed
@@ -82,19 +84,19 @@ n other words, there should be two certifications between each user's key and th
   path to Alice's key.
 - Alice's key certifies `openpgp-ca@example.org` using a trust signature.
   This trust signature means that Alice
-  trust scertifications that the CA key makes on other keys: Alice trusts
+  trusts certifications that the CA key makes on other keys: Alice trusts
   the CA to authenticate third parties on her behalf.
 
 ![Image](oca-certs.png "Certifications between Alice, Bob and the CA Key")
 
 These mutual certifications between each user and the CA mean that all
 members of the organization have a verified path to each other.  And this
-remains the case even as users leave and join the user: users don't need
-to take any special action to authenticate new users.
+remains the case even as users leave and join the organization: users don't
+need to take any special action to authenticate new users.
 
-So, if Alice wants to authenticate Bob, her OpenPGP implementation can use
-two certifications to do the authentication: the trust signature she made on the CA's key, and
-the certification that the CA made on Bob's key.
+For example, if Alice wants to authenticate Bob, her OpenPGP implementation
+can use two certifications to do the authentication: the trust signature
+she made on the CA's key, and the certification that the CA made on Bob's key.
 
 ![Image](oca-auth.png "Alice authenticates Bob using OpenPGP CA certifications")
 
@@ -103,18 +105,19 @@ the certification that the CA made on Bob's key.
 
 Organizations often work closely with a few other
 organizations.  It greatly simplifies the work of such
-organizations if their users also don't have to manually validate each other's
+organizations if their users don't have to manually validate each other's
 keys to securely communicate.  OpenPGP CA supports this use case by allowing CAs to create "bridges" between
 organizations.
 
 In technical terms, OpenPGP CA bridges organizations using *scoped* trust signatures.
-For instance, if users at the two organizations `foo.org` and `bar.org`
+For instance, if users at the two organizations `alpha.org` and `beta.org`
 communicate with each other on a regular basis, then the OpenPGP CA
 administrators can exchange fingerprints, and create a trust
 signature over each other's domain.    These trust signatures are usually scoped to the domain of the
 respective remote organization. The reason for this is that the CA admin of
-`foo.org` probably only wants the `bar.org` CA admin to act as a trusted
-introducer for users at `bar.org` - and not for keys outside that namespace.  
+`alpha.org` probably only wants the `beta.org` CA admin to act as a trusted
+introducer for users at `beta.org` - and not for keys outside that
+namespace.  
 Allowing the remote CA admin to act as a trusted introducer for arbitrary
 user ids would give the remote CA admin much too much power.
 
@@ -132,9 +135,10 @@ can also automatically authenticate everyone else in the organization.
 
 ## Emergent Properties
 
-Most individual users don't use trusted introducers.  But, that doesn't mean that
-their tools can't exploit these certifications.  Consider the following
-scenario.  Alice and Bob are from organization ABC, which uses OpenPGP
+Most individual users of OpenPGP don't use trusted introducers.  But that
+doesn't mean that their tools can't make use of such certifications.
+Consider the following scenario.
+Alice and Bob are from organization ABC, which uses OpenPGP
 CA.  And Zed, an individual who is not part of an organization that uses OpenPGP CA, regularly communicates with Alice.  Now, let's say that Zed wants to send Bob an email.  Zed
 might find many keys for Bob.  Some might be keys that Bob has lost
 control of and hasn't revoked.  Others may have been published by an
@@ -156,31 +160,33 @@ message.
 
 # Key creation, certification
 
-The OpenPGP CA admin makes sure that certifications exist between keys in the
-organization, as shown here:
+The OpenPGP CA admin makes sure that a structure of certifications exists
+between keys in the organization, as shown here:
 
 ![Image](oca-cert-structure.png "Certifications in OpenPGP CA")
 
 There are two different ways in which user keys may be created in an organization that uses OpenPGP CA:
 
-1. Key creation for users can be [performed by the OpenPGP CA
+1. Key creation for users can be (centrally) [performed by the OpenPGP CA
 admin](keys-create.md).  In this case, because OpenPGP CA
 creates the user's key, it can also generate all of the required
-certifications on its own.  OpenPGP CA never saves the private key material
-to disk.  But, this method is still more risky than the alternative.
+certifications on its own.  OpenPGP CA only keeps the private key material
+in RAM and never saves it to disk. Still, this method is more risky
+than the alternative.
 
-2. The alternative is that users [create their own keys](keys-import.md).
+2. The alternative is that users [create their own keys](keys-import.md)
+(decentrally).
 In this workflow, the user sends their public key to  the OpenPGP
 CA admin, who, after authenticating it, adds it to the database.  
 To get all of the benefits of OpenPGP CA, the user also needs to
-certify the OpenPGP CA key.  This is complicated, but only needs to be done
-during the initial setup.  With help from the
+certify the OpenPGP CA key.  This is more complicated, but only needs to be
+done during the initial setup.  With help from the
 CA admin or a help desk team, this is doable.  In the next version of OpenPGP CA, we will add tooling to make this workflow as easy as the other workflow.
 
 # Revocation Certificates
 
 OpenPGP CA optionally generates and stores several revocation
-certificates for users. The reason that it creates
+certificates for users. The reason to create
 multiple revocations is so that at a later time, the most appropriate
 revocation reason can be used. e.g., key lost, key compromised, etc.
 
@@ -195,7 +201,8 @@ but there isn't much support for designated revokers in the OpenPGP ecosystem.
 In OpenPGP CA, the CA admin can provision a user with a
 key. In addition to generating the key, OpenPGP CA creates certifications
 between the new user key and the CA's key.  The admin sends the key to the user.  This can be done by saving it on a USB drive,
-or sending it by email (but encrypting it was a strong password).  And, the public
+or sending it by email (but encrypting it with a strong password).  And, the
+ public
 key is optionally published in the organization's WKD, and uploaded to
 key servers.
 
@@ -227,7 +234,7 @@ This workflow is slightly more complex to perform:
   then automatically certifies the specified uids of the user's new key.
 
 Currently, handling new keys in this decentralized manner is more
-complicated than centralized generation as described above.
+complicated than centralized generation (as described above).
 However, simplifying this workflow is the main goal of OpenPGP CA 2.0
 
 # What happens on the OpenPGP CA admin side
@@ -245,5 +252,5 @@ certificates](#revocation-certificates) for user keys.
 - Finally, the CA's private OpenPGP key is in the database - it is used
 to generate the certifications, and as such needs to be kept safe.
 
-OpenPGP CA 2.0 will support exporting user as well as the CA's public
-keys to key servers, to WKD servers, or as a GPG Sync-style Keylist.
+OpenPGP CA 2.0 will support exporting user keys as well as the CA's public
+key to key servers, to WKD servers, or as a GPG Sync-style Keylist.
