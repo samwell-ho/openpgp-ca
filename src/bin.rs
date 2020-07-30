@@ -304,7 +304,7 @@ fn new_bridge(
     if commit {
         let (bridge, fingerprint) = ca.bridge_new(key_file, email, scope)?;
 
-        println!("signed certificate for {} as bridge\n", bridge.email);
+        println!("Signed certificate for {} as bridge.\n", bridge.email);
         println!("The fingerprint of the remote CA key is");
         println!("{}\n", fingerprint);
     } else {

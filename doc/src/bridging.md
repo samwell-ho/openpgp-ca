@@ -121,7 +121,7 @@ OpenPGP CA again prints a message showing the fingerprint of the remote key
 that we just configured a bridge to.
 
 ```
-signed certificate for openpgp-ca@beta.org as bridge
+Signed certificate for openpgp-ca@beta.org as bridge.
 
 The fingerprint of the remote CA key is
 0B8D 10E9 B64F BABC 51EC  545C BC3A 0B86 2EBC 829F
