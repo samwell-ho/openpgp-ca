@@ -178,7 +178,7 @@ fn print_sigs_status(ca: &OpenpgpCa) -> Result<()> {
             true
         } else {
             println!(
-                "missing signature by CA for user {:?} fingerprint {}",
+                "Missing certification by CA for user {:?} fingerprint {}.",
                 usercert.name, usercert.fingerprint
             );
             false
@@ -197,7 +197,7 @@ fn print_sigs_status(ca: &OpenpgpCa) -> Result<()> {
         }
     }
     println!(
-        "checked {} certs, {} of them had good signatures in both directions",
+        "Checked {} certificates, {} of them had good certifications in both directions.",
         sigs_status.len(),
         count_ok
     );
@@ -248,6 +248,9 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
         );
         println!("fingerprint {}", usercert.fingerprint);
 
+        println!("user cert (or subkey) signed by CA: {}", sig_by_ca);
+        println!("user cert has tsigned CA: {}", tsig_on_ca);
+
         ca.emails_get(&usercert)?
             .iter()
             .for_each(|email| println!("- email {}", email.addr));
@@ -258,9 +261,6 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
         } else {
             println!(" no expiration date is set for this certificate");
         }
-
-        println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
-        println!(" user cert has tsigned CA: {}", tsig_on_ca);
 
         let revs = ca.revocations_get(&usercert)?;
         println!(" {} revocation certificate(s) available", revs.len());

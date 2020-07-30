@@ -13,18 +13,18 @@ We can inspect the state of all users in our OpenPGP CA instance like this:
 ```
 usercert for 'Alice Adams'
 fingerprint F27CB2E92C3E01DA1C656FB21758251C75E25DDD
+user cert (or subkey) signed by CA: true
+user cert has tsigned CA: true
 - email alice@example.org
  no expiration date is set for this certificate
- user cert (or subkey) signed by CA: true
- user cert has tsigned CA: true
  1 revocation certificate(s) available
 
 usercert for 'Bob Baker'
 fingerprint 0EE935F56AC4381E007370E956A10EB1ABED2321
+user cert (or subkey) signed by CA: true
+user cert has tsigned CA: true
 - email bob@example.org
  expires: 12/08/2020
- user cert (or subkey) signed by CA: true
- user cert has tsigned CA: true
  1 revocation certificate(s) available
 ```
 
@@ -107,7 +107,7 @@ To check if all keys are mutually certified:
 `$ openpgp-ca -d example.oca user check sigs`
 
 ```
-checked 2 certs, 2 of them had good signatures in both directions
+Checked 2 certificates, 2 of them had good certifications in both directions.
 ```
 
 ### Checking expiry of user keys

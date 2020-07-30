@@ -191,7 +191,7 @@ pub enum BridgeCommand {
         email: Option<String>,
     },
 
-    /// Add New Bridge (sign existing remote CA Public Key)
+    /// Add New Bridge (certify existing remote CA Public Key)
     New {
         #[structopt(
             short = "e",
