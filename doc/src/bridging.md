@@ -109,7 +109,7 @@ When you've confirmed that the remote key is correct, repeat this command with t
 ```
 
 Please double-check that this fingerprint really corresponds to the intended
-remote CA admin before continuing!
+remote CA's key before continuing!
 
 When we're sure that the key in the file `beta-ca.pub` is the right one, we
 proceed to actually configure the bridge and persist it in our OpenPGP CA
@@ -149,24 +149,25 @@ tedious and there's a high risk that some users will end up with stale
 versions of keys, because updates don't get rolled out to them.
 
 Mechanisms that allow for automated updating of keys and
-certifications by clients include:
+certifications by clients include
+[WKD](https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-09)
+and [Keylist](https://code.firstlook.media/keylist-rfc-explainer).
 
-1. [Keylist](https://code.firstlook.media/keylist-rfc-explainer)
-2. [WKD](https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-09)
+WKD can only be used to distribute keys within the DNS domain of one's own
+organization.
+Keylist also allows for local distribution of key material (including
+certifications) of users outside one's organization.
 
-Keylist allows for local distribution of key material (including
-certifications) of users outside one's organization. WKD, on the other hand
-can only be used to distribute keys within the DNS domain of one's own
-organization. In this case, the CA admin at `beta.org` could upload a
+In this case, the CA admin at `beta.org` could upload a
 new copy of the OpenPGP CA public key on `beta.org`'s WKD instance that
 includes the bridging trust signature by us.
 
 For the purpose of this tutorial, we export our newly signed version of the
 public key of OpenPGP CA at `beta.org` into a file:
 
-`$ openpgp-ca -d alpha.oca bridge export openpgp-ca@beta.org > beta.signed`
+`$ openpgp-ca -d alpha.oca bridge export openpgp-ca@beta.org > beta-ca.signed`
 
-To automatically receive updates such as this additional signature on the
+To automatically receive updates, such as this additional signature on the
 `beta.org` OpenPGP CA key, users should ideally have a mechanism
 that keeps their keyrings up-to-date.
 This could be [GPG Sync](https://github.com/firstlookmedia/gpgsync/), or 
@@ -216,15 +217,16 @@ B40B 4A74 45A4 2522 CE33  90C0 EF2C 4DD0 AD96 4FAF
 As above, we export the public key of the CA at `alpha.org` that now includes
 the certification we just created:
 
-`$ openpgp-ca -d beta.oca bridge export openpgp-ca@alpha.org > alpha.signed`
+`$ openpgp-ca -d beta.oca bridge export openpgp-ca@alpha.org > alpha-ca.signed`
 
 As above, this key - including our newly created certification - now needs
-to be published, e.g. on a WKD server at `alpha.org` - or using Keylist.
+to be published, e.g. on the WKD server at `alpha.org` - or using Keylist.
 
 ## Part 5: Import all keys into Alice's GnuPG environment, confirm authentication
 
-Now we import all of the keys we exported above to see how the bridge will
-look from a user's point of view. We do this from `alice@alpha.org`'s perspectice.
+Now we import all of the keys from above into a GnuPG environment, to see how
+the bridge looks from a user's point of view.
+We do this from `alice@alpha.org`'s perspectice.
 
 ### Setting up a GnuPG test environment 
 
@@ -238,7 +240,7 @@ $ chmod 0700 $GNUPGHOME
 
 ### Getting user keys from both OpenPGP CA instances
 
-For the purpose of this tutorial, we export the public keys of users from both
+For the purpose of this tutorial, we export the public user keys from both
 OpenPGP CA instances into files, and make those files available to the user.
 
 To export the user keys at `alpha.org`, we run
@@ -249,14 +251,14 @@ Likewise, to export the user keys at `beta.org`
 
 `$ openpgp-ca -d beta.oca user export > beta.users`
 
-In a real world scenario, those keys should instead be published on the
-respective organizations' WKD server and retrieved by users' OpenPGP
-software from there.
+In a real world scenario, those keys would instead be published on the
+respective organizations' WKD server, or published via the Keylist mechanism
+and retrieved by users' OpenPGP software from there.
 
 
 ### Import user keys and CA keys of both organizations
 
-`$ gpg --import alpha.signed beta.signed alpha.users beta.users`
+`$ gpg --import alpha-ca.signed beta-ca.signed alpha.users beta.users`
 
 ```
 gpg: keybox '/tmp/tmp.jRItGKnQZn/pubring.kbx' created
@@ -347,8 +349,8 @@ for Bob (who works at `beta.org`):
 
 So Alice at `alpha.org` now has an authenticated path to
 Bob at `beta.org` in the web of trust. Alice
-will also automatically have authenticated paths to any other users that
-will be set up at `beta.org` with OpenPGP CA.
+will also automatically have authenticated paths to any additional new users
+that will be set up at `beta.org` with OpenPGP CA.
 
 ```
 gpg: checking the trustdb
@@ -382,7 +384,7 @@ sub   ed25519 2020-07-03 [S]
 sub   cv25519 2020-07-03 [E]
 ```
 
-# Variation on the bridging Workflow example, external Users
+# Variation on the bridging Workflow example (external users)
 
 In "Part 2", the CA at `beta.org` creates an additional user outside of the domain `beta.org`:
 

@@ -18,9 +18,7 @@ than centralized key creation.
 ### Setting up an OpenPGP CA instance
 
 To start, if we don't already have an instance of OpenPGP CA, we need to set up a
-new one.
-
-Then, we initialize a new OpenPGP CA instance for the domain (in this case,
+new one. We initialize a new OpenPGP CA instance for the domain (in this case,
 we'll use `example.org`) and generate a new keypair for the OpenPGP CA admin:
 
 `$ openpgp-ca -d example.oca ca init example.org` 
@@ -45,7 +43,7 @@ workflow, but details will differ.
 
 ### Setting up a GnuPG test environment
 
-For testing purposes, you'll want to create a separate test environment.
+For testing purposes, we create a separate test environment.
 Using GnuPG, this can be done as follows:
 
 ```
@@ -135,7 +133,7 @@ terms of the reason for revocation, as well as the time of revocation.
 
 Now, as the user, we're going to mark the OpenPGP CA key as trusted
 introducer. This means that the user trusts the CA to authenticate keys on
-the user's behalf (this is expected in OpenPGP CA).
+their behalf (this is expected in OpenPGP CA).
 
 First, we import the OpenPGP CA's public key:
 
@@ -232,8 +230,8 @@ signature:
 
 ## Part 3: OpenPGP CA admin (import the newly created user key)
 
-The user transfers `ca-tsigned.pub`, `alice.pub` - and optionally the
-revocation certificate - to the CA admin. 
+The user transfers `ca-tsigned.pub`, `alice.pub` - and optionally any
+revocation certificates - to the CA admin. 
 
 The CA admin then imports all of Alice's artifacts into the OpenPGP CA
 database:
@@ -244,7 +242,9 @@ database:
 
 ### Export Alice's public key (including the signature by the CA)
 
-When we imported Alice's public key, OpenPGP CA automatically signed the key.  Now, we need to export her key including that certification and publish it $SOMEWHERE, so that her key is integrated intot he WoT:
+When we imported Alice's public key, OpenPGP CA automatically signed the
+key.  Now, we might want to export her key including that certification and
+publish it somewhere, so that her key can be integrated into the WoT:
 
 `$ openpgp-ca -d example.oca user export --email alice@example.org`
 
@@ -261,6 +261,10 @@ Al1QBfoy5sLFO0rIlxsXGeJSw+rxRt9Wau4=
 =9gNp
 -----END PGP PUBLIC KEY BLOCK-----
 ```
+
+In most cases, we will want to publish an updated wkd export of our OpenPGP
+CA instance on our WKD server. This way, clients can automatically receive
+Alice's key complete with the certification by OpenPGP CA.
 
 ### Check OpenPGP CA's user list
 

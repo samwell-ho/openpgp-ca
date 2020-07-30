@@ -3,9 +3,9 @@ So when we want to publish OpenPGP keys for our organization, exporting
 those keys from OpenPGP CA is a convenient possibility. 
 
 There are several ways to publish keys:
-- Key server (internal or [public](https://keys.openpgp.org/)),
 - [Web Key Directory](https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-09) (WKD),
 - [GPG Sync](https://github.com/firstlookmedia/gpgsync/)-style [Keylist](https://datatracker.ietf.org/doc/draft-mccain-keylist/),
+- Key server (internal or [public](https://keys.openpgp.org/)),
 - LDAP.
 
 Of these, OpenPGP CA currently automates exporting as WKD.
@@ -43,7 +43,9 @@ So you might copy it to your webserver as follows:
 `rsync --dry-run --recursive --delete /tmp/wkd/.well-known/openpgpkey/ www@example.org:public_html/.well-known/openpgpkey/`
 
 We use `--delete` to delete stale data. To avoid accidentally deleting data, we've added the '--dry-run' option to the rsync command.
-When you've checked that the output of this `rsync` looks as expected, run rsync again, but without the `--dry-run` parameter, to actually perform the copy and delete operations.
+When you've checked that the output of this `rsync` run looks as expected, run
+rsync again, but without the `--dry-run` parameter, to actually perform
+the copy and delete operations.
 
 ## Testing WKD
 

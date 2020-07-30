@@ -1,4 +1,4 @@
-After our OpenPGP CA database is populated with data, we may want to
+Once our OpenPGP CA database is populated with data, we may want to
 inspect that data.
 
 In this chapter we assume that our OpenPGP CA instance contains the two users
