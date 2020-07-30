@@ -23,9 +23,9 @@ organizational knowledge in a form that OpenPGP software already understands. Fo
 instance, Alice Adams' email address is `alice@example.org` and this is a copy of
 her OpenPGP public key.  This is the authentication aspect.  
 The tooling also facilitates key discovery, by making it easy for the admin to
-publish keys in places that OpenPGP software normally looks for them (e.g., key
-servers {?} and [WKD](https://tools.ietf.org/html/draft-koch-openpgp-webkey
--service-09)s).
+publish keys in places that OpenPGP software normally looks for them (e.g.
+[WKD](https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-09)s
+and key servers).
 And, it makes it easier to keep those directories up to date.
 Finally, OpenPGP CA simplifies managing keys by storing revocation certificates,
 and making it easy to publish one, if and when that is necessary.
