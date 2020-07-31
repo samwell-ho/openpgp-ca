@@ -232,7 +232,6 @@ for their coworkers (via WKD) and strongly authenticate those keys.  The users
 don't need to compare fingerprints, they don't need to go to a key signing party, 
 in fact, they doesn't even need to understand what a certification is.
 
-
 ## Decentralized workflow
 
 In some organizations or for some advanced users, it might be preferrable
@@ -248,10 +247,6 @@ This workflow is slightly more complex to perform:
  the CA admin.
 - The CA admin then needs to import this new user key into OpenPGP CA, which
   then automatically certifies the specified uids of the user's new key.
-
-Currently, handling new keys in this decentralized manner is more
-complicated than centralized generation (as described above).
-However, simplifying this workflow is the main goal of OpenPGP CA 2.0
 
 # What happens on the OpenPGP CA admin side
 
