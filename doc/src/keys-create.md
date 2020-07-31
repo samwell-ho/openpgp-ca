@@ -37,9 +37,9 @@ name is optional.
 
 `$ openpgp-ca -d example.oca user add --email alice@example.org --name "Alice Adams"`
 
-This creates a new OpenPGP key for the user, and creates the necessary
-auxiliary data structure (the various OpenPGP signatures, and updates the
-database).
+This creates a new OpenPGP key for the user, and the necessary
+auxiliary data structure (in particular the mutual certifications),
+and updates the database.
 
 The new user's private key is sent to `stdout` by this command; it is not
 stored. By default, the new key is protected with a diceware password,

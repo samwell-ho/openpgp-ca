@@ -240,7 +240,7 @@ database:
 
 `$ openpgp-ca -d example.oca ca import-tsig ca-tsigned.pub`
 
-### Export Alice's public key (including the signature by the CA)
+### Export Alice's public key (including the certification by the CA)
 
 When we imported Alice's public key, OpenPGP CA automatically signed the
 key.  Now, we might want to export her key including that certification and

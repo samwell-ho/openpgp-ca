@@ -53,8 +53,8 @@ fn main() -> Result<()> {
                     // FIXME: set default in structopt?
                     print_expiry_status(&ca, days.unwrap_or(0))?;
                 }
-                UserCheckSubcommand::Sigs => {
-                    print_sigs_status(&ca)?;
+                UserCheckSubcommand::Certifications => {
+                    print_certifications_status(&ca)?;
                 }
             },
             UserCommand::Import {
@@ -145,7 +145,7 @@ fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
     } else {
         for cert in usercerts {
             println!(
-                "Revocations for Usercert {:?}",
+                "Revocations for user {:?}",
                 cert.name.clone().unwrap_or_else(|| "<no name>".to_string())
             );
             let revoc = ca.revocations_get(&cert)?;
@@ -169,11 +169,11 @@ fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
     Ok(())
 }
 
-fn print_sigs_status(ca: &OpenpgpCa) -> Result<()> {
+fn print_certifications_status(ca: &OpenpgpCa) -> Result<()> {
     let mut count_ok = 0;
 
-    let sigs_status = ca.usercerts_check_signatures()?;
-    for (usercert, (sig_from_ca, tsig_on_ca)) in &sigs_status {
+    let certifications_status = ca.usercerts_check_certifications()?;
+    for (usercert, (sig_from_ca, tsig_on_ca)) in &certifications_status {
         let ok = if *sig_from_ca {
             true
         } else {
@@ -197,8 +197,9 @@ fn print_sigs_status(ca: &OpenpgpCa) -> Result<()> {
         }
     }
     println!(
-        "Checked {} certificates, {} of them had good certifications in both directions.",
-        sigs_status.len(),
+        "Checked {} user keys, {} of them had good certifications in both \
+        directions.",
+        certifications_status.len(),
         count_ok
     );
 
@@ -222,11 +223,11 @@ fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Result<()> {
             let datetime: DateTime<Utc> = exp.into();
             println!(" expires: {}", datetime.format("%d/%m/%Y"));
         } else {
-            println!(" no expiration date is set for this certificate");
+            println!(" no expiration date is set for this user key");
         }
 
         if !alive {
-            println!(" user cert EXPIRED/EXPIRING!");
+            println!(" user key EXPIRED/EXPIRING!");
         }
 
         println!();
@@ -237,7 +238,7 @@ fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Result<()> {
 
 fn print_users(ca: &OpenpgpCa) -> Result<()> {
     for (usercert, (sig_by_ca, tsig_on_ca)) in
-        ca.usercerts_check_signatures()?
+        ca.usercerts_check_certifications()?
     {
         println!(
             "usercert for '{}'",
@@ -259,14 +260,14 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
             let datetime: DateTime<Utc> = exp.into();
             println!(" expires: {}", datetime.format("%d/%m/%Y"));
         } else {
-            println!(" no expiration date is set for this certificate");
+            println!(" no expiration date is set for this user key");
         }
 
         let revs = ca.revocations_get(&usercert)?;
         println!(" {} revocation certificate(s) available", revs.len());
 
         if OpenpgpCa::usercert_possibly_revoked(&usercert)? {
-            println!(" this certificate has (possibly) been REVOKED");
+            println!(" this user key has (possibly) been REVOKED");
         }
         println!();
     }
@@ -304,7 +305,7 @@ fn new_bridge(
     if commit {
         let (bridge, fingerprint) = ca.bridge_new(key_file, email, scope)?;
 
-        println!("Signed certificate for {} as bridge.\n", bridge.email);
+        println!("Signed OpenPGP key for {} as bridge.\n", bridge.email);
         println!("The fingerprint of the remote CA key is");
         println!("{}\n", fingerprint);
     } else {

@@ -159,7 +159,7 @@ pub enum UserCommand {
         #[structopt(help = "Id of a revocation cert")]
         hash: String,
     },
-    /// Show Revocation Keys (if available)
+    /// Show Revocation Certificates (if available)
     ShowRevocations {
         #[structopt(short = "e", long = "email", help = "Email address")]
         email: String,
@@ -177,8 +177,8 @@ pub enum UserCheckSubcommand {
         )]
         days: Option<u64>,
     },
-    /// Check signatures and trust signatures on CA key
-    Sigs,
+    /// Check certifications on CA key
+    Certifications,
 }
 
 #[derive(StructOpt, Debug)]

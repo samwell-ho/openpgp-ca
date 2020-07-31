@@ -510,7 +510,7 @@ impl OpenpgpCa {
     /// - the CA key has a trust-signature from the user's Cert
     ///
     /// Returns a map 'usercert -> (sig_from_ca, tsig_on_ca)'
-    pub fn usercerts_check_signatures(
+    pub fn usercerts_check_certifications(
         &self,
     ) -> Result<HashMap<models::Usercert, (bool, bool)>> {
         let mut map = HashMap::new();

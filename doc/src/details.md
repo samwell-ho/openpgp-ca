@@ -1,6 +1,6 @@
 This chapter describes how OpenPGP CA works at a technical level.
 First, we describe the OpenPGP data structures that it uses.  Then
-we describe some relevant points of OpenPGP CAs implementation.
+we describe some relevant points of OpenPGP CA's implementation.
 
 # What is OpenPGP CA
 
@@ -8,7 +8,7 @@ we describe some relevant points of OpenPGP CAs implementation.
   - implemented as a library (reusable for other frontends)
 - written in Rust
 - OpenPGP CA uses the [Sequoia](https://sequoia-pgp.org/) OpenPGP implementation
-- All state is persisted in a single file (using the SQLite database)
+- All state is persisted in a single file (using an SQLite database)
 
 # How authentication works in the OpenPGP web of trust
 
@@ -23,8 +23,8 @@ included when distributing OpenPGP keys.
 
 ## Regular certifications
 
-A certification is a record that indicates what key an individual allegedly
-controls.  When Bob verifies that Carol's key is `0xCCCC`, he can create
+A certification is a record that indicates what key an entity allegedly
+controls.  When Bob certified that Carol's key is `0xCCCC`, he can create
 a certification that records that fact.  The certification is first
 useful to him: all of his software now understands that he has verified
 Carol's key.  If he publishes the certification, e.g., on a key server,
@@ -53,6 +53,17 @@ the trust using regular expressions](https://tools.ietf.org/html/rfc4880#section
 Carol may trust Dave from the NSA to certify users within his own
 organization, but not other people.
 
+With GnuPG, it's possible to get similar semantics to trust signatures by
+setting the ownertrust property for keys. When using GnuPG, if a
+user were to set this ownertrust property on the OpenPGP CA key to the
+value 'Fully', their setup would work as expected.  
+
+However, OpenPGP CA strongly prefers the use of trust signatures to designate
+the OpenPGP CA key as trusted. Trust signatures are specified in the
+OpenPGP standard, and as a standardized OpenPGP concept, they work the same
+with all OpenPGP implementations.
+
+
 # How the OpenPGP CA paradigm works for authentication
 
 Our approach to authentication is built using the existing and well-established
@@ -66,15 +77,12 @@ works out of the box with existing OpenPGP implementations, such as GnuPG.
 With OpenPGP CA, the CA key certifies the keys of all of the users in the
 organization using normal OpenPGP certifications.  To take advantage of this,
 users in the organization need to set the CA's key to be a trusted introducer.
-There are two main ways to do this.  In GnuPG, for instance, the ownertrust of
-the CA key can be set to 'Fully'.  Alternatively, the user can sign the CA's
-key.  The latter mechanism is the preferred mechanism (as if someone outside
-the organization sets someone inside the organization as a trust introducer,
-they automatically have an authenticated path to anyone in the organization).
+In OpenPGP terms, users generate a trust signature for the CA's key.
 
-In other words, there should be two certifications between each user's key
-and the CA key.  Consider, for instance, Alice whose email address is
-`alice@example.org`:
+In short, each user normally certifies the CA's key, and the CA
+certifies each user's key.
+
+Consider, for instance, Alice whose email address is `alice@example.org`:
 
 - The CA key certifies the `alice@example.org` user id on Alice's key.  This
   certification means that the CA has verified that the key is indeed
@@ -84,19 +92,24 @@ and the CA key.  Consider, for instance, Alice whose email address is
   path to Alice's key.
 - Alice's key certifies `openpgp-ca@example.org` using a trust signature.
   This trust signature means that Alice
-  trusts certifications that the CA key makes on other keys: Alice trusts
+  trusts certifications that the CA key makes on other keys; Alice trusts
   the CA to authenticate third parties on her behalf.
 
+The following figure shows the keys and certifications in an
+OpenPGP CA-using organization with two users, Alice and Bob.
+ 
 ![Image](oca-certs.png "Certifications between Alice, Bob and the CA Key")
 
 These mutual certifications between each user and the CA mean that all
 members of the organization have a verified path to each other.  And this
 remains the case even as users leave and join the organization: users don't
-need to take any special action to authenticate new users.
+need to take any special action to authenticate new users, only the
+OpenPGP CA admin does.
 
 For example, if Alice wants to authenticate Bob, her OpenPGP implementation
 can use two certifications to do the authentication: the trust signature
-she made on the CA's key, and the certification that the CA made on Bob's key.
+she made on the CA's key, and the certification that the CA made on Bob's
+key,  which the next figure illustrates:.
 
 ![Image](oca-auth.png "Alice authenticates Bob using OpenPGP CA certifications")
 
@@ -106,8 +119,8 @@ she made on the CA's key, and the certification that the CA made on Bob's key.
 Organizations often work closely with a few other
 organizations.  It greatly simplifies the work of such
 organizations if their users don't have to manually validate each other's
-keys to securely communicate.  OpenPGP CA supports this use case by allowing CAs to create "bridges" between
-organizations.
+keys to securely communicate.  OpenPGP CA supports this use case by
+by faciliating the creation of so-called "bridges" between organizations.
 
 In technical terms, OpenPGP CA bridges organizations using *scoped* trust signatures.
 For instance, if users at the two organizations `alpha.org` and `beta.org`
@@ -121,30 +134,35 @@ namespace.
 Allowing the remote CA admin to act as a trusted introducer for arbitrary
 user ids would give the remote CA admin much too much power.
 
-Now, members of each organization can
-authenticate members of the other organization.
+Using a bridge, members of each organization can authenticate members of
+the bridged organization as illustrated in the following figure:
 
 ![Image](bridge.png "Bridge between two organizations")
 
 
 ## Gateways into organizations
 
-An added bonus of using a trust signature is that anyone who considers
-someone at an OpenPGP CA-using organization to be a trusted introducer
-can also automatically authenticate everyone else in the organization.
+Because users use a trust signature to certify the OpenPGP CA's key,
+anyone who considers someone at an OpenPGP CA-using organization to be a
+trusted introducer can also automatically authenticate everyone else in the
+organization.
 
 ## Emergent Properties
 
-Most individual users of OpenPGP don't use trusted introducers.  But that
+Most individual users of OpenPGP won't use trusted introducers.  But that
 doesn't mean that their tools can't make use of such certifications.
 Consider the following scenario.
 Alice and Bob are from organization ABC, which uses OpenPGP
-CA.  And Zed, an individual who is not part of an organization that uses OpenPGP CA, regularly communicates with Alice.  Now, let's say that Zed wants to send Bob an email.  Zed
-might find many keys for Bob.  Some might be keys that Bob has lost
-control of and hasn't revoked.  Others may have been published by an
-attacker.  What key should he use for Bob?
+CA.  And Zed, an individual who is not part of an organization that uses
+OpenPGP CA, regularly communicates with Alice.  Now, let's say that Zed
+wants to send Bob an email.  Zed might find many keys that claim to be
+Bob's.  Some might be keys that Bob has lost control of and hasn't revoked.
+Others may have been published by an attacker.  What key should he use for
+Bob?
 
-Using the normal web of trust mecnaisms, Zed's tools can detect a reasonable key for
+Because we use standard OpenPGP artifacts - in particular trust signatures -
+we can publish them. Then, using the normal web of trust mechanisms, Zed's
+tools can detect a reasonable key for
 Bob based on two observations.  First, the tool can observe that there
 is a verified path from Alice to Bob's current key in the web of
 trust.  Second, since Zed is able to successfully communicate with
@@ -161,9 +179,7 @@ message.
 # Key creation, certification
 
 The OpenPGP CA admin makes sure that a structure of certifications exists
-between keys in the organization, as shown here:
-
-![Image](oca-cert-structure.png "Certifications in OpenPGP CA")
+between keys in the organization.
 
 There are two different ways in which user keys may be created in an organization that uses OpenPGP CA:
 
@@ -227,7 +243,7 @@ This workflow is slightly more complex to perform:
 
 - The user needs to obtain the CA's public key,
 - generate their own new key,
-- generate a "trust signature" certification for the CA's key.
+- generate a trust signature for the CA's key.
 - This certification and the user's public key need to be transferred to
  the CA admin.
 - The CA admin then needs to import this new user key into OpenPGP CA, which
@@ -252,5 +268,7 @@ certificates](#revocation-certificates) for user keys.
 - Finally, the CA's private OpenPGP key is in the database - it is used
 to generate the certifications, and as such needs to be kept safe.
 
-OpenPGP CA 2.0 will support exporting user keys as well as the CA's public
-key to key servers, to WKD servers, or as a GPG Sync-style Keylist.
+Currently, OpenPGP CA can export OpenPGP Keys and create a WKD.  The admin
+needs to publish these manually.  For OpenPGP CA 2.0, we plan to add
+support to more easily publish these artifacts in key servers, in the
+organization's WKD, and as GPG Sync-style Keylists.

@@ -75,15 +75,15 @@ Revocations for Usercert "Alice Adams"
 # Publishing the revocation
 
 Now the revocation has been applied to our local copy of the user's
-certificate.
+OpenPGP key.
 We still need to publish this newly revoked version of the user's
-certificate.
+key.
 
 To achieve this we should
 [regenerate our organization's WKD](keys-publish.md#publish-keys-as-a-wkd)
-and publish the new version of this user certificate there.
+and publish the new version of this user's OpenPGP key there.
 
-Also, we can manually export the certificate
+Also, we can manually export the user's key
 
 `$ openpgp-ca -d example.oca user export --email alice@example.org > alice.pub`
  

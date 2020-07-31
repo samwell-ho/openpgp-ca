@@ -16,7 +16,7 @@ fingerprint F27CB2E92C3E01DA1C656FB21758251C75E25DDD
 user cert (or subkey) signed by CA: true
 user cert has tsigned CA: true
 - email alice@example.org
- no expiration date is set for this certificate
+ no expiration date is set for this user key
  1 revocation certificate(s) available
 
 usercert for 'Bob Baker'
@@ -104,10 +104,10 @@ To check if all keys are mutually certified:
 - All user keys have tsigned the CA key, and
 - the CA key has certified all user keys.
  
-`$ openpgp-ca -d example.oca user check sigs`
+`$ openpgp-ca -d example.oca user check certifications`
 
 ```
-Checked 2 certificates, 2 of them had good certifications in both directions.
+Checked 2 user keys, 2 of them had good certifications in both directions.
 ```
 
 ### Checking expiry of user keys
@@ -118,7 +118,7 @@ To get an overview of the expiry of user keys:
 
 ```
 name Alice Adams, fingerprint F27CB2E92C3E01DA1C656FB21758251C75E25DDD
- no expiration date is set for this certificate
+ no expiration date is set for this user key
 
 name Bob Baker, fingerprint 0EE935F56AC4381E007370E956A10EB1ABED2321
  expires: 12/08/2020
@@ -130,7 +130,7 @@ To check if any user keys will expire within a specified number of days:
 
 ```
 name Alice Adams, fingerprint F27CB2E92C3E01DA1C656FB21758251C75E25DDD
- no expiration date is set for this certificate
+ no expiration date is set for this user key
 
 name Bob Baker, fingerprint 0EE935F56AC4381E007370E956A10EB1ABED2321
  expires: 12/08/2020

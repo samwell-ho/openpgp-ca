@@ -512,7 +512,7 @@ fn test_ca_signatures() -> Result<()> {
     // also, CA key gets a tsig by carol
     ca.usercert_new(Some(&"Carol"), &["carol@example.org"], false)?;
 
-    let sigs = ca.usercerts_check_signatures()?;
+    let sigs = ca.usercerts_check_certifications()?;
     for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
         match usercert.name.as_deref() {
             Some("Alice") => {
@@ -626,7 +626,7 @@ fn test_import_signed_cert() -> Result<()> {
     }
 
     // check signature status via OpenpgpCa::usercerts_check_signatures()
-    let sigs = ca.usercerts_check_signatures()?;
+    let sigs = ca.usercerts_check_certifications()?;
     assert_eq!(sigs.len(), 1);
     for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
         match usercert.name.as_deref() {
