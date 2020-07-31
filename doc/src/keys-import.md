@@ -273,11 +273,11 @@ To see the resulting state in OpenPGP CA, we can inspect the `user list`:
 `$ openpgp-ca -d example.oca user list`
 
 ```
-usercert for 'Alice Adams'
-fingerprint A0A61C7554B3316009C8D3C74FBA1B7EF003F9FA
-user cert (or subkey) signed by CA: true
-user cert has tsigned CA: true
-- email alice@example.org
+OpenPGP key for 'Alice Adams'
+ fingerprint A0A61C7554B3316009C8D3C74FBA1B7EF003F9FA
+ user cert (or subkey) signed by CA: true
+ user cert has tsigned CA: true
+ - email alice@example.org
  expires: 02/07/2022
  3 revocation certificate(s) available
 ```

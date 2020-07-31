@@ -241,20 +241,20 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
         ca.usercerts_check_certifications()?
     {
         println!(
-            "usercert for '{}'",
+            "OpenPGP key for '{}'",
             usercert
                 .name
                 .clone()
                 .unwrap_or_else(|| "<no name>".to_string())
         );
-        println!("fingerprint {}", usercert.fingerprint);
+        println!(" fingerprint {}", usercert.fingerprint);
 
-        println!("user cert (or subkey) signed by CA: {}", sig_by_ca);
-        println!("user cert has tsigned CA: {}", tsig_on_ca);
+        println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
+        println!(" user cert has tsigned CA: {}", tsig_on_ca);
 
         ca.emails_get(&usercert)?
             .iter()
-            .for_each(|email| println!("- email {}", email.addr));
+            .for_each(|email| println!(" - email {}", email.addr));
 
         if let Some(exp) = OpenpgpCa::usercert_expiration(&usercert)? {
             let datetime: DateTime<Utc> = exp.into();
