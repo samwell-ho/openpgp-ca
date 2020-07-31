@@ -698,7 +698,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
             .parts_into_secret()?
             .into_keypair()?;
 
-        let sig = b.sign_direct_key(&mut keypair)?;
+        let sig = b.sign_direct_key(&mut keypair, &bob_cert.primary_key())?;
 
         OpenpgpCa::sig_to_armored(&sig)
             .context("couldn't armor revocation cert")?

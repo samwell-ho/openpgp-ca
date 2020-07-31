@@ -39,9 +39,9 @@ sha2 = "0.9"
 futures = "0.1"
 tokio-core = "0.1"
 
-sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.17.0" }
-sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.17.0" }
-sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.17.0" }
+sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.18.0" }
+sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.18.0" }
+sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.18.0" }
 
 #sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "4ec978c1" }
 #sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "4ec978c1" }
