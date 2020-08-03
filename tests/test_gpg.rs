@@ -46,8 +46,8 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA users
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
-    ca.usercert_new(Some(&"Bob"), &["bob@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Bob"), &["bob@example.org"], false)?;
 
     // ---- import keys from OpenPGP CA into GnuPG ----
 
@@ -60,11 +60,11 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     gnupg::import(&ctx, &buf);
 
     // import CA users into GnuPG
-    let usercerts = ca.usercerts_get_all()?;
+    let certs = ca.certs_get_all()?;
 
-    assert_eq!(usercerts.len(), 2);
+    assert_eq!(certs.len(), 2);
 
-    for cert in usercerts {
+    for cert in certs {
         gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 
@@ -158,7 +158,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let bob_key = gnupg::export(&ctx_bob, &"bob@example.org");
 
     // import public keys for alice and bob into CA
-    ca.usercert_import_new(
+    ca.cert_import_new(
         &alice_key,
         vec![],
         Some("Alice"),
@@ -166,18 +166,13 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     )
     .context("import Alice to CA failed")?;
 
-    ca.usercert_import_new(
-        &bob_key,
-        vec![],
-        Some("Bob"),
-        &["bob@example.org"],
-    )
-    .context("import Bob to CA failed")?;
+    ca.cert_import_new(&bob_key, vec![], Some("Bob"), &["bob@example.org"])
+        .context("import Bob to CA failed")?;
 
     // export bob, CA-key from CA
     let ca_key = ca.ca_get_pubkey_armored()?;
-    let usercerts = ca.usercerts_get(&"bob@example.org")?;
-    let bob = usercerts.first().unwrap();
+    let certs = ca.certs_get(&"bob@example.org")?;
+    let bob = certs.first().unwrap();
 
     // import bob+CA key into alice's GnuPG context
     gnupg::import(&ctx_alice, ca_key.as_bytes());
@@ -243,7 +238,7 @@ fn test_bridge() -> Result<()> {
 
     // make CA user
     assert!(ca1
-        .usercert_new(Some(&"Alice"), &["alice@some.org"], false)
+        .user_new(Some(&"Alice"), &["alice@some.org"], false)
         .is_ok());
 
     // ---- populate second OpenPGP CA instance ----
@@ -252,10 +247,10 @@ fn test_bridge() -> Result<()> {
     ca2.ca_init("other.org", None)?;
 
     // make CA user
-    ca2.usercert_new(Some(&"Bob"), &["bob@other.org"], false)?;
+    ca2.user_new(Some(&"Bob"), &["bob@other.org"], false)?;
 
     // make CA user that is out of the domain scope for ca2
-    ca2.usercert_new(Some(&"Carol"), &["carol@third.org"], false)?;
+    ca2.user_new(Some(&"Carol"), &["carol@third.org"], false)?;
 
     // ---- setup bridges: scoped trust between one.org and two.org ---
 
@@ -293,20 +288,20 @@ fn test_bridge() -> Result<()> {
     gnupg::import(&ctx, ca2_cert.as_bytes());
 
     // import CA1 users into GnuPG
-    let usercerts1 = ca1.usercerts_get_all()?;
+    let certs1 = ca1.certs_get_all()?;
 
-    assert_eq!(usercerts1.len(), 1);
+    assert_eq!(certs1.len(), 1);
 
-    for cert in usercerts1 {
+    for cert in certs1 {
         gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 
     // import CA2 users into GnuPG
-    let usercerts2 = ca2.usercerts_get_all()?;
+    let certs2 = ca2.certs_get_all()?;
 
-    assert_eq!(usercerts2.len(), 2);
+    assert_eq!(certs2.len(), 2);
 
-    for cert in usercerts2 {
+    for cert in certs2 {
         gnupg::import(&ctx, cert.pub_cert.as_bytes());
     }
 

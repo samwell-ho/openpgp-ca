@@ -50,15 +50,15 @@ by email:
 `$ openpgp-ca -d example.oca user show-revocations --email alice@example.org`
 
 ```
-Revocations for Usercert "Alice Adams"
- - revocation id 90E28DFB6D501AB7: No reason specified (Unspecified) (15/07/2020)
+Revocations for OpenPGP key B7D7DB3180B91CEF4F34B7A77BADF98D5CF091CE, user "Alice Adams"
+ - revocation id 9D769852A313A2CA: No reason specified (Unspecified) (05/08/2020)
 ```
 The results show an ID for each individual revocation certificate.
 
 When we've determined which revocation certificate we want to apply, we can
 apply that revocation to the user's key:
 
-`$ openpgp-ca -d example.oca user apply-revocation 90E28DFB6D501AB7`
+`$ openpgp-ca -d example.oca user apply-revocation 9D769852A313A2CA`
 
 Afterwards, "show-revocations" will display the additional note: "this
 revocation has been APPLIED", and the user's public key contains the
@@ -67,8 +67,8 @@ revocation certificate:
 `$ openpgp-ca -d example.oca user show-revocations --email alice@example.org`
 
 ```
-Revocations for Usercert "Alice Adams"
- - revocation id 90E28DFB6D501AB7: No reason specified (Unspecified) (15/07/2020)
+Revocations for OpenPGP key B7D7DB3180B91CEF4F34B7A77BADF98D5CF091CE, user "Alice Adams"
+ - revocation id 9D769852A313A2CA: No reason specified (Unspecified) (05/08/2020)
    this revocation has been APPLIED
 ```
 

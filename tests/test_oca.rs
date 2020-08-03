@@ -23,6 +23,7 @@ use tokio_core::reactor::Core;
 
 use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::packet::signature::subpacket::SubpacketTag;
+use openpgp::packet::signature::SignatureBuilder;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
@@ -30,7 +31,7 @@ use openpgp::{Cert, Fingerprint, KeyID};
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
-use sequoia_openpgp::packet::signature::SignatureBuilder;
+use std::ops::Deref;
 
 pub mod gnupg;
 
@@ -51,18 +52,18 @@ fn test_ca() -> Result<()> {
     ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     // make CA user
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let usercerts = ca.usercerts_get_all()?;
+    let certs = ca.certs_get_all()?;
 
-    assert_eq!(usercerts.len(), 1);
+    assert_eq!(certs.len(), 1);
 
-    let usercert = &usercerts[0];
-    let emails = ca.emails_get(usercert)?;
+    let cert = &certs[0];
+    let emails = ca.emails_get(cert)?;
 
     assert_eq!(emails.len(), 1);
 
-    let revocs = ca.revocations_get(usercert)?;
+    let revocs = ca.revocations_get(cert)?;
     assert_eq!(revocs.len(), 1);
 
     // check that the custom name has ended up in the CA Cert
@@ -92,8 +93,8 @@ fn test_ca() -> Result<()> {
 /// created).
 /// Check that the updated user cert has the expected expiry duration.
 ///
-/// This test also exercises the OpenpgpCa::usercerts_expired() function.
-fn test_update_usercert_key() -> Result<()> {
+/// This test also exercises the OpenpgpCa::certs_expired() function.
+fn test_update_cert_key() -> Result<()> {
     let policy = StandardPolicy::new();
 
     let now = SystemTime::now();
@@ -119,7 +120,7 @@ fn test_update_usercert_key() -> Result<()> {
     gnupg::create_user(&ctx, "alice@example.org");
     let alice1_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import_new(
+    ca.cert_import_new(
         &alice1_key,
         vec![],
         Some("Alice"),
@@ -128,25 +129,25 @@ fn test_update_usercert_key() -> Result<()> {
     .context("import Alice 1 to CA failed")?;
 
     // check the state of CA data
-    let usercerts = ca.usercerts_get_all()?;
+    let certs = ca.certs_get_all()?;
 
-    assert_eq!(usercerts.len(), 1);
+    assert_eq!(certs.len(), 1);
 
-    let alice = &usercerts[0];
+    let alice = &certs[0];
 
     // check that expiry is ~2y
-    let cert = OpenpgpCa::usercert_to_cert(alice)?;
+    let cert = OpenpgpCa::cert_to_cert(alice)?;
 
     cert.with_policy(&policy, in_one_year)?.alive()?;
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_err());
 
-    // check the same with ca.usercert_expired()
-    let exp1 = ca.usercerts_expired(365)?;
+    // check the same with ca.cert_expired()
+    let exp1 = ca.certs_expired(365)?;
     assert_eq!(exp1.len(), 1);
     let (_, (alive, _)) = exp1.iter().next().unwrap();
     assert!(alive);
 
-    let exp3 = ca.usercerts_expired(3 * 365).unwrap();
+    let exp3 = ca.certs_expired(3 * 365).unwrap();
     assert_eq!(exp3.len(), 1);
     let (_, (alive, _)) = exp3.iter().next().unwrap();
     assert!(!alive);
@@ -155,32 +156,32 @@ fn test_update_usercert_key() -> Result<()> {
     gnupg::edit_expire(&ctx, "alice@example.org", "5y")?;
     let alice2_key = gnupg::export(&ctx, &"alice@example.org");
 
-    // get usercert for alice
-    let usercerts = ca.usercerts_get("alice@example.org")?;
-    assert_eq!(usercerts.len(), 1);
-    let alice = &usercerts[0];
+    // get cert for alice
+    let certs = ca.certs_get("alice@example.org")?;
+    assert_eq!(certs.len(), 1);
+    let _alice = &certs[0];
 
     // store updated version of cert
-    ca.usercert_import_update(&alice2_key, alice)?;
+    ca.cert_import_update(&alice2_key)?;
 
     // check the state of CA data
-    let usercerts = ca.usercerts_get_all()?;
+    let certs = ca.certs_get_all()?;
 
-    assert_eq!(usercerts.len(), 1);
+    assert_eq!(certs.len(), 1);
 
     // check that expiry is not ~2y but ~5y
-    let cert = OpenpgpCa::usercert_to_cert(&usercerts[0])?;
+    let cert = OpenpgpCa::cert_to_cert(&certs[0])?;
 
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_ok());
     assert!(!cert.with_policy(&policy, in_six_years)?.alive().is_ok());
 
-    // check the same with ca.usercert_expired()
-    let exp3 = ca.usercerts_expired(3 * 365)?;
+    // check the same with ca.cert_expired()
+    let exp3 = ca.certs_expired(3 * 365)?;
     assert_eq!(exp3.len(), 1);
     let (_, (alive, _)) = exp3.iter().next().unwrap();
     assert!(alive);
 
-    let exp6 = ca.usercerts_expired(6 * 365)?;
+    let exp6 = ca.certs_expired(6 * 365)?;
     assert_eq!(exp6.len(), 1);
     let (_, (alive, _)) = exp6.iter().next().unwrap();
     assert!(!alive);
@@ -189,14 +190,10 @@ fn test_update_usercert_key() -> Result<()> {
 }
 
 #[test]
-/// Create a CA, then externally create a user cert and import it.
-/// Externally create a new user cert for the same email, then import that
-/// cert as an update for the OpenPGP CA usercert.
-///
-/// Expected outcome: Two usercerts exist in OpenPGP CA, the newer one
-/// points to the older one with the "updates_cert_id" field.
-fn test_update_user_cert() -> Result<()> {
+fn test_ca_import() -> Result<()> {
+    // update key with new version, but same fingerprint
     let ctx = gnupg::make_context()?;
+    //    ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -207,11 +204,10 @@ fn test_update_user_cert() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // import key as new user
-    let ctx_alice1 = gnupg::make_context()?;
-    gnupg::create_user(&ctx_alice1, "alice@example.org");
-    let alice1_key = gnupg::export(&ctx_alice1, &"alice@example.org");
+    gnupg::create_user(&ctx, "alice@example.org");
+    let alice1_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import_new(
+    ca.cert_import_new(
         &alice1_key,
         vec![],
         Some("Alice"),
@@ -219,47 +215,42 @@ fn test_update_user_cert() -> Result<()> {
     )
     .context("import Alice 1 to CA failed")?;
 
-    // import key as update to user key
-    let ctx_alice2 = gnupg::make_context()?;
-    gnupg::create_user(&ctx_alice2, "alice@example.org");
-    let alice2_key = gnupg::export(&ctx_alice2, &"alice@example.org");
+    // call "cert_import_new" again with the same key. this should be
+    // cause an error, because no two certs with the same fingerprint can be
+    // imported as distinct certs
+    let res = ca.cert_import_new(
+        &alice1_key,
+        vec![],
+        Some("Alice"),
+        &["alice@example.org"],
+    );
 
-    // get usercert for alice
-    let usercerts = ca.usercerts_get("alice@example.org")?;
+    assert!(res.is_err());
 
-    assert_eq!(usercerts.len(), 1);
+    // try to update the database cert entry with a different key.
+    // this should cause an error, because updating a key is only allowed if
+    // the fingerprint stays the same
 
-    let alice = &usercerts[0];
+    // make a new key
+    gnupg::create_user(&ctx, "bob@example.org");
+    let bob_key = gnupg::export(&ctx, &"bob@example.org");
 
-    // store updated version of cert
-    ca.usercert_import_update(&alice2_key, alice)?;
+    // call "cert_import_update" with a new key
 
-    // check the state of CA data
-    let usercerts = ca.usercerts_get_all()?;
-
-    assert_eq!(usercerts.len(), 2);
-
-    // test that the "new" usercert points to the "old" usercert via
-    // the updates_cert_id database field
-    for uc in usercerts {
-        match uc.id {
-            1 => assert_eq!(uc.updates_cert_id, None),
-            2 => assert_eq!(uc.updates_cert_id, Some(1)),
-            _ => panic!("only ID 1 and 2 should exist"),
-        }
-    }
-
-    // FIXME: add method to filter for "current" usercerts, or similar?!
+    // -> expect error, because this key doesn't exist in OpenPGP CA and
+    // thus is not a legal update
+    let res = ca.cert_import_update(&bob_key);
+    assert!(res.is_err());
 
     Ok(())
 }
 
 #[test]
-/// Create a new CA and two usercerts with the same email.
+/// Create a new CA and two certs with the same email.
 ///
-/// Expected outcome: two independent usercerts got created.
+/// Expected outcome: two independent certs / users got created.
 fn test_ca_insert_duplicate_email() -> Result<()> {
-    // two usercerts with the same email are considered distinct certs
+    // two certs with the same email are considered distinct certs
     // (e.g. "normal cert" vs "code signing cert")
 
     let ctx = gnupg::make_context()?;
@@ -273,22 +264,19 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     assert!(ca.ca_init("example.org", None).is_ok());
 
     // make CA user
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
     // make another CA user with the same email address
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let usercerts = ca.usercerts_get_all()?;
+    let certs = ca.certs_get_all()?;
 
-    assert_eq!(usercerts.len(), 2);
+    assert_eq!(certs.len(), 2);
 
-    // ca cert should be tsigned by all usercerts.
-    for uc in &usercerts {
-        let tsig = ca.usercert_check_tsig_on_ca(&uc)?;
+    // ca cert should be tsigned by all user certs.
+    for c in &certs {
+        let tsig = ca.cert_check_tsig_on_ca(&c)?;
         assert!(tsig);
-
-        // "updates_cert_id" should be None for all usercerts.
-        assert_eq!(uc.updates_cert_id, None);
     }
 
     Ok(())
@@ -312,13 +300,9 @@ fn test_ca_export_wkd() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     ca.ca_init("example.org", None)?;
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
-    ca.usercert_new(
-        Some(&"Bob"),
-        &["bob@example.org", "bob@other.org"],
-        false,
-    )?;
-    ca.usercert_new(Some(&"Carol"), &["carol@other.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Bob"), &["bob@example.org", "bob@other.org"], false)?;
+    ca.user_new(Some(&"Carol"), &["carol@other.org"], false)?;
 
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
@@ -387,18 +371,13 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     ca.ca_init("sequoia-pgp.org", None)?;
 
-    ca.usercert_import_new(
+    ca.cert_import_new(
         &justus_key,
         vec![],
         None,
         &["justus@sequoia-pgp.org"],
     )?;
-    ca.usercert_import_new(
-        &neal_key,
-        vec![],
-        None,
-        &["neal@sequoia-pgp.org"],
-    )?;
+    ca.cert_import_new(&neal_key, vec![], None, &["neal@sequoia-pgp.org"])?;
 
     // -- export as WKD
 
@@ -414,7 +393,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 /// Create a CA instance. Externally create a user cert and two revocations.
 /// Import user cert and both revocations.
 ///
-/// Check that CA API shows one usercert with two revocations.
+/// Check that CA API shows one cert with two revocations.
 fn test_ca_multiple_revocations() -> Result<()> {
     // create two different revocation certificates for one key and import them
 
@@ -433,7 +412,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
 
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import_new(&alice_key, vec![], None, &[])?;
+    ca.cert_import_new(&alice_key, vec![], None, &[])?;
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
@@ -446,13 +425,14 @@ fn test_ca_multiple_revocations() -> Result<()> {
     ca.revocation_add(&PathBuf::from(revoc_file3))?;
 
     // check data in CA
-    let usercerts = ca.usercerts_get_all()?;
+    let certs = ca.certs_get_all()?;
 
     // check that name/email has been autodetected on CA import from the pubkey
-    assert_eq!(usercerts.len(), 1);
-    let alice = &usercerts[0];
+    assert_eq!(certs.len(), 1);
+    let alice = &certs[0];
 
-    assert_eq!(alice.name, Some("Alice".to_string()));
+    let name = ca.cert_get_name(&alice)?;
+    assert_eq!(name, "Alice".to_string());
 
     let emails = ca.emails_get(alice)?;
     assert_eq!(emails.len(), 1);
@@ -473,7 +453,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
 /// - Carol is created with OpenPGP CA, so their cert is signed by and tsigns
 ///   the CA cert.
 ///
-/// Check the output of OpenpgpCa::usercerts_check_signatures().
+/// Check the output of OpenpgpCa::certs_check_signatures().
 /// Expected:
 /// - Alice is signed but hasn't tsigned the CA,
 /// - Bob is not signed and hasn't tsigned the CA,
@@ -491,7 +471,7 @@ fn test_ca_signatures() -> Result<()> {
     gnupg::create_user(&ctx, "alice@example.org");
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.usercert_import_new(
+    ca.cert_import_new(
         &alice_key,
         vec![],
         Some("Alice"),
@@ -505,16 +485,22 @@ fn test_ca_signatures() -> Result<()> {
 
     // CA does not signs bob's key because the "email" parameter is empty.
     // Only userids that are supplied in `email` are signed by the CA.
-    ca.usercert_import_new(&bob_key, vec![], Some("Bob"), &[])
+    ca.cert_import_new(&bob_key, vec![], Some("Bob"), &[])
         .context("import Bob to CA failed")?;
 
     // create carol, CA will sign carol's key.
     // also, CA key gets a tsig by carol
-    ca.usercert_new(Some(&"Carol"), &["carol@example.org"], false)?;
+    ca.user_new(Some(&"Carol"), &["carol@example.org"], false)?;
 
-    let sigs = ca.usercerts_check_certifications()?;
-    for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
-        match usercert.name.as_deref() {
+    let sigs = ca.certs_check_certifications()?;
+    for (cert, (sig_from_ca, tsig_on_ca)) in sigs {
+        let user = ca.cert_get_users(&cert)?;
+
+        assert_eq!(user.len(), 1);
+
+        let name: Option<String> = user[0].name.to_owned();
+
+        match name.as_deref() {
             Some("Alice") => {
                 assert!(sig_from_ca);
                 assert!(!tsig_on_ca);
@@ -549,13 +535,13 @@ fn test_apply_revocation() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA user
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let usercerts = ca.usercerts_get_all()?;
+    let certs = ca.certs_get_all()?;
 
-    assert_eq!(usercerts.len(), 1);
+    assert_eq!(certs.len(), 1);
 
-    let alice = &usercerts[0];
+    let alice = &certs[0];
 
     let rev = ca.revocations_get(alice)?;
     assert_eq!(rev.len(), 1);
@@ -598,7 +584,7 @@ fn test_import_signed_cert() -> Result<()> {
 
     // import alice into OpenPGP CA
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
-    ca.usercert_import_new(
+    ca.cert_import_new(
         &alice_key,
         vec![],
         Some("Alice"),
@@ -606,11 +592,11 @@ fn test_import_signed_cert() -> Result<()> {
     )?;
 
     // get alice cert back from CA
-    let users = ca.usercerts_get("alice@example.org")?;
-    assert_eq!(users.len(), 1);
+    let certs = ca.certs_get("alice@example.org")?;
+    assert_eq!(certs.len(), 1);
 
-    let alice = &users[0];
-    let cert = OpenpgpCa::usercert_to_cert(&alice)?;
+    let alice = &certs[0];
+    let cert = OpenpgpCa::cert_to_cert(&alice)?;
 
     assert_eq!(cert.userids().len(), 1);
 
@@ -625,12 +611,13 @@ fn test_import_signed_cert() -> Result<()> {
         );
     }
 
-    // check signature status via OpenpgpCa::usercerts_check_signatures()
-    let sigs = ca.usercerts_check_certifications()?;
+    // check signature status via OpenpgpCa::certs_check_signatures()
+    let sigs = ca.certs_check_certifications()?;
     assert_eq!(sigs.len(), 1);
-    for (usercert, (sig_from_ca, tsig_on_ca)) in sigs {
-        match usercert.name.as_deref() {
-            Some("Alice") => {
+    for (cert, (sig_from_ca, tsig_on_ca)) in sigs {
+        let name = ca.cert_get_name(&cert)?;
+        match name.deref() {
+            "Alice" => {
                 assert!(sig_from_ca);
                 assert!(!tsig_on_ca);
             }
@@ -664,12 +651,12 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // create Alice
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
     // gpg: make key for Bob
     gnupg::create_user(&ctx, "Bob <bob@example.org>");
     let bob_key = gnupg::export(&ctx, &"bob@example.org");
-    ca.usercert_import_new(&bob_key, vec![], None, &[])?;
+    ca.cert_import_new(&bob_key, vec![], None, &[])?;
 
     // make a revocation certificate for bob ...
     let revoc_file = format!("{}/bob.revoc", home_path);
@@ -716,18 +703,28 @@ fn test_revocation_no_fingerprint() -> Result<()> {
 
     //
     // -- check data in CA --
-    let usercerts = ca.usercerts_get_all()?;
+    let certs = ca.certs_get_all()?;
 
-    let alice = usercerts
+    let alice = certs
         .iter()
-        .find(|u| u.name == Some("Alice".to_owned()))
+        .find(|c| {
+            ca.cert_get_users(&c)
+                .unwrap()
+                .iter()
+                .any(|u| u.name == Some("Alice".to_owned()))
+        })
         .unwrap();
     let alice_revs = ca.revocations_get(alice)?;
     assert_eq!(alice_revs.len(), 1, "Revocation generated by OpenPGP CA");
 
-    let bob = usercerts
+    let bob = certs
         .iter()
-        .find(|u| u.name == Some("Bob".to_owned()))
+        .find(|c| {
+            ca.cert_get_users(&c)
+                .unwrap()
+                .iter()
+                .any(|u| u.name == Some("Bob".to_owned()))
+        })
         .unwrap();
     let bob_revs = ca.revocations_get(bob)?;
     assert_eq!(bob_revs.len(), 1, "Revocation without issuer fingerprint");
@@ -751,14 +748,14 @@ fn test_create_user_with_pw() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA user
-    ca.usercert_new(Some(&"Alice"), &["alice@example.org"], true)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], true)?;
 
-    let usercerts = ca.usercerts_get_all()?;
-    assert_eq!(usercerts.len(), 1);
-    let alice = &usercerts[0];
+    let certs = ca.certs_get_all()?;
+    assert_eq!(certs.len(), 1);
+    let alice = &certs[0];
 
     assert!(
-        ca.usercert_check_tsig_on_ca(alice)?,
+        ca.cert_check_tsig_on_ca(alice)?,
         "CA cert is not signed by Alice"
     );
 

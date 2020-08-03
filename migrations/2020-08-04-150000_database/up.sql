@@ -13,39 +13,74 @@ CREATE TABLE cacerts (
   FOREIGN KEY(ca_id) REFERENCES cas(id)
 );
 
-CREATE TABLE usercerts (
+CREATE TABLE users (
   id INTEGER NOT NULL PRIMARY KEY,
-  updates_cert_id INTEGER, -- this is an update to an older usercert
-
-  name VARCHAR,
-  pub_cert VARCHAR NOT NULL,
-  fingerprint VARCHAR NOT NULL,
+    name VARCHAR,
 
   -- FIXME publish flag (wkd, ..?)
   -- FIXME user retired
 
   ca_id INTEGER NOT NULL,
   FOREIGN KEY(ca_id) REFERENCES cas(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE certs (
+  id INTEGER NOT NULL PRIMARY KEY,
+
+  fingerprint VARCHAR NOT NULL,
+  pub_cert VARCHAR NOT NULL,
 
   CONSTRAINT cert_fingerprint_unique UNIQUE (fingerprint)
 );
 
+CREATE UNIQUE INDEX idx_certs_fingerprint
+ON certs (fingerprint);
+
+-- n:m mapping  users <-> certs
+CREATE TABLE users_certs (
+  id INTEGER NOT NULL PRIMARY KEY,
+
+  user_id INTEGER NOT NULL,
+  cert_id INTEGER NOT NULL,
+
+  FOREIGN KEY(user_id) REFERENCES users(id),
+  FOREIGN KEY(cert_id) REFERENCES certs(id)
+);
+
+CREATE INDEX idx_users_certs_user_id
+ON users_certs (user_id);
+
+CREATE INDEX idx_users_certs_cert_id
+ON users_certs (cert_id);
+
 CREATE TABLE emails (
   id INTEGER NOT NULL PRIMARY KEY,
   addr VARCHAR NOT NULL,
+
   CONSTRAINT emails_addr_unique UNIQUE (addr)
 );
 
--- n:m mapping  usercerts <-> emails
+CREATE INDEX idx_emails_addr
+ON emails (addr);
+
+-- n:m mapping  certs <-> emails
 CREATE TABLE certs_emails (
   id INTEGER NOT NULL PRIMARY KEY,
-  usercert_id INTEGER NOT NULL,
+
+  cert_id INTEGER NOT NULL,
   email_id INTEGER NOT NULL,
-  FOREIGN KEY(usercert_id) REFERENCES usercerts(id),
+
+  FOREIGN KEY(cert_id) REFERENCES certs(id),
   FOREIGN KEY(email_id) REFERENCES emails(id)
 );
 
--- revocations for user certs, user_ids, ...
+CREATE INDEX idx_certs_emails_cert_id
+ON certs_emails (cert_id);
+
+CREATE INDEX idx_certs_emails_email_id
+ON certs_emails (email_id);
+
+-- revocations for certs
 CREATE TABLE revocations (
   id INTEGER NOT NULL PRIMARY KEY,
   hash VARCHAR NOT NULL,
@@ -56,9 +91,12 @@ CREATE TABLE revocations (
   -- reason -- FIXME
   -- expiration_time -- FIXME
 
-  usercert_id INTEGER NOT NULL,
-  FOREIGN KEY(usercert_id) REFERENCES usercerts(id)
+  cert_id INTEGER NOT NULL,
+  FOREIGN KEY(cert_id) REFERENCES certs(id)
 );
+
+CREATE UNIQUE INDEX idx_revocations_hash
+ON revocations (hash);
 
 CREATE TABLE bridges (
   id INTEGER NOT NULL PRIMARY KEY,

@@ -58,24 +58,42 @@ pub struct NewCacert {
     Hash,
 )]
 #[belongs_to(Ca)]
-pub struct Usercert {
+pub struct User {
     pub id: i32,
-    pub updates_cert_id: Option<i32>,
     pub name: Option<String>,
-    pub pub_cert: String,
-    pub fingerprint: String,
     // https://docs.diesel.rs/diesel/associations/index.html
     pub ca_id: i32,
 }
 
 #[derive(Insertable, Debug)]
-#[table_name = "usercerts"]
-pub struct NewUsercert<'a> {
-    pub updates_cert_id: Option<i32>,
+#[table_name = "users"]
+pub struct NewUser<'a> {
     pub name: Option<&'a str>,
-    pub pub_cert: &'a str,
-    pub fingerprint: &'a str,
     pub ca_id: i32,
+}
+
+#[derive(
+    Identifiable,
+    Queryable,
+    Debug,
+    Associations,
+    Clone,
+    AsChangeset,
+    PartialEq,
+    Eq,
+    Hash,
+)]
+pub struct Cert {
+    pub id: i32,
+    pub fingerprint: String,
+    pub pub_cert: String,
+}
+
+#[derive(Insertable, Debug)]
+#[table_name = "certs"]
+pub struct NewCert<'a> {
+    pub fingerprint: &'a str,
+    pub pub_cert: &'a str,
 }
 
 #[derive(Identifiable, Queryable, Debug, Clone, PartialEq, Eq, Hash)]
@@ -91,32 +109,50 @@ pub struct NewEmail<'a> {
 }
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(Usercert)]
+#[belongs_to(Cert)]
 #[belongs_to(Email)]
 #[table_name = "certs_emails"]
 pub struct CertEmail {
     pub id: i32,
     // https://docs.diesel.rs/diesel/associations/index.html
-    pub usercert_id: i32,
+    pub cert_id: i32,
     pub email_id: i32,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "certs_emails"]
 pub struct NewCertEmail {
-    pub usercert_id: i32,
+    pub cert_id: i32,
     pub email_id: i32,
 }
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(Usercert)]
+#[belongs_to(User)]
+#[belongs_to(Cert)]
+#[table_name = "users_certs"]
+pub struct UserCert {
+    pub id: i32,
+    // https://docs.diesel.rs/diesel/associations/index.html
+    pub cert_id: i32,
+    pub user_id: i32,
+}
+
+#[derive(Insertable, Debug)]
+#[table_name = "users_certs"]
+pub struct NewUserCert {
+    pub cert_id: i32,
+    pub user_id: i32,
+}
+
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
+#[belongs_to(Cert)]
 pub struct Revocation {
     pub id: i32,
     pub hash: String,
     pub revocation: String,
     pub published: bool,
     // FIXME - https://docs.diesel.rs/diesel/associations/index.html
-    pub usercert_id: i32,
+    pub cert_id: i32,
 }
 
 #[derive(Insertable, Debug)]
@@ -125,7 +161,7 @@ pub struct NewRevocation<'a> {
     pub hash: &'a str,
     pub revocation: &'a str,
     pub published: bool,
-    pub usercert_id: i32,
+    pub cert_id: i32,
 }
 
 #[derive(Identifiable, Queryable, Clone, AsChangeset, Debug)]

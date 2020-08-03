@@ -52,19 +52,45 @@ impl Db {
 
     // --- building block functions ---
 
-    fn insert_usercert(&self, cert: NewUsercert) -> Result<Usercert> {
-        let inserted_count = diesel::insert_into(usercerts::table)
+    fn insert_user(&self, user: NewUser) -> Result<User> {
+        let inserted_count = diesel::insert_into(users::table)
+            .values(&user)
+            .execute(&self.conn)?;
+
+        if inserted_count != 1 {
+            return Err(anyhow::anyhow!(
+                "insert_user: insert should return count '1'"
+            ));
+        }
+
+        let u: Vec<User> = users::table
+            .order(users::id.desc())
+            .limit(inserted_count as i64)
+            .load(&self.conn)?
+            .into_iter()
+            .rev()
+            .collect();
+
+        if u.len() == 1 {
+            Ok(u[0].clone())
+        } else {
+            Err(anyhow::anyhow!("insert_user: unexpected insert failure"))
+        }
+    }
+
+    fn insert_cert(&self, cert: NewCert) -> Result<Cert> {
+        let inserted_count = diesel::insert_into(certs::table)
             .values(&cert)
             .execute(&self.conn)?;
 
         if inserted_count != 1 {
             return Err(anyhow::anyhow!(
-                "insert_usercert: insert should return count '1'"
+                "insert_cert: insert should return count '1'"
             ));
         }
 
-        let c: Vec<Usercert> = usercerts::table
-            .order(usercerts::id.desc())
+        let c: Vec<Cert> = certs::table
+            .order(certs::id.desc())
             .limit(inserted_count as i64)
             .load(&self.conn)?
             .into_iter()
@@ -74,9 +100,7 @@ impl Db {
         if c.len() == 1 {
             Ok(c[0].clone())
         } else {
-            Err(anyhow::anyhow!(
-                "insert_usercert: unexpected insert failure"
-            ))
+            Err(anyhow::anyhow!("insert_cert: unexpected insert failure"))
         }
     }
 
@@ -108,14 +132,10 @@ impl Db {
         }
     }
 
-    fn insert_or_link_email(
-        &self,
-        addr: &str,
-        usercert_id: i32,
-    ) -> Result<Email> {
+    fn insert_or_link_email(&self, addr: &str, cert_id: i32) -> Result<Email> {
         if let Some(e) = self.get_email(addr)? {
             let ce = NewCertEmail {
-                usercert_id,
+                cert_id,
                 email_id: e.id,
             };
             let inserted_count = diesel::insert_into(certs_emails::table)
@@ -131,8 +151,26 @@ impl Db {
 
             Ok(e)
         } else {
-            self.insert_email(NewEmail { addr }, usercert_id)
+            self.insert_email(NewEmail { addr }, cert_id)
         }
+    }
+
+    fn link_user_cert(&self, u: &User, c: &Cert) -> Result<()> {
+        let inserted_count = diesel::insert_into(users_certs::table)
+            .values(&NewUserCert {
+                cert_id: c.id,
+                user_id: u.id,
+            })
+            .execute(&self.conn)
+            .context("Error saving new users_certs")?;
+
+        if inserted_count != 1 {
+            return Err(anyhow::anyhow!(
+                "link_user_cert: insert should return count '1'"
+            ));
+        }
+
+        Ok(())
     }
 
     fn get_email(&self, addr: &str) -> Result<Option<Email>> {
@@ -150,11 +188,7 @@ impl Db {
         }
     }
 
-    fn insert_email(
-        &self,
-        email: NewEmail,
-        usercert_id: i32,
-    ) -> Result<Email> {
+    fn insert_email(&self, email: NewEmail, cert_id: i32) -> Result<Email> {
         let inserted_count = diesel::insert_into(emails::table)
             .values(&email)
             .execute(&self.conn)
@@ -183,7 +217,7 @@ impl Db {
         let e = e[0].clone();
 
         let ce = NewCertEmail {
-            usercert_id,
+            cert_id,
             email_id: e.id,
         };
         let inserted_count = diesel::insert_into(certs_emails::table)
@@ -269,15 +303,14 @@ impl Db {
         }
     }
 
-    pub fn add_usercert(
+    pub fn add_user(
         &self,
         name: Option<&str>,
         (pub_cert, fingerprint): (&str, &str),
         emails: &[&str],
         revocation_certs: &[String],
         ca_cert_tsigned: Option<&str>,
-        updates_cert_id: Option<i32>,
-    ) -> Result<Usercert> {
+    ) -> Result<User> {
         self.conn.transaction::<_, anyhow::Error, _>(|| {
             let (ca, mut cacert_db) =
                 self.get_ca().context("Couldn't find CA")?.unwrap();
@@ -292,15 +325,18 @@ impl Db {
                 self.update_cacert(&cacert_db)?;
             }
 
-            // UserCert
-            let newcert = NewUsercert {
-                updates_cert_id,
+            // User
+            let newuser = NewUser { name, ca_id: ca.id };
+            let u = self.insert_user(newuser)?;
+
+            // Cert
+            let newcert = NewCert {
                 pub_cert,
-                name,
                 fingerprint,
-                ca_id: ca.id,
             };
-            let c = self.insert_usercert(newcert)?;
+            let c = self.insert_cert(newcert)?;
+
+            self.link_user_cert(&u, &c)?;
 
             // Revocations
             for revocation in revocation_certs {
@@ -308,7 +344,7 @@ impl Db {
                 self.insert_revocation(NewRevocation {
                     hash,
                     revocation,
-                    usercert_id: c.id,
+                    cert_id: c.id,
                     published: false,
                 })?;
             }
@@ -317,15 +353,24 @@ impl Db {
             for addr in emails {
                 self.insert_or_link_email(addr, c.id)?;
             }
-            Ok(c)
+            Ok(u)
         })
     }
 
-    pub fn update_usercert(&self, usercert: &Usercert) -> Result<()> {
-        diesel::update(usercert)
-            .set(usercert)
+    pub fn update_cert(&self, cert: &Cert) -> Result<()> {
+        diesel::update(cert)
+            .set(cert)
             .execute(&self.conn)
-            .context("Error updating Usercert")?;
+            .context("Error updating Cert")?;
+
+        Ok(())
+    }
+
+    pub fn update_user(&self, user: &User) -> Result<()> {
+        diesel::update(user)
+            .set(user)
+            .execute(&self.conn)
+            .context("Error updating User")?;
 
         Ok(())
     }
@@ -339,70 +384,73 @@ impl Db {
         Ok(())
     }
 
-    pub fn get_usercert_by_id(&self, id: i32) -> Result<Option<Usercert>> {
-        let db: Vec<Usercert> = usercerts::table
-            .filter(usercerts::id.eq(id))
-            .load::<Usercert>(&self.conn)
-            .context("Error loading UserCert by id")?;
+    pub fn get_cert_by_id(&self, id: i32) -> Result<Option<Cert>> {
+        let db: Vec<Cert> = certs::table
+            .filter(certs::id.eq(id))
+            .load::<Cert>(&self.conn)
+            .context("Error loading Cert by id")?;
 
-        if let Some(usercert) = db.get(0) {
-            Ok(Some(usercert.clone()))
+        if let Some(cert) = db.get(0) {
+            Ok(Some(cert.clone()))
         } else {
             Ok(None)
         }
     }
 
-    pub fn get_usercert(&self, fingerprint: &str) -> Result<Option<Usercert>> {
-        let u = usercerts::table
-            .filter(usercerts::fingerprint.eq(fingerprint))
-            .load::<Usercert>(&self.conn)
-            .context("Error loading UserCert by fingerprint")?;
+    pub fn get_cert(&self, fingerprint: &str) -> Result<Option<Cert>> {
+        let u = certs::table
+            .filter(certs::fingerprint.eq(fingerprint))
+            .load::<Cert>(&self.conn)
+            .context("Error loading Cert by fingerprint")?;
 
         match u.len() {
             0 => Ok(None),
             1 => Ok(Some(u[0].clone())),
-            _ => {
-                Err(anyhow::anyhow!("get_usercert: expected 0 or 1 usercert"))
-            }
+            _ => Err(anyhow::anyhow!("get_cert: expected 0 or 1 cert")),
         }
     }
 
-    pub fn get_usercerts(&self, email: &str) -> Result<Vec<Usercert>> {
+    pub fn get_certs(&self, email: &str) -> Result<Vec<Cert>> {
         if let Some(email) = self.get_email(email)? {
-            let cert_ids = CertEmail::belonging_to(&email)
-                .select(certs_emails::usercert_id);
+            let cert_ids =
+                CertEmail::belonging_to(&email).select(certs_emails::cert_id);
 
-            Ok(usercerts::table
-                .filter(usercerts::id.eq_any(cert_ids))
-                .load::<Usercert>(&self.conn)
-                .expect("could not load usercerts"))
+            Ok(certs::table
+                .filter(certs::id.eq_any(cert_ids))
+                .load::<Cert>(&self.conn)
+                .expect("could not load certs"))
         } else {
             // FIXME: or error for email not found?
             Ok(vec![])
         }
     }
-
-    pub fn get_all_usercerts(&self) -> Result<Vec<Usercert>> {
-        Ok(usercerts::table
-            .load::<Usercert>(&self.conn)
-            .context("Error loading usercerts")?)
+    pub fn get_all_certs(&self) -> Result<Vec<Cert>> {
+        Ok(certs::table
+            .load::<Cert>(&self.conn)
+            .context("Error loading certs")?)
     }
 
-    pub fn get_revocations(&self, cert: &Usercert) -> Result<Vec<Revocation>> {
+    pub fn get_all_users(&self) -> Result<Vec<User>> {
+        Ok(users::table
+            .load::<User>(&self.conn)
+            .context("Error loading users")?)
+    }
+
+    pub fn get_revocations(&self, cert: &Cert) -> Result<Vec<Revocation>> {
         Ok(Revocation::belonging_to(cert).load::<Revocation>(&self.conn)?)
     }
 
     pub fn add_revocation(
         &self,
         revocation: &str,
-        cert: &Usercert,
+        cert: &Cert,
     ) -> Result<Revocation> {
         let hash = &Pgp::revocation_to_hash(revocation)?;
 
         self.insert_revocation(NewRevocation {
             hash,
             revocation,
-            usercert_id: cert.id,
+            cert_id: cert.id,
             published: false,
         })
     }
@@ -428,10 +476,7 @@ impl Db {
         }
     }
 
-    pub fn get_emails_by_usercert(
-        &self,
-        cert: &Usercert,
-    ) -> Result<Vec<Email>> {
+    pub fn get_emails_by_cert(&self, cert: &Cert) -> Result<Vec<Email>> {
         let email_ids =
             CertEmail::belonging_to(cert).select(certs_emails::email_id);
 
@@ -439,6 +484,16 @@ impl Db {
             .filter(emails::id.eq_any(email_ids))
             .load::<Email>(&self.conn)
             .expect("could not load emails"))
+    }
+
+    pub fn get_users_by_cert(&self, cert: &Cert) -> Result<Vec<User>> {
+        let user_ids =
+            UserCert::belonging_to(cert).select(users_certs::user_id);
+
+        Ok(users::table
+            .filter(users::id.eq_any(user_ids))
+            .load::<User>(&self.conn)
+            .expect("could not load users"))
     }
 
     pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {

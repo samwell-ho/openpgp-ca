@@ -1,6 +1,7 @@
 DROP TABLE if exists cas;
 DROP TABLE if exists cacerts;
-DROP TABLE if exists usercerts;
+DROP TABLE if exists users;
+DROP TABLE if exists users_certs;
 DROP TABLE if exists emails;
 DROP TABLE if exists certs_emails;
 DROP TABLE if exists revocations;
