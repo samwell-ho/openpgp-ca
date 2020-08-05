@@ -546,7 +546,7 @@ impl OpenpgpCa {
 
         Ok(sigs
             .iter()
-            .any(|s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
+            .any(|s| s.issuer_fingerprint() == Some(&ca.fingerprint())))
     }
 
     /// Check if this Usercert has tsigned the CA Key
