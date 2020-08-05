@@ -32,6 +32,7 @@ use openpgp::types::{
 };
 use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
+use std::convert::identity;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -252,8 +253,7 @@ impl Pgp {
                     None
                 }
             })
-            .filter(|fp| fp.is_some())
-            .map(|fp| fp.unwrap())
+            .filter_map(identity)
             .collect();
 
         match sig_fingerprints.len() {
