@@ -496,7 +496,7 @@ impl OpenpgpCa {
 
         Ok(sigs
             .iter()
-            .any(|s| s.issuer_fingerprint().unwrap() == &ca.fingerprint()))
+            .any(|s| s.issuer_fingerprint() == Some(&ca.fingerprint())))
     }
 
     /// Check if this Cert has tsigned the CA Key
@@ -506,9 +506,9 @@ impl OpenpgpCa {
 
         let user_cert = Pgp::armored_to_cert(&cert.pub_cert)?;
 
-        Ok(tsigs.iter().any(|t| {
-            t.issuer_fingerprint().unwrap() == &user_cert.fingerprint()
-        }))
+        Ok(tsigs
+            .iter()
+            .any(|t| t.issuer_fingerprint() == Some(&user_cert.fingerprint())))
     }
 
     /// Get sequoia Cert representation of a database Cert
