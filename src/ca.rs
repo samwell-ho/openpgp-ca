@@ -249,7 +249,7 @@ impl OpenpgpCa {
         emails: &[&str],
         password: bool,
     ) -> Result<()> {
-        let ca_cert = self.ca_get_cert().unwrap();
+        let ca_cert = self.ca_get_cert()?;
 
         // make user key (signed by CA)
         let (user, revoc, pass) = Pgp::make_user_cert(emails, name, password)
@@ -359,7 +359,7 @@ impl OpenpgpCa {
         } else {
             // no - this is a new usercert that we need to create in the DB
 
-            let ca_cert = self.ca_get_cert().unwrap();
+            let ca_cert = self.ca_get_cert()?;
 
             // sign only the User IDs that have been specified
             let certified =
@@ -386,7 +386,7 @@ impl OpenpgpCa {
                 let userids: Vec<_> = user_cert.userids().collect();
                 let emails: Vec<String> = userids
                     .iter()
-                    .map(|uid| uid.userid().email().unwrap_or(None).unwrap())
+                    .filter_map(|uid| uid.userid().email().ok().flatten())
                     .collect();
                 emails
             };
@@ -979,8 +979,8 @@ impl OpenpgpCa {
         let mut merge = Pgp::armored_to_cert(&usercert.pub_cert)?;
 
         for email in emails {
-            let mut core = Core::new().unwrap();
-            let certs = core.run(wkd::get(&email.addr)).unwrap();
+            let mut core = Core::new()?;
+            let certs = core.run(wkd::get(&email.addr))?;
 
             for cert in certs {
                 if cert.fingerprint().to_hex() == usercert.fingerprint {
@@ -1011,7 +1011,7 @@ impl OpenpgpCa {
         let c = sequoia_core::Context::new()?;
         let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
 
-        let mut core = Core::new().unwrap();
+        let mut core = Core::new()?;
 
         let f = (usercert.fingerprint).parse::<Fingerprint>()?;
         let cert = core.run(hagrid.get(&KeyID::from(f)))?;
