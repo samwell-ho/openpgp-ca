@@ -58,11 +58,23 @@ This is called
 ascertaining that a key is indeed the correct key for the other party.  (A closely
 related goal is key discovery, which OpenPGP CA also simplifies.)
 
-Imagine that we're sending an email to Alice. When authentication works, our
-email client will show a green icon, or something similar when we have the
-right key for Alice.
+Imagine that we're receiving an email from Alice. Our email software can
+indicate to us whether we can authenticate Alice's OpenPGP key.
 
-{+ screenshot(s) of thunderbird - with/without authentication}
+For example, Thunderbird/Enigmail shows the authentication status for a signed
+email with two visual cues:
+1) the color of the bar at the top of the email window, and
+2) the "envelope" icon at the right side of the window.
+
+This is how an email looks from an unauthenticated sender:
+
+![Image](enigmail-sig.png "Thunderbird/Enigmail showing an unauthenticated signature")
+
+In contrast, when authentication works, Thunderbird/Enigmail shows this with a
+green bar, and a wax seal on the envelope icon, both indicating that we
+have the right key for Alice:
+
+![Image](enigmail-sig-auth.png "Thunderbird/Enigmail showing an authenticated signature")
 
 More precisely, what is authenticated is the association between an identity
 and a key. Authentication deals with identities and
