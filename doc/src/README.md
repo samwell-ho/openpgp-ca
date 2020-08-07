@@ -61,10 +61,10 @@ related goal is key discovery, which OpenPGP CA also simplifies.)
 Imagine that we're receiving an email from Alice. Our email software can
 indicate to us whether we can authenticate Alice's OpenPGP key.
 
-For example, Thunderbird/Enigmail shows the authentication status for a signed
+For example, the Enigmail plug-in for Thunderbird 68 shows the authentication status for a signed
 email with two visual cues:
 1) the color of the bar at the top of the email window, and
-2) the "envelope" icon at the right side of the window.
+2) the envelope icon at the right side of the window.
 
 This is how an email looks from an unauthenticated sender:
 
@@ -72,7 +72,7 @@ This is how an email looks from an unauthenticated sender:
 
 In contrast, when authentication works, Thunderbird/Enigmail shows this with a
 green bar, and a wax seal on the envelope icon, both indicating that we
-have the right key for Alice:
+have an authenticated key for Alice:
 
 ![Image](enigmail-sig-auth.png "Thunderbird/Enigmail showing an authenticated signature")
 
@@ -110,23 +110,21 @@ encrypted channel
 
 ## With OpenPGP CA the most common communication partners are automatically authenticated
 
-People often mainly communicate with others in the same
-organization - and with people in one of a few affiliated organizations. 
+We can classify communication partners into three categories: people in the same
+organization, people in an affiliated organization, and other.  For our purposes,
+we consider two organizations to be affiliated if they often communicate with each other.  OpenPGP CA is designed to secure the first two types of communication, but
+it can even help with the third type.
 
-For example, imagine two organizations `alpha.org` and `beta.org`. Each
-organization has a number of users, some of whom exchange lots of email,
-others only infrequently. Some users might in addition have regular email
-contacts outside of the two organizations.
+The following figure shows two affiliated organizations, `alpha.org` and `beta.org`,
+a few of their members, a third-party (Carol), arrows showing who communicates with whom, and how often.  These communication patterns are typtical for many organizations.
 
 ![Image](emails.png "Patterns of email between users of two organizations")
 
-With OpenPGP CA, when communication follows this type of pattern, users'
-OpenPGP software will be able to authenticate their most common
-communication partners without any extra effort from the user.
-Members of the organization automatically have
-authenticated paths to the people they communicate with most: people
-within their organization, and their usual external collaborators.
-
+Using OpenPGP CA, the admin of `alpha.org` and the admin of `beta.org` can
+ensure that all of their users' OpenPGP-based tools can automatically
+authenticate all of their communication partners.  That is, after the initial
+setup, normal users don't need to do anything to authenticate their communication
+partners.  The admins do all of the work with the help of OpenPGP CA.
 
 ## Intended Audience
 
