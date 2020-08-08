@@ -442,9 +442,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="1"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.1524332"
-     inkscape:cx="790.98733"
-     inkscape:cy="604.95139"
+     inkscape:zoom="1.1557459"
+     inkscape:cx="930.82203"
+     inkscape:cy="416.45573"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -521,27 +521,37 @@
          id="flowPara4825" /></flowRoot>    <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
-       x="138.021"
-       y="69.750603"
+       x="142.14856"
+       y="66.893127"
        id="text5134"
        inkscape:export-xdpi="96"
        inkscape:export-ydpi="96"
-       inkscape:export-filename="/home/heiko/path1009.png"><tspan
+       inkscape:export-filename="/home/heiko/src/openpgp/openpgp-ca/doc/src/certification.png"><tspan
          sodipodi:role="line"
          id="tspan5132"
-         x="138.021"
-         y="69.750603"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332">Bob certifies that</tspan><tspan
+         x="142.14856"
+         y="66.893127"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332">Bob verified</tspan><tspan
          sodipodi:role="line"
-         x="138.021"
-         y="74.5131"
+         x="142.14856"
+         y="71.655624"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
-         id="tspan5858">key 0xCCCC</tspan><tspan
+         id="tspan5858">that key 0xCCCC</tspan><tspan
          sodipodi:role="line"
-         x="138.021"
-         y="79.275604"
+         x="142.14856"
+         y="76.418129"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
-         id="tspan5856">belongs to Carol</tspan></text>
+         id="tspan5856">belongs to Carol</tspan><tspan
+         sodipodi:role="line"
+         x="142.14856"
+         y="81.180626"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
+         id="tspan1522">and recorded this</tspan><tspan
+         sodipodi:role="line"
+         x="142.14856"
+         y="85.94313"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
+         id="tspan1524">as a certification</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
@@ -626,7 +636,7 @@
     </g>
     <path
        style="fill:none;stroke:#000000;stroke-width:0.15899999;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-mid:url(#marker1336);marker-end:url(#marker2032)"
-       d="m 144.02073,120.14532 c -0.79994,13.66233 -3.9777,22.89402 -15.80951,26.49728"
+       d="m 144.02073,120.14532 c -0.38787,8.58011 -4.38977,14.24052 -16.22158,17.84378"
        id="path1017"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
@@ -685,24 +695,29 @@
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.07999992px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
        x="127.99322"
-       y="105.67841"
+       y="102.18597"
        id="text4781"><tspan
-         id="tspan5774"
          sodipodi:role="line"
          x="127.99322"
-         y="105.67841"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.07999992px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332">Certification for</tspan><tspan
-         sodipodi:role="line"
-         x="127.99322"
-         y="112.02841"
+         y="102.18597"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.07999992px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
-         id="tspan14994">0xCCCC from Bob</tspan></text>
+         id="tspan1503">Certification of</tspan><tspan
+         sodipodi:role="line"
+         x="127.99322"
+         y="108.53596"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.07999992px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
+         id="tspan1509">&lt;Carol, 0xCCCC&gt;</tspan><tspan
+         sodipodi:role="line"
+         x="127.99322"
+         y="114.88596"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.07999992px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
+         id="tspan14994">by 0xBBBB</tspan></text>
     <rect
-       style="fill:none;stroke:#000000;stroke-width:0.11609121;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:none;stroke:#000000;stroke-width:0.11750814;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="rect32666"
-       width="63.705845"
+       width="65.270432"
        height="23.059753"
-       x="112.52345"
+       x="110.95887"
        y="95.600006" />
     <flowRoot
        xml:space="preserve"
@@ -768,7 +783,7 @@
          style="fill:none;stroke:#000000;stroke-width:0.16664037;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
     </g>
     <g
-       transform="translate(104.59588,-11.776891)"
+       transform="translate(103.64338,-11.776891)"
        id="g17608">
       <g
          transform="translate(62.234342,-1.82146)"

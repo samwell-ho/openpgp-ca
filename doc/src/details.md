@@ -23,20 +23,26 @@ included when distributing OpenPGP keys.
 
 ## Regular certifications
 
-A certification is a record that indicates what key an entity allegedly
-controls.  When Bob certified that Carol's key is `0xCCCC`, he can create
-a certification that records that fact.  The certification is first
-useful to him: all of his software now understands that he has verified
-Carol's key.  If he publishes the certification, e.g., on a key server,
-it can also be useful to others.
-
 Say that Alice wants to communicate with Carol, but she hasn't authenticated
-Carol's key.  If she has access to Bob's certification she has evidence that
-`0xCCCC` is the right key for Carol.  Of course, Carol should only trust Bob's
-certification as much as she trusts Bob to correctly certify Alice's
-key.
+Carol's key.
+
+A certification is a record that indicates what key an entity allegedly
+controls.  When Bob certifies that Carol's key is `0xCCCC`, he can create
+a certification that records that fact. This certification binds an
+identity ("Carol", in our example; in practice, OpenPGP certifications
+often use email addresses as identities) with a key ("0xCCCC", here), 
+
+This certification is first useful to Bob: his software now
+understands that he has verified Carol's key.  If he publishes the
+certification, e.g., on a key server, it can also be useful to others.
+
+For example, if Alice has access to Bob's certification, she has evidence that
+`0xCCCC` is the right key for Carol:
 
 ![Image](certification.png "Bob certified Carol's Key")
+
+Of course, Carol should only trust Bob's certification as much as she
+trusts Bob to correctly certify Alice's key.
 
 ## Trust signatures
 
