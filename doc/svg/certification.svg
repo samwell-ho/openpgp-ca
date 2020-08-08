@@ -443,8 +443,8 @@
      inkscape:pageopacity="1"
      inkscape:pageshadow="2"
      inkscape:zoom="1.1557459"
-     inkscape:cx="930.82203"
-     inkscape:cy="416.45573"
+     inkscape:cx="747.69927"
+     inkscape:cy="192.15088"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -712,13 +712,6 @@
          y="114.88596"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.07999992px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
          id="tspan14994">by 0xBBBB</tspan></text>
-    <rect
-       style="fill:none;stroke:#000000;stroke-width:0.11750814;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
-       id="rect32666"
-       width="65.270432"
-       height="23.059753"
-       x="110.95887"
-       y="95.600006" />
     <flowRoot
        xml:space="preserve"
        id="flowRoot42800"
@@ -731,7 +724,7 @@
            y="272.57446" /></flowRegion><flowPara
          id="flowPara42806" /></flowRoot>    <path
        style="fill:none;stroke:#000000;stroke-width:0.15875;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.47624999, 0.47624999;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#Arrow1Lend)"
-       d="M 30.160114,116.68488 C 74.07487,199.13435 162.6977,158.79823 162.21506,119.23951"
+       d="m 30.160114,116.68488 c 60.947046,75.85633 120.724866,46.7835 120.516946,3.51613"
        id="path68552"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc"
