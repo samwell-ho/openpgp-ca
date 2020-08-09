@@ -298,8 +298,8 @@ journalists, and lawyers.
 
 OpenPGP CA cannot only be used to create authenticated paths between users in a single organization, but also between organizations, in a decentralized, federated manner.
 
-Affiliated organizations that use OpenPGP CA can easily set up a
-so-called bridge between their respective CAs.
+Affiliated organizations that use OpenPGP CA can easily set up what we call a
+bridge between their respective CAs.
 Creating a bridge creates authenticated paths between all users in the two
 organizations - users in each organizations can authenticate
 keys of users in the other without any additional effort.

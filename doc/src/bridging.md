@@ -2,8 +2,8 @@ Until now, we've shown how to use OpenPGP CA to make it easy for
 users (or rather, their software) in the same organization to authenticate
 each other's keys.  It is also possible for OpenPGP CA admins to connect their
 organizations so that any user at one organization can authenticate the OpenPGP keys of users at the other
-organization and vice versa.  This is done by creating a so-called
-bridge between the two OpenPGP CA instances.
+organization and vice versa.  We call this type of setup a bridge between
+two OpenPGP CA instances.
 
 A bridge should only be created when the CA admins at both organizations are
 satisfied that the other admin is following good
@@ -432,3 +432,17 @@ within their own organization, for their internal use).
 Scoping trust to remote organizations in this way formalizes the distinction
 between certifications within an organization and certifications of keys
 that are external to the organization. 
+
+# Variation on bridging (unidirectional bridge)
+
+In some cases it may be preferrable, or simply sufficient, to set up only one
+half of the bridge configuration as described above.
+
+For example, the OpenPGP CA admin at `alpha.org` may decide to configure a
+bridge to the OpenPGP CA key at `beta.org`, but the reverse bridge from
+`beta.org` to `alpha.org` might not get set up.
+In such a setup, `alice@alpha.org` could easily authenticate `bob@beta.org`,
+but not the reverse.
+
+This is a normal and fully  supported use case - OpenPGP CA doesn't require
+bridges to be symmetrical.

@@ -126,7 +126,7 @@ Organizations often work closely with a few other
 organizations.  It greatly simplifies the work of such
 organizations if their users don't have to manually validate each other's
 keys to securely communicate.  OpenPGP CA supports this use case by
-by faciliating the creation of so-called "bridges" between organizations.
+by faciliating the creation of so-called bridges between organizations.
 
 In technical terms, OpenPGP CA bridges organizations using *scoped* trust signatures.
 For instance, if users at the two organizations `alpha.org` and `beta.org`
