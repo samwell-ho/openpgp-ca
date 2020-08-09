@@ -141,7 +141,9 @@ Allowing the remote CA admin to act as a trusted introducer for arbitrary
 user ids would give the remote CA admin much too much power.
 
 Using a bridge, members of each organization can authenticate members of
-the bridged organization as illustrated in the following figure:
+the remote organization.  The following diagram shows the keys and
+certifications that are created when bridging two organizations. The
+bold path shows the path that Alice can use to authenticate Bob:
 
 ![Image](bridge.png "Bridge between two organizations")
 
