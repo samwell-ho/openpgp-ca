@@ -83,7 +83,7 @@ fn main() -> Result<()> {
             UserCommand::Export { email } => {
                 let certs = match email {
                     Some(email) => ca.certs_get(&email)?,
-                    None => ca.certs_get_all()?,
+                    None => ca.user_certs_get_all()?,
                 };
                 certs.iter().for_each(|cert| println!("{}", cert.pub_cert));
             }
@@ -173,34 +173,41 @@ fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
 
 fn print_certifications_status(ca: &OpenpgpCa) -> Result<()> {
     let mut count_ok = 0;
+    let mut count_all = 0;
 
-    let certifications_status = ca.certs_check_certifications()?;
-    for (cert, (sig_from_ca, tsig_on_ca)) in &certifications_status {
-        let name = ca.cert_get_name(&cert);
-        let ok = if *sig_from_ca {
-            true
-        } else {
-            println!(
-                "Missing certification by CA for user {:?} fingerprint {}.",
-                name, cert.fingerprint
-            );
-            false
-        } && if *tsig_on_ca {
-            true
-        } else {
-            println!("CA Cert has not been tsigned by user {:?}", name);
-            false
-        };
+    for user in ca.users_get_all()? {
+        for cert in ca.get_certs_by_user(&user)? {
+            let (sig_from_ca, tsig_on_ca) =
+                ca.cert_check_certifications(&cert)?;
 
-        if ok {
-            count_ok += 1;
+            count_all += 1;
+
+            let name = ca.cert_get_name(&cert);
+            let ok = if sig_from_ca {
+                true
+            } else {
+                println!(
+                    "Missing certification by CA for user {:?} fingerprint {}.",
+                    user.name, cert.fingerprint
+                );
+                false
+            } && if tsig_on_ca {
+                true
+            } else {
+                println!("CA Cert has not been tsigned by user {:?}", name);
+                false
+            };
+
+            if ok {
+                count_ok += 1;
+            }
         }
     }
+
     println!(
         "Checked {} user keys, {} of them had good certifications in both \
         directions.",
-        certifications_status.len(),
-        count_ok
+        count_all, count_ok
     );
 
     Ok(())
@@ -233,33 +240,38 @@ fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Result<()> {
 }
 
 fn print_users(ca: &OpenpgpCa) -> Result<()> {
-    for (cert, (sig_by_ca, tsig_on_ca)) in ca.certs_check_certifications()? {
-        let name = ca.cert_get_name(&cert)?;
+    for user in ca.users_get_all()? {
+        let name = user.name.clone().unwrap_or_else(|| "<no name>".to_owned());
 
-        println!("OpenPGP key for '{}'", name);
-        println!(" fingerprint {}", cert.fingerprint);
+        for cert in ca.get_certs_by_user(&user)? {
+            let (sig_by_ca, tsig_on_ca) =
+                ca.cert_check_certifications(&cert)?;
 
-        println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
-        println!(" user cert has tsigned CA: {}", tsig_on_ca);
+            println!("OpenPGP key for '{}'", name);
+            println!(" fingerprint {}", cert.fingerprint);
 
-        ca.emails_get(&cert)?
-            .iter()
-            .for_each(|email| println!(" - email {}", email.addr));
+            println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
+            println!(" user cert has tsigned CA: {}", tsig_on_ca);
 
-        if let Some(exp) = OpenpgpCa::cert_expiration(&cert)? {
-            let datetime: DateTime<Utc> = exp.into();
-            println!(" expires: {}", datetime.format("%d/%m/%Y"));
-        } else {
-            println!(" no expiration date is set for this user key");
+            ca.emails_get(&cert)?
+                .iter()
+                .for_each(|email| println!(" - email {}", email.addr));
+
+            if let Some(exp) = OpenpgpCa::cert_expiration(&cert)? {
+                let datetime: DateTime<Utc> = exp.into();
+                println!(" expires: {}", datetime.format("%d/%m/%Y"));
+            } else {
+                println!(" no expiration date is set for this user key");
+            }
+
+            let revs = ca.revocations_get(&cert)?;
+            println!(" {} revocation certificate(s) available", revs.len());
+
+            if OpenpgpCa::cert_possibly_revoked(&cert)? {
+                println!(" this user key has (possibly) been REVOKED");
+            }
+            println!();
         }
-
-        let revs = ca.revocations_get(&cert)?;
-        println!(" {} revocation certificate(s) available", revs.len());
-
-        if OpenpgpCa::cert_possibly_revoked(&cert)? {
-            println!(" this user key has (possibly) been REVOKED");
-        }
-        println!();
     }
 
     Ok(())
@@ -279,9 +291,11 @@ fn export_bridges(ca: &OpenpgpCa, email: Option<String>) -> Result<()> {
         ca.bridges_get()?
     };
 
-    bridges
-        .iter()
-        .for_each(|bridge| println!("{}", bridge.pub_key));
+    for bridge in bridges {
+        let cert = ca.cert_by_id(bridge.cert_id)?;
+        println!("{}", cert.unwrap().pub_cert);
+    }
+
     Ok(())
 }
 

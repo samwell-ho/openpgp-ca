@@ -132,64 +132,8 @@ impl Db {
         }
     }
 
-    fn insert_or_link_email(&self, addr: &str, cert_id: i32) -> Result<Email> {
-        if let Some(e) = self.get_email(addr)? {
-            let ce = NewCertEmail {
-                cert_id,
-                email_id: e.id,
-            };
-            let inserted_count = diesel::insert_into(certs_emails::table)
-                .values(&ce)
-                .execute(&self.conn)
-                .context("Error saving new certs_emails")?;
-
-            if inserted_count != 1 {
-                return Err(anyhow::anyhow!(
-                    "insert_or_link_email: insert should return count '1'"
-                ));
-            }
-
-            Ok(e)
-        } else {
-            self.insert_email(NewEmail { addr }, cert_id)
-        }
-    }
-
-    fn link_user_cert(&self, u: &User, c: &Cert) -> Result<()> {
-        let inserted_count = diesel::insert_into(users_certs::table)
-            .values(&NewUserCert {
-                cert_id: c.id,
-                user_id: u.id,
-            })
-            .execute(&self.conn)
-            .context("Error saving new users_certs")?;
-
-        if inserted_count != 1 {
-            return Err(anyhow::anyhow!(
-                "link_user_cert: insert should return count '1'"
-            ));
-        }
-
-        Ok(())
-    }
-
-    fn get_email(&self, addr: &str) -> Result<Option<Email>> {
-        let emails: Vec<Email> = emails::table
-            .filter(emails::addr.eq(addr))
-            .load::<Email>(&self.conn)
-            .context("Error loading Emails")?;
-
-        match emails.len() {
-            0 => Ok(None),
-            1 => Ok(Some(emails[0].clone())),
-            _ => Err(anyhow::anyhow!(
-                "found more than one email for addr, this should not happen"
-            )),
-        }
-    }
-
-    fn insert_email(&self, email: NewEmail, cert_id: i32) -> Result<Email> {
-        let inserted_count = diesel::insert_into(emails::table)
+    fn insert_email(&self, email: NewCertEmail) -> Result<CertEmail> {
+        let inserted_count = diesel::insert_into(certs_emails::table)
             .values(&email)
             .execute(&self.conn)
             .context("Error saving new email")?;
@@ -200,12 +144,11 @@ impl Db {
             ));
         }
 
-        let e: Vec<Email> = emails::table
-            .order(emails::id.desc())
+        let e: Vec<CertEmail> = certs_emails::table
+            .order(certs_emails::id.desc())
             .limit(inserted_count as i64)
             .load(&self.conn)?
             .into_iter()
-            .rev()
             .collect();
 
         if e.len() != 1 {
@@ -214,24 +157,7 @@ impl Db {
             ));
         }
 
-        let e = e[0].clone();
-
-        let ce = NewCertEmail {
-            cert_id,
-            email_id: e.id,
-        };
-        let inserted_count = diesel::insert_into(certs_emails::table)
-            .values(&ce)
-            .execute(&self.conn)
-            .context("Error saving new certs_emails")?;
-
-        if inserted_count != 1 {
-            return Err(anyhow::anyhow!(
-                "insert_email: unexpected insert failure [certs_emails]"
-            ));
-        }
-
-        Ok(e)
+        Ok(e[0].clone())
     }
 
     // --- public ---
@@ -251,7 +177,7 @@ impl Db {
 
             let ca_cert = NewCacert {
                 ca_id: ca.id,
-                cert: ca_key.to_string(),
+                priv_cert: ca_key.to_string(),
             };
             diesel::insert_into(cacerts::table)
                 .values(&ca_cert)
@@ -319,9 +245,9 @@ impl Db {
             if let Some(ca_cert_tsigned) = ca_cert_tsigned {
                 let tsigned = Pgp::armored_to_cert(&ca_cert_tsigned)?;
 
-                let merged =
-                    Pgp::armored_to_cert(&cacert_db.cert)?.merge(tsigned)?;
-                cacert_db.cert = Pgp::priv_cert_to_armored(&merged)?;
+                let merged = Pgp::armored_to_cert(&cacert_db.priv_cert)?
+                    .merge(tsigned)?;
+                cacert_db.priv_cert = Pgp::priv_cert_to_armored(&merged)?;
                 self.update_cacert(&cacert_db)?;
             }
 
@@ -329,14 +255,7 @@ impl Db {
             let newuser = NewUser { name, ca_id: ca.id };
             let u = self.insert_user(newuser)?;
 
-            // Cert
-            let newcert = NewCert {
-                pub_cert,
-                fingerprint,
-            };
-            let c = self.insert_cert(newcert)?;
-
-            self.link_user_cert(&u, &c)?;
+            let c = self.add_cert(pub_cert, fingerprint, Some(u.id))?;
 
             // Revocations
             for revocation in revocation_certs {
@@ -350,11 +269,28 @@ impl Db {
             }
 
             // Emails
-            for addr in emails {
-                self.insert_or_link_email(addr, c.id)?;
+            for &addr in emails {
+                self.insert_email(NewCertEmail {
+                    addr: addr.to_owned(),
+                    cert_id: c.id,
+                })?;
             }
             Ok(u)
         })
+    }
+
+    pub fn add_cert(
+        &self,
+        pub_cert: &str,
+        fingerprint: &str,
+        user_id: Option<i32>,
+    ) -> Result<Cert> {
+        let newcert = NewCert {
+            pub_cert,
+            fingerprint,
+            user_id,
+        };
+        self.insert_cert(newcert)
     }
 
     pub fn update_cert(&self, cert: &Cert) -> Result<()> {
@@ -411,27 +347,26 @@ impl Db {
     }
 
     pub fn get_certs(&self, email: &str) -> Result<Vec<Cert>> {
-        if let Some(email) = self.get_email(email)? {
-            let cert_ids =
-                CertEmail::belonging_to(&email).select(certs_emails::cert_id);
+        let cert_ids = certs_emails::table
+            .filter(certs_emails::addr.eq(email))
+            .select(certs_emails::cert_id);
 
-            Ok(certs::table
-                .filter(certs::id.eq_any(cert_ids))
-                .load::<Cert>(&self.conn)
-                .expect("could not load certs"))
-        } else {
-            // FIXME: or error for email not found?
-            Ok(vec![])
-        }
-    }
-    pub fn get_all_certs(&self) -> Result<Vec<Cert>> {
         Ok(certs::table
+            .filter(certs::id.eq_any(cert_ids))
             .load::<Cert>(&self.conn)
-            .context("Error loading certs")?)
+            .expect("could not load certs"))
     }
 
-    pub fn get_all_users(&self) -> Result<Vec<User>> {
+    /// All Certs that belong to `user`, ordered by certs::id
+    pub fn get_cert_by_user(&self, user: &User) -> Result<Vec<Cert>> {
+        Ok(Cert::belonging_to(user)
+            .order(certs::id)
+            .load::<Cert>(&self.conn)?)
+    }
+
+    pub fn get_all_users_sort_by_name(&self) -> Result<Vec<User>> {
         Ok(users::table
+            .order((users::name, users::id))
             .load::<User>(&self.conn)
             .context("Error loading users")?)
     }
@@ -476,24 +411,30 @@ impl Db {
         }
     }
 
-    pub fn get_emails_by_cert(&self, cert: &Cert) -> Result<Vec<Email>> {
-        let email_ids =
-            CertEmail::belonging_to(cert).select(certs_emails::email_id);
-
-        Ok(emails::table
-            .filter(emails::id.eq_any(email_ids))
-            .load::<Email>(&self.conn)
+    pub fn get_emails_by_cert(&self, cert: &Cert) -> Result<Vec<CertEmail>> {
+        Ok(certs_emails::table
+            .filter(certs_emails::cert_id.eq(cert.id))
+            .load(&self.conn)
             .expect("could not load emails"))
     }
 
-    pub fn get_users_by_cert(&self, cert: &Cert) -> Result<Vec<User>> {
-        let user_ids =
-            UserCert::belonging_to(cert).select(users_certs::user_id);
+    pub fn get_user_by_cert(&self, cert: &Cert) -> Result<Option<User>> {
+        match cert.user_id {
+            None => Ok(None),
+            Some(search_id) => {
+                let users = users::table
+                    .filter(users::id.eq(search_id))
+                    .load::<User>(&self.conn)?;
 
-        Ok(users::table
-            .filter(users::id.eq_any(user_ids))
-            .load::<User>(&self.conn)
-            .expect("could not load users"))
+                match users.len() {
+                    0 => Ok(None),
+                    1 => Ok(Some(users[0].clone())),
+                    _ => Err(anyhow::anyhow!(
+                        "get_user_by_cert: found more than 1 user for a cert. this should be impossible."
+                    )),
+                }
+            }
+        }
     }
 
     pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {
@@ -521,15 +462,6 @@ impl Db {
         } else {
             Err(anyhow::anyhow!("insert_user: unexpected insert failure"))
         }
-    }
-
-    pub fn update_bridge(&self, bridge: &Bridge) -> Result<()> {
-        diesel::update(bridge)
-            .set(bridge)
-            .execute(&self.conn)
-            .context("Error updating Bridge")?;
-
-        Ok(())
     }
 
     pub fn search_bridge(&self, email: &str) -> Result<Option<Bridge>> {

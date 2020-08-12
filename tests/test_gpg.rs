@@ -60,7 +60,7 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     gnupg::import(&ctx, &buf);
 
     // import CA users into GnuPG
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
 
     assert_eq!(certs.len(), 2);
 
@@ -221,7 +221,7 @@ fn test_bridge() -> Result<()> {
     let ctx = gnupg::make_context()?;
 
     // don't delete home dir (for manual inspection)
-    //    ctx.leak_tempdir();
+    // ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
 
@@ -274,21 +274,21 @@ fn test_bridge() -> Result<()> {
     let bridges2 = ca2.bridges_get()?;
     assert_eq!(bridges2.len(), 1);
 
-    let ca1_cert = &bridges2[0].pub_key;
+    let ca1_cert = ca2.cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
 
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)
     let bridges1 = ca1.bridges_get()?;
     assert_eq!(bridges1.len(), 1);
 
-    let ca2_cert = &bridges1[0].pub_key;
+    let ca2_cert = ca1.cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
 
     // import CA keys into GnuPG
     gnupg::import(&ctx, ca1_cert.as_bytes());
     gnupg::import(&ctx, ca2_cert.as_bytes());
 
     // import CA1 users into GnuPG
-    let certs1 = ca1.certs_get_all()?;
+    let certs1 = ca1.user_certs_get_all()?;
 
     assert_eq!(certs1.len(), 1);
 
@@ -297,7 +297,7 @@ fn test_bridge() -> Result<()> {
     }
 
     // import CA2 users into GnuPG
-    let certs2 = ca2.certs_get_all()?;
+    let certs2 = ca2.user_certs_get_all()?;
 
     assert_eq!(certs2.len(), 2);
 

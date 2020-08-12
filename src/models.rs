@@ -34,7 +34,7 @@ pub struct NewCa<'a> {
 #[belongs_to(Ca)]
 pub struct Cacert {
     pub id: i32,
-    pub cert: String,
+    pub priv_cert: String,
     // https://docs.diesel.rs/diesel/associations/index.html
     pub ca_id: i32,
 }
@@ -42,7 +42,7 @@ pub struct Cacert {
 #[derive(Insertable)]
 #[table_name = "cacerts"]
 pub struct NewCacert {
-    pub cert: String,
+    pub priv_cert: String,
     pub ca_id: i32,
 }
 
@@ -83,10 +83,12 @@ pub struct NewUser<'a> {
     Eq,
     Hash,
 )]
+#[belongs_to(User)]
 pub struct Cert {
     pub id: i32,
     pub fingerprint: String,
     pub pub_cert: String,
+    pub user_id: Option<i32>,
 }
 
 #[derive(Insertable, Debug)]
@@ -94,54 +96,23 @@ pub struct Cert {
 pub struct NewCert<'a> {
     pub fingerprint: &'a str,
     pub pub_cert: &'a str,
+    pub user_id: Option<i32>,
 }
 
-#[derive(Identifiable, Queryable, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Email {
-    pub id: i32,
-    pub addr: String,
-}
-
-#[derive(Insertable, Debug)]
-#[table_name = "emails"]
-pub struct NewEmail<'a> {
-    pub addr: &'a str,
-}
-
-#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(Cert)]
-#[belongs_to(Email)]
+#[derive(Associations, Identifiable, Queryable, Debug, Clone, AsChangeset)]
 #[table_name = "certs_emails"]
+#[belongs_to(Cert)]
 pub struct CertEmail {
     pub id: i32,
-    // https://docs.diesel.rs/diesel/associations/index.html
+    pub addr: String,
     pub cert_id: i32,
-    pub email_id: i32,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "certs_emails"]
 pub struct NewCertEmail {
+    pub addr: String,
     pub cert_id: i32,
-    pub email_id: i32,
-}
-
-#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
-#[belongs_to(User)]
-#[belongs_to(Cert)]
-#[table_name = "users_certs"]
-pub struct UserCert {
-    pub id: i32,
-    // https://docs.diesel.rs/diesel/associations/index.html
-    pub cert_id: i32,
-    pub user_id: i32,
-}
-
-#[derive(Insertable, Debug)]
-#[table_name = "users_certs"]
-pub struct NewUserCert {
-    pub cert_id: i32,
-    pub user_id: i32,
 }
 
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
@@ -169,7 +140,7 @@ pub struct Bridge {
     pub id: i32,
     pub email: String,
     pub scope: String,
-    pub pub_key: String,
+    pub cert_id: i32,
     pub cas_id: i32,
 }
 
@@ -178,7 +149,7 @@ pub struct Bridge {
 pub struct NewBridge<'a> {
     pub email: &'a str,
     pub scope: &'a str,
-    pub pub_key: &'a str,
+    pub cert_id: i32,
     pub cas_id: i32,
 }
 

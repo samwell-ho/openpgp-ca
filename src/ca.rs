@@ -152,7 +152,7 @@ impl OpenpgpCa {
     /// This is the "private" OpenPGP Cert of the CA.
     pub fn ca_get_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
-            Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.cert)?),
+            Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
             _ => panic!("get_ca_cert() failed"),
         }
     }
@@ -169,7 +169,7 @@ impl OpenpgpCa {
             .unwrap();
         println!("\nOpenPGP CA for Domain: {}", ca.domainname);
         println!();
-        println!("{}", ca_cert.cert);
+        println!("{}", ca_cert.priv_cert);
         Ok(())
     }
 
@@ -219,7 +219,7 @@ impl OpenpgpCa {
                 .context("failed to load CA from database")?
                 .unwrap();
 
-            ca_cert.cert = Pgp::priv_cert_to_armored(&signed)
+            ca_cert.priv_cert = Pgp::priv_cert_to_armored(&signed)
                 .context("failed to armor CA Cert")?;
 
             self.db
@@ -251,16 +251,18 @@ impl OpenpgpCa {
     ) -> Result<models::User> {
         let ca_cert = self.ca_get_cert()?;
 
-        // make user key (signed by CA)
-        let (user, revoc, pass) = Pgp::make_user_cert(emails, name, password)
-            .context("make_user failed")?;
+        // make user cert (signed by CA)
+        let (user_cert, revoc, pass) =
+            Pgp::make_user_cert(emails, name, password)
+                .context("make_user failed")?;
 
         // sign user key with CA key
-        let certified = Pgp::sign_user_emails(&ca_cert, &user, Some(emails))
-            .context("sign_user failed")?;
+        let certified =
+            Pgp::sign_user_emails(&ca_cert, &user_cert, Some(emails))
+                .context("sign_user failed")?;
 
         // user tsigns CA key
-        let tsigned_ca = Pgp::tsign_ca(ca_cert, &user, pass.as_deref())
+        let tsigned_ca = Pgp::tsign_ca(ca_cert, &user_cert, pass.as_deref())
             .context("failed: user tsigns CA")?;
 
         let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
@@ -270,7 +272,7 @@ impl OpenpgpCa {
 
         let res = self.db.add_user(
             name,
-            (pub_key, &user.fingerprint().to_hex()),
+            (pub_key, &user_cert.fingerprint().to_hex()),
             emails,
             &[revoc],
             Some(&tsigned_ca_armored),
@@ -437,7 +439,8 @@ impl OpenpgpCa {
         let days = Duration::new(60 * 60 * 24 * days, 0);
         let expiry_test = SystemTime::now().checked_add(days).unwrap();
 
-        let certs = self.certs_get_all().context("couldn't load certs")?;
+        let certs =
+            self.user_certs_get_all().context("couldn't load certs")?;
 
         for cert in certs {
             let c = Pgp::armored_to_cert(&cert.pub_cert)?;
@@ -465,26 +468,19 @@ impl OpenpgpCa {
     /// - the CA key has a trust-signature from the Cert
     ///
     /// Returns a map 'cert -> (sig_from_ca, tsig_on_ca)'
-    pub fn certs_check_certifications(
+    pub fn cert_check_certifications(
         &self,
-    ) -> Result<HashMap<models::Cert, (bool, bool)>> {
-        let mut map = HashMap::new();
+        cert: &models::Cert,
+    ) -> Result<(bool, bool)> {
+        let sig_from_ca = self
+            .cert_check_ca_sig(&cert)
+            .context("Failed while checking CA sig")?;
 
-        let certs = self.certs_get_all().context("couldn't load certs")?;
+        let tsig_on_ca = self
+            .cert_check_tsig_on_ca(&cert)
+            .context("Failed while checking tsig on CA")?;
 
-        for cert in certs {
-            let sig_from_ca = self
-                .cert_check_ca_sig(&cert)
-                .context("Failed while checking CA sig")?;
-
-            let tsig_on_ca = self
-                .cert_check_tsig_on_ca(&cert)
-                .context("Failed while checking tsig on CA")?;
-
-            map.insert(cert, (sig_from_ca, tsig_on_ca));
-        }
-
-        Ok(map)
+        Ok((sig_from_ca, tsig_on_ca))
     }
 
     /// Check if this Cert has been signed by the CA Key
@@ -520,8 +516,8 @@ impl OpenpgpCa {
     pub fn cert_get_users(
         &self,
         cert: &models::Cert,
-    ) -> Result<Vec<models::User>> {
-        self.db.get_users_by_cert(cert)
+    ) -> Result<Option<models::User>> {
+        self.db.get_user_by_cert(cert)
     }
 
     /// Get a user name that is associated with this Cert.
@@ -530,15 +526,10 @@ impl OpenpgpCa {
     /// no name can be found, or to "<multiple users>" if the Cert is
     /// associated with more than one User.
     pub fn cert_get_name(&self, cert: &models::Cert) -> Result<String> {
-        let users = self.cert_get_users(cert)?;
-
-        match users.len() {
-            0 => Ok("<no name>".to_string()),
-            1 => Ok(users[0]
-                .name
-                .clone()
-                .unwrap_or_else(|| "<no name>".to_string())),
-            _ => Ok("<multiple users>".to_string()),
+        if let Some(user) = self.cert_get_users(cert)? {
+            Ok(user.name.unwrap_or_else(|| "<no name>".to_string()))
+        } else {
+            Ok("<no name>".to_string())
         }
     }
 
@@ -547,19 +538,41 @@ impl OpenpgpCa {
         Pgp::cert_to_armored(cert)
     }
 
-    /// Get a list of all Certs
-    pub fn certs_get_all(&self) -> Result<Vec<models::Cert>> {
-        self.db.get_all_certs()
+    /// Get a list of all User Certs
+    //
+    // FIXME: remove this method ->
+    // it's probably always better to explicitly iterate over user,
+    // then certs(user)
+    pub fn user_certs_get_all(&self) -> Result<Vec<models::Cert>> {
+        let users = self.db.get_all_users_sort_by_name()?;
+        let mut user_certs = Vec::new();
+        for user in users {
+            user_certs.append(&mut self.db.get_cert_by_user(&user)?);
+        }
+        Ok(user_certs)
     }
 
-    /// Get a list of all Users
+    /// Get a list of all Certs for one User
+    pub fn get_certs_by_user(
+        &self,
+        user: &models::User,
+    ) -> Result<Vec<models::Cert>> {
+        self.db.get_cert_by_user(&user)
+    }
+
+    /// Get a list of all Users, ordered by name
     pub fn users_get_all(&self) -> Result<Vec<models::User>> {
-        self.db.get_all_users()
+        self.db.get_all_users_sort_by_name()
     }
 
     /// Get a list of the Certs that are associated with `email`
     pub fn certs_get(&self, email: &str) -> Result<Vec<models::Cert>> {
         self.db.get_certs(email)
+    }
+
+    /// Get a Cert by id
+    pub fn cert_by_id(&self, cert_id: i32) -> Result<Option<models::Cert>> {
+        self.db.get_cert_by_id(cert_id)
     }
 
     // -------- revocations
@@ -648,7 +661,7 @@ impl OpenpgpCa {
         }
         let r_keyid = r_keyid.unwrap();
 
-        for cert in self.certs_get_all()? {
+        for cert in self.user_certs_get_all()? {
             let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
             // require that keyid of cert and Signature issuer match
@@ -747,7 +760,7 @@ impl OpenpgpCa {
     pub fn emails_get(
         &self,
         cert: &models::Cert,
-    ) -> Result<Vec<models::Email>> {
+    ) -> Result<Vec<models::CertEmail>> {
         self.db.get_emails_by_cert(cert)
     }
 
@@ -852,14 +865,22 @@ impl OpenpgpCa {
             regexes,
         )?;
 
+        // FIXME: transaction
+
         // store new bridge in DB
         let (ca_db, _) =
             self.db.get_ca().context("Couldn't find CA")?.unwrap();
 
+        let cert: models::Cert = self.db.add_cert(
+            &Pgp::cert_to_armored(&bridged)?,
+            &bridged.fingerprint().to_hex(),
+            None,
+        )?;
+
         let new_bridge = models::NewBridge {
             email: &email,
             scope,
-            pub_key: &Pgp::cert_to_armored(&bridged)?,
+            cert_id: cert.id,
             cas_id: ca_db.id,
         };
 
@@ -877,30 +898,31 @@ impl OpenpgpCa {
             return Err(anyhow::anyhow!("bridge not found"));
         }
 
-        let mut bridge = bridge.unwrap();
-
-        //        println!("bridge {:?}", &bridge.clone());
-        //        let ca_id = bridge.clone().cas_id;
+        let bridge = bridge.unwrap();
 
         let (_, ca_cert) = self.db.get_ca()?.unwrap();
-        let ca_cert = Pgp::armored_to_cert(&ca_cert.cert)?;
+        let ca_cert = Pgp::armored_to_cert(&ca_cert.priv_cert)?;
 
-        let bridge_pub = Pgp::armored_to_cert(&bridge.pub_key)?;
+        if let Some(mut db_cert) = self.db.get_cert_by_id(bridge.cert_id)? {
+            let bridge_pub = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
-        // make sig to revoke bridge
-        let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_cert)?;
+            // make sig to revoke bridge
+            let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_cert)?;
 
-        let revoc_cert_arm = &Pgp::sig_to_armored(&rev_cert)?;
-        println!("revoc cert:\n{}", revoc_cert_arm);
+            let revoc_cert_arm = &Pgp::sig_to_armored(&rev_cert)?;
+            println!("revoc cert:\n{}", revoc_cert_arm);
 
-        // save updated key (with revocation) to DB
-        let revoked_arm = Pgp::cert_to_armored(&cert)?;
-        println!("revoked remote key:\n{}", &revoked_arm);
+            // save updated key (with revocation) to DB
+            let revoked_arm = Pgp::cert_to_armored(&cert)?;
+            println!("revoked remote key:\n{}", &revoked_arm);
 
-        bridge.pub_key = revoked_arm;
-        self.db.update_bridge(&bridge)?;
+            db_cert.pub_cert = revoked_arm;
+            self.db.update_cert(&db_cert)?;
 
-        Ok(())
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("no cert found for bridge"))
+        }
     }
 
     /// Get a list of Bridges
@@ -929,7 +951,7 @@ impl OpenpgpCa {
         let ca_cert = self.ca_get_cert()?;
         wkd::insert(&path, domain, None, &ca_cert)?;
 
-        for cert in self.certs_get_all()? {
+        for cert in self.user_certs_get_all()? {
             let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
             if Self::cert_has_uid_in_domain(&c, domain)? {

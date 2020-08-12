@@ -31,7 +31,6 @@ use openpgp::{Cert, Fingerprint, KeyID};
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
-use std::ops::Deref;
 
 pub mod gnupg;
 
@@ -54,7 +53,7 @@ fn test_ca() -> Result<()> {
     // make CA user
     ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
 
     assert_eq!(certs.len(), 1);
 
@@ -129,7 +128,7 @@ fn test_update_cert_key() -> Result<()> {
     .context("import Alice 1 to CA failed")?;
 
     // check the state of CA data
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
 
     assert_eq!(certs.len(), 1);
 
@@ -165,7 +164,7 @@ fn test_update_cert_key() -> Result<()> {
     ca.cert_import_update(&alice2_key)?;
 
     // check the state of CA data
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
 
     assert_eq!(certs.len(), 1);
 
@@ -269,7 +268,7 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     // make another CA user with the same email address
     ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
 
     assert_eq!(certs.len(), 2);
 
@@ -425,7 +424,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
     ca.revocation_add(&PathBuf::from(revoc_file3))?;
 
     // check data in CA
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
 
     // check that name/email has been autodetected on CA import from the pubkey
     assert_eq!(certs.len(), 1);
@@ -492,24 +491,26 @@ fn test_ca_signatures() -> Result<()> {
     // also, CA key gets a tsig by carol
     ca.user_new(Some(&"Carol"), &["carol@example.org"], false)?;
 
-    let sigs = ca.certs_check_certifications()?;
-    for (cert, (sig_from_ca, tsig_on_ca)) in sigs {
-        let user = ca.cert_get_users(&cert)?;
+    for user in ca.users_get_all()? {
+        let certs = ca.get_certs_by_user(&user)?;
 
-        assert_eq!(user.len(), 1);
+        let name = user.name.unwrap_or_else(|| "<no name>".to_owned());
 
-        let name: Option<String> = user[0].name.to_owned();
+        assert_eq!(certs.len(), 1);
 
-        match name.as_deref() {
-            Some("Alice") => {
+        let (sig_from_ca, tsig_on_ca) =
+            ca.cert_check_certifications(&certs[0])?;
+
+        match name.as_str() {
+            "Alice" => {
                 assert!(sig_from_ca);
                 assert!(!tsig_on_ca);
             }
-            Some("Bob") => {
+            "Bob" => {
                 assert!(!sig_from_ca);
                 assert!(!tsig_on_ca);
             }
-            Some("Carol") => {
+            "Carol" => {
                 assert!(sig_from_ca);
                 assert!(tsig_on_ca);
             }
@@ -537,7 +538,7 @@ fn test_apply_revocation() -> Result<()> {
     // make CA user
     ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
 
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
 
     assert_eq!(certs.len(), 1);
 
@@ -612,17 +613,18 @@ fn test_import_signed_cert() -> Result<()> {
     }
 
     // check signature status via OpenpgpCa::certs_check_signatures()
-    let sigs = ca.certs_check_certifications()?;
-    assert_eq!(sigs.len(), 1);
-    for (cert, (sig_from_ca, tsig_on_ca)) in sigs {
-        let name = ca.cert_get_name(&cert)?;
-        match name.deref() {
-            "Alice" => {
-                assert!(sig_from_ca);
-                assert!(!tsig_on_ca);
-            }
-            _ => panic!(),
+    let certs = ca.user_certs_get_all()?;
+    assert_eq!(certs.len(), 1);
+
+    let (sig_from_ca, tsig_on_ca) = ca.cert_check_certifications(&certs[0])?;
+
+    let name = ca.cert_get_name(&certs[0])?;
+    match name.as_str() {
+        "Alice" => {
+            assert!(sig_from_ca);
+            assert!(!tsig_on_ca);
         }
+        _ => panic!(),
     }
 
     Ok(())
@@ -703,7 +705,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
 
     //
     // -- check data in CA --
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
 
     let alice = certs
         .iter()
@@ -750,7 +752,7 @@ fn test_create_user_with_pw() -> Result<()> {
     // make CA user
     ca.user_new(Some(&"Alice"), &["alice@example.org"], true)?;
 
-    let certs = ca.certs_get_all()?;
+    let certs = ca.user_certs_get_all()?;
     assert_eq!(certs.len(), 1);
     let alice = &certs[0];
 

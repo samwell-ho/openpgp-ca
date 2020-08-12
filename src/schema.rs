@@ -3,7 +3,7 @@ table! {
         id -> Integer,
         email -> Text,
         scope -> Text,
-        pub_key -> Text,
+        cert_id -> Integer,
         cas_id -> Integer,
     }
 }
@@ -11,7 +11,7 @@ table! {
 table! {
     cacerts (id) {
         id -> Integer,
-        cert -> Text,
+        priv_cert -> Text,
         ca_id -> Integer,
     }
 }
@@ -28,21 +28,15 @@ table! {
         id -> Integer,
         fingerprint -> Text,
         pub_cert -> Text,
+        user_id -> Nullable<Integer>,
     }
 }
 
 table! {
     certs_emails (id) {
         id -> Integer,
-        cert_id -> Integer,
-        email_id -> Integer,
-    }
-}
-
-table! {
-    emails (id) {
-        id -> Integer,
         addr -> Text,
+        cert_id -> Integer,
     }
 }
 
@@ -64,22 +58,13 @@ table! {
     }
 }
 
-table! {
-    users_certs (id) {
-        id -> Integer,
-        user_id -> Integer,
-        cert_id -> Integer,
-    }
-}
-
 joinable!(bridges -> cas (cas_id));
+joinable!(bridges -> certs (cert_id));
 joinable!(cacerts -> cas (ca_id));
+joinable!(certs -> users (user_id));
 joinable!(certs_emails -> certs (cert_id));
-joinable!(certs_emails -> emails (email_id));
 joinable!(revocations -> certs (cert_id));
 joinable!(users -> cas (ca_id));
-joinable!(users_certs -> certs (cert_id));
-joinable!(users_certs -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(
     bridges,
@@ -87,8 +72,6 @@ allow_tables_to_appear_in_same_query!(
     cas,
     certs,
     certs_emails,
-    emails,
     revocations,
     users,
-    users_certs,
 );
