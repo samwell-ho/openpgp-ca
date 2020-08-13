@@ -162,6 +162,38 @@ impl Db {
 
     // --- public ---
 
+    pub fn get_ca(&self) -> Result<Option<(Ca, Cacert)>> {
+        let cas = cas::table
+            .load::<Ca>(&self.conn)
+            .context("Error loading CAs")?;
+
+        match cas.len() {
+            0 => Ok(None),
+            1 => {
+                let ca = cas[0].clone();
+
+                let ca_certs: Vec<_> = cacerts::table
+                    .filter(cacerts::ca_id.eq(ca.id))
+                    .load::<Cacert>(&self.conn)
+                    .context("Error loading CA Certs")?;
+
+                match ca_certs.len() {
+                    0 => Ok(None),
+                    1 => Ok(Some((ca, ca_certs[0].to_owned()))),
+                    _ => {
+                        // FIXME: which cert(s) should be returned?
+                        // -> there can be more than one "active" cert,
+                        // as well as even more "inactive" certs.
+                        unimplemented!("get_ca: more than one ca_cert in DB");
+                    }
+                }
+            }
+            _ => Err(anyhow::anyhow!(
+                "more than 1 CA in database. this should never happen"
+            )),
+        }
+    }
+
     pub fn insert_ca(&self, ca: NewCa, ca_key: &str) -> Result<()> {
         diesel::insert_into(cas::table)
             .values(&ca)
@@ -195,35 +227,29 @@ impl Db {
         Ok(())
     }
 
-    pub fn get_ca(&self) -> Result<Option<(Ca, Cacert)>> {
-        let cas = cas::table
-            .load::<Ca>(&self.conn)
-            .context("Error loading CAs")?;
+    pub fn get_users_sort_by_name(&self) -> Result<Vec<User>> {
+        Ok(users::table
+            .order((users::name, users::id))
+            .load::<User>(&self.conn)
+            .context("Error loading users")?)
+    }
 
-        match cas.len() {
-            0 => Ok(None),
-            1 => {
-                let ca = cas[0].clone();
+    pub fn get_user_by_cert(&self, cert: &Cert) -> Result<Option<User>> {
+        match cert.user_id {
+            None => Ok(None),
+            Some(search_id) => {
+                let users = users::table
+                    .filter(users::id.eq(search_id))
+                    .load::<User>(&self.conn)?;
 
-                let ca_certs: Vec<_> = cacerts::table
-                    .filter(cacerts::ca_id.eq(ca.id))
-                    .load::<Cacert>(&self.conn)
-                    .context("Error loading CA Certs")?;
-
-                match ca_certs.len() {
+                match users.len() {
                     0 => Ok(None),
-                    1 => Ok(Some((ca, ca_certs[0].to_owned()))),
-                    _ => {
-                        // FIXME: which cert(s) should be returned?
-                        // -> there can be more than one "active" cert,
-                        // as well as even more "inactive" certs.
-                        unimplemented!("get_ca: more than one ca_cert in DB");
-                    }
+                    1 => Ok(Some(users[0].clone())),
+                    _ => Err(anyhow::anyhow!(
+                        "get_user_by_cert: found more than 1 user for a cert. this should be impossible."
+                    )),
                 }
             }
-            _ => Err(anyhow::anyhow!(
-                "more than 1 CA in database. this should never happen"
-            )),
         }
     }
 
@@ -238,21 +264,23 @@ impl Db {
         let (ca, mut cacert_db) =
             self.get_ca().context("Couldn't find CA")?.unwrap();
 
-        // merge updated tsigned CA cert, if applicable
+        // merge new trust signature into local CA cert (if applicable)
         if let Some(ca_cert_tsigned) = ca_cert_tsigned {
             let tsigned = Pgp::armored_to_cert(&ca_cert_tsigned)?;
 
             let merged =
                 Pgp::armored_to_cert(&cacert_db.priv_cert)?.merge(tsigned)?;
             cacert_db.priv_cert = Pgp::priv_cert_to_armored(&merged)?;
+
+            // update new version of CA cert in database
             self.update_cacert(&cacert_db)?;
         }
 
         // User
         let newuser = NewUser { name, ca_id: ca.id };
-        let u = self.insert_user(newuser)?;
+        let user = self.insert_user(newuser)?;
 
-        let c = self.add_cert(pub_cert, fingerprint, Some(u.id))?;
+        let cert = self.add_cert(pub_cert, fingerprint, Some(user.id))?;
 
         // Revocations
         for revocation in revocation_certs {
@@ -260,7 +288,7 @@ impl Db {
             self.insert_revocation(NewRevocation {
                 hash,
                 revocation,
-                cert_id: c.id,
+                cert_id: cert.id,
                 published: false,
             })?;
         }
@@ -269,10 +297,19 @@ impl Db {
         for &addr in emails {
             self.insert_email(NewCertEmail {
                 addr: addr.to_owned(),
-                cert_id: c.id,
+                cert_id: cert.id,
             })?;
         }
-        Ok(u)
+        Ok(user)
+    }
+
+    pub fn update_user(&self, user: &User) -> Result<()> {
+        diesel::update(user)
+            .set(user)
+            .execute(&self.conn)
+            .context("Error updating User")?;
+
+        Ok(())
     }
 
     pub fn add_cert(
@@ -294,24 +331,6 @@ impl Db {
             .set(cert)
             .execute(&self.conn)
             .context("Error updating Cert")?;
-
-        Ok(())
-    }
-
-    pub fn update_user(&self, user: &User) -> Result<()> {
-        diesel::update(user)
-            .set(user)
-            .execute(&self.conn)
-            .context("Error updating User")?;
-
-        Ok(())
-    }
-
-    pub fn update_revocation(&self, revocation: &Revocation) -> Result<()> {
-        diesel::update(revocation)
-            .set(revocation)
-            .execute(&self.conn)
-            .context("Error updating Revocation")?;
 
         Ok(())
     }
@@ -342,7 +361,7 @@ impl Db {
         }
     }
 
-    pub fn get_certs(&self, email: &str) -> Result<Vec<Cert>> {
+    pub fn get_certs_by_email(&self, email: &str) -> Result<Vec<Cert>> {
         let cert_ids = certs_emails::table
             .filter(certs_emails::addr.eq(email))
             .select(certs_emails::cert_id);
@@ -358,13 +377,6 @@ impl Db {
         Ok(Cert::belonging_to(user)
             .order(certs::id)
             .load::<Cert>(&self.conn)?)
-    }
-
-    pub fn get_all_users_sort_by_name(&self) -> Result<Vec<User>> {
-        Ok(users::table
-            .order((users::name, users::id))
-            .load::<User>(&self.conn)
-            .context("Error loading users")?)
     }
 
     pub fn get_revocations(&self, cert: &Cert) -> Result<Vec<Revocation>> {
@@ -407,30 +419,20 @@ impl Db {
         }
     }
 
+    pub fn update_revocation(&self, revocation: &Revocation) -> Result<()> {
+        diesel::update(revocation)
+            .set(revocation)
+            .execute(&self.conn)
+            .context("Error updating Revocation")?;
+
+        Ok(())
+    }
+
     pub fn get_emails_by_cert(&self, cert: &Cert) -> Result<Vec<CertEmail>> {
         Ok(certs_emails::table
             .filter(certs_emails::cert_id.eq(cert.id))
             .load(&self.conn)
             .expect("could not load emails"))
-    }
-
-    pub fn get_user_by_cert(&self, cert: &Cert) -> Result<Option<User>> {
-        match cert.user_id {
-            None => Ok(None),
-            Some(search_id) => {
-                let users = users::table
-                    .filter(users::id.eq(search_id))
-                    .load::<User>(&self.conn)?;
-
-                match users.len() {
-                    0 => Ok(None),
-                    1 => Ok(Some(users[0].clone())),
-                    _ => Err(anyhow::anyhow!(
-                        "get_user_by_cert: found more than 1 user for a cert. this should be impossible."
-                    )),
-                }
-            }
-        }
     }
 
     pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {
@@ -484,7 +486,7 @@ impl Db {
             .context("Error loading bridges")?)
     }
 
-    pub fn migrations(&self) {
+    pub fn diesel_migrations_run(&self) {
         embed_migrations!();
 
         embedded_migrations::run(&self.conn).unwrap_or_else(|e| {

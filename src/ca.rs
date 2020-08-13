@@ -90,7 +90,7 @@ impl OpenpgpCa {
         };
 
         let db = Db::new(db_url.as_deref())?;
-        db.migrations();
+        db.diesel_migrations_run();
 
         Ok(OpenpgpCa { db })
     }
@@ -552,7 +552,7 @@ impl OpenpgpCa {
     // it's probably always better to explicitly iterate over user,
     // then certs(user)
     pub fn user_certs_get_all(&self) -> Result<Vec<models::Cert>> {
-        let users = self.db.get_all_users_sort_by_name()?;
+        let users = self.db.get_users_sort_by_name()?;
         let mut user_certs = Vec::new();
         for user in users {
             user_certs.append(&mut self.db.get_cert_by_user(&user)?);
@@ -570,12 +570,12 @@ impl OpenpgpCa {
 
     /// Get a list of all Users, ordered by name
     pub fn users_get_all(&self) -> Result<Vec<models::User>> {
-        self.db.get_all_users_sort_by_name()
+        self.db.get_users_sort_by_name()
     }
 
     /// Get a list of the Certs that are associated with `email`
     pub fn certs_get(&self, email: &str) -> Result<Vec<models::Cert>> {
-        self.db.get_certs(email)
+        self.db.get_certs_by_email(email)
     }
 
     /// Get a Cert by id
