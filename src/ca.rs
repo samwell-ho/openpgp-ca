@@ -58,6 +58,8 @@ use crate::db::Db;
 use crate::models;
 use crate::pgp::Pgp;
 
+use diesel::prelude::*;
+
 use crate::models::Revocation;
 use anyhow::{Context, Result};
 
@@ -127,9 +129,11 @@ impl OpenpgpCa {
 
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
 
-        self.db.insert_ca(models::NewCa { domainname }, ca_key)?;
+        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
+            self.db.insert_ca(models::NewCa { domainname }, ca_key)?;
 
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Get the Ca and Cacert objects from the database
@@ -270,33 +274,35 @@ impl OpenpgpCa {
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
 
-        let res = self.db.add_user(
-            name,
-            (pub_key, &user_cert.fingerprint().to_hex()),
-            emails,
-            &[revoc],
-            Some(&tsigned_ca_armored),
-        );
+        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
+            let res = self.db.add_user(
+                name,
+                (pub_key, &user_cert.fingerprint().to_hex()),
+                emails,
+                &[revoc],
+                Some(&tsigned_ca_armored),
+            );
 
-        if res.is_err() {
-            eprint!("{:?}", res);
-            return Err(anyhow::anyhow!("Couldn't insert user"));
-        }
+            if res.is_err() {
+                eprint!("{:?}", res);
+                return Err(anyhow::anyhow!("Couldn't insert user"));
+            }
 
-        // the private key needs to be handed over to the user, print for now
-        println!(
-            "new user key for {}:\n{}",
-            name.unwrap_or(""),
-            &Pgp::priv_cert_to_armored(&certified)?
-        );
-        if let Some(pass) = pass {
-            println!("password for this key: '{}'\n", pass);
-        } else {
-            println!("no password set for this key\n");
-        }
-        // --
+            // the private key needs to be handed over to the user, print for now
+            println!(
+                "new user key for {}:\n{}",
+                name.unwrap_or(""),
+                &Pgp::priv_cert_to_armored(&certified)?
+            );
+            if let Some(pass) = pass {
+                println!("password for this key: '{}'\n", pass);
+            } else {
+                println!("no password set for this key\n");
+            }
+            // --
 
-        Ok(res?)
+            Ok(res?)
+        })
     }
 
     /// Update a User in the database
@@ -378,20 +384,22 @@ impl OpenpgpCa {
 
         let emails: Vec<&str> = emails.iter().map(|s| &**s).collect();
 
-        let res = self.db.add_user(
-            name.as_deref(),
-            (pub_key, fingerprint),
-            &emails,
-            &revoc_certs,
-            None,
-        );
+        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
+            let res = self.db.add_user(
+                name.as_deref(),
+                (pub_key, fingerprint),
+                &emails,
+                &revoc_certs,
+                None,
+            );
 
-        if res.is_err() {
-            eprint!("{:?}", res);
-            return Err(anyhow::anyhow!("Couldn't insert user"));
-        }
+            if res.is_err() {
+                eprint!("{:?}", res);
+                return Err(anyhow::anyhow!("Couldn't insert user"));
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Update key for existing database Cert
@@ -720,7 +728,6 @@ impl OpenpgpCa {
     ///
     /// The revocation is merged into out copy of the OpenPGP Cert.
     pub fn revocation_apply(&self, revoc: models::Revocation) -> Result<()> {
-        use diesel::prelude::*;
         self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
             let cert = self.db.get_cert_by_id(revoc.cert_id)?;
 

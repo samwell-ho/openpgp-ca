@@ -163,29 +163,27 @@ impl Db {
     // --- public ---
 
     pub fn insert_ca(&self, ca: NewCa, ca_key: &str) -> Result<()> {
-        self.conn.transaction::<_, anyhow::Error, _>(|| {
-            diesel::insert_into(cas::table)
-                .values(&ca)
-                .execute(&self.conn)
-                .context("Error saving new CA")?;
+        diesel::insert_into(cas::table)
+            .values(&ca)
+            .execute(&self.conn)
+            .context("Error saving new CA")?;
 
-            let cas = cas::table
-                .load::<Ca>(&self.conn)
-                .context("Error loading CAs")?;
+        let cas = cas::table
+            .load::<Ca>(&self.conn)
+            .context("Error loading CAs")?;
 
-            let ca = cas.first().unwrap();
+        let ca = cas.first().unwrap();
 
-            let ca_cert = NewCacert {
-                ca_id: ca.id,
-                priv_cert: ca_key.to_string(),
-            };
-            diesel::insert_into(cacerts::table)
-                .values(&ca_cert)
-                .execute(&self.conn)
-                .context("Error saving new CA Cert")?;
+        let ca_cert = NewCacert {
+            ca_id: ca.id,
+            priv_cert: ca_key.to_string(),
+        };
+        diesel::insert_into(cacerts::table)
+            .values(&ca_cert)
+            .execute(&self.conn)
+            .context("Error saving new CA Cert")?;
 
-            Ok(())
-        })
+        Ok(())
     }
 
     pub fn update_cacert(&self, cacert: &Cacert) -> Result<()> {
@@ -237,46 +235,44 @@ impl Db {
         revocation_certs: &[String],
         ca_cert_tsigned: Option<&str>,
     ) -> Result<User> {
-        self.conn.transaction::<_, anyhow::Error, _>(|| {
-            let (ca, mut cacert_db) =
-                self.get_ca().context("Couldn't find CA")?.unwrap();
+        let (ca, mut cacert_db) =
+            self.get_ca().context("Couldn't find CA")?.unwrap();
 
-            // merge updated tsigned CA cert, if applicable
-            if let Some(ca_cert_tsigned) = ca_cert_tsigned {
-                let tsigned = Pgp::armored_to_cert(&ca_cert_tsigned)?;
+        // merge updated tsigned CA cert, if applicable
+        if let Some(ca_cert_tsigned) = ca_cert_tsigned {
+            let tsigned = Pgp::armored_to_cert(&ca_cert_tsigned)?;
 
-                let merged = Pgp::armored_to_cert(&cacert_db.priv_cert)?
-                    .merge(tsigned)?;
-                cacert_db.priv_cert = Pgp::priv_cert_to_armored(&merged)?;
-                self.update_cacert(&cacert_db)?;
-            }
+            let merged =
+                Pgp::armored_to_cert(&cacert_db.priv_cert)?.merge(tsigned)?;
+            cacert_db.priv_cert = Pgp::priv_cert_to_armored(&merged)?;
+            self.update_cacert(&cacert_db)?;
+        }
 
-            // User
-            let newuser = NewUser { name, ca_id: ca.id };
-            let u = self.insert_user(newuser)?;
+        // User
+        let newuser = NewUser { name, ca_id: ca.id };
+        let u = self.insert_user(newuser)?;
 
-            let c = self.add_cert(pub_cert, fingerprint, Some(u.id))?;
+        let c = self.add_cert(pub_cert, fingerprint, Some(u.id))?;
 
-            // Revocations
-            for revocation in revocation_certs {
-                let hash = &Pgp::revocation_to_hash(revocation)?;
-                self.insert_revocation(NewRevocation {
-                    hash,
-                    revocation,
-                    cert_id: c.id,
-                    published: false,
-                })?;
-            }
+        // Revocations
+        for revocation in revocation_certs {
+            let hash = &Pgp::revocation_to_hash(revocation)?;
+            self.insert_revocation(NewRevocation {
+                hash,
+                revocation,
+                cert_id: c.id,
+                published: false,
+            })?;
+        }
 
-            // Emails
-            for &addr in emails {
-                self.insert_email(NewCertEmail {
-                    addr: addr.to_owned(),
-                    cert_id: c.id,
-                })?;
-            }
-            Ok(u)
-        })
+        // Emails
+        for &addr in emails {
+            self.insert_email(NewCertEmail {
+                addr: addr.to_owned(),
+                cert_id: c.id,
+            })?;
+        }
+        Ok(u)
     }
 
     pub fn add_cert(
