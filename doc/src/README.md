@@ -262,9 +262,10 @@ verifiers of identity (often, but not always, for-profit).
 To organizations that use TLS certificates, these CAs are external actors.
 
 While TLS server certificates of course bring massive benefits for
-secure communication on the web, there are also problems:  
-The interests of CAs in the TLS space are not aligned with the interests
-of their users.
+secure communication on the web, there are also problems:
+
+- The interests of CAs in the TLS space are not aligned with the interests
+  of their users.
 - For-profit CAs are driven by profit, not by the needs of users.
 - Law enforcement might interact with these CAs in ways that are contrary
   (and opaque) to the users of the certificates and detrimental to their
