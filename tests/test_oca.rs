@@ -333,6 +333,13 @@ fn test_ca_export_wkd() -> Result<()> {
     );
     assert!(test_path.is_file());
 
+    // check that a policy file been created
+    let test_path = wkd_path.join(
+        ".well-known/openpgpkey/example.org\
+         /policy",
+    );
+    assert!(test_path.is_file());
+
     Ok(())
 }
 
