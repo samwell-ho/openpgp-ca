@@ -1,57 +1,70 @@
-# OpenPGP certification authority
+# OpenPGP CA
 
-OpenPGP CA is a tool for managing OpenPGP keys within an organization.
+OpenPGP CA (certificate authority) is a tool for managing OpenPGP keys
+within groups.
 
-The primary goal is to make it trivial for end users to authenticate
-OpenPGP keys of other users in their organization (or in affiliated
-organizations).
+Imagine this:  Alice is the technical expert in her group.  The need for
+protecting the group's communication has come up and they are thinking
+about how to improve this.
+Alice knows about OpenPGP.  In fact, she's not only used OpenPGP herself,
+she's helped out at a few crypto parties.  So, she knows: normal users,
+even those who are worried about their security, have a very hard time
+using OpenPGP securely; there are too many details for normal users to
+worry about.
 
-*Authentication* here means that users can be confident that they are using
-the right OpenPGP key for their communication partners. 
- 
-The benefit that using OpenPGP CA brings is roughly the same as if each user
-had verified and signed the keys of everyone they regularly communicate
-with - but without the overhead of every user having to actually authenticate
-and sign all of those keys manually.
-
-The approach of OpenPGP CA moves the effort of authentication to a new role in
-the organization: the *OpenPGP CA admin* sets up the web of trust for
-all users, so that the users can be confident that they are using the right
-OpenPGP keys for their communication partners.
-This works without users needing training to perform these tasks - and without
-each user needing to spend significant effort on authenticating a
-potentially large number of keys. 
+This is where OpenPGP CA helps.  The members of Alice's group trust her.
+She is already their sys admin.  So, it is sensible that Alice acts as a
+kind of certificate authority (CA) for her group.  This is exactly what
+OpenPGP CA helps Alice do.  Using OpenPGP CA, only Alice has to verify
+fingerprints.  Then, her users just need to be taught to recognize whether
+a message has been authenticated, and how to make sure 
+encryption is enabled.  This significantly lowers the threshold to using
+OpenPGP correctly, which gives Alice and her collegues a real chance of
+communicating securely.
 
 
-## Quick intro
+## Getting started
 
-When using OpenPGP CA's centralized key creation workflow, generating
-new OpenPGP keys for users in your organization is
-as simple as running the following commands (and distributing the resulting
-key material to user machines):
+There are several different ways to use OpenPGP CA.  Here, we show one
+possible workflow.
+Please read [the book](https://openpgp-ca.gitlab.io/openpgp-ca/) for more
+details.
+
+The first thing that you need to do is to create an OpenPGP CA instance
+for your organization:
 
 ```
 $ openpgp-ca -d example.oca ca init example.org 
+```
 
+As part of this process, OpenPGP CA automatically creates a CA key for
+your organization.  The key's User ID is set to `openpgp-ca@example.org`.
+You should make sure that that email address is configured to forward
+mail to you.
+
+Next, we'll create a few users:
+
+```
 $ openpgp-ca -d example.oca user add --email alice@example.org --name "Alice Adams"
 $ openpgp-ca -d example.oca user add --email bob@example.org --name "Bob Baker"
 ```
 
-The first command generates a new key for the OpenPGP CA itself, the
-following commands generate keys for two users. The private user keys are
-output to stdout (and never stored locally) - these private keys need to be
-stored (e.g. as `alice.priv` and `bob.priv`) and transferred to the respective
-users. By default, these keys are protected by passphrases (which need to
-be transmitted to Alice and Bob over a secure channel, for them to be able
-to access their OpenPGP keys).
+The private keys are output to stdout (but they are never stored locally!) -
+these private keys need to be transferred to the respective users. By
+default, the keys are protected by passphrases.
+One way to do this is to store each key on a USB key, and to write each
+key's passphrase and fingerprint on a piece of paper.
 
-The users also need access to the OpenPGP CA's public key, which can be
-manually exported as follows:
+It is also convenient to give the new user the CA's public key at the same
+time.  This can be exported as follows:
 
-`$ openpgp-ca -d example.org ca export > example-ca.pub`
+```
+$ openpgp-ca -d example.org ca export > example-ca.pub
+```
 
-After this, users can import - for example using gnupg, as follows (for
-testing purposes, a temporary gnupg environment is set up):
+After this, users can import their new key.  Using GnuPG (and for
+testing purposes, using a temporary gnupg environment), this is done as
+follows:
 
 ```
 $ export GNUPGHOME=$(mktemp -d)
@@ -60,29 +73,34 @@ $ gpg --import alice.priv
 $ gpg --import example-ca.pub
 ```
 
-Finally, gnupg needs to be told that Alice considers the key `alice.priv`
-as her own (and thus "trusted"):
+Now, GnuPG needs to be told that Alice considers the key `alice.priv`
+to be her own (and thus "ultimately trusted"):
 
-`$ gpg --edit-key alice@example.org`
+```
+$ gpg --edit-key alice@example.org
+```
 
 Then enter `trust`, `<enter>` `5`, `<enter>`, `y`, `<enter>`, `quit`,
 `<enter>`.
 
-Before setting this "trust", Alice needs to make sure that this key is
+Before setting this trust level, Alice needs to make sure that this key is
 indeed the correct one for her - for example by having the OpenPGP CA admin
 confirm the key's fingerprint on a sufficiently secure channel.
 
 After this, users can automatically authenticate each other as soon as their
-OpenPGP implementations have copies of other users' keys.
+OpenPGP implementations have copies of other users' keys;
 Users do not need to manually check fingerprints or sign each others' keys.
-
+OpenPGP CA also helps here: it can automatically generate a WKD.
 This means that, for example, Thunderbird/Enigmail will show green header
 bars for received email from contacts that the OpenPGP CA admin has
-authenticated.
+authenticated.  So when Alice gets email from Bob, there is visual
+confirmation in her email software that the key that Bob used to sign his
+email has been verified to actually be Bob's key.
 
-E.g. when Alice gets email from Bob, there is visual confirmation in her
-email software that the key that Bob used to sign his email has been
-verified to actually be Bob's key by the OpenPGP CA admin.
+OpenPGP CA makes it not only easy for users in an organization to
+authenticate each other, but provides support to create so-called bridges
+between organizations.  In this case, the CA admins from two OpenPGP CA
+using organizations sign each others CA key using a scoped trust signature.
 
 ## Documentation
 
