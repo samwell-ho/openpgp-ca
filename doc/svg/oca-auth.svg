@@ -1180,16 +1180,16 @@
      borderopacity="1.0"
      inkscape:pageopacity="1"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.7321937"
-     inkscape:cx="989"
-     inkscape:cy="348"
+     inkscape:zoom="0.94663123"
+     inkscape:cx="563.50093"
+     inkscape:cy="406.42792"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
      inkscape:window-width="1920"
-     inkscape:window-height="1057"
-     inkscape:window-x="0"
-     inkscape:window-y="23"
+     inkscape:window-height="1177"
+     inkscape:window-x="1200"
+     inkscape:window-y="353"
      inkscape:window-maximized="1"
      scale-x="0.6"
      inkscape:pagecheckerboard="true"
@@ -1224,12 +1224,12 @@
      id="layer1"
      transform="translate(0,-52.199999)">
     <rect
-       style="fill:#eef38f;fill-opacity:0.10837438;stroke:#000000;stroke-width:0.15446933;stroke-miterlimit:4;stroke-dasharray:0.61787728, 0.61787728;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:#eef38f;fill-opacity:0.10837438;stroke:#000000;stroke-width:0.15861729;stroke-miterlimit:4;stroke-dasharray:0.63446909, 0.63446909;stroke-dashoffset:0;stroke-opacity:1"
        id="rect1486"
-       width="66.33802"
-       height="51.217716"
-       x="57.923904"
-       y="105.44612" />
+       width="69.952278"
+       height="51.215019"
+       x="56.674156"
+       y="105.44746" />
     <flowRoot
        xml:space="preserve"
        id="flowRoot4819"
@@ -1260,7 +1260,7 @@
            y="-11.171743" /></flowRegion><flowPara
          id="flowPara5356" /></flowRoot>    <g
        id="g6319"
-       transform="translate(-7.4668061,-3.731213)">
+       transform="translate(-8.7368061,-3.731213)">
       <text
          inkscape:export-filename="/home/heiko/path1009.png"
          inkscape:export-ydpi="96"
@@ -1305,21 +1305,21 @@
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
-       x="141.41966"
+       x="142.68968"
        y="119.06802"
        id="text4781"><tspan
          id="tspan5774"
          sodipodi:role="line"
-         x="141.41966"
+         x="142.68968"
          y="119.06802"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332">Certification of</tspan><tspan
          sodipodi:role="line"
-         x="141.41966"
+         x="142.68968"
          y="123.83052"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
          id="tspan14994">&lt;Bob, 0xBBBB&gt;</tspan><tspan
          sodipodi:role="line"
-         x="141.41966"
+         x="142.68968"
          y="128.59302"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
          id="tspan5992">by 0xCACA</tspan></text>
@@ -1335,7 +1335,7 @@
            y="272.57446" /></flowRegion><flowPara
          id="flowPara42806" /></flowRoot>    <g
        id="g6327"
-       transform="translate(9.5726875,-2.6612513)">
+       transform="translate(10.842687,-2.6612513)">
       <text
          inkscape:export-filename="/home/heiko/path1009.png"
          inkscape:export-ydpi="96"
@@ -1424,100 +1424,100 @@
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
-       x="7.6239491"
+       x="6.3539486"
        y="103.30936"
        id="text4781-9-4"><tspan
          sodipodi:role="line"
-         x="7.6239491"
+         x="6.3539486"
          y="103.30936"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
          id="tspan14994-2-9">Trust Signature for</tspan><tspan
          sodipodi:role="line"
-         x="7.6239491"
+         x="6.3539486"
          y="108.07185"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
          id="tspan9542">&lt;OpenPGP CA, 0xCACA&gt;</tspan><tspan
          sodipodi:role="line"
-         x="7.6239491"
+         x="6.3539486"
          y="112.83436"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.26458332"
          id="tspan4864-4">by 0xAAAA</tspan></text>
     <path
        style="fill:none;stroke:#000000;stroke-width:0.15875px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#marker1360)"
-       d="m 29.668087,141.58533 2.500098,-27.55896"
+       d="m 28.398087,141.58533 2.500098,-27.55896"
        id="path1090"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
     <path
        style="fill:none;stroke:#000000;stroke-width:0.15899999;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow1Lend)"
-       d="M 36.966717,84.872134 C 41.409689,76.634322 55.56576,70.909777 65.411794,71.021967"
+       d="M 35.490302,85.381243 C 39.933274,77.143431 55.56576,70.909777 65.411794,71.021967"
        id="path1092"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
     <path
        style="fill:none;stroke:#000000;stroke-width:0.15899998;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#marker1416)"
-       d="M 150.84927,100.32237 C 148.34466,81.544708 136.02916,71.021967 113.85093,71.021967"
+       d="M 151.29159,101.04115 C 148.78698,82.263483 136.02916,71.021967 113.85093,71.021967"
        id="path1092-8"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
     <path
        style="fill:none;stroke:#000000;stroke-width:0.15874998px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#marker1422)"
-       d="m 153.48931,130.32632 0.56031,12.73206"
+       d="m 154.75931,130.32632 0.56031,12.73206"
        id="path1418"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.15874998"
-       x="61.493999"
+       x="58.63649"
        y="118.83779"
        id="text1426"><tspan
          sodipodi:role="line"
          id="tspan1424"
-         x="61.493999"
+         x="58.63649"
          y="118.83779"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.15874998">1. Alice has tsigned 0xCACA</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.15874998"
-       x="61.269939"
+       x="58.41243"
        y="129.92331"
        id="text1426-7"><tspan
          sodipodi:role="line"
-         id="tspan1424-6"
-         x="61.269939"
+         x="58.41243"
          y="129.92331"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.15874998">2. Alice observes that 0xCACA</tspan><tspan
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.15874998"
+         id="tspan1446">2. Alice observes that 0xCACA</tspan><tspan
          sodipodi:role="line"
-         x="61.269939"
+         x="58.41243"
          y="134.68581"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.15874998"
-         id="tspan1446">    has certified 0xBBBB</tspan></text>
+         id="tspan1069">    has certified &lt;Bob, 0xBBBB&gt;</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.15874998"
-       x="61.525032"
+       x="58.667522"
        y="145.00792"
        id="text1426-8"><tspan
          sodipodi:role="line"
          id="tspan1424-5"
-         x="61.525032"
+         x="58.667522"
          y="145.00792"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.15874998">3. Alice considers 0xBBBB</tspan><tspan
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.15874998">3. Alice considers &lt;Bob, 0xBBBB&gt;</tspan><tspan
          sodipodi:role="line"
-         x="61.525032"
+         x="58.667522"
          y="149.77042"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.80999994px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.15874998"
-         id="tspan1466">    authenticated</tspan></text>
+         id="tspan1466">    as authenticated</tspan></text>
     <path
        style="fill:none;stroke:#000000;stroke-width:0.15874998;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.47624995, 0.47624995;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#marker1472)"
-       d="M 78.497076,113.40423 C 67.936182,98.854093 62.225765,95.476855 43.533651,93.425868"
+       d="M 78.497076,113.40423 C 67.936182,98.854093 59.425667,95.222301 40.733553,93.171314"
        id="path1468"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
     <path
        style="fill:none;stroke:#000000;stroke-width:0.15874998;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.47624995, 0.47624995;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#marker1478)"
-       d="m 120.45231,128.01889 c 6.14395,-9.85301 11.57198,-15.11497 22.57404,-17.67651"
+       d="m 120.45231,128.01889 c 6.14395,-9.85301 13.72831,-15.77845 24.73037,-18.33999"
        id="path1474"
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
@@ -1528,7 +1528,7 @@
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
     <g
-       transform="translate(135.20984,-10.218854)"
+       transform="translate(136.47984,-10.218854)"
        id="g17608">
       <g
          transform="translate(62.234342,-1.82146)"
@@ -1560,7 +1560,7 @@
     </g>
     <g
        id="g9639"
-       transform="translate(-3.175)">
+       transform="translate(-4.445)">
       <g
          id="g15609-9"
          transform="translate(100.21387,-27.90099)">
