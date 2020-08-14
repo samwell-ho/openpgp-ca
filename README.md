@@ -11,13 +11,16 @@ the right OpenPGP key for their communication partners.
  
 The benefit that using OpenPGP CA brings is roughly the same as if each user
 had verified and signed the keys of everyone they regularly communicate
-with - but without the overhead of having to manually authenticate all of
-those keys.
+with - but without the overhead of every user having to actually authenticate
+and sign all of those keys manually.
 
 The approach of OpenPGP CA moves the effort of authentication to a new role in
-the organization: the *OpenPGP CA admin* sets up the web of trust for users,
-so that everyone can be confident that they are using the right OpenPGP keys
-for their communication partners. 
+the organization: the *OpenPGP CA admin* sets up the web of trust for
+all users, so that the users can be confident that they are using the right
+OpenPGP keys for their communication partners.
+This works without users needing training to perform these tasks - and without
+each user needing to spend significant effort on authenticating a
+potentially large number of keys. 
 
 
 ## Quick intro
