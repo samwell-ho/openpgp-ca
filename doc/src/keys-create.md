@@ -58,7 +58,7 @@ feQnksqX3SRInBSvbCYBAMV3XC2AJX9mXuG4GWNw7z+FsfOI/knVggHTADuMerkK
 =rI68
 -----END PGP PRIVATE KEY BLOCK-----
 
-password for this key: 'Unshackle empower mangy Habitual buddhism'
+Password for this key: 'Unshackle empower mangy Habitual buddhism'.
 ```
 
 It is up to the admin to transfer the key to the user.  This can, for

@@ -38,7 +38,7 @@ maKI1ruhnPW5KHEA/AodNGWjXf3SrN2HaUiuw5KrWtqfkzqh8P7pEuJEmsYB
 =56dh
 -----END PGP PRIVATE KEY BLOCK-----
 
-password for this key: 'ambiguity Gap Fineness Surely denote'
+Password for this key: 'ambiguity Gap Fineness Surely denote'.
 ```
 
 The admin at `beta.org` will need the public key of the OpenPGP CA
@@ -69,7 +69,7 @@ eJSnbiuL30kBAODAli9L8gwGyX7WgPBG62Hre2PqxJvZt8cjscDBstIE
 =1fqR
 -----END PGP PRIVATE KEY BLOCK-----
 
-password for this key: 'radar Undergrad consuming Repulsive Emptiness'
+Password for this key: 'radar Undergrad consuming Repulsive Emptiness'.
 ```
 
 We will also need the public key of this OpenPGP CA instance so that the admin

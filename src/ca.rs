@@ -295,9 +295,9 @@ impl OpenpgpCa {
                 &Pgp::priv_cert_to_armored(&certified)?
             );
             if let Some(pass) = pass {
-                println!("password for this key: '{}'\n", pass);
+                println!("Password for this key: '{}'.\n", pass);
             } else {
-                println!("no password set for this key\n");
+                println!("No password set for this key.\n");
             }
             // --
 
