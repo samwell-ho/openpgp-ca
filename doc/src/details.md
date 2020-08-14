@@ -138,7 +138,7 @@ respective remote organization. The reason for this is that the CA admin of
 introducer for users at `beta.org` - and not for keys outside that
 namespace.  
 Allowing the remote CA admin to act as a trusted introducer for arbitrary
-user ids would give the remote CA admin much too much power.
+user ids would give the remote CA admin too much power.
 
 Using a bridge, members of each organization can authenticate members of
 the remote organization.  The following diagram shows the keys and
@@ -248,13 +248,14 @@ having new keys generated centrally by the CA admin.
 
 This workflow is slightly more complex to perform:
 
-- The user needs to obtain the CA's public key,
+- The user needs to obtain and authenticate the CA's public key,
 - generate their own new key,
 - generate a trust signature for the CA's key.
 - This certification and the user's public key need to be transferred to
- the CA admin.
-- The CA admin then needs to import this new user key into OpenPGP CA, which
-  then automatically certifies the specified uids of the user's new key.
+  the CA admin.
+- The CA admin then needs to authenticate and import this new user key into
+  OpenPGP CA, which then automatically certifies the specified uids of
+  the user's new key.
 
 # What happens on the OpenPGP CA admin side
 

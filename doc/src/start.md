@@ -31,7 +31,7 @@ Note: the integration tests call out to GnuPG to check that the data structures 
 OpenPGP CA creates actually do what they are supposed to do.  Thus, you'll
 need to have GnuPG installed to run the integration tests.
 
-`$ cargo test`
+`$ cargo test --release`
 
 Assuming the compilation succeeded, the resulting binary will be called
 `target/release/openpgp-ca`.  
