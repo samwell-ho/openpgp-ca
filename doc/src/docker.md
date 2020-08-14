@@ -1,6 +1,11 @@
 ## Running in Docker
 
-You can also use `openpgp-ca` in [Docker](https://www.docker.com/). Building boils down to:
+You can also use `openpgp-ca` in [Docker](https://www.docker.com/).
+
+The OpenPGP CA repository contains a dockerfile at `/Dockerfile` that
+helps you build and use the `openpgp-ca` tool.
+
+Building is done by running:
 
 ```
 $ docker build --tag openpgp-ca ./
@@ -33,4 +38,5 @@ $ docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user add
 $ docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user list
 ```
 
-Obviously for regular use you might use more automated tools like [`docker-compose`](https://docs.docker.com/compose/).
+Obviously for regular use you might use more automated tools like
+[`docker-compose`](https://docs.docker.com/compose/).
