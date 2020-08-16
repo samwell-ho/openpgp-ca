@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # OpenPGP CA
 
 OpenPGP CA (certificate authority) is a tool for managing OpenPGP keys

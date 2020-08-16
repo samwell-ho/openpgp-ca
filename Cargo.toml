@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 [package]
 name = "openpgp-ca"
 version = "0.1.3"

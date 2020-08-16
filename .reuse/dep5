@@ -1,0 +1,10 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: OpenPGP CA
+Upstream-Contact: Heiko Schaefer <heiko@schaefer.name>
+Source: https://gitlab.com/openpgp-ca/openpgp-ca
+
+Files: doc/*
+Copyright: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+License: GPL-3.0-or-later
+
+
