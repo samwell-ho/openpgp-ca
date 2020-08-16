@@ -6,25 +6,25 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # OpenPGP CA
 
 OpenPGP CA (certificate authority) is a tool for managing OpenPGP keys
-within groups.
+within groups or organizations.
 
-Imagine this:  Alice is the technical expert in her group.  The need for
+Imagine this:  Carol is the technical expert in her group.  The need for
 protecting the group's communication has come up and they are thinking
 about how to improve this.
-Alice knows about OpenPGP.  In fact, she's not only used OpenPGP herself,
+Carol knows about OpenPGP.  In fact, she's not only used OpenPGP herself,
 she's helped out at a few crypto parties.  So, she knows: normal users,
 even those who are worried about their security, have a very hard time
 using OpenPGP securely; there are too many details for normal users to
 worry about.
 
-This is where OpenPGP CA helps.  The members of Alice's group trust her.
-She is already their sys admin.  So, it is sensible that Alice acts as a
+This is where OpenPGP CA helps.  The members of Carol's group trust her.
+She is already their sys admin.  So, it is sensible that Carol acts as a
 kind of certificate authority (CA) for her group.  This is exactly what
-OpenPGP CA helps Alice do.  Using OpenPGP CA, only Alice has to verify
+OpenPGP CA helps Carol do.  Using OpenPGP CA, only Carol has to verify
 fingerprints.  Then, her users just need to be taught to recognize whether
 a message has been authenticated, and how to make sure 
 encryption is enabled.  This significantly lowers the threshold to using
-OpenPGP correctly, which gives Alice and her collegues a real chance of
+OpenPGP correctly, which gives Carol and her collegues a real chance of
 communicating securely.
 
 
@@ -47,7 +47,7 @@ your organization.  The key's User ID is set to `openpgp-ca@example.org`.
 You should make sure that that email address is configured to forward
 mail to you.
 
-Next, we'll create a few users:
+Next, we'll create two users:
 
 ```
 $ openpgp-ca -d example.oca user add --email alice@example.org --name "Alice Adams"
@@ -56,9 +56,10 @@ $ openpgp-ca -d example.oca user add --email bob@example.org --name "Bob Baker"
 
 The private keys are output to stdout (but they are never stored locally!) -
 these private keys need to be transferred to the respective users. By
-default, the keys are protected by passphrases.
+default, the keys are protected by passwords (which are also output to
+stdout on key creation).
 One way to do this is to store each key on a USB key, and to write each
-key's passphrase and fingerprint on a piece of paper.
+key's password and fingerprint on a piece of paper.
 
 It is also convenient to give the new user the CA's public key at the same
 time.  This can be exported as follows:
@@ -92,7 +93,8 @@ Before setting this trust level, Alice needs to make sure that this key is
 indeed the correct one for her - for example by having the OpenPGP CA admin
 confirm the key's fingerprint on a sufficiently secure channel.
 
-After this, users can automatically authenticate each other as soon as their
+After this, users in the organization (Alice and Bob, in our example) can
+automatically authenticate each other as soon as their
 OpenPGP implementations have copies of other users' keys;
 Users do not need to manually check fingerprints or sign each others' keys.
 OpenPGP CA also helps here: it can automatically generate a WKD.
