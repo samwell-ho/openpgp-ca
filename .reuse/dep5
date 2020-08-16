@@ -8,3 +8,7 @@ Copyright: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 License: GPL-3.0-or-later
 
 
+Files: src/schema.rs.license Cargo.lock.license
+Copyright: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+License: CC0-1.0
+
