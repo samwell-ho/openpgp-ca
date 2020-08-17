@@ -24,6 +24,7 @@ pub struct NewCa<'a> {
 #[belongs_to(Ca)]
 pub struct Cacert {
     pub id: i32,
+    pub fingerprint: String,
     pub priv_cert: String,
     // https://docs.diesel.rs/diesel/associations/index.html
     pub ca_id: i32,
@@ -31,7 +32,8 @@ pub struct Cacert {
 
 #[derive(Insertable)]
 #[table_name = "cacerts"]
-pub struct NewCacert {
+pub struct NewCacert<'a> {
+    pub fingerprint: &'a str,
     pub priv_cert: String,
     pub ca_id: i32,
 }

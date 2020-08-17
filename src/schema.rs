@@ -11,6 +11,7 @@ table! {
 table! {
     cacerts (id) {
         id -> Integer,
+        fingerprint -> Text,
         priv_cert -> Text,
         ca_id -> Integer,
     }

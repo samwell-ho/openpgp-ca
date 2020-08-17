@@ -184,7 +184,12 @@ impl Db {
         }
     }
 
-    pub fn insert_ca(&self, ca: NewCa, ca_key: &str) -> Result<()> {
+    pub fn insert_ca(
+        &self,
+        ca: NewCa,
+        ca_key: &str,
+        fingerprint: &str,
+    ) -> Result<()> {
         diesel::insert_into(cas::table)
             .values(&ca)
             .execute(&self.conn)
@@ -197,6 +202,7 @@ impl Db {
         let ca = cas.first().unwrap();
 
         let ca_cert = NewCacert {
+            fingerprint,
             ca_id: ca.id,
             priv_cert: ca_key.to_string(),
         };

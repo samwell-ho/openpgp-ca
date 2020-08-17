@@ -120,7 +120,11 @@ impl OpenpgpCa {
         let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
 
         self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-            self.db.insert_ca(models::NewCa { domainname }, ca_key)?;
+            self.db.insert_ca(
+                models::NewCa { domainname },
+                ca_key,
+                &cert.fingerprint().to_hex(),
+            )?;
 
             Ok(())
         })

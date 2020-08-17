@@ -8,6 +8,7 @@
 
 PRAGMA foreign_keys = ON;
 
+
 -- CA metadata
 --
 -- By convention, one OpenPGP CA database only
@@ -21,16 +22,24 @@ CREATE TABLE cas (
   CONSTRAINT cas_domainname_unique UNIQUE (domainname)
 );
 
+
 -- Certificate(s) for the CA
 --
 -- This table may have multiple rows, if a CA cert is superseded by a new cert
 CREATE TABLE cacerts (
   id INTEGER NOT NULL PRIMARY KEY,
+
+  fingerprint VARCHAR NOT NULL,
   priv_cert VARCHAR NOT NULL,
 
   ca_id INTEGER NOT NULL,
   FOREIGN KEY(ca_id) REFERENCES cas(id)
 );
+
+-- cacerts.fingerprint may be used for lookups, so we create an index
+CREATE UNIQUE INDEX idx_cacerts_fingerprint
+ON cacerts (fingerprint);
+
 
 -- User metadata
 --
@@ -45,6 +54,7 @@ CREATE TABLE users (
   ca_id INTEGER NOT NULL,
   FOREIGN KEY(ca_id) REFERENCES cas(id) ON DELETE RESTRICT
 );
+
 
 -- Certificates
 --
@@ -63,9 +73,10 @@ CREATE TABLE certs (
   CONSTRAINT cert_fingerprint_unique UNIQUE (fingerprint)
 );
 
--- certs.fingerprint is used for lookups, so we generate an index
+-- certs.fingerprint is used for lookups, so we create an index
 CREATE UNIQUE INDEX idx_certs_fingerprint
 ON certs (fingerprint);
+
 
 -- Each cert is connected to n email addresses, via this table
 CREATE TABLE certs_emails (
@@ -76,13 +87,14 @@ CREATE TABLE certs_emails (
   FOREIGN KEY(cert_id) REFERENCES certs(id)
 );
 
--- Certs may be looked up via email addr, so we create an index
+-- certs_emails.addr is used for lookups, so we create an index
 CREATE INDEX idx_emails_addr
 ON certs_emails (addr);
 
--- Certs may be looked up via cert_id, so we create an index
+-- certs_emails.cert_id is used for lookups, so we create an index
 CREATE INDEX idx_certs_emails_cert_id
 ON certs_emails (cert_id);
+
 
 -- Revocations for Certs
 --
@@ -110,6 +122,7 @@ ON revocations (hash);
 CREATE INDEX idx_revocations_cert_id
 ON revocations (cert_id);
 
+
 -- Bridges
 --
 -- When a bridge is configured, a row in this table represents the remote
@@ -128,6 +141,7 @@ CREATE TABLE bridges (
 
   CONSTRAINT bridge_email_unique UNIQUE (email)
 );
+
 
 --CREATE TABLE prefs (
 --  id INTEGER NOT NULL PRIMARY KEY
