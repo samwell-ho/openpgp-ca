@@ -47,3 +47,11 @@ pages:
       - public
   only:
     - master
+
+reuse:
+  image:
+    name: fsfe/reuse:latest
+    entrypoint: [""]
+  script:
+    - reuse lint
+
