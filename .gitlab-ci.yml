@@ -48,10 +48,9 @@ pages:
   only:
     - master
 
-reuse:
-  image:
-    name: fsfe/reuse:latest
-    entrypoint: [""]
-  script:
-    - reuse lint
-
+#reuse:
+#  image:
+#    name: fsfe/reuse:latest
+#    entrypoint: [""]
+#  script:
+#    - reuse lint
