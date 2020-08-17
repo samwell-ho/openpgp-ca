@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 The second approach for managing user keys with OpenPGP CA is that users
 create their own keys, and supply their public key to the OpenPGP CA admin.
 We call this workflow "decentralized key creation", because OpenPGP keys do

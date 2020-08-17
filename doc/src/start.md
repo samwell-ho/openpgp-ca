@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Now that we've looked at OpenPGP CA's concepts, let's get started
 using it.
 

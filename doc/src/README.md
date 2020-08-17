@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # A High-Level overview of OpenPGP CA
 
 OpenPGP CA is two things:

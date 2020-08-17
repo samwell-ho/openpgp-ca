@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 This chapter describes how OpenPGP CA works at a technical level.
 First, we describe the OpenPGP data structures that it uses.  Then
 we describe some relevant points of OpenPGP CA's implementation.

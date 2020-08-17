@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # Calibrating OpenPGP CA security/usability tradeoffs 
 
 OpenPGP CA prescribes some aspects of how to use OpenPGP within an organization. However, there are also some degrees of freedom in how to deploy OpenPGP CA. Organizations need to make some decisions before rolling out OpenPGP CA.

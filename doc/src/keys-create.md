@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 There are two ways to manage user keys with OpenPGP CA.
 The simplest way for both the admin and users is to have OpenPGP CA create
 keys on behalf of the user.  This allows OpenPGP CA to automatically create

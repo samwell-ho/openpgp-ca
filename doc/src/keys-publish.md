@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 OpenPGP CA serves as a repository of user keys within our organization.
 So when we want to publish OpenPGP keys for our organization, exporting
 those keys from OpenPGP CA is a convenient possibility. 

@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Until now, we've shown how to use OpenPGP CA to make it easy for
 users (or rather, their software) in the same organization to authenticate
 each other's keys.  It is also possible for OpenPGP CA admins to connect their
