@@ -28,6 +28,7 @@ use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
+use sequoia_openpgp::cert::CipherSuite;
 use sha2::Digest;
 
 pub struct Pgp {}
@@ -56,6 +57,7 @@ impl Pgp {
 
         // Generate a Cert, and create a keypair from the primary key.
         let (cert, sig) = cert::CertBuilder::new()
+            .set_cipher_suite(CipherSuite::RSA4k)
             .add_signing_subkey()
             // FIXME: set expiration from CLI
             // std::time::Duration::new(123456, 0)
@@ -115,6 +117,7 @@ impl Pgp {
         };
 
         let mut builder = cert::CertBuilder::new()
+            .set_cipher_suite(CipherSuite::RSA4k)
             .add_subkey(
                 KeyFlags::default()
                     .set_transport_encryption()
