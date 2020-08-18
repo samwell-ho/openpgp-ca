@@ -75,7 +75,13 @@ fn main() -> Result<()> {
                     Some(email) => ca.certs_get(&email)?,
                     None => ca.user_certs_get_all()?,
                 };
-                certs.iter().for_each(|cert| println!("{}", cert.pub_cert));
+
+                let mut c = Vec::new();
+                for cert in certs {
+                    c.push(OpenpgpCa::cert_to_cert(&cert)?);
+                }
+
+                println!("{}", OpenpgpCa::certs_to_armored(&c)?);
             }
             UserCommand::List => print_users(&ca)?,
             UserCommand::ShowRevocations { email } => {

@@ -146,6 +146,19 @@ impl Pgp {
         Ok(String::from_utf8(v)?)
     }
 
+    /// Get the armored "keyring" representation of a List of public-key Certs
+    pub fn certs_to_armored(certs: &[Cert]) -> Result<String> {
+        let mut writer =
+            armor::Writer::new(Vec::new(), armor::Kind::PublicKey)?;
+
+        for cert in certs {
+            cert.serialize(&mut writer)?;
+        }
+        let buffer = writer.finalize()?;
+
+        Ok(String::from_utf8_lossy(&buffer).to_string())
+    }
+
     /// make a "private key" ascii-armored representation of a Cert
     pub fn priv_cert_to_armored(cert: &Cert) -> Result<String> {
         let mut buffer = vec![];

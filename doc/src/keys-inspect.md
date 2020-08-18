@@ -60,27 +60,13 @@ To output all public user keys from OpenPGP CA to stdout:
 
 ```
 -----BEGIN PGP PUBLIC KEY BLOCK-----
-Comment: F27C B2E9 2C3E 01DA 1C65  6FB2 1758 251C 75E2 5DDD
-Comment: Alice Adams <alice@example.org>
 
 xjMEXv8FyxYJKwYBBAHaRw8BAQdADeFuwt/+AtkUWNMxmi/nKwpF/Nnf76QX7qNi
 v2JWUxjCfgQfFgoADwWCXv8FywIVCgKbAQIeAQAhCRAXWCUcdeJd3RYhBPJ8suks
 [...]
-6Sw+AdocZW+yF1glHHXiXd1lcgD/byHHRjsKEux07gYeGUs+MpP4trLr6SL3Gyqf
-bRcVqcMA/0RsK9WcWw5ZHmVqCM7OXOu1Fdk81xqVJVggKhdgMwcD
-=TFLi
------END PGP PUBLIC KEY BLOCK-----
-
------BEGIN PGP PUBLIC KEY BLOCK-----
-Comment: 0EE9 35F5 6AC4 381E 0073  70E9 56A1 0EB1 ABED 2321
-Comment: Bob Baker <bob@example.org>
-
-xsDNBF7/BgMBDADGqq+EenMXzetD1mO2L2APhuOKzOQRcJrztXRly6gd4asjx50T
-X2RH0D/8ahDuisLF7//HcwYUntH/BFG6Tvxf703Bg4+Uo+8+s6+9gZ/9yEH1yf/r
-[...]
-wfGODYtIstlqFbesf1m8WRneB13FlzFxngM3+6Oq4fu/XOVJNlo5ZMEBShkrpU25
-75YuEbrUY++9El5KuIHzCmf73NFagLszXfZjb261+lzGQEb0ln3LTVZL
-=vqMk
+L41nIJEWza8ZhWPINdDFWAnOEWuDF/312/k3mZBs4IGCN0NjFKMQKL2dBTacWzZz
+8J0nPe2QqePJHVH4
+=F05k
 -----END PGP PUBLIC KEY BLOCK-----
 ```
 

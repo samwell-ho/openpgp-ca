@@ -540,6 +540,11 @@ impl OpenpgpCa {
         Pgp::cert_to_armored(cert)
     }
 
+    /// Get the armored "keyring" representation of a List of public-key Certs
+    pub fn certs_to_armored(certs: &[Cert]) -> Result<String> {
+        Pgp::certs_to_armored(certs)
+    }
+
     /// Get a list of all User Certs
     //
     // FIXME: remove this method ->
