@@ -52,6 +52,7 @@ use diesel::prelude::*;
 
 use crate::models::Revocation;
 use anyhow::{Context, Result};
+use sequoia_openpgp::KeyHandle;
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
@@ -494,7 +495,7 @@ impl OpenpgpCa {
 
         Ok(sigs
             .iter()
-            .any(|s| s.issuer_fingerprint() == Some(&ca.fingerprint())))
+            .any(|s| s.issuer_fingerprints().any(|f| f == &ca.fingerprint())))
     }
 
     /// Check if this Cert has tsigned the CA Key
@@ -504,9 +505,10 @@ impl OpenpgpCa {
 
         let user_cert = Pgp::armored_to_cert(&cert.pub_cert)?;
 
-        Ok(tsigs
-            .iter()
-            .any(|t| t.issuer_fingerprint() == Some(&user_cert.fingerprint())))
+        Ok(tsigs.iter().any(|t| {
+            t.issuer_fingerprints()
+                .any(|fp| fp == &user_cert.fingerprint())
+        }))
     }
 
     /// Get sequoia Cert representation of a database Cert
@@ -662,18 +664,18 @@ impl OpenpgpCa {
         &self,
         revoc: &Signature,
     ) -> Result<Option<models::Cert>> {
-        let r_keyid = revoc.issuer();
-        if r_keyid.is_none() {
+        let revoc_keyhandles = revoc.get_issuers();
+        if revoc_keyhandles.is_empty() {
             return Err(anyhow::anyhow!("Signature has no issuer KeyID"));
         }
-        let r_keyid = r_keyid.unwrap();
 
         for cert in self.user_certs_get_all()? {
             let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
             // require that keyid of cert and Signature issuer match
             let c_keyid = c.keyid();
-            if &c_keyid != r_keyid {
+
+            if !revoc_keyhandles.contains(&KeyHandle::KeyID(c_keyid)) {
                 // ignore certs with non-matching KeyID
                 continue;
             }

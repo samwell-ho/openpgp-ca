@@ -60,8 +60,7 @@ impl Pgp {
             .set_cipher_suite(CipherSuite::RSA4k)
             .add_signing_subkey()
             // FIXME: set expiration from CLI
-            // std::time::Duration::new(123456, 0)
-            .set_expiration_time(None)
+            // .set_validity_period()
             .generate()?;
 
         let mut keypair = cert
@@ -89,8 +88,8 @@ impl Pgp {
                 .add_notation(
                     "openpgp-ca@sequoia-pgp.org",
                     (format!("domain={}", domainname)).as_bytes(),
-                    signature::subpacket::NotationDataFlags::default()
-                        .set_human_readable(true),
+                    signature::subpacket::NotationDataFlags::empty()
+                        .set_human_readable(),
                     false,
                 )?;
         let binding = userid.bind(&mut keypair, &cert, builder)?;
@@ -108,8 +107,6 @@ impl Pgp {
         name: Option<&str>,
         password: bool,
     ) -> Result<(Cert, Signature, Option<String>)> {
-        // FIXME: use passphrase
-
         let pass = if password {
             Some(Self::diceware())
         } else {
@@ -119,7 +116,7 @@ impl Pgp {
         let mut builder = cert::CertBuilder::new()
             .set_cipher_suite(CipherSuite::RSA4k)
             .add_subkey(
-                KeyFlags::default()
+                KeyFlags::empty()
                     .set_transport_encryption()
                     .set_storage_encryption(),
                 None,
@@ -436,7 +433,10 @@ impl Pgp {
                 .with_policy(&policy, None)?
                 .bundle()
                 .certifications();
-            if sigs.iter().any(|s| s.issuer_fingerprint() == Some(&fp_ca)) {
+            if sigs
+                .iter()
+                .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
+            {
                 // there is already a signature by ca_cert on this uid - skip
                 continue;
             }

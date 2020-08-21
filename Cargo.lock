@@ -103,12 +103,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
 
 [[package]]
-name = "base64"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
-
-[[package]]
 name = "bindgen"
 version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -204,7 +198,7 @@ dependencies = [
 [[package]]
 name = "buffered-reader"
 version = "0.18.0"
-source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v0.18.0#df2c629b439e197eed7a7fd3745069ae002f9205"
+source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v0.19.0#383133f6be990237044900a4df676488bf8dd71e"
 dependencies = [
  "bzip2",
  "flate2",
@@ -1738,7 +1732,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bc8af4bda8e1ff4932523b94d3dd20ee30a87232323eda55903ffd71d2fb017"
 dependencies = [
- "base64 0.11.0",
+ "base64",
  "blake2b_simd",
  "constant_time_eq",
  "crossbeam-utils",
@@ -1833,8 +1827,8 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "sequoia-core"
-version = "0.18.0"
-source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v0.18.0#df2c629b439e197eed7a7fd3745069ae002f9205"
+version = "0.19.0"
+source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v0.19.0#383133f6be990237044900a4df676488bf8dd71e"
 dependencies = [
  "anyhow",
  "dirs 2.0.2",
@@ -1844,8 +1838,8 @@ dependencies = [
 
 [[package]]
 name = "sequoia-net"
-version = "0.18.0"
-source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v0.18.0#df2c629b439e197eed7a7fd3745069ae002f9205"
+version = "0.19.0"
+source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v0.19.0#383133f6be990237044900a4df676488bf8dd71e"
 dependencies = [
  "anyhow",
  "futures",
@@ -1867,12 +1861,12 @@ dependencies = [
 
 [[package]]
 name = "sequoia-openpgp"
-version = "0.18.0"
-source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v0.18.0#df2c629b439e197eed7a7fd3745069ae002f9205"
+version = "0.19.0"
+source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v0.19.0#383133f6be990237044900a4df676488bf8dd71e"
 dependencies = [
  "anyhow",
  "backtrace",
- "base64 0.12.3",
+ "base64",
  "buffered-reader",
  "bzip2",
  "dyn-clone",
