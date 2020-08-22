@@ -344,19 +344,21 @@ impl Pgp {
 
         let mut packets: Vec<Packet> = Vec::new();
 
-        // create one TSIG for each regex
-        for regex in scope_regexes {
-            for signer in &mut cert_keys {
-                let builder = signature::SignatureBuilder::new(
-                    SignatureType::GenericCertification,
-                )
-                .set_trust_signature(255, 120)?
-                .set_regular_expression(regex.as_bytes())?;
+        // create one tsig for each signer
+        for signer in &mut cert_keys {
+            let mut builder = signature::SignatureBuilder::new(
+                SignatureType::GenericCertification,
+            )
+            .set_trust_signature(255, 120)?;
 
-                let tsig = userid.bind(signer, &remote_ca_cert, builder)?;
-
-                packets.push(tsig.into());
+            // add all regexes
+            for regex in &scope_regexes {
+                builder = builder.add_regular_expression(regex.as_bytes())?;
             }
+
+            let tsig = userid.bind(signer, &remote_ca_cert, builder)?;
+
+            packets.push(tsig.into());
         }
 
         // FIXME: expiration?
