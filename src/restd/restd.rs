@@ -66,6 +66,6 @@ fn rocket() -> rocket::Rocket {
 
     let cli = RestdCli::from_args();
     match cli.cmd {
-        Command::Run => rocket::ignite().mount("/api", routes![post_user_new]),
+        Command::Run => rocket::ignite().mount("/", routes![post_user_new]),
     }
 }

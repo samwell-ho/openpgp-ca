@@ -21,15 +21,20 @@ $ openpgp-ca-restd -d example.oca run
     => limits: forms = 32KiB
     => keep-alive: 5s
     => tls: disabled
-🛰  Mounting /api:
-    => POST /api/users/new application/json (post_user_new)
+🛰  Mounting /:
+    => POST /users/new application/json (post_user_new)
 🚀 Rocket has launched from http://localhost:8000
 ```
 
-To test this service, you can now add a new user via POST using curl:
+## Adding users
+
+Using this service, you can now add a new user to the OpenPGP CA database
+via a POST request.
+
+For testing purposes we'll use curl:
 
 ```
-curl --header "Content-Type: application/json" --request POST --data @user.json  http://localhost:8000/api/users/new
+curl --header "Content-Type: application/json" --request POST --data @user.json  http://localhost:8000/users/new
 ```
 
 With a data-file `user.json` as follows:
