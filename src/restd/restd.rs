@@ -62,10 +62,20 @@ fn post_user_new(user: Json<User>) -> String {
         )
     });
 
+    // FIXME: error handling?
+
+    // Return fingerprint as potential database key?!
+
     format!("Result: {:?}\n", res)
 }
 
 #[launch]
 fn rocket() -> rocket::Rocket {
-    rocket::ignite().mount("/api", routes![post_user_new])
+    use cli::Command;
+    use RestdCli;
+
+    let cli = RestdCli::from_args();
+    match cli.cmd {
+        Command::Run => rocket::ignite().mount("/api", routes![post_user_new]),
+    }
 }

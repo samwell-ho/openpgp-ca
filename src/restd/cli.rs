@@ -19,4 +19,13 @@ about = "OpenPGP CA REST daemon."
 pub struct RestdCli {
     #[structopt(name = "filename", short = "d", long = "database")]
     pub database: Option<String>,
+
+    #[structopt(subcommand)]
+    pub cmd: Command,
+}
+
+#[derive(StructOpt, Debug)]
+pub enum Command {
+    /// Run restd
+    Run,
 }

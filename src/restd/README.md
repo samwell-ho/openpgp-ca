@@ -10,7 +10,7 @@ $ openpgp-ca -d example.oca ca init example.org
 Then the REST daemon can be started:
 
 ```
-$ openpgp-ca-restd -d example.oca
+$ openpgp-ca-restd -d example.oca run
 
 🔧 Configured for development.
     => address: localhost
