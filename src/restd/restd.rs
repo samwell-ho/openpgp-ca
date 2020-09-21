@@ -6,15 +6,13 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// #![feature(decl_macro)]
+use std::ops::Deref;
+
 #[macro_use]
 extern crate rocket;
 
 use rocket_contrib::json::Json;
-
 use serde::{Deserialize, Serialize};
-
-use std::ops::Deref;
 
 pub mod cli;
 
@@ -23,15 +21,8 @@ use structopt::StructOpt;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
 
-#[macro_use]
-extern crate lazy_static;
-
-lazy_static! {
-    static ref CLI: RestdCli = RestdCli::from_args();
-}
-
 thread_local! {
-    static CA: OpenpgpCa = OpenpgpCa::new(CLI.database.as_deref())
+    static CA: OpenpgpCa = OpenpgpCa::new(RestdCli::from_args().database.as_deref())
         .expect("OpenPGP CA new() failed - database problem?");
 }
 
@@ -72,7 +63,6 @@ fn post_user_new(user: Json<User>) -> String {
 #[launch]
 fn rocket() -> rocket::Rocket {
     use cli::Command;
-    use RestdCli;
 
     let cli = RestdCli::from_args();
     match cli.cmd {
