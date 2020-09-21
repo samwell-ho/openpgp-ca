@@ -1,16 +1,16 @@
 # Experimental REST API for OpenPGP CA
 
-To use the OpenPGP CA REST server, the CA needs to be initialized once
-(to set up the CA key):
+To use the OpenPGP CA as a REST service, the CA first needs to be initialized
+once (to create the CA key):
 
 ```
-$ openpgp-ca -d /tmp/openpgpca.sqlite ca init example.org
+$ openpgp-ca -d example.oca ca init example.org
 ```
 
 Then the REST daemon can be started:
 
 ```
-$ openpgp-ca-restd
+$ openpgp-ca-restd -d example.oca
 
 🔧 Configured for development.
     => address: localhost
@@ -26,17 +26,18 @@ $ openpgp-ca-restd
 🚀 Rocket has launched from http://localhost:8000
 ```
 
-
-To add new user via POST, run:
+To test this service, you can now add a new user via POST using curl:
 
 ```
 curl --header "Content-Type: application/json" --request POST --data @user.json  http://localhost:8000/api/users/new
 ```
 
-with a data-file `user.json` as follows:
+With a data-file `user.json` as follows:
 
 ```
-{"email":["alice@example.org"],"name": "Alice Adams", "key": "-----BEGIN PGP PUBLIC KEY BLOCK-----
+{"email": ["alice@example.org"],
+ "name": "Alice Adams",
+ "key": "-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 xsFNBF9orW8BEAC9RievEe67QyvqV7XGnGVV2VwMGuoJFtER8xwU0RCSqKMnu6L+
 un0wri829zQm/trLebHDD70Dvwe6Wl5gwXJtbKTETMg3KuJ51DAZvo4W0JUkEvwC
