@@ -7,21 +7,26 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 OpenPGP CA prescribes some aspects of how to use OpenPGP within an organization. However, there are also some degrees of freedom in how to deploy OpenPGP CA. Organizations need to make some decisions before rolling out OpenPGP CA.
 
-
-## Does my organization need an offline OpenPGP CA, or is an online instance okay?
+## Protecting the CA key
 
 The OpenPGP CA database currently contains the private key of the CA.
-This key can create certifications that all users in the organization trust
-implicitly. If an attacker can get control of the CA key, they can
-certify keys to perform man-in-the-middle attacks on users.
-
-If this scenario is an unacceptable risk, OpenPGP CA can be
-run on an airgapped ("offline") system.
+This private key needs to be protected: it can create certifications that
+all users in the organization trust implicitly. If an attacker gets access
+to the private CA key, they can certify keys to perform man-in-the-middle
+attacks on users.
 
 The OpenPGP CA database itself is not encrypted or otherwise protected, and
 the CA key is not currently password protected. This means that the
 database file needs to be protected appropriately (e.g. stored on
-removable encrypted storage).
+removable encrypted storage, like dm-crypt/LUKS).
+
+
+## Does my organization need an offline OpenPGP CA, or is an online instance okay?
+
+If the risk of a compromised CA key is unacceptable, OpenPGP CA
+should be run on an airgapped ("offline") system.
+
+For offline instances we suggest running OpenPGP CA on tails.
 
 
 ## Should my organization use the centralized or decentralized workflows?
