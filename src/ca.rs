@@ -156,6 +156,32 @@ impl OpenpgpCa {
         }
     }
 
+    /// get the domainname of this CA
+    pub fn get_ca_domain(&self) -> Result<String> {
+        let cert = self.ca_get_cert()?;
+        let uids: Vec<_> = cert.userids().collect();
+
+        if uids.len() != 1 {
+            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
+        }
+
+        let email = &uids[0].userid().email()?;
+
+        if let Some(email) = email {
+            let split: Vec<_> = email.split("@").collect();
+
+            if split.len() == 2 {
+                Ok(split[1].to_owned())
+            } else {
+                Err(anyhow::anyhow!(
+                    "ERROR: Error while splitting domain from CA user_id "
+                ))
+            }
+        } else {
+            Err(anyhow::anyhow!("ERROR: CA user_id has no email"))
+        }
+    }
+
     /// Print information about the Ca to stdout.
     ///
     /// This shows the domainname of this OpenPGP CA instance and the
@@ -421,7 +447,8 @@ impl OpenpgpCa {
             Ok(())
         } else {
             Err(anyhow::anyhow!(
-                "No cert with this ingerprint exists in the DB, cannot update"
+                "No cert with this fingerprint exists in the DB, cannot \
+                update"
             ))
         }
     }
@@ -537,6 +564,11 @@ impl OpenpgpCa {
         }
     }
 
+    /// Get the Cert representation of an armored key
+    pub fn armored_to_cert(armored: &str) -> Result<Cert> {
+        Pgp::armored_to_cert(armored)
+    }
+
     /// Get the armored "public key" representation of a Cert
     pub fn cert_to_armored(cert: &Cert) -> Result<String> {
         Pgp::cert_to_armored(cert)
@@ -577,6 +609,14 @@ impl OpenpgpCa {
     /// Get a list of the Certs that are associated with `email`
     pub fn certs_get(&self, email: &str) -> Result<Vec<models::Cert>> {
         self.db.get_certs_by_email(email)
+    }
+
+    /// Get Cert by fingerprint
+    pub fn cert_get_by_fingerprint(
+        &self,
+        fingerprint: &str,
+    ) -> Result<Option<models::Cert>> {
+        self.db.get_cert(fingerprint)
     }
 
     /// Get a Cert by id
