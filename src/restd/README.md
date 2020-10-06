@@ -42,7 +42,8 @@ With a data-file `user.json` as follows:
 ```
 {"email": ["alice@example.org"],
  "name": "Alice Adams",
- "key": "-----BEGIN PGP PUBLIC KEY BLOCK-----
+ "revocations": [],
+ "cert": "-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 xsFNBF9orW8BEAC9RievEe67QyvqV7XGnGVV2VwMGuoJFtER8xwU0RCSqKMnu6L+
 un0wri829zQm/trLebHDD70Dvwe6Wl5gwXJtbKTETMg3KuJ51DAZvo4W0JUkEvwC
