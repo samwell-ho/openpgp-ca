@@ -112,7 +112,7 @@ fn check_and_normalize_cert(ca: &OpenpgpCa, user: &User) -> Result<Cert> {
     Ok(cert)
 }
 
-#[get("/certs/<email>")]
+#[get("/certs/list/<email>")]
 fn list_certs(email: String) -> Json<Vec<CertJSON>> {
     let res: Result<Vec<CertJSON>> = CA.with(|ca| {
         let mut certificates = Vec::new();
@@ -144,7 +144,7 @@ fn list_certs(email: String) -> Json<Vec<CertJSON>> {
 /// Similar to "post_user", but doesn't commit data to DB.
 ///
 /// Returns information about what the commit would result in.
-#[post("/users/check", data = "<user>", format = "json")]
+#[get("/certs/check", data = "<user>", format = "json")]
 fn check_cert(user: Json<User>) -> Json<CertJSON> {
     // "the user clicks submit
     // the certificates are summarized
