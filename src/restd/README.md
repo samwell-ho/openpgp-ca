@@ -38,16 +38,15 @@ When a user uploads an OpenPGP certificate (key), our suggested workflow is to
 give the user feedback on aspects of that key before asking them if
 they want to persist the new data to OpenPGP CA.
 
-There are two reasons for this:
+It is good to show human readable information about certificate additions
+and updates  for the user to review. In particular because:
 
 - OpenPGP certificates are typically not in a human-readable form, so it's
   useful to confirm that the user has actually uploaded the right key
-- This REST-service potentially normalizes certificates.
-  Some data may be removed (such as some user_ids).
-  Also, in the case of an update to an existing certificate, information from
+- This REST-service potentially normalizes certificates,
+  some data may be removed (e.g. some user_ids).
+- In the case of an update to an existing certificate, information from
   both variants of the certificate will be merged.
-  In all of these cases it is good to show the user the resulting data for
-  review.
 
 ```
 curl --header "Content-Type: application/json" --request GET --data @user.json  http://localhost:8000/certs/check
@@ -78,15 +77,18 @@ persist the certificate.
 
 ## Persisting OpenPGP certificates
 
-After checking and previewing a certificate addition or update, you can 
-persist the data to the OpenPGP CA database via a POST request:
+After previewing a certificate addition or update, and getting confirmation
+for this data from the user, the data can be persisted to the OpenPGP CA
+database via a POST request:
 
 ```
 curl --header "Content-Type: application/json" --request POST --data @user.json  http://localhost:8000/users/new
 ```
 
-The format and content of the output of this call is exactly the same as above
-for `/certs/check`.
+(The format and content of the output of this call is exactly the same as
+above for `/certs/check` - except that there may be additional errors in this
+call, if persisting to the database fails)
+
 
 ## Revoking a certificate
 
@@ -94,48 +96,56 @@ When a user wants to stop using a certificate, normal procedure is to apply a
 "revocation". The revocation marks the certificate as invalid (and can
 contain additional information about the reason for revocation).
 
-For the purpose of this API, this operation is just a regular "update" to
-the certificate. It has in some sense the semantics of a "delete" operation:
-The user's certificate was usable before the revocation - after the
-operation it is marked as non-usable.
+For the purpose of this API, this operation is a regular "update" to
+the certificate.
 
-However, it is necessary to leave this (now invalidated) key accessible on
-WKD (ideally indefinitely): This is how third parties will learn of the key's
-revocation.
+This update (on the API level) has - in some sense - the semantics
+of a "delete" operation, on the logical OpenPGP level: The user's certificate
+was marked as usable before the revocation - after the operation it is
+marked as not usable.
+
+After revocation, it is good practice to leave this (now invalidated) key
+accessible on WKD (ideally indefinitely):
+This is how third parties will learn of the key's revocation.
 
 
 ## Listing all OpenPGP certificates for a user
 
-A `user` is identified by their email, in this service.
+A user is identified by their email, in this service.
 To get a list of all OpenPGP certificates for a user, call:
 
 ```
 curl --request GET http://localhost:8000/certs/list/alice@example.org
 ```
 
-Among other things, the returned data contains fingerprint strings for each
-certificate, which are used as keys for the following operations.
+Among other information, the returned data contains fingerprint strings for
+each certificate. These fingerprint strings are used as parameters for the
+following operations.
 
 
-## Marking a certificate as deactivated
+## Marking a certificate as "deactivated"
 
 When a user leaves the organization (such as FSFE), this has subtle
 implications for their OpenPGP certificate:
 
-First of all, it probably doesn't mean that the key should be revoked.
-A certificate can be associated with various email addresses (this would be
-represented by a number of user_ids).
-The user may keep using the same key in other contexts, with
+First of all, it probably doesn't mean that the key should be revoked:
+A certificate can be associated with various email addresses (such
+associations are represented by a number of user_ids).
+The user may keep using this key in other contexts, associated with
 other email addresses.
 
 When a user leaves FSFE, it makes sense that FSFE stops to certify the
-user_id at FSFE (after all, this email address does not exist anymore).
+user_id at FSFE, such as `alice@fsfe.org` (after all, this email address does
+not exist anymore).
 
 This is what we mean by "deactivation":
 While a user is an FSFE member, the FSFE OpenPGP CA will certify their
 user_id `alice@fsfe.org`. After the user has left FSFE, this certification
 will not be renewed. FSFE stops to certify that the OpenPGP certificate is
-associate with the email address `alice@fsfe.org`
+associated with the email address `alice@fsfe.org`
+
+However, it is also good practice to keep this key published on the WKD,
+in this case. 
 
 This "deactivate" operation can be performed like this:
 
@@ -143,11 +153,11 @@ This "deactivate" operation can be performed like this:
 curl --request POST http://localhost:8000/certs/deactivate/<fingerprint>
 ```
 
-## Delisting a certificate
+## De-listing a certificate
 
-It is possible that a certificate should actually not be listed on WKD any
-more - however, this is probably very rare. When that operation is
-appropriate, it can be performed like this:
+It is possible that a certificate should actually not be listed on the WKD any
+more. However, this is expected to be a rare requirement.
+When this operation is appropriate, it can be performed as follows:
  
 ```
 curl --request DELETE http://localhost:8000/certs/<fingerprint>
