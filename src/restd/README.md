@@ -112,6 +112,17 @@ This is how third parties will learn of the key's revocation.
 ## Listing all OpenPGP certificates for a user
 
 A user is identified by their email, in this service.
+
+Users may have multiple certificates in the OpenPGP CA database, for example:
+
+- Past certificates that have been revoked (but that are still listed, so that
+  third parties may learn of the revocation)
+- A certificate that is still valid, but in the process of being phased out
+- A new certificate that is in the process of being replaced the previous one
+- Additional special purpose certificates (such as a certificate for code
+  signing) that the user wants to manage separately from their other
+  OpenPGP certificates
+
 To get a list of all OpenPGP certificates for a user, call:
 
 ```
@@ -125,7 +136,7 @@ following operations.
 
 ## Marking a certificate as "deactivated"
 
-When a user leaves the organization (such as FSFE), this has subtle
+When a user leaves the organization (such as EXAMPLE.ORG), this has subtle
 implications for their OpenPGP certificate:
 
 First of all, it probably doesn't mean that the key should be revoked:
@@ -134,15 +145,16 @@ associations are represented by a number of user_ids).
 The user may keep using this key in other contexts, associated with
 other email addresses.
 
-When a user leaves FSFE, it makes sense that FSFE stops to certify the
-user_id at FSFE, such as `alice@fsfe.org` (after all, this email address does
-not exist anymore).
+When a user leaves EXAMPLE.ORG, it makes sense that EXAMPLE.ORG stops to certify the
+user_id at EXAMPLE.ORG, such as `alice@example.org` (after all, this email
+address does not exist anymore).
 
 This is what we mean by "deactivation":
-While a user is an FSFE member, the FSFE OpenPGP CA will certify their
-user_id `alice@fsfe.org`. After the user has left FSFE, this certification
-will not be renewed. FSFE stops to certify that the OpenPGP certificate is
-associated with the email address `alice@fsfe.org`
+While a user has an email address at EXAMPLE.ORG, the EXAMPLE.ORG OpenPGP
+CA instance will certify their
+user_id `alice@example.org`. After the user has left EXAMPLE.ORG, this
+certification will not be renewed. EXAMPLE.ORG stops to certify that the
+OpenPGP certificate is associated with the email address `alice@example.org`
 
 However, it is also good practice to keep this key published on the WKD,
 in this case. 
