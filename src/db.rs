@@ -347,14 +347,14 @@ impl Db {
     }
 
     pub fn get_cert(&self, fingerprint: &str) -> Result<Option<Cert>> {
-        let u = certs::table
+        let c = certs::table
             .filter(certs::fingerprint.eq(fingerprint))
             .load::<Cert>(&self.conn)
             .context("Error loading Cert by fingerprint")?;
 
-        match u.len() {
+        match c.len() {
             0 => Ok(None),
-            1 => Ok(Some(u[0].clone())),
+            1 => Ok(Some(c[0].clone())),
             _ => Err(anyhow::anyhow!("get_cert: expected 0 or 1 cert")),
         }
     }
