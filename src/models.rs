@@ -81,6 +81,8 @@ pub struct Cert {
     pub fingerprint: String,
     pub pub_cert: String,
     pub user_id: Option<i32>,
+    pub delisted: bool,
+    pub inactive: bool,
 }
 
 #[derive(Insertable, Debug)]
@@ -89,6 +91,8 @@ pub struct NewCert<'a> {
     pub fingerprint: &'a str,
     pub pub_cert: &'a str,
     pub user_id: Option<i32>,
+    pub delisted: bool,
+    pub inactive: bool,
 }
 
 #[derive(Associations, Identifiable, Queryable, Debug, Clone, AsChangeset)]

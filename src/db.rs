@@ -317,6 +317,8 @@ impl Db {
         let newcert = NewCert {
             pub_cert,
             fingerprint,
+            delisted: false,
+            inactive: false,
             user_id,
         };
         self.insert_cert(newcert)

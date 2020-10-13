@@ -30,6 +30,8 @@ table! {
         fingerprint -> Text,
         pub_cert -> Text,
         user_id -> Nullable<Integer>,
+        delisted -> Bool,
+        inactive -> Bool,
     }
 }
 

@@ -3,7 +3,7 @@
 
 [package]
 name = "openpgp-ca"
-version = "0.9.0"
+version = "0.9.1"
 description = "OpenPGP CA is a tool for managing OpenPGP keys within organizations"
 authors = ["Heiko Schaefer <heiko.schaefer@posteo.de>"]
 license = "GPL-3.0-or-later"

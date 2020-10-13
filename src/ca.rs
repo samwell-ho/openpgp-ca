@@ -168,7 +168,7 @@ impl OpenpgpCa {
         let email = &uids[0].userid().email()?;
 
         if let Some(email) = email {
-            let split: Vec<_> = email.split("@").collect();
+            let split: Vec<_> = email.split('@').collect();
 
             if split.len() == 2 {
                 Ok(split[1].to_owned())
