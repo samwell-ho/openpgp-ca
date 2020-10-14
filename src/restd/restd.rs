@@ -14,8 +14,11 @@ extern crate rocket;
 use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
 
-pub mod cli;
-pub mod util;
+mod certinfo;
+mod cli;
+mod util;
+
+use certinfo::CertInfo;
 
 use anyhow::Result;
 use cli::RestdCli;
@@ -39,22 +42,39 @@ const KEY_SIZE_LIMIT: usize = 1024 * 1024;
 /// REST Interface for OpenPGP CA.
 /// This is an experimental API for use at FSFE.
 #[derive(Debug, Serialize, Deserialize)]
-struct User {
+struct Certificate {
     email: Vec<String>,
     name: Option<String>,
     cert: String,
     revocations: Vec<String>,
+    // doesn't need to be provided (default: false),
+    // but will always be returned
+    delisted: Option<bool>,
+    // doesn't need to be provided (default: false),
+    // but will always be returned
+    inactive: Option<bool>,
 }
 
-/// Human-readable information about an OpenPGP certificate
+/// A container for information about a Cert.
+///
+/// `cert_info` contains factual information about a cert.
+///
+/// Later we may add e.g. `cert_lints` (... ?)
 #[derive(Debug, Serialize, Deserialize)]
-struct CertJSON {
-    fingerprint: String,
-    user_ids: Vec<String>,
+struct ReturnJSON {
+    cert_info: CertInfo,
+    // later:
+    // - cert_lints (e.g. expiry warnings, deprecated crypto, ...)
+    action: Option<String>,
+    // "new", "update" ?
+    key: String, // the key, ascii armored
 }
 
-fn check_and_normalize_cert(ca: &OpenpgpCa, user: &User) -> Result<Cert> {
-    let mut cert = OpenpgpCa::armored_to_cert(&user.cert)
+fn check_and_normalize_cert(
+    ca: &OpenpgpCa,
+    certificate: &Certificate,
+) -> Result<Cert> {
+    let mut cert = OpenpgpCa::armored_to_cert(&certificate.cert)
         .expect("Error while parsing the user-provided armored OpenPGP key");
 
     // private keys are illegal
@@ -65,10 +85,10 @@ fn check_and_normalize_cert(ca: &OpenpgpCa, user: &User) -> Result<Cert> {
     }
 
     // reject unreasonably big keys
-    if user.cert.len() > KEY_SIZE_LIMIT {
+    if certificate.cert.len() > KEY_SIZE_LIMIT {
         return Err(anyhow::anyhow!(
             "ERROR: User certificate is too long ({} bytes)",
-            user.cert.len()
+            certificate.cert.len()
         ));
     }
 
@@ -78,10 +98,11 @@ fn check_and_normalize_cert(ca: &OpenpgpCa, user: &User) -> Result<Cert> {
         .expect("Error while getting the CA's domain");
 
     // split up user_ids between "external" and "internal" emails, then:
-    let (int_provided, ext_provided) =
-        util::split_emails(&my_domain, &user.email)?;
+    let (int_provided, _) =
+        util::split_emails(&my_domain, &certificate.email)?;
 
     let mut int_remaining: HashSet<_> = int_provided.iter().collect();
+    let mut filter_uid = Vec::new();
 
     for user_id in cert.userids() {
         let email = user_id.email()?;
@@ -91,11 +112,16 @@ fn check_and_normalize_cert(ca: &OpenpgpCa, user: &User) -> Result<Cert> {
                 if int_remaining.contains(&email) {
                     int_remaining.remove(&email);
                 } else {
-                    // b) additional "internal" emails the key's user_ids must be stripped
-                    unimplemented!();
+                    // b) flag additional "internal" emails for removal
+                    filter_uid.push(user_id.userid().clone());
                 }
             }
         }
+    }
+
+    // b) strip additional "internal"s user_ids from the Cert
+    for filter in filter_uid {
+        cert = util::user_id_filter(&cert, &filter)?;
     }
 
     if !int_remaining.is_empty() {
@@ -106,33 +132,26 @@ fn check_and_normalize_cert(ca: &OpenpgpCa, user: &User) -> Result<Cert> {
             "ERROR: User certificate does not contain user_ids for '{:?}'",
             int_remaining
         ));
-        panic!();
     }
 
     Ok(cert)
 }
 
 #[get("/certs/list/<email>")]
-fn list_certs(email: String) -> Json<Vec<CertJSON>> {
-    let res: Result<Vec<CertJSON>> = CA.with(|ca| {
+fn list_certs(email: String) -> Json<Vec<ReturnJSON>> {
+    let res: Result<Vec<ReturnJSON>> = CA.with(|ca| {
         let mut certificates = Vec::new();
 
         for c in ca.certs_get(&email)? {
             let cert = OpenpgpCa::armored_to_cert(&c.pub_cert)?;
 
-            let emails = cert
-                .userids()
-                .filter_map(|uid| {
-                    uid.email().expect("ERROR while converting user_id")
-                })
-                .collect();
-
-            let cert_json = CertJSON {
-                fingerprint: cert.fingerprint().to_hex(),
-                user_ids: emails,
+            let r = ReturnJSON {
+                cert_info: (&cert).into(),
+                key: OpenpgpCa::cert_to_armored(&cert)?,
+                action: None,
             };
 
-            certificates.push(cert_json);
+            certificates.push(r);
         }
 
         Ok(certificates)
@@ -144,21 +163,43 @@ fn list_certs(email: String) -> Json<Vec<CertJSON>> {
 /// Similar to "post_user", but doesn't commit data to DB.
 ///
 /// Returns information about what the commit would result in.
-#[get("/certs/check", data = "<user>", format = "json")]
-fn check_cert(user: Json<User>) -> Json<CertJSON> {
-    // "the user clicks submit
-    // the certificates are summarized
-    // and then the user gets another chance to click accept or reject
-    // when viewing the certificates, the web panel needs to query openpgp ca and say: give me the data for this user
-    // then they are summarized in the previous fashion
-    // the web panel db should not try and save the openpgp certificates"
+#[get("/certs/check", data = "<certificate>", format = "json")]
+fn check_cert(certificate: Json<Certificate>) -> Json<ReturnJSON> {
+    CA.with(|ca| {
+        let res = check_and_normalize_cert(&ca, &certificate.into_inner());
 
-    // "the preview prevents the user from publishing incorrect data
-    // it is also a point where we can display some lints
-    // and warnings (like: you uploaded a private key! your key is
-    // invalid because it uses sha-1!)"
+        // FIXME: do some more linting?
 
-    unimplemented!()
+        if let Ok(cert) = res {
+            // check if fingerprint exists in db
+            // -> action "new" or "update"
+
+            let fp = cert.fingerprint().to_hex();
+            let res = ca.cert_get_by_fingerprint(&fp);
+            if let Ok(cert_by_fp) = res {
+                let action = if cert_by_fp.is_some() {
+                    "update"
+                } else {
+                    "new"
+                };
+
+                let armor = OpenpgpCa::cert_to_armored(&cert);
+                if let Ok(key) = armor {
+                    Json(ReturnJSON {
+                        cert_info: (&cert).into(),
+                        key,
+                        action: Some(action.to_string()),
+                    })
+                } else {
+                    panic!(armor);
+                }
+            } else {
+                panic!(res);
+            }
+        } else {
+            panic!(res);
+        }
+    })
 }
 
 /// Store new User-Key data in the OpenPGP CA database.
@@ -167,83 +208,50 @@ fn check_cert(user: Json<User>) -> Json<CertJSON> {
 ///
 /// 1) add an entirely new user
 /// 2) store an update for an existing key (i.e. same fingerprint)
-/// 2a) one specific case of this:
-///     the user adds a revocation to their key, as an update.
+/// 2a) one notable specific case of this:
+///     the user adds a revocation to their key (as an update).
 /// 3) store a "new" (i.e. different fingerprint) key for the same user
-#[post("/certs", data = "<user>", format = "json")]
-fn post_user(user: Json<User>) -> String {
+#[post("/certs", data = "<certificate>", format = "json")]
+fn post_user(certificate: Json<Certificate>) {
+    // let cert: Cert; // resulting Cert, after persisting (?)
+
     let res = CA.with(|ca| {
-        let user = user.into_inner();
+        let cert = certificate.into_inner();
 
         // check and normalize user-provided public key
-        let cert_new = check_and_normalize_cert(ca, &user)?;
+        let cert_normalized = check_and_normalize_cert(ca, &cert)?;
 
-        // find only the "internal" emails from user.email
-        // - get the domain of this CA
-        let my_domain = ca
-            .get_ca_domain()
-            .expect("Error while getting the CA domain");
+        // check if a cert with this fingerprint exists already
+        let fp = cert_normalized.fingerprint().to_hex();
+        let cert_by_fp = ca.cert_get_by_fingerprint(&fp)?;
 
-        // - split up user_ids between "external" and "internal" emails, then:
-        let (internal_emails, external) =
-            util::split_emails(&my_domain, &user.email)?;
+        if let Some(cert_by_fp) = cert_by_fp {
+            // fingerprint of the key already exists
+            //   -> merge data, update existing key
+            let existing = OpenpgpCa::armored_to_cert(&cert_by_fp.pub_cert)?;
 
-        // get existing Certs for this email from the CA DB
-        let mut certs: Vec<_> = Vec::new();
-        for email in &internal_emails {
-            certs.append(&mut ca.certs_get(email)?);
-        }
+            let updated = existing.merge(cert_normalized)?;
 
-        if certs.is_empty() {
-            // 1. the "internal" email/userid doesn't exist in O-CA yet
-            // -> new user
+            ca.cert_import_update(&OpenpgpCa::cert_to_armored(&updated)?)
+        } else {
+            // fingerprint doesn't exist yet -> new cert
 
             ca.cert_import_new(
-                &OpenpgpCa::cert_to_armored(&cert_new)?,
+                &OpenpgpCa::cert_to_armored(&cert_normalized)?,
                 vec![],
-                user.name.as_deref(),
-                user.email
+                cert.name.as_deref(),
+                cert.email
                     .iter()
                     .map(|e| e.deref())
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
-        } else {
-            // 2. the "internal" email/userid exist in OpenPGP CA already
-
-            // check if a cert with this fingerprint exists already
-            let fp = cert_new.fingerprint().to_hex();
-
-            if let Some(exist_cert) = ca.cert_get_by_fingerprint(&fp)? {
-                let cert_exist =
-                    OpenpgpCa::armored_to_cert(&exist_cert.pub_cert)?;
-
-                let update = cert_exist.merge(cert_new)?;
-
-                //   2a. fingerprint of the key already exists
-                //   (-> updated version of this key -> merge)
-
-                //     -> update existing key, merge data
-
-                ca.cert_import_update(&OpenpgpCa::cert_to_armored(&update)?)
-            } else {
-                //   2b. fingerprint doesn't exist -> new key for existing user
-
-                //     - add a new entry
-
-                //     - what should we do with the old key?
-
-                unimplemented!()
-            }
         }
     });
 
-    // FIXME: error handling?
-
-    // Return fingerprint as potential database key?!
-
-    // FIXME: output?
-    format!("Result: {:?}\n", res)
+    if res.is_err() {
+        panic!(res);
+    }
 }
 
 /// Mark a certificate as "deactivated".
@@ -254,7 +262,18 @@ fn post_user(user: Json<User>) -> String {
 /// certificate.
 #[post("/certs/deactivate/<fp>")]
 fn deactivate_cert(fp: String) -> String {
-    unimplemented!()
+    CA.with(|ca| {
+        if let Ok(Some(mut cert)) = ca.cert_get_by_fingerprint(&fp) {
+            cert.inactive = true;
+            if ca.cert_update(&cert).is_err() {
+                panic!("Couldn't update Cert in database");
+            }
+        } else {
+            panic!("Couldn't get Cert by fingerprint {}", fp);
+        }
+    });
+
+    "Cert deactivated".to_string()
 }
 
 /// Remove a cert from the OpenPGP CA database, by fingerprint.
@@ -268,7 +287,18 @@ fn deactivate_cert(fp: String) -> String {
 /// to "deactivate" a cert.
 #[delete("/certs/<fp>")]
 fn delist_cert(fp: String) -> String {
-    unimplemented!();
+    CA.with(|ca| {
+        if let Ok(Some(mut cert)) = ca.cert_get_by_fingerprint(&fp) {
+            cert.delisted = true;
+            if ca.cert_update(&cert).is_err() {
+                panic!("Couldn't update Cert in database");
+            }
+        } else {
+            panic!("Couldn't get Cert by fingerprint {}", fp);
+        }
+    });
+
+    "Cert delisted".to_string()
 }
 
 /// Refresh CA certifications on all user certs
