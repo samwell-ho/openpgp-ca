@@ -453,6 +453,11 @@ impl OpenpgpCa {
         }
     }
 
+    /// Update a Cert in the database
+    pub fn cert_update(&self, cert: &models::Cert) -> Result<()> {
+        self.db.update_cert(cert)
+    }
+
     /// Get the SystemTime for when the specified Cert will expire
     pub fn cert_expiration(cert: &models::Cert) -> Result<Option<SystemTime>> {
         let cert = Pgp::armored_to_cert(&cert.pub_cert)?;
