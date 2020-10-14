@@ -96,7 +96,7 @@ impl Pgp {
 
         // Now merge the userid and binding signature into the Cert.
         let cert =
-            cert.merge_packets(vec![Packet::from(userid), binding.into()])?;
+            cert.insert_packets(vec![Packet::from(userid), binding.into()])?;
 
         Ok((cert, sig))
     }
@@ -317,7 +317,7 @@ impl Pgp {
             }
         }
 
-        let signed = ca_cert.merge_packets(sigs)?;
+        let signed = ca_cert.insert_packets(sigs)?;
 
         Ok(signed)
     }
@@ -363,7 +363,7 @@ impl Pgp {
 
         // FIXME: expiration?
 
-        let signed = remote_ca_cert.merge_packets(packets)?;
+        let signed = remote_ca_cert.insert_packets(packets)?;
 
         Ok(signed)
     }
@@ -407,7 +407,7 @@ impl Pgp {
 
         packets.push(revocation_sig.clone().into());
 
-        let revoked = remote_ca_cert.clone().merge_packets(packets)?;
+        let revoked = remote_ca_cert.clone().insert_packets(packets)?;
 
         Ok((revocation_sig, revoked))
     }
@@ -471,7 +471,7 @@ impl Pgp {
             }
         }
 
-        Ok(user_cert.clone().merge_packets(packets)?)
+        Ok(user_cert.clone().insert_packets(packets)?)
     }
 
     /// get all valid, certification capable keys with secret key material

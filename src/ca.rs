@@ -234,7 +234,7 @@ impl OpenpgpCa {
             tsigs.iter().for_each(|s| packets.push(s.clone().into()));
 
             let signed = ca_cert
-                .merge_packets(packets)
+                .insert_packets(packets)
                 .context("merging tsigs into CA Key failed")?;
 
             // update in DB
@@ -639,7 +639,7 @@ impl OpenpgpCa {
     /// Verifies that applying the revocation cert can be validated by the
     /// cert. Only if this is successful is the revocation stored.
     pub fn revocation_add(&self, revoc_file: &PathBuf) -> Result<()> {
-        let revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
+        let mut revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
             .context("Couldn't load revocation cert")?;
 
         // find the matching cert for this revocation certificate
@@ -650,14 +650,14 @@ impl OpenpgpCa {
         }
         // - if match by fingerprint failed: test all certs
         if cert.is_none() {
-            cert = self.search_revocable_cert_by_keyid(&revoc_cert)?;
+            cert = self.search_revocable_cert_by_keyid(&mut revoc_cert)?;
         }
 
         if let Some(cert) = cert {
             let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
             // verify that revocation certificate validates with cert
-            if Self::validate_revocation(&c, &revoc_cert)? {
+            if Self::validate_revocation(&c, &mut revoc_cert)? {
                 // update sig in DB
                 let armored = Pgp::sig_to_armored(&revoc_cert)
                     .context("couldn't armor revocation cert")?;
@@ -682,11 +682,11 @@ impl OpenpgpCa {
     /// self revocation
     fn validate_revocation(
         cert: &Cert,
-        revoc_cert: &Signature,
+        revoc_cert: &mut Signature,
     ) -> Result<bool> {
         let before = cert.primary_key().self_revocations().len();
 
-        let revoked = cert.to_owned().merge_packets(revoc_cert.to_owned())?;
+        let revoked = cert.to_owned().insert_packets(revoc_cert.to_owned())?;
 
         let after = revoked.primary_key().self_revocations().len();
 
@@ -707,7 +707,7 @@ impl OpenpgpCa {
     /// cert.
     fn search_revocable_cert_by_keyid(
         &self,
-        revoc: &Signature,
+        mut revoc: &mut Signature,
     ) -> Result<Option<models::Cert>> {
         let revoc_keyhandles = revoc.get_issuers();
         if revoc_keyhandles.is_empty() {
@@ -726,7 +726,7 @@ impl OpenpgpCa {
             }
 
             // if KeyID matches, check if revocation validates
-            if Self::validate_revocation(&c, &revoc)? {
+            if Self::validate_revocation(&c, &mut revoc)? {
                 return Ok(Some(cert));
             }
         }
@@ -782,7 +782,7 @@ impl OpenpgpCa {
                 let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
                 let revocation: Packet = sig.into();
-                let revoked = c.merge_packets(vec![revocation])?;
+                let revoked = c.insert_packets(vec![revocation])?;
 
                 cert.pub_cert = Pgp::cert_to_armored(&revoked)?;
 
