@@ -143,7 +143,7 @@ pub fn user_id_filter(cert: &Cert, user_id: &UserID) -> Result<Cert> {
 fn test_split() {
     let (int, ext) = split_emails(
         "fsfe.org",
-        &vec![
+        &[
             "foo@fsfe.org".to_string(),
             "bar@fsfe.org".to_string(),
             "foo@gmail.com".to_string(),
