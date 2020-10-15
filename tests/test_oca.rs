@@ -682,20 +682,24 @@ fn test_revocation_no_fingerprint() -> Result<()> {
             .parts_into_secret()?
             .into_keypair()?;
 
+        // wait for a second before making a new signature -
+        // two signatures with the same timestamp are not allowed
+        std::thread::sleep(std::time::Duration::from_millis(1_000));
+
         let mut sig =
             b.sign_direct_key(&mut keypair, &bob_cert.primary_key())?;
 
         sig.unhashed_area_mut()
             .remove_all(SubpacketTag::IssuerFingerprint);
 
+        sig.hashed_area_mut()
+            .remove_all(SubpacketTag::IssuerFingerprint);
+
         // assert that sig has no KeyHandle::Fingerprint in its issuers
-        assert!(!sig.get_issuers().iter().any(|x| {
-            if let KeyHandle::Fingerprint(_fp) = x {
-                true
-            } else {
-                false
-            }
-        }));
+        assert!(!sig
+            .get_issuers()
+            .iter()
+            .any(|kh| { matches!(kh, KeyHandle::Fingerprint(_)) }));
 
         OpenpgpCa::sig_to_armored(&sig)
             .context("couldn't armor revocation cert")?
