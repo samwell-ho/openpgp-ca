@@ -1005,10 +1005,13 @@ impl OpenpgpCa {
         wkd::insert(&path, domain, None, &ca_cert)?;
 
         for cert in self.user_certs_get_all()? {
-            let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+            // don't export to WKD if the cert is marked "delisted"
+            if !cert.delisted {
+                let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
-            if Self::cert_has_uid_in_domain(&c, domain)? {
-                wkd::insert(&path, domain, None, &c)?;
+                if Self::cert_has_uid_in_domain(&c, domain)? {
+                    wkd::insert(&path, domain, None, &c)?;
+                }
             }
         }
 
