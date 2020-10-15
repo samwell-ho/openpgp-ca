@@ -14,6 +14,7 @@ use tokio_core::reactor::Core;
 
 use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::packet::signature::subpacket::SubpacketTag;
+use openpgp::packet::signature::{subpacket::*, SignatureBuilder};
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
@@ -22,7 +23,6 @@ use openpgp::{Cert, Fingerprint, KeyID};
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
-use sequoia_openpgp::packet::signature::SignatureBuilder;
 
 pub mod gnupg;
 
@@ -668,10 +668,6 @@ fn test_revocation_no_fingerprint() -> Result<()> {
         .context("Input could not be parsed")?;
 
     let armored = if let openpgp::Packet::Signature(s) = p {
-        // modify Signature: remove IssuerFingerprint subpacket
-
-        let b: SignatureBuilder = s.into();
-
         // use Bob as a Signer
         let bob_sec = gnupg::export_secret(&ctx, &"bob@example.org");
         let bob_cert = Cert::from_bytes(&bob_sec)?;
@@ -681,6 +677,26 @@ fn test_revocation_no_fingerprint() -> Result<()> {
             .clone()
             .parts_into_secret()?
             .into_keypair()?;
+
+        // modify Signature: remove IssuerFingerprint subpacket
+
+        let mut b: SignatureBuilder = s.into();
+
+        // Set the IssuerFingerprint (and Issuer) in the unhashed area.
+        // Otherwise Sequoia will add them to the hashed area, and then we
+        // can't remove them (below) without breaking the signature.
+        b = b.modify_unhashed_area(|mut a| {
+            a.add(Subpacket::new(
+                SubpacketValue::IssuerFingerprint(bob_cert.fingerprint()),
+                false,
+            )?)?;
+            a.add(Subpacket::new(
+                SubpacketValue::Issuer(bob_cert.keyid()),
+                false,
+            )?)?;
+
+            Ok(a)
+        })?;
 
         // wait for a second before making a new signature -
         // two signatures with the same timestamp are not allowed
