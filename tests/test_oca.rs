@@ -692,9 +692,6 @@ fn test_revocation_no_fingerprint() -> Result<()> {
         sig.unhashed_area_mut()
             .remove_all(SubpacketTag::IssuerFingerprint);
 
-        sig.hashed_area_mut()
-            .remove_all(SubpacketTag::IssuerFingerprint);
-
         // assert that sig has no KeyHandle::Fingerprint in its issuers
         assert!(!sig
             .get_issuers()
@@ -713,7 +710,8 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     std::fs::write(&revoc_file, &armored)?;
 
     // ... and import into the CA
-    ca.revocation_add(&PathBuf::from(&revoc_file))?;
+    ca.revocation_add(&PathBuf::from(&revoc_file))
+        .context("Storing Bob's revocation in OpenPGP CA")?;
 
     //
     // -- check data in CA --
