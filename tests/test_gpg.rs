@@ -37,8 +37,8 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA users
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
-    ca.user_new(Some(&"Bob"), &["bob@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
+    ca.user_new(Some(&"Bob"), &["bob@example.org"], None, false)?;
 
     // ---- import keys from OpenPGP CA into GnuPG ----
 
@@ -154,11 +154,18 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
         vec![],
         Some("Alice"),
         &["alice@example.org"],
+        None,
     )
     .context("import Alice to CA failed")?;
 
-    ca.cert_import_new(&bob_key, vec![], Some("Bob"), &["bob@example.org"])
-        .context("import Bob to CA failed")?;
+    ca.cert_import_new(
+        &bob_key,
+        vec![],
+        Some("Bob"),
+        &["bob@example.org"],
+        None,
+    )
+    .context("import Bob to CA failed")?;
 
     // export bob, CA-key from CA
     let ca_key = ca.ca_get_pubkey_armored()?;
@@ -229,7 +236,7 @@ fn test_bridge() -> Result<()> {
 
     // make CA user
     assert!(ca1
-        .user_new(Some(&"Alice"), &["alice@some.org"], false)
+        .user_new(Some(&"Alice"), &["alice@some.org"], None, false)
         .is_ok());
 
     // ---- populate second OpenPGP CA instance ----
@@ -238,10 +245,10 @@ fn test_bridge() -> Result<()> {
     ca2.ca_init("other.org", None)?;
 
     // make CA user
-    ca2.user_new(Some(&"Bob"), &["bob@other.org"], false)?;
+    ca2.user_new(Some(&"Bob"), &["bob@other.org"], None, false)?;
 
     // make CA user that is out of the domain scope for ca2
-    ca2.user_new(Some(&"Carol"), &["carol@third.org"], false)?;
+    ca2.user_new(Some(&"Carol"), &["carol@third.org"], None, false)?;
 
     // ---- setup bridges: scoped trust between one.org and two.org ---
 

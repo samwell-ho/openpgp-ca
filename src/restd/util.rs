@@ -40,6 +40,9 @@ pub fn split_emails(
 /// Make a copy of Cert, but without the User ID user_id.
 /// See https://docs.sequoia-pgp.org/sequoia_openpgp/cert/struct.Cert.html#filtering-certificates
 pub fn user_id_filter(cert: &Cert, user_id: &UserID) -> Result<Cert> {
+    // FIXME use:
+    // https://docs.sequoia-pgp.org/sequoia_openpgp/cert/struct.Cert.html#method.retain_userids
+
     // Iterate over all of the Cert components, pushing packets we
     // want to keep into the accumulator.
     let mut acc = Vec::new();

@@ -32,7 +32,7 @@ fn main() -> Result<()> {
                 let email: Vec<&str> =
                     email.iter().map(String::as_str).collect();
 
-                ca.user_new(name.as_deref(), &email[..], true)?;
+                ca.user_new(name.as_deref(), &email[..], None, true)?;
             }
             UserCommand::AddRevocation { revocation_file } => {
                 ca.revocation_add(&revocation_file)?
@@ -68,6 +68,7 @@ fn main() -> Result<()> {
                     revoc_certs,
                     name.as_deref(),
                     &email[..],
+                    None,
                 )?;
             }
             UserCommand::Export { email } => {

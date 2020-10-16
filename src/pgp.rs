@@ -417,6 +417,7 @@ impl Pgp {
         ca_cert: &Cert,
         user_cert: &Cert,
         emails_filter: Option<&[&str]>,
+        duration_days: Option<u64>,
     ) -> Result<Cert> {
         let policy = StandardPolicy::new();
 
@@ -460,9 +461,20 @@ impl Pgp {
                     }
                 }
 
-                let sig =
-                    userid.certify(signer, &user_cert, None, None, None)?;
+                // make certification
+                let mut sb = signature::SignatureBuilder::new(
+                    SignatureType::GenericCertification,
+                );
+                if let Some(days) = duration_days {
+                    // the signature should be good for "days" days from now
+                    const SECONDS_IN_DAY: u64 = 60 * 60 * 24;
+                    sb = sb.set_signature_validity_period(
+                        std::time::Duration::new(SECONDS_IN_DAY * days, 0),
+                    )?;
+                }
+                let sig = userid.bind(signer, user_cert, sb)?;
 
+                // collect all certifications
                 packets.push(sig.into());
 
                 // FIXME: complain about emails that have been specified but
@@ -471,6 +483,7 @@ impl Pgp {
             }
         }
 
+        // insert all new certifications into user_cert
         Ok(user_cert.clone().insert_packets(packets)?)
     }
 

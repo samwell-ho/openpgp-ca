@@ -39,6 +39,9 @@ thread_local! {
 // key size limit (armored): 1 mbyte
 const KEY_SIZE_LIMIT: usize = 1024 * 1024;
 
+// CA certifications are good for 365 days
+const CERTIFICATION_DAYS: Option<u64> = Some(365);
+
 /// REST Interface for OpenPGP CA.
 /// This is an experimental API for use at FSFE.
 #[derive(Debug, Serialize, Deserialize)]
@@ -160,6 +163,8 @@ fn list_certs(email: String) -> Json<Vec<ReturnJSON>> {
     Json(res.unwrap())
 }
 
+// FIXME add: get cert by fp
+
 /// Similar to "post_user", but doesn't commit data to DB.
 ///
 /// Returns information about what the commit would result in.
@@ -245,6 +250,7 @@ fn post_user(certificate: Json<Certificate>) {
                     .map(|e| e.deref())
                     .collect::<Vec<_>>()
                     .as_slice(),
+                CERTIFICATION_DAYS,
             )
         }
     });

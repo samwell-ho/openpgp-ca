@@ -27,7 +27,7 @@
 //! // create a new user, with all signatures
 //! // (the private key is printed to stdout and needs to be manually
 //! // processed from there)
-//! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], false).unwrap();
+//! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false).unwrap();
 //! ```
 
 use std::collections::HashMap;
@@ -272,6 +272,7 @@ impl OpenpgpCa {
         &self,
         name: Option<&str>,
         emails: &[&str],
+        duration_days: Option<u64>,
         password: bool,
     ) -> Result<models::User> {
         let ca_cert = self.ca_get_cert()?;
@@ -282,9 +283,13 @@ impl OpenpgpCa {
                 .context("make_user failed")?;
 
         // sign user key with CA key
-        let certified =
-            Pgp::sign_user_emails(&ca_cert, &user_cert, Some(emails))
-                .context("sign_user failed")?;
+        let certified = Pgp::sign_user_emails(
+            &ca_cert,
+            &user_cert,
+            Some(emails),
+            duration_days,
+        )
+        .context("sign_user failed")?;
 
         // user tsigns CA key
         let tsigned_ca = Pgp::tsign_ca(ca_cert, &user_cert, pass.as_deref())
@@ -350,6 +355,7 @@ impl OpenpgpCa {
         revoc_certs: Vec<String>,
         name: Option<&str>,
         emails: &[&str],
+        duration_days: Option<u64>,
     ) -> Result<()> {
         let c = Pgp::armored_to_cert(key)
             .context("cert_import_new: couldn't process key")?;
@@ -371,8 +377,9 @@ impl OpenpgpCa {
         let ca_cert = self.ca_get_cert()?;
 
         // sign only the User IDs that have been specified
-        let certified = Pgp::sign_user_emails(&ca_cert, &c, Some(emails))
-            .context("sign_user_emails failed")?;
+        let certified =
+            Pgp::sign_user_emails(&ca_cert, &c, Some(emails), duration_days)
+                .context("sign_user_emails failed")?;
 
         // use name from User IDs, if no name was passed
         let name = match name {

@@ -43,7 +43,7 @@ fn test_ca() -> Result<()> {
     ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -116,6 +116,7 @@ fn test_update_cert_key() -> Result<()> {
         vec![],
         Some("Alice"),
         &["alice@example.org"],
+        None,
     )
     .context("import Alice 1 to CA failed")?;
 
@@ -203,6 +204,7 @@ fn test_ca_import() -> Result<()> {
         vec![],
         Some("Alice"),
         &["alice@example.org"],
+        None,
     )
     .context("import Alice 1 to CA failed")?;
 
@@ -214,6 +216,7 @@ fn test_ca_import() -> Result<()> {
         vec![],
         Some("Alice"),
         &["alice@example.org"],
+        None,
     );
 
     assert!(res.is_err());
@@ -255,10 +258,10 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     assert!(ca.ca_init("example.org", None).is_ok());
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
 
     // make another CA user with the same email address
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -291,9 +294,14 @@ fn test_ca_export_wkd() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     ca.ca_init("example.org", None)?;
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
-    ca.user_new(Some(&"Bob"), &["bob@example.org", "bob@other.org"], false)?;
-    ca.user_new(Some(&"Carol"), &["carol@other.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
+    ca.user_new(
+        Some(&"Bob"),
+        &["bob@example.org", "bob@other.org"],
+        None,
+        false,
+    )?;
+    ca.user_new(Some(&"Carol"), &["carol@other.org"], None, false)?;
 
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
@@ -374,8 +382,15 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
         vec![],
         None,
         &["justus@sequoia-pgp.org"],
+        None,
     )?;
-    ca.cert_import_new(&neal_key, vec![], None, &["neal@sequoia-pgp.org"])?;
+    ca.cert_import_new(
+        &neal_key,
+        vec![],
+        None,
+        &["neal@sequoia-pgp.org"],
+        None,
+    )?;
 
     // -- export as WKD
 
@@ -410,7 +425,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
 
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.cert_import_new(&alice_key, vec![], None, &[])?;
+    ca.cert_import_new(&alice_key, vec![], None, &[], None)?;
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
@@ -474,6 +489,7 @@ fn test_ca_signatures() -> Result<()> {
         vec![],
         Some("Alice"),
         &["alice@example.org"],
+        None,
     )
     .context("import Alice to CA failed")?;
 
@@ -483,12 +499,12 @@ fn test_ca_signatures() -> Result<()> {
 
     // CA does not signs bob's key because the "email" parameter is empty.
     // Only userids that are supplied in `email` are signed by the CA.
-    ca.cert_import_new(&bob_key, vec![], Some("Bob"), &[])
+    ca.cert_import_new(&bob_key, vec![], Some("Bob"), &[], None)
         .context("import Bob to CA failed")?;
 
     // create carol, CA will sign carol's key.
     // also, CA key gets a tsig by carol
-    ca.user_new(Some(&"Carol"), &["carol@example.org"], false)?;
+    ca.user_new(Some(&"Carol"), &["carol@example.org"], None, false)?;
 
     for user in ca.users_get_all()? {
         let certs = ca.get_certs_by_user(&user)?;
@@ -535,7 +551,7 @@ fn test_apply_revocation() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -589,6 +605,7 @@ fn test_import_signed_cert() -> Result<()> {
         vec![],
         Some("Alice"),
         &["alice@example.org"],
+        None,
     )?;
 
     // get alice cert back from CA
@@ -652,12 +669,12 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // create Alice
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
 
     // gpg: make key for Bob
     gnupg::create_user(&ctx, "Bob <bob@example.org>");
     let bob_key = gnupg::export(&ctx, &"bob@example.org");
-    ca.cert_import_new(&bob_key, vec![], None, &[])?;
+    ca.cert_import_new(&bob_key, vec![], None, &[], None)?;
 
     // make a revocation certificate for bob ...
     let revoc_file = format!("{}/bob.revoc", home_path);
@@ -778,7 +795,7 @@ fn test_create_user_with_pw() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], true)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true)?;
 
     let certs = ca.user_certs_get_all()?;
     assert_eq!(certs.len(), 1);
