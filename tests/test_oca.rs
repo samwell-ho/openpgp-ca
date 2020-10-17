@@ -75,6 +75,63 @@ fn test_ca() -> Result<()> {
 }
 
 #[test]
+/// Creates a CA and a user. The certification for the user is valid for
+/// 365 days only.
+///
+/// Checks that the certification indeed has a limited validity.
+fn test_expiring_certification() -> Result<()> {
+    let ctx = gnupg::make_context()?;
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let ca = OpenpgpCa::new(Some(&db))?;
+
+    // make new CA key
+    ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
+
+    let ca_cert = ca.ca_get_cert()?;
+    let ca_fp = ca_cert.fingerprint();
+
+    // make CA user
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], Some(365), false)?;
+
+    let certs = ca.user_certs_get_all()?;
+
+    assert_eq!(certs.len(), 1);
+
+    let cert = &certs[0];
+
+    let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
+
+    // alice should have one user id
+    assert_eq!(c.userids().len(), 1);
+
+    let uid = c.userids().last().unwrap();
+
+    let certs = uid.certifications();
+    assert_eq!(certs.len(), 1);
+
+    let ca_certification = &certs[0];
+
+    // is this certification really from our CA?
+    assert_eq!(
+        *ca_certification.issuer_fingerprints().last().unwrap(),
+        ca_fp
+    );
+
+    let validity = ca_certification.signature_validity_period();
+
+    assert!(validity.is_some());
+    let days = validity.unwrap().as_secs() / 60 / 60 / 24;
+
+    // check that the certification by the CA is valid for ~365 days
+    assert!((364 <= days) && (366 >= days));
+
+    Ok(())
+}
+
+#[test]
 /// Create a CA, then externally create a user cert and import it.
 /// Check that the expiry of that cert is as expected.
 ///
