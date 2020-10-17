@@ -482,30 +482,29 @@ impl OpenpgpCa {
 
         let threshold_secs = threshold_days * 24 * 60 * 60;
 
-        for cert in self.db.get_certs()? {
-            if cert.inactive {
-                // ignore "inactive" Certs
-                continue;
-            }
-
+        for cert in self
+            .db
+            .get_certs()?
+            .iter()
+            // ignore "inactive" Certs
+            .filter(|c| !c.inactive)
+        {
             let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
             let mut uids_to_recert = Vec::new();
 
             for uid in c.userids() {
-                for certification in uid.certifications() {
-                    if certification
-                        .issuer_fingerprints()
-                        .any(|ifp| *ifp == ca_fp)
+                for certification in uid
+                    .certifications()
+                    .iter()
+                    .filter(|c| c.issuer_fingerprints().any(|fp| *fp == ca_fp))
+                {
+                    // certification from CA, check if it's going to expire soon
+                    let validity = certification.signature_validity_period();
+                    if validity.is_some()
+                        && (validity.unwrap().as_secs() < threshold_secs)
                     {
-                        // certification from CA, check if it's going to expire soon
-                        let validity =
-                            certification.signature_validity_period();
-                        if validity.is_some()
-                            && (validity.unwrap().as_secs() < threshold_secs)
-                        {
-                            //  if any are about to expire, issue a new certification
-                            uids_to_recert.push(uid.userid());
-                        }
+                        //  if any are about to expire, issue a new certification
+                        uids_to_recert.push(uid.userid());
                     }
                 }
             }
