@@ -377,6 +377,12 @@ impl Db {
             .load::<Cert>(&self.conn)?)
     }
 
+    pub fn get_certs(&self) -> Result<Vec<Cert>> {
+        certs::table
+            .load::<Cert>(&self.conn)
+            .context("Error loading certs")
+    }
+
     pub fn get_revocations(&self, cert: &Cert) -> Result<Vec<Revocation>> {
         Ok(Revocation::belonging_to(cert).load::<Revocation>(&self.conn)?)
     }

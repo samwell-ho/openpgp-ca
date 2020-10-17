@@ -412,55 +412,25 @@ impl Pgp {
         Ok((revocation_sig, revoked))
     }
 
-    /// CA signs all, or a specified list of userids of Cert
-    pub fn sign_user_emails(
+    /// CA signs a specified list of userids of Cert
+    pub fn sign_user_ids(
         ca_cert: &Cert,
         user_cert: &Cert,
-        emails_filter: Option<&[&str]>,
+        uids_certify: &[&UserID],
         duration_days: Option<u64>,
     ) -> Result<Cert> {
-        let policy = StandardPolicy::new();
-
         let mut cert_keys = Self::get_cert_keys(&ca_cert, None)
             .context("filtered for unencrypted secret keys above")?;
 
-        let fp_ca = ca_cert.fingerprint();
-
         let mut packets: Vec<Packet> = Vec::new();
 
-        'uid: for uid in user_cert.userids() {
-            // check if this uid already has a signature by ca_cert.
-            // if yes, don't add another one.
-            let sigs = uid
-                .clone()
-                .with_policy(&policy, None)?
-                .bundle()
-                .certifications();
-            if sigs
-                .iter()
-                .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
-            {
-                // there is already a signature by ca_cert on this uid - skip
-                continue;
-            }
-
+        for userid in user_cert
+            .userids()
+            // sign only userids that are in "uids_certify"
+            .filter(|u| uids_certify.contains(&u.userid()))
+            .map(|u| u.userid())
+        {
             for signer in &mut cert_keys {
-                let userid = uid.userid();
-
-                let uid_addr = userid
-                    .email_normalized()?
-                    .expect("email normalization failed");
-
-                // did we get a filter-list for email addresses?
-                if let Some(emails) = emails_filter {
-                    // if so, don't process this userid if the email is
-                    // not in the list
-                    if !emails.contains(&uid_addr.as_str()) {
-                        // don't certify this userid
-                        continue 'uid;
-                    }
-                }
-
                 // make certification
                 let mut sb = signature::SignatureBuilder::new(
                     SignatureType::GenericCertification,
@@ -476,15 +446,59 @@ impl Pgp {
 
                 // collect all certifications
                 packets.push(sig.into());
-
-                // FIXME: complain about emails that have been specified but
-                // haven't been found in the userids?
-                //            panic!("Email {} not found in the key", );
             }
         }
 
         // insert all new certifications into user_cert
         Ok(user_cert.clone().insert_packets(packets)?)
+    }
+
+    /// ca_cert certifies either all or a specified subset of userids of
+    /// user_cert
+    pub fn sign_user_emails(
+        ca_cert: &Cert,
+        user_cert: &Cert,
+        emails_filter: Option<&[&str]>,
+        duration_days: Option<u64>,
+    ) -> Result<Cert> {
+        // let policy = StandardPolicy::new();
+
+        let fp_ca = ca_cert.fingerprint();
+
+        let mut uids = Vec::new();
+
+        for uid in user_cert.userids() {
+            // check if this uid already has a signature by ca_cert.
+            // if yes, don't add another one.
+            if uid
+                .certifications()
+                .iter()
+                .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
+            {
+                // there is already a signature by ca_cert on this uid - skip
+                continue;
+            }
+
+            let userid = uid.userid();
+            let uid_addr = userid
+                .email_normalized()?
+                .expect("email normalization failed");
+
+            // certify this userid if we
+            // a) have no filter-list, or
+            // b) if the userid is in the filter-list
+            if emails_filter.is_none()
+                || emails_filter.unwrap().contains(&uid_addr.as_str())
+            {
+                uids.push(userid);
+            }
+        }
+
+        // FIXME: complain about emails that have been specified but
+        // haven't been found in the userids?
+        //            panic!("Email {} not found in the key", );
+
+        Self::sign_user_ids(ca_cert, user_cert, &uids, duration_days)
     }
 
     /// get all valid, certification capable keys with secret key material
