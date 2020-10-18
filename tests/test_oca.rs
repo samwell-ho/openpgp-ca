@@ -865,3 +865,91 @@ fn test_create_user_with_pw() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+/// Create a CA and a number of users with certifications by the CA that
+/// expire at different points.
+///
+/// Run a refresh and check if the results are as expected
+fn test_refresh() -> Result<()> {
+    let ctx = gnupg::make_context()?;
+    //    ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let ca = OpenpgpCa::new(Some(&db))?;
+    ca.ca_init("example.org", None)?;
+
+    let ca_cert = ca.ca_get_cert()?;
+    let ca_fp = ca_cert.fingerprint();
+
+    // make CA user
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], Some(10), true)?;
+    ca.user_new(Some(&"Bob"), &["bob@example.org"], Some(365), true)?;
+    ca.user_new(Some(&"Carol"), &["carol@example.org"], None, true)?;
+    ca.user_new(Some(&"Dave"), &["dave@example.org"], Some(10), true)?;
+
+    // set date to "inactive"
+    let cert = ca.certs_get("dave@example.org")?;
+    assert_eq!(cert.len(), 1);
+    let mut dave = cert[0].clone();
+    dave.inactive = true;
+    ca.cert_update(&dave)?;
+
+    // refresh all CA certifications that are valid for less than 30 days
+    ca.certs_refresh_ca_certifications(30, 365)?;
+
+    let certs = ca.user_certs_get_all()?;
+    for cert in certs {
+        let u = ca.cert_get_users(&cert)?.unwrap();
+        let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
+
+        // get all certifications from the CA
+        assert_eq!(c.userids().len(), 1);
+        let uid = c.userids().last().unwrap();
+        let ca_sigs: Vec<_> = uid
+            .certifications()
+            .iter()
+            .filter(|s| s.issuer_fingerprints().any(|fp| *fp == ca_fp))
+            .collect();
+
+        match u.name.unwrap().as_str() {
+            "Alice" => {
+                assert_eq!(ca_sigs.len(), 2);
+                assert_eq!(
+                    ca_sigs[0].signature_validity_period(),
+                    Some(Duration::new(31536000, 0))
+                );
+                assert_eq!(
+                    ca_sigs[1].signature_validity_period(),
+                    Some(Duration::new(864000, 0))
+                );
+                assert_eq!(cert.inactive, false);
+            }
+            "Bob" => {
+                assert_eq!(ca_sigs.len(), 1);
+                assert_eq!(cert.inactive, false);
+            }
+            "Carol" => {
+                assert_eq!(ca_sigs.len(), 1);
+                assert_eq!(cert.inactive, false);
+            }
+            "Dave" => {
+                assert_eq!(ca_sigs.len(), 1);
+                assert_eq!(
+                    ca_sigs[0].signature_validity_period(),
+                    Some(Duration::new(864000, 0))
+                );
+                assert_eq!(cert.inactive, true);
+            }
+
+            _ => panic!("unexpected cert found"),
+        }
+    }
+
+    // assert_eq!(certs.len(), 1);
+    // let alice = &certs[0];
+
+    Ok(())
+}
