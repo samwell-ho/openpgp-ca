@@ -890,7 +890,7 @@ fn test_refresh() -> Result<()> {
     ca.user_new(Some(&"Carol"), &["carol@example.org"], None, true)?;
     ca.user_new(Some(&"Dave"), &["dave@example.org"], Some(10), true)?;
 
-    // set date to "inactive"
+    // set dave to "inactive"
     let cert = ca.certs_get("dave@example.org")?;
     assert_eq!(cert.len(), 1);
     let mut dave = cert[0].clone();
@@ -948,8 +948,65 @@ fn test_refresh() -> Result<()> {
         }
     }
 
-    // assert_eq!(certs.len(), 1);
-    // let alice = &certs[0];
+    Ok(())
+}
+
+#[test]
+/// Create a CA and two users. "delist" one user.
+/// Export to WKD. Check that only the other user has been exported.
+fn test_wkd_delist() -> Result<()> {
+    let ctx = gnupg::make_context()?;
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let db = format!("{}/ca.sqlite", home_path);
+
+    let ca = OpenpgpCa::new(Some(&db))?;
+    ca.ca_init("example.org", None)?;
+
+    // make CA users
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true)?;
+    ca.user_new(Some(&"Bob"), &["bob@example.org"], None, true)?;
+
+    // set bob to "delisted"
+    let cert = ca.certs_get("bob@example.org")?;
+    assert_eq!(cert.len(), 1);
+    let mut bob = cert[0].clone();
+    bob.delisted = true;
+    ca.cert_update(&bob)?;
+
+    // export to WKD
+    let wkd_dir = home_path + "/wkd/";
+    let wkd_path = Path::new(&wkd_dir);
+
+    ca.wkd_export("example.org", &wkd_path)?;
+
+    // expect 3 exported keys (carol should not be in the export)
+    let test_path = wkd_path.join(".well-known/openpgpkey/example.org/hu/");
+    let paths: Vec<_> = fs::read_dir(test_path)?.collect();
+    assert_eq!(paths.len(), 2);
+
+    // check that Alice's and the CA's keys have been written to files
+
+    // Alice
+    let test_path = wkd_path.join(
+        ".well-known/openpgpkey/example.org\
+         /hu/kei1q4tipxxu1yj79k9kfukdhfy631xe",
+    );
+    assert!(test_path.is_file());
+
+    // check that CA key has been written to file
+    let test_path = wkd_path.join(
+        ".well-known/openpgpkey/example.org\
+         /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t",
+    );
+    assert!(test_path.is_file());
+
+    // check that a policy file been created
+    let test_path = wkd_path.join(
+        ".well-known/openpgpkey/example.org\
+         /policy",
+    );
+    assert!(test_path.is_file());
 
     Ok(())
 }
