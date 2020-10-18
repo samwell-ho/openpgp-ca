@@ -475,59 +475,66 @@ impl OpenpgpCa {
         threshold_days: u64,
         validity_days: u64,
     ) -> Result<()> {
-        // FIXME: as db transaction?!
+        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
+            let ca_cert = self.ca_get_cert()?;
+            let ca_fp = ca_cert.fingerprint();
 
-        let ca_cert = self.ca_get_cert()?;
-        let ca_fp = ca_cert.fingerprint();
+            let threshold_secs = threshold_days * 24 * 60 * 60;
+            let threshold_time =
+                SystemTime::now() + Duration::new(threshold_secs, 0);
 
-        let threshold_secs = threshold_days * 24 * 60 * 60;
+            for cert in self
+                .db
+                .get_certs()?
+                .iter()
+                // ignore "inactive" Certs
+                .filter(|c| !c.inactive)
+            {
+                let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
+                let mut uids_to_recert = Vec::new();
 
-        for cert in self
-            .db
-            .get_certs()?
-            .iter()
-            // ignore "inactive" Certs
-            .filter(|c| !c.inactive)
-        {
-            let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
-            let mut uids_to_recert = Vec::new();
+                for uid in c.userids() {
+                    let ca_certifications: Vec<_> = uid
+                        .certifications()
+                        .iter()
+                        .filter(|c| {
+                            c.issuer_fingerprints().any(|fp| *fp == ca_fp)
+                        })
+                        .collect();
 
-            for uid in c.userids() {
-                for certification in uid
-                    .certifications()
-                    .iter()
-                    .filter(|c| c.issuer_fingerprints().any(|fp| *fp == ca_fp))
-                {
-                    // certification from CA, check if it's going to expire soon
-                    let validity = certification.signature_validity_period();
-                    if validity.is_some()
-                        && (validity.unwrap().as_secs() < threshold_secs)
+                    // a new certification is created if certifications by the
+                    // CA exist, but none of the existing certifications are
+                    // valid for longer than `threshold_days`
+                    if !ca_certifications.is_empty()
+                        && !ca_certifications.iter().any(|c| {
+                            let expiration = c.signature_expiration_time();
+                            expiration.is_none()
+                                || (expiration.unwrap() > threshold_time)
+                        })
                     {
-                        //  if any are about to expire, issue a new certification
+                        // make a new certification for this uid
                         uids_to_recert.push(uid.userid());
                     }
                 }
+                if !uids_to_recert.is_empty() {
+                    // make new certifications for "uids_to_update"
+                    let recertified = Pgp::sign_user_ids(
+                        &ca_cert,
+                        &c,
+                        &uids_to_recert[..],
+                        Some(validity_days),
+                    )?;
+
+                    // update cert in db
+                    let mut cert_update = cert.clone();
+                    cert_update.pub_cert =
+                        OpenpgpCa::cert_to_armored(&recertified)?;
+                    self.cert_update(&cert_update)?;
+                }
             }
-            if !uids_to_recert.is_empty() {
-                // make new certifications for "uids_to_update"
-                // that last for "validity_days"
 
-                let recertified = Pgp::sign_user_ids(
-                    &ca_cert,
-                    &c,
-                    &uids_to_recert[..],
-                    Some(validity_days),
-                )?;
-
-                // update cert in db
-                let mut cert_update = cert.clone();
-                cert_update.pub_cert =
-                    OpenpgpCa::cert_to_armored(&recertified)?;
-                self.cert_update(&cert_update)?;
-            }
-        }
-
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Get the SystemTime for when the specified Cert will expire
