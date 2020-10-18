@@ -412,7 +412,10 @@ impl Pgp {
         Ok((revocation_sig, revoked))
     }
 
-    /// CA signs a specified list of userids of Cert
+    /// ca_cert certifies a specified list of userids of user_cert.
+    ///
+    /// This fn does not perform any checks as a precondition for adding new
+    /// certifications.
     pub fn sign_user_ids(
         ca_cert: &Cert,
         user_cert: &Cert,
@@ -461,36 +464,35 @@ impl Pgp {
         emails_filter: Option<&[&str]>,
         duration_days: Option<u64>,
     ) -> Result<Cert> {
-        // let policy = StandardPolicy::new();
+        let policy = StandardPolicy::new();
 
         let fp_ca = ca_cert.fingerprint();
 
         let mut uids = Vec::new();
 
         for uid in user_cert.userids() {
-            // check if this uid already has a signature by ca_cert.
+            // check if this uid already has a valid signature by ca_cert.
             // if yes, don't add another one.
-            if uid
+            if !uid
+                .clone()
+                .with_policy(&policy, None)?
                 .certifications()
                 .iter()
                 .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
             {
-                // there is already a signature by ca_cert on this uid - skip
-                continue;
-            }
+                let userid = uid.userid();
+                let uid_addr = userid
+                    .email_normalized()?
+                    .expect("email normalization failed");
 
-            let userid = uid.userid();
-            let uid_addr = userid
-                .email_normalized()?
-                .expect("email normalization failed");
-
-            // certify this userid if we
-            // a) have no filter-list, or
-            // b) if the userid is in the filter-list
-            if emails_filter.is_none()
-                || emails_filter.unwrap().contains(&uid_addr.as_str())
-            {
-                uids.push(userid);
+                // certify this userid if we
+                // a) have no filter-list, or
+                // b) if the userid is specified in the filter-list
+                if emails_filter.is_none()
+                    || emails_filter.unwrap().contains(&uid_addr.as_str())
+                {
+                    uids.push(userid);
+                }
             }
         }
 
