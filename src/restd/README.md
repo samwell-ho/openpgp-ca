@@ -57,7 +57,7 @@ or updates for the user to review, because:
 curl --header "Content-Type: application/json" --request GET --data @user.json  http://localhost:8000/certs/check
 ```
 
-The data-file `user.json` contains data in the form:
+The payload (here we use a data-file `user.json`) contains data in the form:
 
 ```
 {"email": ["alice@example.org"],
