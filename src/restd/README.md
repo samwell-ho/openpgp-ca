@@ -96,7 +96,8 @@ The output of this call is JSON-formatted information about the certificate
     "fingerprint": "B702503FBB24BDB1656270786CC91D1754643106",
     "user_ids": [
       "alice@example.org"
-    ]
+    ],
+    "primary_creation_time": "2020-10-19T11:48:21Z"
   },
   "action": "update",
   "certificate": {
@@ -198,6 +199,7 @@ An example:
     "user_ids": [
       "alice@example.org"
     ]
+    "primary_creation_time": "2020-10-19T11:48:21Z"
   },
   "action": null,
   "certificate": {

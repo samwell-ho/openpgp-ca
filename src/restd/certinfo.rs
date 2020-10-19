@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use sequoia_openpgp::Cert;
 use serde::{Deserialize, Serialize};
 
@@ -7,8 +8,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CertInfo {
     fingerprint: String,
-    // split user_id into name/email?!
+
     user_ids: Vec<String>,
+
+    primary_creation_time: DateTime<Utc>,
     // pk_algo: String,
     // pk_size: usize,
     // subkeys: Vec<SubkeyInfo>,
@@ -30,6 +33,7 @@ impl From<&Cert> for CertInfo {
         CertInfo {
             fingerprint: cert.fingerprint().to_hex(),
             user_ids: emails,
+            primary_creation_time: cert.primary_key().creation_time().into(),
         }
     }
 }
