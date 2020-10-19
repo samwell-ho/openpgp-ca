@@ -22,7 +22,8 @@ $ openpgp-ca-restd -d example.oca run
     => keep-alive: 5s
     => tls: disabled
 🛰  Mounting /:
-    => GET /certs/list/<email> (list_certs)
+    => GET /certs/by_email/<email> (certs_by_email)
+    => GET /certs/by_fp/<fp> (certs_by_fp)
     => GET /certs/check application/json (check_cert)
     => POST /certs application/json (post_user)
     => POST /certs/deactivate/<fp> (deactivate_cert)
@@ -32,7 +33,7 @@ $ openpgp-ca-restd -d example.oca run
 🚀 Rocket has launched from http://localhost:8000
 ```
 
-## Previewing an OpenPGP certificate (addition or update)
+## Previewing an OpenPGP certificate (before adding or update)
 
 When a user uploads an OpenPGP certificate (often referred to as a "key"),
 it may either be new, or an update to a previous version of
@@ -64,16 +65,52 @@ The data-file `user.json` contains data in the form:
  "revocations": [],
  "cert": "-----BEGIN PGP PUBLIC KEY BLOCK-----
 
-xsFNBF9orW8BEAC9RievEe67QyvqV7XGnGVV2VwMGuoJFtER8xwU0RCSqKMnu6L+
-un0wri829zQm/trLebHDD70Dvwe6Wl5gwXJtbKTETMg3KuJ51DAZvo4W0JUkEvwC
-[..]
-iIJw33bSlyssaXTnnfGR5KySs91HCl8PlZHJBz4D6+Tae27cA14rcrgRewO8YyBZ
-=vus6
+mDMEX419BRYJKwYBBAHaRw8BAQdAnfJuV3EHFAJ31D968YvLlAAu0YqUxySSJ1Lh
+ZeFRGhiIiQQfFgoAOwWCX419BQWJBaSPvQMLCQcJEGzJHRdUZDEGAxUKCAKbAQIe
+ARYhBLcCUD+7JL2xZWJweGzJHRdUZDEGAABrPAD/byicPJZ8jy1ltwVMhm4YGADa
+9SrxXioiT0ekwmb/+OoA/3wtR2erbbRS8z7+2eQ7qrCoRWk/FRKL6aDv7GKHS3EC
+tBFhbGljZUBleGFtcGxlLm9yZ4iMBBMWCgA+BYJfjX0FBYkFpI+9AwsJBwkQbMkd
+F1RkMQYDFQoIApkBApsBAh4BFiEEtwJQP7skvbFlYnB4bMkdF1RkMQYAANv8AP9G
+MadAR2b3JOLvoe4b5MWwg0aVGY49rvVx39sU6OWFiwEAlLo9zCq8++ClBIuZDZcB
+5WYHX/eTUzyyWUV3D2Zsowy4MwRfjX0FFgkrBgEEAdpHDwEBB0DpdKcbcCQRWnXw
+75pBIF2jXWJk9Yp4oSK+87F4xfgCWoj4BBgWCgCqBYJfjX0FBYkFpI+9CRBsyR0X
+VGQxBgKbAgIeAXagBBkWCgAnBYJfjX0FCRCgJ8lVXt8OxhYhBONIP93aDZThvL4K
+aaAnyVVe3w7GAAAWYwD9FX3JULe0K6IfcpxhP6sKfjx20NdXLXueX5fg9/D6Bt0B
+AOf5L4ACGZPCNwSG90dUtA9DiYbFlJTs80OKQ8YjETIMFiEEtwJQP7skvbFlYnB4
+bMkdF1RkMQYAAPt0AQC/vVwTx4TUbo4ustT7wJ/9Q60e/Kns2AQ+tfKBsLldqgEA
+8qibe9f7xjlTz6KfohB3dHkJRQh8I+90PWpT4wMK6Aa4OARfjX0FEgorBgEEAZdV
+AQUBAQdAuObJBQI6kR3a0zslOKqs2Ojav/Ssgt9fmREBZ/EAXnQDAQgJiIEEGBYK
+ADMFgl+NfQUFiQWkj70JEGzJHRdUZDEGApsMAh4BFiEEtwJQP7skvbFlYnB4bMkd
+F1RkMQYAAPC0AQCA+xFqHX8503ijkIg4nQntnUzi7r5tdi2t2MMRFpf2SgEAtNLD
+Xof5uIAoYhwfZWuSg3ggQv4/JaxXO02UIQx4pQk=
+=GU5p
 -----END PGP PUBLIC KEY BLOCK-----"}
 ```
 
 The output of this call is JSON-formatted information about the certificate
 (or an error, if the certificate is not acceptable to our system).
+
+```
+{
+  "cert_info": {
+    "fingerprint": "B702503FBB24BDB1656270786CC91D1754643106",
+    "user_ids": [
+      "alice@example.org"
+    ]
+  },
+  "action": "update",
+  "certificate": {
+    "email": [
+      "alice@example.org"
+    ],
+    "name": "Alice Adams",
+    "cert": "-----BEGIN PGP PUBLIC KEY BLOCK-----\nComment: B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106\nComment: alice@example.org\n\nxjMEX419BRYJKwYBBAHaRw8BAQdAnfJuV3EHFAJ31D968YvLlAAu0YqUxySSJ1Lh\nZeFRGhjCiQQfFgoAOwWCX419BQWJBaSPvQMLCQcJEGzJHRdUZDEGAxUKCAKbAQIe\nARYhBLcCUD+7JL2xZWJweGzJHRdUZDEGAABrPAD/byicPJZ8jy1ltwVMhm4YGADa\n9SrxXioiT0ekwmb/+OoA/3wtR2erbbRS8z7+2eQ7qrCoRWk/FRKL6aDv7GKHS3EC\nzRFhbGljZUBleGFtcGxlLm9yZ8KMBBMWCgA+BYJfjX0FBYkFpI+9AwsJBwkQbMkd\nF1RkMQYDFQoIApkBApsBAh4BFiEEtwJQP7skvbFlYnB4bMkdF1RkMQYAANv8AP9G\nMadAR2b3JOLvoe4b5MWwg0aVGY49rvVx39sU6OWFiwEAlLo9zCq8++ClBIuZDZcB\n5WYHX/eTUzyyWUV3D2ZsowzOMwRfjX0FFgkrBgEEAdpHDwEBB0DpdKcbcCQRWnXw\n75pBIF2jXWJk9Yp4oSK+87F4xfgCWsLAOAQYFgoAqgWCX419BQWJBaSPvQkQbMkd\nF1RkMQYCmwICHgF2oAQZFgoAJwWCX419BQkQoCfJVV7fDsYWIQTjSD/d2g2U4by+\nCmmgJ8lVXt8OxgAAFmMA/RV9yVC3tCuiH3KcYT+rCn48dtDXVy17nl+X4Pfw+gbd\nAQDn+S+AAhmTwjcEhvdHVLQPQ4mGxZSU7PNDikPGIxEyDBYhBLcCUD+7JL2xZWJw\neGzJHRdUZDEGAAD7dAEAv71cE8eE1G6OLrLU+8Cf/UOtHvyp7NgEPrXygbC5XaoB\nAPKom3vX+8Y5U8+in6IQd3R5CUUIfCPvdD1qU+MDCugGzjgEX419BRIKKwYBBAGX\nVQEFAQEHQLjmyQUCOpEd2tM7JTiqrNjo2r/0rILfX5kRAWfxAF50AwEICcKBBBgW\nCgAzBYJfjX0FBYkFpI+9CRBsyR0XVGQxBgKbDAIeARYhBLcCUD+7JL2xZWJweGzJ\nHRdUZDEGAADwtAEAgPsRah1/OdN4o5CIOJ0J7Z1M4u6+bXYtrdjDERaX9koBALTS\nw16H+biAKGIcH2VrkoN4IEL+PyWsVztNlCEMeKUJ\n=N/c9\n-----END PGP PUBLIC KEY BLOCK-----\n",
+    "revocations": [],
+    "delisted": null,
+    "inactive": null
+  }
+}
+```
 
 Additionally, the result shows if the certificate is "new", or would be
 handled as an update. 
@@ -82,6 +119,7 @@ This JSON data should be shown to the user, asking them if they want to
 persist the certificate as shown. If they confirm, proceed to the next step to
 persist the certificate.
 
+
 ## Persisting OpenPGP certificates
 
 After previewing a certificate addition or update, and getting confirmation
@@ -89,7 +127,7 @@ for this data from the user, the data can be persisted to the OpenPGP CA
 database via a POST request:
 
 ```
-curl --header "Content-Type: application/json" --request POST --data @user.json  http://localhost:8000/users/new
+curl --header "Content-Type: application/json" --request POST --data @user.json  http://localhost:8000/certs
 ```
 
 
@@ -138,7 +176,7 @@ Among other information, the returned data contains fingerprint strings for
 each certificate. These fingerprint strings are used as parameters for the
 following operations.
 
-(The format of the returned data is the same as for `/certs/check`)
+The format of the returned data is the same as for `/certs/check`.
 
 ## Getting one OpenPGP certificate by fingerprint
 
@@ -148,8 +186,32 @@ To get one OpenPGP certificate by fingerprint, call:
 curl --request GET http://localhost:8000/certs/by_fp/<fingerprint>
 ```
 
-The format of the returned data is the same as for `/certs/list`.
+The format of the returned data is the same as for `/certs/check` and
+`/certs/by_email`.
 
+An example:
+
+```
+{
+  "cert_info": {
+    "fingerprint": "B702503FBB24BDB1656270786CC91D1754643106",
+    "user_ids": [
+      "alice@example.org"
+    ]
+  },
+  "action": null,
+  "certificate": {
+    "email": [
+      "alice@example.org"
+    ],
+    "name": "Alice Adams",
+    "cert": "-----BEGIN PGP PUBLIC KEY BLOCK-----\nComment: B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106\nComment: alice@example.org\n\nxjMEX419BRYJKwYBBAHaRw8BAQdAnfJuV3EHFAJ31D968YvLlAAu0YqUxySSJ1Lh\nZeFRGhjCiQQfFgoAOwWCX419BQWJBaSPvQMLCQcJEGzJHRdUZDEGAxUKCAKbAQIe\nARYhBLcCUD+7JL2xZWJweGzJHRdUZDEGAABrPAD/byicPJZ8jy1ltwVMhm4YGADa\n9SrxXioiT0ekwmb/+OoA/3wtR2erbbRS8z7+2eQ7qrCoRWk/FRKL6aDv7GKHS3EC\nzRFhbGljZUBleGFtcGxlLm9yZ8KMBBMWCgA+BYJfjX0FBYkFpI+9AwsJBwkQbMkd\nF1RkMQYDFQoIApkBApsBAh4BFiEEtwJQP7skvbFlYnB4bMkdF1RkMQYAANv8AP9G\nMadAR2b3JOLvoe4b5MWwg0aVGY49rvVx39sU6OWFiwEAlLo9zCq8++ClBIuZDZcB\n5WYHX/eTUzyyWUV3D2ZsowzCwXkEEAEKAC0Fgl+NgGsFgwHhM4AJEMbvFKdXSZcW\nFiEEH6Q6mn8dkeBce44Oxu8Up1dJlxYAAG2+EACKQkGtP7I+cD3uzFFY1/L+FCTw\nuC6YelD/spszA3Wf9vD5bs35H0G/EyrDVEi8AkZv2z4Ni99iW1QnR24qkrhwDn/i\nN6s9RLbGKmXhf5q+2Cc4Xo+n3sSDV6v3XCBA3d+GZK1c9Jpp3r0G7x5HcaaRi0uv\nEzu5uaqup9V5/4kEdJ2i69ueMhzFipEWjLMB3Lzbw/wlCWlzV/LkCHOYnMEXXREK\nSkSlAvte3lg8tTKAKC9Rjkm2VHfqU8Sxdqr+5h+UvM/Wxgz1uynNHrSI7soyQd8c\nFO+Z9QH70vRgvIcptlx7RiWOPWqWyC53rWsfbdlL/J/5kLnqtTNvc1gGzTBd1SZ2\nrdvWUTfnorkv1iSQ+v0mvXVe9O6z6rMWPId7vCa6LYAZvN5d5NiFgH+re0T6RVd5\nr7/fCE6nmXyL4itotRy9Y8h8U6k8TojNnIotPiCtDOEFrJMRzDJD+hu38/VLHK48\nQNXc1knYte0Se8KzMRD3t4+oSqGI1TpN9ZbRyFcLPQttXblgb/Tu4NuzJdThO110\njI0jeRfxvsdjzmBI8Ovw5fBO4JLCds4ZugHD9zIj2FZ2EWljajJVnSCrBh5XFNFT\nwUsBDIUuFaAzdS0dyQMuwAn+gro7FwojRp6WBnrft5ZLMBTDGCi3wCLjMsxk/+lj\nQ5mo+oAURR+6Un/eUc4zBF+NfQUWCSsGAQQB2kcPAQEHQOl0pxtwJBFadfDvmkEg\nXaNdYmT1inihIr7zsXjF+AJawsA4BBgWCgCqBYJfjX0FBYkFpI+9CRBsyR0XVGQx\nBgKbAgIeAXagBBkWCgAnBYJfjX0FCRCgJ8lVXt8OxhYhBONIP93aDZThvL4KaaAn\nyVVe3w7GAAAWYwD9FX3JULe0K6IfcpxhP6sKfjx20NdXLXueX5fg9/D6Bt0BAOf5\nL4ACGZPCNwSG90dUtA9DiYbFlJTs80OKQ8YjETIMFiEEtwJQP7skvbFlYnB4bMkd\nF1RkMQYAAPt0AQC/vVwTx4TUbo4ustT7wJ/9Q60e/Kns2AQ+tfKBsLldqgEA8qib\ne9f7xjlTz6KfohB3dHkJRQh8I+90PWpT4wMK6AbOOARfjX0FEgorBgEEAZdVAQUB\nAQdAuObJBQI6kR3a0zslOKqs2Ojav/Ssgt9fmREBZ/EAXnQDAQgJwoEEGBYKADMF\ngl+NfQUFiQWkj70JEGzJHRdUZDEGApsMAh4BFiEEtwJQP7skvbFlYnB4bMkdF1Rk\nMQYAAPC0AQCA+xFqHX8503ijkIg4nQntnUzi7r5tdi2t2MMRFpf2SgEAtNLDXof5\nuIAoYhwfZWuSg3ggQv4/JaxXO02UIQx4pQk=\n=o584\n-----END PGP PUBLIC KEY BLOCK-----\n",
+    "revocations": [],
+    "delisted": false,
+    "inactive": false
+  }
+}
+```
 
 ## Marking a certificate as "deactivated"
 

@@ -11,6 +11,7 @@ use std::ops::Deref;
 #[macro_use]
 extern crate rocket;
 
+use rocket::http::Status;
 use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +21,7 @@ mod util;
 
 use certinfo::CertInfo;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use cli::RestdCli;
 use structopt::StructOpt;
 
@@ -30,6 +31,7 @@ use openpgp::Cert;
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::models;
 
 thread_local! {
     static CA: OpenpgpCa = OpenpgpCa::new(RestdCli::from_args().database.as_deref())
@@ -44,7 +46,7 @@ const CERTIFICATION_DAYS: Option<u64> = Some(365);
 
 /// REST Interface for OpenPGP CA.
 /// This is an experimental API for use at FSFE.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Certificate {
     email: Vec<String>,
     name: Option<String>,
@@ -58,6 +60,27 @@ struct Certificate {
     inactive: Option<bool>,
 }
 
+impl Certificate {
+    fn from(
+        cert: &models::Cert,
+        user: &models::User,
+        emails: &Vec<models::CertEmail>,
+        rev: &Vec<models::Revocation>,
+    ) -> Self {
+        let r: Vec<_> = rev.iter().map(|r| r.revocation.clone()).collect();
+        let e: Vec<_> = emails.iter().map(|e| e.addr.clone()).collect();
+
+        Certificate {
+            email: e,
+            name: user.name.clone(),
+            cert: cert.pub_cert.clone(),
+            revocations: r,
+            delisted: Some(cert.delisted),
+            inactive: Some(cert.inactive),
+        }
+    }
+}
+
 /// A container for information about a Cert.
 ///
 /// `cert_info` contains factual information about a cert.
@@ -66,19 +89,23 @@ struct Certificate {
 #[derive(Debug, Serialize, Deserialize)]
 struct ReturnJSON {
     cert_info: CertInfo,
+
     // later:
     // - cert_lints (e.g. expiry warnings, deprecated crypto, ...)
+
+    // action can be "new" or "update"
     action: Option<String>,
-    // "new", "update" ?
-    key: String, // the key, ascii armored
+
+    certificate: Certificate,
 }
 
 fn check_and_normalize_cert(
     ca: &OpenpgpCa,
     certificate: &Certificate,
 ) -> Result<Cert> {
-    let mut cert = OpenpgpCa::armored_to_cert(&certificate.cert)
-        .expect("Error while parsing the user-provided armored OpenPGP key");
+    let mut cert = OpenpgpCa::armored_to_cert(&certificate.cert).context(
+        "Error while parsing the user-provided armored OpenPGP key",
+    )?;
 
     // private keys are illegal
     if cert.is_tsk() {
@@ -150,8 +177,8 @@ fn certs_by_email(email: String) -> Json<Vec<ReturnJSON>> {
 
             let r = ReturnJSON {
                 cert_info: (&cert).into(),
-                key: OpenpgpCa::cert_to_armored(&cert)?,
                 action: None,
+                certificate: load_certificate_data(&ca, &c)?,
             };
 
             certificates.push(r);
@@ -163,35 +190,47 @@ fn certs_by_email(email: String) -> Json<Vec<ReturnJSON>> {
     Json(res.unwrap())
 }
 
+fn load_certificate_data(
+    ca: &OpenpgpCa,
+    cert: &models::Cert,
+) -> Result<Certificate> {
+    let user = ca.cert_get_users(&cert)?.unwrap();
+    let emails = ca.emails_get(&cert)?;
+    let rev = ca.revocations_get(&cert)?;
+
+    Ok(Certificate::from(&cert, &user, &emails, &rev))
+}
+
 #[get("/certs/by_fp/<fp>")]
 fn certs_by_fp(fp: String) -> Json<Option<ReturnJSON>> {
     let res: Result<Option<ReturnJSON>> = CA.with(|ca| {
         let c = ca.cert_get_by_fingerprint(&fp)?;
-        if c.is_none() {
-            Ok(None)
-        } else {
-            let cert = OpenpgpCa::armored_to_cert(&c.unwrap().pub_cert)?;
+        if let Some(c) = c {
+            let cert = OpenpgpCa::armored_to_cert(&c.pub_cert)?;
 
             Ok(Some(ReturnJSON {
                 cert_info: (&cert).into(),
-                key: OpenpgpCa::cert_to_armored(&cert)?,
+                certificate: load_certificate_data(&ca, &c)?,
                 action: None,
             }))
+        } else {
+            Ok(None)
         }
     });
 
     Json(res.unwrap())
 }
 
-// FIXME add: get cert by fp
-
 /// Similar to "post_user", but doesn't commit data to DB.
 ///
 /// Returns information about what the commit would result in.
 #[get("/certs/check", data = "<certificate>", format = "json")]
-fn check_cert(certificate: Json<Certificate>) -> Json<ReturnJSON> {
+fn check_cert(
+    certificate: Json<Certificate>,
+) -> Result<Json<ReturnJSON>, Status> {
     CA.with(|ca| {
-        let res = check_and_normalize_cert(&ca, &certificate.into_inner());
+        let certificate = certificate.into_inner();
+        let res = check_and_normalize_cert(&ca, &certificate);
 
         // FIXME: do some more linting?
 
@@ -210,19 +249,25 @@ fn check_cert(certificate: Json<Certificate>) -> Json<ReturnJSON> {
 
                 let armor = OpenpgpCa::cert_to_armored(&cert);
                 if let Ok(key) = armor {
-                    Json(ReturnJSON {
+                    let mut certificate = certificate;
+                    certificate.cert = key;
+
+                    Ok(Json(ReturnJSON {
                         cert_info: (&cert).into(),
-                        key,
+                        certificate,
                         action: Some(action.to_string()),
-                    })
+                    }))
                 } else {
-                    panic!(armor);
+                    // panic!(armor);
+                    Err(Status::UnprocessableEntity)
                 }
             } else {
-                panic!(res);
+                // panic!(res);
+                Err(Status::UnprocessableEntity)
             }
         } else {
-            panic!(res);
+            // panic!(res);
+            Err(Status::UnprocessableEntity)
         }
     })
 }
@@ -237,7 +282,7 @@ fn check_cert(certificate: Json<Certificate>) -> Json<ReturnJSON> {
 ///     the user adds a revocation to their key (as an update).
 /// 3) store a "new" (i.e. different fingerprint) key for the same user
 #[post("/certs", data = "<certificate>", format = "json")]
-fn post_user(certificate: Json<Certificate>) {
+fn post_user(certificate: Json<Certificate>) -> Result<(), Status> {
     // let cert: Cert; // resulting Cert, after persisting (?)
 
     let res = CA.with(|ca| {
@@ -276,7 +321,10 @@ fn post_user(certificate: Json<Certificate>) {
     });
 
     if res.is_err() {
-        panic!(res);
+        // panic!(res);
+        Err(Status::UnprocessableEntity)
+    } else {
+        Ok(())
     }
 }
 
@@ -352,6 +400,7 @@ fn rocket() -> rocket::Rocket {
             "/",
             routes![
                 certs_by_email,
+                certs_by_fp,
                 check_cert,
                 post_user,
                 deactivate_cert,

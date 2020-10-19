@@ -17,6 +17,6 @@ extern crate diesel_migrations;
 
 pub mod ca;
 mod db;
-mod models;
+pub mod models;
 mod pgp;
 mod schema;
