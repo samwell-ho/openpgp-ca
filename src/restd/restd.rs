@@ -140,8 +140,8 @@ fn check_and_normalize_cert(
     Ok(cert)
 }
 
-#[get("/certs/list/<email>")]
-fn list_certs(email: String) -> Json<Vec<ReturnJSON>> {
+#[get("/certs/by_email/<email>")]
+fn certs_by_email(email: String) -> Json<Vec<ReturnJSON>> {
     let res: Result<Vec<ReturnJSON>> = CA.with(|ca| {
         let mut certificates = Vec::new();
 
@@ -158,6 +158,26 @@ fn list_certs(email: String) -> Json<Vec<ReturnJSON>> {
         }
 
         Ok(certificates)
+    });
+
+    Json(res.unwrap())
+}
+
+#[get("/certs/by_fp/<fp>")]
+fn certs_by_fp(fp: String) -> Json<Option<ReturnJSON>> {
+    let res: Result<Option<ReturnJSON>> = CA.with(|ca| {
+        let c = ca.cert_get_by_fingerprint(&fp)?;
+        if c.is_none() {
+            Ok(None)
+        } else {
+            let cert = OpenpgpCa::armored_to_cert(&c.unwrap().pub_cert)?;
+
+            Ok(Some(ReturnJSON {
+                cert_info: (&cert).into(),
+                key: OpenpgpCa::cert_to_armored(&cert)?,
+                action: None,
+            }))
+        }
     });
 
     Json(res.unwrap())
@@ -331,7 +351,7 @@ fn rocket() -> rocket::Rocket {
         Command::Run => rocket::ignite().mount(
             "/",
             routes![
-                list_certs,
+                certs_by_email,
                 check_cert,
                 post_user,
                 deactivate_cert,

@@ -131,7 +131,7 @@ Users may have multiple certificates in the OpenPGP CA database. For example:
 To get a list of all OpenPGP certificates for a user, call:
 
 ```
-curl --request GET http://localhost:8000/certs/list/alice@example.org
+curl --request GET http://localhost:8000/certs/by_email/alice@example.org
 ```
 
 Among other information, the returned data contains fingerprint strings for
@@ -139,6 +139,16 @@ each certificate. These fingerprint strings are used as parameters for the
 following operations.
 
 (The format of the returned data is the same as for `/certs/check`)
+
+## Getting one OpenPGP certificate by fingerprint
+
+To get one OpenPGP certificate by fingerprint, call:
+
+```
+curl --request GET http://localhost:8000/certs/by_fp/<fingerprint>
+```
+
+The format of the returned data is the same as for `/certs/list`.
 
 
 ## Marking a certificate as "deactivated"
