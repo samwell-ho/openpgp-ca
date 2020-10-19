@@ -502,15 +502,19 @@ impl OpenpgpCa {
                         })
                         .collect();
 
+                    let sig_valid_past_threshold = |c: &&Signature| {
+                        let expiration = c.signature_expiration_time();
+                        expiration.is_none()
+                            || (expiration.unwrap() > threshold_time)
+                    };
+
                     // a new certification is created if certifications by the
                     // CA exist, but none of the existing certifications are
                     // valid for longer than `threshold_days`
                     if !ca_certifications.is_empty()
-                        && !ca_certifications.iter().any(|c| {
-                            let expiration = c.signature_expiration_time();
-                            expiration.is_none()
-                                || (expiration.unwrap() > threshold_time)
-                        })
+                        && !ca_certifications
+                            .iter()
+                            .any(sig_valid_past_threshold)
                     {
                         // make a new certification for this uid
                         uids_to_recert.push(uid.userid());
