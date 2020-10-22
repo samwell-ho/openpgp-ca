@@ -113,8 +113,18 @@ The output of this call is JSON-formatted information about the certificate
 }
 ```
 
-Additionally, the result shows if the certificate is "new", or would be
-handled as an update. 
+The top level of the JSON format is split into two main parts:
+
+- "certificate" shows an uninterpreted view of data in the OpenPGP CA database
+
+- "cert_info" gives human readable details of the actual OpenPGP key. This
+ data is meant to be shown to users to help them determine if a key they
+ uploaded is indeed the one they intended to upload - or to choose one key
+ out of a set of keys, if they have uploaded multiple keys. 
+
+Additionally, the result shows if the certificate is "new", or if it would be
+handled as an update to an existing version of this key (i.e. we already
+have a version of the key with this fingerprint in OpenPGP CA). 
 
 This JSON data should be shown to the user, asking them if they want to
 persist the certificate as shown. If they confirm, proceed to the next step to
