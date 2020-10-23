@@ -151,6 +151,9 @@ enum ReturnStatus {
     /// This should not happen - if it happens, it should probably be
     /// handled similar to HTTP 500, and investigated.
     InternalError,
+
+    /// requested entity couldn't be found (e.g. lookup by fingerprint)
+    NotFound,
 }
 
 fn check_and_normalize_cert(
@@ -564,19 +567,33 @@ fn post_user(
 /// This approach is probably appropriate in most cases to phase out a
 /// certificate.
 #[post("/certs/deactivate/<fp>")]
-fn deactivate_cert(fp: String) -> String {
+fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
-        if let Ok(Some(mut cert)) = ca.cert_get_by_fingerprint(&fp) {
-            cert.inactive = true;
-            if ca.cert_update(&cert).is_err() {
-                panic!("Couldn't update Cert in database");
-            }
-        } else {
-            panic!("Couldn't get Cert by fingerprint {}", fp);
-        }
-    });
+        let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
+            ReturnError::bad_req(
+                ReturnStatus::InternalError,
+                format!("Error looking up Fingerprint '{}'", e),
+            )
+        })?;
 
-    "Cert deactivated".to_string()
+        if let Some(mut cert) = cert {
+            cert.inactive = true;
+
+            ca.cert_update(&cert).map_err(|e| {
+                ReturnError::bad_req(
+                    ReturnStatus::InternalError,
+                    format!("Error updating Cert '{}'", e),
+                )
+            })?;
+        } else {
+            return Err(ReturnError::bad_req(
+                ReturnStatus::NotFound,
+                format!("Fingerprint '{}' not found", fp),
+            ));
+        }
+
+        Ok(())
+    })
 }
 
 /// Remove a cert from the OpenPGP CA database, by fingerprint.
@@ -589,19 +606,33 @@ fn deactivate_cert(fp: String) -> String {
 /// This method is probably rarely appropriate. In most cases, it's better
 /// to "deactivate" a cert.
 #[delete("/certs/<fp>")]
-fn delist_cert(fp: String) -> String {
+fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
-        if let Ok(Some(mut cert)) = ca.cert_get_by_fingerprint(&fp) {
-            cert.delisted = true;
-            if ca.cert_update(&cert).is_err() {
-                panic!("Couldn't update Cert in database");
-            }
-        } else {
-            panic!("Couldn't get Cert by fingerprint {}", fp);
-        }
-    });
+        let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
+            ReturnError::bad_req(
+                ReturnStatus::InternalError,
+                format!("Error looking up Fingerprint '{}'", e),
+            )
+        })?;
 
-    "Cert delisted".to_string()
+        if let Some(mut cert) = cert {
+            cert.delisted = true;
+
+            ca.cert_update(&cert).map_err(|e| {
+                ReturnError::bad_req(
+                    ReturnStatus::InternalError,
+                    format!("Error updating Cert '{}'", e),
+                )
+            })?;
+        } else {
+            return Err(ReturnError::bad_req(
+                ReturnStatus::NotFound,
+                format!("Fingerprint '{}' not found", fp),
+            ));
+        }
+
+        Ok(())
+    })
 }
 
 /// Refresh CA certifications on all user certs
@@ -609,8 +640,20 @@ fn delist_cert(fp: String) -> String {
 /// For certifications which are going to expire soon:
 /// Make a new certification, unless the user cert is marked as "deactivated".
 #[post("/refresh_ca_certifications")]
-fn refresh_certifications() -> String {
-    unimplemented!()
+fn refresh_certifications() -> Result<(), BadRequest<Json<ReturnError>>> {
+    CA.with(|ca| {
+        ca.certs_refresh_ca_certifications(30, 365).map_err(|e| {
+            ReturnError::bad_req(
+                ReturnStatus::InternalError,
+                format!(
+                    "Error during certs_refresh_ca_certifications '{}'",
+                    e
+                ),
+            )
+        })?;
+
+        Ok(())
+    })
 }
 
 /// Poll for updates to user keys (e.g. on https://keys.openpgp.org/)
