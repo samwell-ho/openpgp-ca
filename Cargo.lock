@@ -1798,6 +1798,7 @@ dependencies = [
  "dotenv",
  "futures 0.1.30",
  "lazy_static",
+ "once_cell",
  "publicsuffix",
  "rexpect",
  "rocket",

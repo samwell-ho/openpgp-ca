@@ -11,9 +11,6 @@
 
 use std::ops::Deref;
 
-#[macro_use]
-extern crate rocket;
-
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
@@ -24,19 +21,20 @@ mod util;
 
 use certinfo::CertInfo;
 
-use cli::RestdCli;
-use structopt::StructOpt;
-
 use std::collections::HashSet;
 
 use openpgp::Cert;
 use sequoia_openpgp as openpgp;
 
-use openpgp_ca_lib::ca::OpenpgpCa;
-use openpgp_ca_lib::models;
+use super::ca::OpenpgpCa;
+use super::models;
+
+use once_cell::sync::OnceCell;
+
+static DB: OnceCell<Option<String>> = OnceCell::new();
 
 thread_local! {
-    static CA: OpenpgpCa = OpenpgpCa::new(RestdCli::from_args().database.as_deref())
+    static CA: OpenpgpCa = OpenpgpCa::new(DB.get().unwrap().as_deref())
         .expect("OpenPGP CA new() failed - database problem?");
 }
 
@@ -662,24 +660,20 @@ fn poll_for_updates() -> String {
     unimplemented!()
 }
 
-#[launch]
-fn rocket() -> rocket::Rocket {
-    use cli::Command;
+pub fn run(db: Option<String>) -> rocket::Rocket {
+    DB.set(db).unwrap();
 
-    let cli = RestdCli::from_args();
-    match cli.cmd {
-        Command::Run => rocket::ignite().mount(
-            "/",
-            routes![
-                certs_by_email,
-                certs_by_fp,
-                check_cert,
-                post_user,
-                deactivate_cert,
-                delist_cert,
-                refresh_certifications,
-                poll_for_updates,
-            ],
-        ),
-    }
+    rocket::ignite().mount(
+        "/",
+        routes![
+            certs_by_email,
+            certs_by_fp,
+            check_cert,
+            post_user,
+            deactivate_cert,
+            delist_cert,
+            refresh_certifications,
+            poll_for_updates,
+        ],
+    )
 }

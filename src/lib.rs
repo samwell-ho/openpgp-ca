@@ -15,8 +15,13 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
+#[macro_use]
+extern crate rocket;
+
 pub mod ca;
 mod db;
 pub mod models;
 mod pgp;
 mod schema;
+
+pub mod restd;
