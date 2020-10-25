@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 /// Human-readable information about an OpenPGP certificate
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CertInfo {
-    fingerprint: String,
+    pub fingerprint: String,
 
-    user_ids: Vec<String>,
+    pub user_ids: Vec<String>,
 
-    primary_creation_time: DateTime<Utc>,
+    pub primary_creation_time: DateTime<Utc>,
     // pk_algo: String,
     // pk_size: usize,
     // subkeys: Vec<SubkeyInfo>,
