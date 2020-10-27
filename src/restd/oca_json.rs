@@ -21,14 +21,15 @@ use crate::models;
 /// Later we may add e.g. `cert_lints` (... ?)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnJSON {
+    /// Factual information about the properties of an OpenPGP Cert
     pub cert_info: CertInfo,
 
-    // later:
-    // - cert_lints (e.g. expiry warnings, deprecated crypto, ...)
+    /// +later: cert_lints (e.g. expiry warnings, deprecated crypto, ...)
 
-    // action can be "new" or "update"
+    /// action ("new" or "update")
     pub action: Option<Action>,
 
+    /// OpenPGP CA representation of a Cert (armored cert + metadata)
     pub certificate: Certificate,
 }
 
