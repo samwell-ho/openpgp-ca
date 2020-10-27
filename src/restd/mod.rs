@@ -14,7 +14,6 @@ use std::ops::Deref;
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
 
-pub mod certinfo;
 mod cli;
 mod oca_json;
 mod util;

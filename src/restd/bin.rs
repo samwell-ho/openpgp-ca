@@ -12,9 +12,8 @@
 #[macro_use]
 extern crate rocket;
 
-mod certinfo;
 mod cli;
-mod util;
+pub mod util;
 
 use cli::RestdCli;
 use openpgp_ca_lib::restd;
