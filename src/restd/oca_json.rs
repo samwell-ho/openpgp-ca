@@ -6,12 +6,71 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use chrono::{DateTime, Utc};
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
+use sequoia_openpgp::Cert;
 use serde::{Deserialize, Serialize};
 
 use crate::models;
-use crate::restd::certinfo::CertInfo;
+
+/// A container for information about a Cert.
+///
+/// `cert_info` contains factual information about a cert.
+///
+/// Later we may add e.g. `cert_lints` (... ?)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReturnJSON {
+    pub cert_info: CertInfo,
+
+    // later:
+    // - cert_lints (e.g. expiry warnings, deprecated crypto, ...)
+
+    // action can be "new" or "update"
+    pub action: Option<Action>,
+
+    pub certificate: Certificate,
+}
+
+/// Human-readable information about an OpenPGP certificate
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CertInfo {
+    pub fingerprint: String,
+
+    pub user_ids: Vec<String>,
+
+    pub primary_creation_time: DateTime<Utc>,
+    // pk_algo: String,
+    // pk_size: usize,
+    // subkeys: Vec<SubkeyInfo>,
+    // revocation status
+}
+
+// #[derive(Debug, Serialize, Deserialize)]
+// struct SubkeyInfo {}
+
+impl From<&Cert> for CertInfo {
+    fn from(cert: &Cert) -> Self {
+        let emails = cert
+            .userids()
+            .filter_map(|uid| {
+                uid.email().expect("ERROR while converting user_id")
+            })
+            .collect();
+
+        CertInfo {
+            fingerprint: cert.fingerprint().to_hex(),
+            user_ids: emails,
+            primary_creation_time: cert.primary_key().creation_time().into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Action {
+    New,
+    Update,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Certificate {
@@ -46,30 +105,6 @@ impl Certificate {
             inactive: Some(cert.inactive),
         }
     }
-}
-
-/// A container for information about a Cert.
-///
-/// `cert_info` contains factual information about a cert.
-///
-/// Later we may add e.g. `cert_lints` (... ?)
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ReturnJSON {
-    pub cert_info: CertInfo,
-
-    // later:
-    // - cert_lints (e.g. expiry warnings, deprecated crypto, ...)
-
-    // action can be "new" or "update"
-    pub action: Option<Action>,
-
-    pub certificate: Certificate,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Action {
-    New,
-    Update,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
