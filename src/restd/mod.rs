@@ -15,7 +15,8 @@ use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
 
 mod cli;
-mod oca_json;
+pub mod client;
+pub mod oca_json;
 mod util;
 
 use std::collections::HashSet;

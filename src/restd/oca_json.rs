@@ -67,7 +67,7 @@ impl From<&Cert> for CertInfo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Action {
     New,
     Update,
