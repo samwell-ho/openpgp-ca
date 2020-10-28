@@ -6,7 +6,6 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use reqwest;
 use reqwest::{Response, StatusCode};
 
 use crate::restd::oca_json::{Certificate, ReturnError, ReturnJSON};
@@ -32,12 +31,12 @@ impl Client {
                 StatusCode::OK => {
                     let resp = o.json::<ReturnJSON>().await.unwrap();
 
-                    return Ok(resp);
+                    Ok(resp)
                 }
                 StatusCode::BAD_REQUEST => {
                     let resp = o.json::<ReturnError>().await.unwrap();
 
-                    return Err(resp);
+                    Err(resp)
                 }
                 _ => panic!("unexpected status code {}", o.status()),
             },
