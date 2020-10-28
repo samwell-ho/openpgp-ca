@@ -6,6 +6,9 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! Very basic client wrapper for the OpenPGP CA restd,
+//! intended for use in integration tests.
+
 use reqwest::{Response, StatusCode};
 
 use crate::restd::oca_json::{Certificate, ReturnError, ReturnJSON};
