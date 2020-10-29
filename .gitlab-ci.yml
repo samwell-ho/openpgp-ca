@@ -14,15 +14,13 @@ variables:
   # To have a common name that can be referenced from other job, branch or repo
   RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest
 
-
-#before_script:
-#  - mkdir -p /run/user/$UID
-#  - apt update -y -qq
-#  - apt install -y -qq --no-install-recommends  git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev ca-certificates valgrind strace python3-dev python3-setuptools python3-cffi python3-pytest gnupg
-#  - apt clean
-
 cargo-test:
   stage: test
+  before_script:
+    - mkdir -p /run/user/$UID
+    - apt update -y -qq
+    - apt install -y -qq --no-install-recommends  git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev ca-certificates valgrind strace python3-dev python3-setuptools python3-cffi python3-pytest gnupg
+    - apt clean
   script:
   - cargo test
 
@@ -32,6 +30,11 @@ cargo-fmt:
     - cargo fmt -- --check
 
 cargo-clippy:
+  before_script:
+    - mkdir -p /run/user/$UID
+    - apt update -y -qq
+    - apt install -y -qq --no-install-recommends  git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev ca-certificates valgrind strace python3-dev python3-setuptools python3-cffi python3-pytest gnupg
+    - apt clean
   script:
     - rustup component add clippy
     - cargo clippy --verbose --tests -- -D warnings
@@ -52,12 +55,12 @@ pages:
   only:
     - master
 
-#reuse:
-#  image:
-#    name: fsfe/reuse:latest
-#    entrypoint: [""]
-#  script:
-#    - reuse lint
+reuse:
+  image:
+    name: fsfe/reuse:latest
+    entrypoint: [""]
+  script:
+    - reuse lint
 
 build_docker_production:
   stage: test
