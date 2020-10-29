@@ -74,7 +74,5 @@ build_docker_production:
     # tag it as latest and push it too
     - docker tag $IMAGE $RELEASE_IMAGE
     - docker push $RELEASE_IMAGE
-  only:
-    - mainline
   needs: []
 
