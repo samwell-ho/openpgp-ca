@@ -3,10 +3,10 @@
 
 image: rust:latest
 
-cache:
-  paths:
-    - cargo/registry
-    - cargo/git
+#cache:
+#  paths:
+#    - cargo/registry
+#    - cargo/git
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/cargo
