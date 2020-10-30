@@ -17,9 +17,9 @@ variables:
 reuse:
   image:
     name: fsfe/reuse:latest
-#    entrypoint: [""]
-#  script:
-#    - reuse lint
+    entrypoint: [""]
+  script:
+    - reuse lint
 
 cargo-test:
   stage: test
