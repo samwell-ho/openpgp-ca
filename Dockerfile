@@ -14,10 +14,11 @@ ENV OPENPGP_CA_DB=/var/run/openpgp-ca/openpgp-ca.sqlite
 
 # OpenPGP CA
 ADD ./ /opt/openpgp-ca/
-RUN cd /opt/openpgp-ca/ && cargo build --release
-RUN cp /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/
-RUN cp /opt/openpgp-ca/target/release/openpgp-ca-restd /usr/local/bin/
-RUN cd /opt/openpgp-ca/ && cargo clean
+RUN cd /opt/openpgp-ca/ \
+ && cargo build --release \
+ && cp /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/ \
+ && cp /opt/openpgp-ca/target/release/openpgp-ca-restd /usr/local/bin/ \
+ && cargo clean
 
 VOLUME ["/var/run/openpgp-ca/"]
 ENTRYPOINT ["/usr/local/bin/openpgp-ca"]
