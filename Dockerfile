@@ -17,6 +17,7 @@ ADD ./ /opt/openpgp-ca/
 RUN cd /opt/openpgp-ca/ && cargo build --release
 RUN cp /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/
 RUN cp /opt/openpgp-ca/target/release/openpgp-ca-restd /usr/local/bin/
+RUN cd /opt/openpgp-ca/ && cargo clean
 
 VOLUME ["/var/run/openpgp-ca/"]
 ENTRYPOINT ["/usr/local/bin/openpgp-ca"]
