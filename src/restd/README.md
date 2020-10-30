@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # Experimental REST API for OpenPGP CA
 
 To use the OpenPGP CA as a REST service, first the CA needs to be
