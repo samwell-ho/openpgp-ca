@@ -63,7 +63,7 @@ pages:
     - master
 
 build_docker:
-  stage: test
+  stage: deploy
   image: docker:stable
   services:
       - docker:stable-dind
