@@ -14,6 +14,13 @@ variables:
   # To have a common name that can be referenced from other job, branch or repo
   RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest
 
+reuse:
+  image:
+    name: fsfe/reuse:latest
+#    entrypoint: [""]
+#  script:
+#    - reuse lint
+
 cargo-test:
   stage: test
   before_script:
@@ -54,13 +61,6 @@ pages:
       - public
   only:
     - master
-
-reuse:
-  image:
-    name: fsfe/reuse:latest
-    entrypoint: [""]
-  script:
-    - reuse lint
 
 build_docker:
   stage: test
