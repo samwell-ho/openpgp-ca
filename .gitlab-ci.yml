@@ -62,7 +62,7 @@ reuse:
   script:
     - reuse lint
 
-build_docker_production:
+build_docker:
   stage: test
   image: docker:stable
   services:
@@ -72,7 +72,7 @@ build_docker_production:
     - docker info
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - docker pull $RELEASE_IMAGE || true
-    - docker build -t $IMAGE --cache-from $RELEASE_IMAGE --target production .
+    - docker build -t $IMAGE --cache-from $RELEASE_IMAGE .
     - docker push $IMAGE
     # tag it as latest and push it too
     - docker tag $IMAGE $RELEASE_IMAGE
