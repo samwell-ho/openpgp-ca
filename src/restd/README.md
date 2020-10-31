@@ -192,7 +192,8 @@ Among other information, the returned data contains fingerprint strings for
 each certificate. These fingerprint strings are used as parameters for the
 following operations.
 
-The format of the returned data is the same as for `/certs/check`.
+The format of the returned data is the same as for `/certs/check`. However,
+unlike other calls, this endpoint returns a list of results.
 
 ## Getting one OpenPGP certificate by fingerprint
 
