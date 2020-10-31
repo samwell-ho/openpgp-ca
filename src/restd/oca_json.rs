@@ -110,8 +110,8 @@ impl Certificate {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnError {
-    status: ReturnStatus,
-    msg: String,
+    pub status: ReturnStatus,
+    pub msg: String,
 }
 
 impl ReturnError {
@@ -128,7 +128,7 @@ impl ReturnError {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum ReturnStatus {
     /// A private OpenPGP Key was provided - this is not allowed
     PrivateKey,
