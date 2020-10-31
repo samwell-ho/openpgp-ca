@@ -77,7 +77,12 @@ fn start_restd(db: String) -> AbortHandle {
 }
 
 #[tokio::test(threaded_scheduler)]
-async fn test_restd_checks() {
+async fn test_restd() {
+    // Run all "restd" tests in one test-case.
+    //
+    // Running multiple restd-tests in parallel leads to errors when
+    // multiple rocket daemons try to bind to the same tcp port.
+
     let ctx = gnupg::make_context().unwrap();
     // ctx.leak_tempdir();
 
@@ -90,8 +95,9 @@ async fn test_restd_checks() {
 
     // -- start restd --
     let abort_handle = start_restd(db);
-
     let c = Client::new("http://localhost:8000/");
+
+    // --- Various "check" calls ---
 
     // 1. Alice, Ok
     let cert = Certificate {
@@ -108,6 +114,8 @@ async fn test_restd_checks() {
     let ret = res.unwrap();
     assert!(ret.is_some());
     let ret = ret.unwrap();
+
+    let alice_fp = ret.cert_info.fingerprint.clone();
 
     assert_eq!(ret.action, Some(Action::New));
     assert_eq!(
@@ -163,28 +171,7 @@ async fn test_restd_checks() {
     let ret = res.err().unwrap();
     assert_eq!(ret.status, ReturnStatus::PrivateKey);
 
-    // -- abort restd --
-    abort_handle.abort();
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn test_restd_persist_retrieve() {
-    let ctx = gnupg::make_context().unwrap();
-    // ctx.leak_tempdir();
-
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    // -- init OpenPGP CA --
-    let ca = OpenpgpCa::new(Some(&db)).unwrap();
-    ca.ca_init("example.org", None).unwrap();
-
-    // -- start restd --
-    let abort_handle = start_restd(db);
-
-    let c = Client::new("http://localhost:8000/");
-
-    // 1. Alice, Ok
+    // --- Persist, Modify, Read ---
     let cert = Certificate {
         cert: ALICE_CERT.to_owned(),
         delisted: None,
@@ -194,14 +181,6 @@ async fn test_restd_persist_retrieve() {
         revocations: vec![],
     };
 
-    // check
-    let res = c.check(&cert).await;
-    assert!(res.is_ok());
-
-    let res = res.unwrap().unwrap();
-    let fp = res.cert_info.fingerprint;
-
-    // persist
     let res = c.persist(&cert).await;
     assert!(res.is_ok());
 
@@ -218,7 +197,7 @@ async fn test_restd_persist_retrieve() {
     assert_eq!(res.len(), 0);
 
     // look up by fingerprint
-    let res = c.get_by_fp(fp.clone()).await;
+    let res = c.get_by_fp(alice_fp.clone()).await;
     assert!(res.is_ok());
     let res = res.unwrap();
     assert!(res.is_some());
@@ -230,10 +209,10 @@ async fn test_restd_persist_retrieve() {
     assert!(res.is_none());
 
     // => POST /certs/deactivate/<fp> (deactivate_cert)
-    let res = c.deactivate(fp.clone()).await;
+    let res = c.deactivate(alice_fp.clone()).await;
     assert!(res.is_ok());
 
-    let res = c.get_by_fp(fp.clone()).await;
+    let res = c.get_by_fp(alice_fp.clone()).await;
     assert!(res.is_ok());
     let res = res.unwrap();
     assert!(res.is_some());
@@ -241,10 +220,10 @@ async fn test_restd_persist_retrieve() {
     assert!(res.certificate.inactive.unwrap());
 
     // => DELETE /certs/<fp> (delist_cert)
-    let res = c.delist(fp.clone()).await;
+    let res = c.delist(alice_fp.clone()).await;
     assert!(res.is_ok());
 
-    let res = c.get_by_fp(fp.clone()).await;
+    let res = c.get_by_fp(alice_fp.clone()).await;
     assert!(res.is_ok());
     let res = res.unwrap();
     assert!(res.is_some());
