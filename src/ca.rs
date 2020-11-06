@@ -76,9 +76,13 @@ impl OpenpgpCa {
             // load config from .env
             dotenv::dotenv().ok();
 
+            // FIXME: result to option
+
             // diesel naming convention for .env
             Some(env::var("DATABASE_URL").unwrap())
         };
+
+        // check that is some, otherwise return error
 
         let db = Db::new(db_url.as_deref())?;
         db.diesel_migrations_run();
