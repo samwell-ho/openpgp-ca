@@ -76,18 +76,21 @@ impl OpenpgpCa {
             // load config from .env
             dotenv::dotenv().ok();
 
-            // FIXME: result to option
-
             // diesel naming convention for .env
-            Some(env::var("DATABASE_URL").unwrap())
+            let env_db = env::var("DATABASE_URL");
+
+            // if unset (or bad), return None
+            env_db.map_or(None, |url| Some(url))
         };
 
-        // check that is some, otherwise return error
+        if let Some(db_url) = db_url {
+            let db = Db::new(&db_url)?;
+            db.diesel_migrations_run();
 
-        let db = Db::new(db_url.as_deref())?;
-        db.diesel_migrations_run();
-
-        Ok(OpenpgpCa { db })
+            Ok(OpenpgpCa { db })
+        } else {
+            Err(anyhow::anyhow!("ERROR: no database configuration found"))
+        }
     }
 
     // -------- CAs

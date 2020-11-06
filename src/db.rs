@@ -19,21 +19,16 @@ pub struct Db {
 }
 
 impl Db {
-    pub fn new(db_url: Option<&str>) -> Result<Self> {
-        match db_url {
-            None => Err(anyhow::anyhow!("no database has been set")),
-            Some(db_url) => {
-                let conn = SqliteConnection::establish(&db_url)
-                    .context(format!("Error connecting to {}", db_url))?;
+    pub fn new(db_url: &str) -> Result<Self> {
+        let conn = SqliteConnection::establish(&db_url)
+            .context(format!("Error connecting to {}", db_url))?;
 
-                // enable handling of foreign key constraints in sqlite
-                diesel::sql_query("PRAGMA foreign_keys=1;")
-                    .execute(&conn)
-                    .context("Couldn't set 'PRAGMA foreign_keys=1;'")?;
+        // enable handling of foreign key constraints in sqlite
+        diesel::sql_query("PRAGMA foreign_keys=1;")
+            .execute(&conn)
+            .context("Couldn't set 'PRAGMA foreign_keys=1;'")?;
 
-                Ok(Db { conn })
-            }
-        }
+        Ok(Db { conn })
     }
 
     pub fn get_conn(&self) -> &SqliteConnection {
