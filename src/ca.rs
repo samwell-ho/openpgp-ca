@@ -80,7 +80,7 @@ impl OpenpgpCa {
             let env_db = env::var("DATABASE_URL");
 
             // if unset (or bad), return None
-            env_db.map_or(None, |url| Some(url))
+            env_db.ok()
         };
 
         if let Some(db_url) = db_url {
