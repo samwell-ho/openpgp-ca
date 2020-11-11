@@ -116,3 +116,12 @@ on the user's machine, and then import those keys into OpenPGP CA) - see the
 documentation at:
 
 https://openpgp-ca.gitlab.io/openpgp-ca/
+
+## Support
+
+If you are interested in deploying OpenPGP CA in your organization, please
+contact <heiko@schaefer.name>. We can consult on the setup, help you with
+the setup or even add features.
+
+For non-profit organizations reduced rates are available.  This is also a
+useful way for companies to support the project.
