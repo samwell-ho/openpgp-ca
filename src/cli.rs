@@ -89,6 +89,8 @@ pub enum UserCommand {
             short = "e",
             long = "email",
             required = true,
+            number_of_values = 1,
+            multiple = true,
             help = "Email address"
         )]
         email: Vec<String>,
@@ -113,7 +115,13 @@ pub enum UserCommand {
     },
     /// Import User (use existing Public Key)
     Import {
-        #[structopt(short = "e", long = "email", help = "Email address")]
+        #[structopt(
+            short = "e",
+            long = "email",
+            number_of_values = 1,
+            multiple = true,
+            help = "Email address"
+        )]
         email: Vec<String>,
 
         #[structopt(
@@ -133,6 +141,8 @@ pub enum UserCommand {
         #[structopt(
             short = "r",
             long = "revocation-file",
+            number_of_values = 1,
+            multiple = true,
             help = "File that contains a revocation cert for this user"
         )]
         revocation_file: Vec<PathBuf>,
