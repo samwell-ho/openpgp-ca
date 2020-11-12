@@ -45,3 +45,8 @@ $ docker run -v "/some/host/directory/:/var/run/openpgp-ca/" openpgp-ca user lis
 
 Obviously for regular use you might use more automated tools like
 [`docker-compose`](https://docs.docker.com/compose/).
+
+## Container Registry
+
+You can find our pre-built
+[container images on gitlab](https://gitlab.com/openpgp-ca/openpgp-ca/container_registry/).
