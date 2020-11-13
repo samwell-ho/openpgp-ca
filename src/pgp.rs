@@ -31,6 +31,8 @@ use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
 use sequoia_openpgp::cert::CipherSuite;
 use sha2::Digest;
 
+const POLICY: &'static StandardPolicy = &StandardPolicy::new();
+
 pub struct Pgp {}
 
 impl Pgp {
@@ -74,11 +76,9 @@ impl Pgp {
         let email = format!("openpgp-ca@{}", domainname);
         let userid = Self::user_id(&email, name);
 
-        let policy = StandardPolicy::new();
-
         let direct_key_sig = cert
             .primary_key()
-            .with_policy(&policy, None)?
+            .with_policy(POLICY, None)?
             .binding_signature();
         let builder =
             signature::SignatureBuilder::from(direct_key_sig.clone())
@@ -217,15 +217,14 @@ impl Pgp {
 
     /// get expiration of cert as SystemTime
     pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
-        let policy = StandardPolicy::new();
-        let primary = cert.primary_key().with_policy(&policy, None)?;
+        let primary = cert.primary_key().with_policy(POLICY, None)?;
         Ok(primary.key_expiration_time())
     }
 
     /// is (possibly) revoked
     pub fn is_possibly_revoked(cert: &Cert) -> bool {
         RevocationStatus::NotAsFarAsWeKnow
-            != cert.revocation_status(&StandardPolicy::new(), None)
+            != cert.revocation_status(POLICY, None)
     }
 
     /// Load Revocation Cert from file
@@ -464,8 +463,6 @@ impl Pgp {
         emails_filter: Option<&[&str]>,
         duration_days: Option<u64>,
     ) -> Result<Cert> {
-        let policy = StandardPolicy::new();
-
         let fp_ca = ca_cert.fingerprint();
 
         let mut uids = Vec::new();
@@ -475,7 +472,7 @@ impl Pgp {
             // if yes, don't add another one.
             if !uid
                 .clone()
-                .with_policy(&policy, None)?
+                .with_policy(POLICY, None)?
                 .certifications()
                 .iter()
                 .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
@@ -508,10 +505,9 @@ impl Pgp {
         cert: &Cert,
         password: Option<&str>,
     ) -> Result<Vec<KeyPair>> {
-        let policy = StandardPolicy::new();
         let keys = cert
             .keys()
-            .with_policy(&policy, None)
+            .with_policy(POLICY, None)
             .alive()
             .revoked(false)
             .for_certification()
