@@ -31,7 +31,7 @@ use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
 use sequoia_openpgp::cert::CipherSuite;
 use sha2::Digest;
 
-const POLICY: &'static StandardPolicy = &StandardPolicy::new();
+const POLICY: &StandardPolicy = &StandardPolicy::new();
 
 pub struct Pgp {}
 
