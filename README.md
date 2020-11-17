@@ -47,34 +47,63 @@ your organization.  The key's User ID is set to `openpgp-ca@example.org`.
 You should make sure that that email address is configured to forward
 mail to you.
 
-Next, we'll create two users:
+
+## Importing user keys
+
+Once the CA is set up, users can supply their public keys to the CA admin
+for use with OpenPGP CA.
+ 
+We expect that most organizations will predominantly want to take this
+approach: users will either want to use their pre-existing OpenPGP keys, or
+generate new ones on their own machine.
+
+For more details about this workflow, see
+["importing user keys"](https://openpgp-ca.gitlab.io/openpgp-ca/keys-import.html)
+in our documentation. 
+
+
+## Generating user keys with OpenPGP CA
+
+Alternatively new user keys can be generated using OpenPGP CA.
+This workflow is extremely simple to perform, so when it is appropriate for
+keys to be centrally created, that is very easy to do with OpenPGP CA.
+
+Let's generate two new keys:
 
 ```
 $ openpgp-ca -d example.oca user add --email alice@example.org --name "Alice Adams"
 $ openpgp-ca -d example.oca user add --email bob@example.org --name "Bob Baker"
 ```
 
-The private keys are output to stdout (but they are never stored locally!) -
-these private keys need to be transferred to the respective users. By
-default, the keys are protected by passwords (which are also output to
+The new private keys are printed to stdout (but they are never stored
+locally!).
+These private keys need to be transferred to the respective users. By
+default, the keys are protected with passwords (which are also printed to
 stdout on key creation).
-One way to do this is to store each key on a USB key, and to write each
-key's password and fingerprint on a piece of paper.
 
-It is also convenient to give the new user the CA's public key at the same
-time.  This can be exported as follows:
+One way to transport the keys is to store each on a USB key, and to write
+each key's password and fingerprint on a piece of paper.
+
+It is useful to give the new user the CA's public key at the same
+time.  The CA key can be exported as follows:
 
 ```
 $ openpgp-ca -d example.org ca export > example-ca.pub
 ```
 
-After this, users can import their new key.  Using GnuPG (and for
-testing purposes, using a temporary gnupg environment), this is done as
-follows:
+Once the user has these keys (and the password), they can import them.
+Using GnuPG, this is done as follows
+ 
+For testing purposes, we first set up a temporary GnuPG environment:
 
 ```
 $ export GNUPGHOME=$(mktemp -d)
 $ chmod 0700 $GNUPGHOME
+```
+
+Then we import the new user key and the CA key:
+
+```
 $ gpg --import alice.priv
 $ gpg --import example-ca.pub
 ```
@@ -93,7 +122,7 @@ Before setting this trust level, Alice needs to make sure that this key is
 indeed the correct one for her - for example by having the OpenPGP CA admin
 confirm the key's fingerprint on a sufficiently secure channel.
 
-After this, users in the organization (Alice and Bob, in our example) can
+At this point, users in the organization (Alice and Bob, in our example) can
 automatically authenticate each other as soon as their
 OpenPGP implementations have copies of other users' keys;
 Users do not need to manually check fingerprints or sign each others' keys.
@@ -109,6 +138,7 @@ authenticate each other, but provides support to create so-called bridges
 between organizations.  In this case, the CA admins from two OpenPGP CA
 using organizations sign each others CA key using a scoped trust signature.
 
+
 ## Documentation
 
 For more details and more workflows (including a workflow to create user keys
@@ -116,6 +146,7 @@ on the user's machine, and then import those keys into OpenPGP CA) - see the
 documentation at:
 
 https://openpgp-ca.gitlab.io/openpgp-ca/
+
 
 ## Support
 
