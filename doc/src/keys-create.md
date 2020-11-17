@@ -3,11 +3,13 @@ SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-There are two ways to manage user keys with OpenPGP CA.
-The simplest way for both the admin and users is to have OpenPGP CA create
-keys on behalf of the user.  This allows OpenPGP CA to automatically create
-all of the necessary auxiliary data structures (the certifications and
-revocation certificates).
+In some cases, it may be useful and appropriate for the OpenPGP CA admin to
+generate new keys on behalf of users.
+This is the simplest workflow for both the admin and users.
+
+OpenPGP CA can automatically create all of the necessary auxiliary data
+structures (certifications, as well as revocation certificates) when
+generating new user keys.
 
 We call this workflow "centralized key creation", because
 OpenPGP keys get created centrally by the OpenPGP CA admin.
