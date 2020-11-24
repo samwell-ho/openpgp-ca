@@ -170,8 +170,7 @@ impl Pgp {
                 &mut buffer,
                 armor::Kind::SecretKey,
                 headers,
-            )
-            .unwrap();
+            )?;
 
             cert.as_tsk().serialize(&mut writer)?;
             writer.finalize()?;
@@ -207,7 +206,7 @@ impl Pgp {
             let rev = Packet::Signature(sig.clone());
 
             let mut writer =
-                armor::Writer::new(&mut buf, armor::Kind::Signature).unwrap();
+                armor::Writer::new(&mut buf, armor::Kind::Signature)?;
             rev.serialize(&mut writer)?;
             writer.finalize()?;
         }
@@ -400,8 +399,7 @@ impl Pgp {
             .set_reason_for_revocation(
                 ReasonForRevocation::Unspecified,
                 b"removing OpenPGP CA bridge",
-            )
-            .unwrap()
+            )?
             .build(signer, &remote_ca_cert, &userid, None)?;
 
         packets.push(revocation_sig.clone().into());
