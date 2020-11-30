@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+# SPDX-License-Identifier: CC0-1.0
+
 .dockerignore
 Dockerfile
 .git
-
