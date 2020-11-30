@@ -8,12 +8,6 @@ image: rust:latest
 #    - cargo/registry
 #    - cargo/git
 
-variables:
-  CARGO_HOME: $CI_PROJECT_DIR/cargo
-  IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
-  # To have a common name that can be referenced from other job, branch or repo
-  RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest
-
 reuse:
   image:
     name: fsfe/reuse:latest
@@ -66,15 +60,18 @@ build_docker:
   image: docker:stable
   services:
       - docker:stable-dind
-  script:
-    - echo building $IMAGE and releasing as $RELEASE_IMAGE
+  before_script:
     - docker info
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker pull $RELEASE_IMAGE || true
-    - docker build -t $IMAGE --cache-from $RELEASE_IMAGE .
-    - docker push $IMAGE
-    # tag it as latest and push it too
-    - docker tag $IMAGE $RELEASE_IMAGE
-    - docker push $RELEASE_IMAGE
-  needs: []
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build  --cache-from $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA -t $CI_REGISTRY_IMAGE:latest .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE:latest
 
+    - docker pull $CI_REGISTRY_IMAGE/openpgp-ca-restd:latest || true
+    - docker build  --cache-from $CI_REGISTRY_IMAGE/openpgp-ca-restd:latest -t $CI_REGISTRY_IMAGE/openpgp-ca-restd:$CI_COMMIT_SHA -t $CI_REGISTRY_IMAGE/openpgp-ca-restd:latest .
+    - docker push $CI_REGISTRY_IMAGE/openpgp-ca-restd:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE/openpgp-ca-restd:latest
+
+  needs: []

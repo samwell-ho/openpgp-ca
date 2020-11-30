@@ -15,8 +15,8 @@ ADD ./ /opt/openpgp-ca/
 RUN cd /opt/openpgp-ca/ && cargo build --release
 
 
-# Stage 1: build Docker image
-FROM debian:buster-slim
+# Stage 1: build base Docker image
+FROM debian:buster-slim as base
 
 # Sequoia dependencies
 RUN DEBIAN_FRONTEND=noninteractive apt-get -q update && \
@@ -27,10 +27,22 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -q update && \
 # OpenPGP CA database file
 ENV OPENPGP_CA_DB=/var/run/openpgp-ca/openpgp-ca.sqlite
 
-RUN mkdir -p /usr/local/bin
-COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/openpgp-ca
-COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca-restd /usr/local/bin/openpgp-ca-restd
-
 VOLUME ["/var/run/openpgp-ca/"]
+
+
+# Stage 2: build "openpgp-ca" Docker image
+FROM base as openpgp-ca
+
+COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/openpgp-ca
+
 ENTRYPOINT ["/usr/local/bin/openpgp-ca"]
 CMD ["--help"]
+
+
+# Stage 3: build "openpgp-ca-restd" Docker image
+FROM base as openpgp-ca-restd
+
+COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca-restd /usr/local/bin/openpgp-ca-restd
+
+ENTRYPOINT ["/usr/local/bin/openpgp-ca-restd"]
+CMD ["run"]
