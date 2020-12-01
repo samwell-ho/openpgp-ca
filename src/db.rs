@@ -261,7 +261,7 @@ impl Db {
 
             let merged =
                 Pgp::armored_to_cert(&cacert_db.priv_cert)?.merge(tsigned)?;
-            cacert_db.priv_cert = Pgp::priv_cert_to_armored(&merged)?;
+            cacert_db.priv_cert = Pgp::cert_to_armored_private_key(&merged)?;
 
             // update new version of CA cert in database
             self.update_cacert(&cacert_db)?;

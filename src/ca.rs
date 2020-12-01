@@ -125,7 +125,7 @@ impl OpenpgpCa {
 
         let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
 
-        let ca_key = &Pgp::priv_cert_to_armored(&cert)?;
+        let ca_key = &Pgp::cert_to_armored_private_key(&cert)?;
 
         self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
             self.db.insert_ca(
@@ -251,7 +251,7 @@ impl OpenpgpCa {
                 .context("failed to load CA from database")?
                 .unwrap();
 
-            ca_cert.priv_cert = Pgp::priv_cert_to_armored(&signed)
+            ca_cert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
                 .context("failed to armor CA Cert")?;
 
             self.db
@@ -302,7 +302,8 @@ impl OpenpgpCa {
         let tsigned_ca = Pgp::tsign_ca(ca_cert, &user_cert, pass.as_deref())
             .context("failed: user tsigns CA")?;
 
-        let tsigned_ca_armored = Pgp::priv_cert_to_armored(&tsigned_ca)?;
+        let tsigned_ca_armored =
+            Pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
         let revoc = Pgp::sig_to_armored(&revoc)?;
@@ -325,7 +326,7 @@ impl OpenpgpCa {
             println!(
                 "new user key for {}:\n{}",
                 name.unwrap_or(""),
-                &Pgp::priv_cert_to_armored(&certified)?
+                &Pgp::cert_to_armored_private_key(&certified)?
             );
             if let Some(pass) = pass {
                 println!("Password for this key: '{}'.\n", pass);

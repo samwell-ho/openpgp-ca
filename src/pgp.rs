@@ -157,24 +157,23 @@ impl Pgp {
     }
 
     /// make a "private key" ascii-armored representation of a Cert
-    pub fn priv_cert_to_armored(cert: &Cert) -> Result<String> {
+    pub fn cert_to_armored_private_key(cert: &Cert) -> Result<String> {
         let mut buffer = vec![];
-        {
-            let headers = cert.armor_headers();
-            let headers: Vec<_> = headers
-                .iter()
-                .map(|value| ("Comment", value.as_str()))
-                .collect();
 
-            let mut writer = armor::Writer::with_headers(
-                &mut buffer,
-                armor::Kind::SecretKey,
-                headers,
-            )?;
+        let headers: Vec<_> = cert
+            .armor_headers()
+            .into_iter()
+            .map(|value| ("Comment", value))
+            .collect();
 
-            cert.as_tsk().serialize(&mut writer)?;
-            writer.finalize()?;
-        }
+        let mut writer = armor::Writer::with_headers(
+            &mut buffer,
+            armor::Kind::SecretKey,
+            headers,
+        )?;
+
+        cert.as_tsk().serialize(&mut writer)?;
+        writer.finalize()?;
 
         Ok(String::from_utf8(buffer)?)
     }
