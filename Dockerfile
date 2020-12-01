@@ -30,19 +30,22 @@ ENV OPENPGP_CA_DB=/var/run/openpgp-ca/openpgp-ca.sqlite
 VOLUME ["/var/run/openpgp-ca/"]
 
 
-# Stage 2: build "openpgp-ca" Docker image
-FROM base as openpgp-ca
-
-COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/openpgp-ca
-
-ENTRYPOINT ["/usr/local/bin/openpgp-ca"]
-CMD ["--help"]
-
-
-# Stage 3: build "openpgp-ca-restd" Docker image
+# Stage 2: build "openpgp-ca-restd" Docker image
 FROM base as openpgp-ca-restd
 
 COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca-restd /usr/local/bin/openpgp-ca-restd
 
 ENTRYPOINT ["/usr/local/bin/openpgp-ca-restd"]
 CMD ["run"]
+
+
+# Stage 3: build "openpgp-ca" Docker image
+#
+# NOTE: the last target is default for -t,
+# putting this stage last makes openpgp-ca the "default image"
+FROM base as openpgp-ca
+
+COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/openpgp-ca
+
+ENTRYPOINT ["/usr/local/bin/openpgp-ca"]
+CMD ["--help"]
