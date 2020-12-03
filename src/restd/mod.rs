@@ -169,7 +169,7 @@ fn load_certificate_data(
                         ReturnStatus::InternalError,
                         format!(
                             "load_certificate_data: error while loading users \
-                        '{}'", e
+                        '{:?}'", e
                         ),
                     )
                 })?
@@ -179,7 +179,7 @@ fn load_certificate_data(
             ReturnError::new(
                 ReturnStatus::InternalError,
                 format!(
-                    "load_certificate_data: error while loading emails '{}'",
+                    "load_certificate_data: error while loading emails '{:?}'",
                     e
                 ),
             )
@@ -190,7 +190,7 @@ fn load_certificate_data(
                 ReturnStatus::InternalError,
                 format!(
                     "load_certificate_data: error while loading revocations\
-                     '{}'",
+                     '{:?}'",
                     e
                 ),
             )
@@ -213,7 +213,7 @@ fn certs_by_email(
             ReturnError::bad_req(
                 ReturnStatus::InternalError,
                 format!(
-                    "certs_by_email: error loading certificates data '{}'",
+                    "certs_by_email: error loading certificates data '{:?}'",
                     e
                 ),
             )
@@ -225,7 +225,8 @@ fn certs_by_email(
                     ReturnError::bad_req(
                         ReturnStatus::InternalError,
                         format!(
-                            "certs_by_email: error during armored_to_cert '{}'",
+                            "certs_by_email: error during armored_to_cert \
+                            '{:?}'",
                             e
                         ),
                     )
@@ -255,7 +256,11 @@ fn certs_by_fp(
         let c = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::bad_req(
                 ReturnStatus::InternalError,
-                format!("certs_by_fp: error loading certificate data '{}'", e),
+                format!(
+                    "certs_by_fp: error loading certificate data \
+                '{:?}'",
+                    e
+                ),
             )
         })?;
 
@@ -265,7 +270,8 @@ fn certs_by_fp(
                     ReturnError::bad_req(
                         ReturnStatus::InternalError,
                         format!(
-                            "certs_by_fp: error during armored_to_cert '{}'",
+                            "certs_by_fp: error during armored_to_cert \
+                            '{:?}'",
                             e
                         ),
                     )
@@ -324,15 +330,15 @@ fn check_cert(
                 } else {
                     Err(ReturnError::bad_req(
                         ReturnStatus::BadKey,
-                        armor.err().unwrap().to_string(),
+                        format!("{:?}", armor.err()),
                     ))
                 }
             } else {
                 Err(ReturnError::bad_req(
                     ReturnStatus::InternalError,
                     format!(
-                        "Error during database lookup by fingerprint: {}",
-                        res.err().unwrap().to_string(),
+                        "Error during database lookup by fingerprint: {:?}",
+                        res.err(),
                     ),
                 ))
             }
@@ -368,7 +374,10 @@ fn post_user(
         let cert_by_fp = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::bad_req(
                 ReturnStatus::InternalError,
-                format!("Error during database lookup by fingerprint: {}", e,),
+                format!(
+                    "Error during database lookup by fingerprint: {:?}",
+                    e
+                ),
             )
         })?;
 
@@ -404,10 +413,7 @@ fn post_user(
             ca.cert_import_update(&armored).map_err(|e| {
                 ReturnError::bad_req(
                     ReturnStatus::InternalError,
-                    format!(
-                        "Error updating Cert in database: {}",
-                        e.to_string()
-                    ),
+                    format!("Error updating Cert in database: {:?}", e),
                 )
             })?;
         } else {
@@ -435,10 +441,7 @@ fn post_user(
             .map_err(|e| {
                 ReturnError::bad_req(
                     ReturnStatus::InternalError,
-                    format!(
-                        "Error importing Cert into database: {}",
-                        e.to_string()
-                    ),
+                    format!("Error importing Cert into database: {:?}", e),
                 )
             })?;
         }
@@ -459,7 +462,7 @@ fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
         let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::bad_req(
                 ReturnStatus::InternalError,
-                format!("Error looking up Fingerprint '{}'", e),
+                format!("Error looking up Fingerprint '{:?}'", e),
             )
         })?;
 
@@ -469,7 +472,7 @@ fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
             ca.cert_update(&cert).map_err(|e| {
                 ReturnError::bad_req(
                     ReturnStatus::InternalError,
-                    format!("Error updating Cert '{}'", e),
+                    format!("Error updating Cert '{:?}'", e),
                 )
             })?;
         } else {
@@ -498,7 +501,7 @@ fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
         let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::bad_req(
                 ReturnStatus::InternalError,
-                format!("Error looking up Fingerprint '{}'", e),
+                format!("Error looking up Fingerprint '{:?}'", e),
             )
         })?;
 
@@ -508,7 +511,7 @@ fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
             ca.cert_update(&cert).map_err(|e| {
                 ReturnError::bad_req(
                     ReturnStatus::InternalError,
-                    format!("Error updating Cert '{}'", e),
+                    format!("Error updating Cert '{:?}'", e),
                 )
             })?;
         } else {
@@ -533,7 +536,7 @@ fn refresh_certifications() -> Result<(), BadRequest<Json<ReturnError>>> {
             ReturnError::bad_req(
                 ReturnStatus::InternalError,
                 format!(
-                    "Error during certs_refresh_ca_certifications '{}'",
+                    "Error during certs_refresh_ca_certifications '{:?}'",
                     e
                 ),
             )
