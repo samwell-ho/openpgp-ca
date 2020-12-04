@@ -35,6 +35,8 @@ FROM base as openpgp-ca-restd
 
 COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca-restd /usr/local/bin/openpgp-ca-restd
 
+ENV ROCKET_ADDRESS=0.0.0.0
+
 ENTRYPOINT ["/usr/local/bin/openpgp-ca-restd"]
 CMD ["run"]
 
