@@ -395,12 +395,13 @@ fn post_user(
                     )
                 })?;
 
-            let updated = existing.merge(cert_normalized).map_err(|_e| {
-                ReturnError::bad_req(
-                    ReturnStatus::InternalError,
-                    String::from("Error while merging Certs"),
-                )
-            })?;
+            let updated =
+                existing.merge_public(cert_normalized).map_err(|_e| {
+                    ReturnError::bad_req(
+                        ReturnStatus::InternalError,
+                        String::from("Error while merging Certs"),
+                    )
+                })?;
 
             let armored =
                 OpenpgpCa::cert_to_armored(&updated).map_err(|_e| {

@@ -10,7 +10,6 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use tokio_core::reactor::Core;
 
 use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::packet::signature::subpacket::SubpacketTag;
@@ -412,18 +411,23 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     // -- get keys from hagrid
 
-    let c = sequoia_core::Context::new()?;
-
-    let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
-
-    let mut core = Core::new()?;
+    use tokio::runtime::Runtime;
+    let mut rt = Runtime::new()?;
 
     let j: Fingerprint = "CBCD8F030588653EEDD7E2659B7DD433F254904A".parse()?;
-    let justus: Cert = core.run(hagrid.get(&KeyID::from(j)))?;
+    let justus: Cert = rt.block_on(async move {
+        let c = sequoia_core::Context::new()?;
+        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
+        hagrid.get(&KeyID::from(j)).await
+    })?;
     let justus_key = OpenpgpCa::cert_to_armored(&justus)?;
 
     let n: Fingerprint = "8F17777118A33DDA9BA48E62AACB3243630052D9".parse()?;
-    let neal: Cert = core.run(hagrid.get(&KeyID::from(n)))?;
+    let neal: Cert = rt.block_on(async move {
+        let c = sequoia_core::Context::new()?;
+        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
+        hagrid.get(&KeyID::from(n)).await
+    })?;
     let neal_key = OpenpgpCa::cert_to_armored(&neal)?;
 
     // -- import keys into CA
@@ -776,8 +780,10 @@ fn test_revocation_no_fingerprint() -> Result<()> {
         // two signatures with the same timestamp are not allowed
         std::thread::sleep(std::time::Duration::from_millis(1_000));
 
-        let mut sig =
-            b.sign_direct_key(&mut keypair, &bob_cert.primary_key())?;
+        let mut sig = b.sign_direct_key(
+            &mut keypair,
+            Some(bob_cert.primary_key().key()),
+        )?;
 
         sig.unhashed_area_mut()
             .remove_all(SubpacketTag::IssuerFingerprint);

@@ -83,7 +83,7 @@ impl Pgp {
         let builder =
             signature::SignatureBuilder::from(direct_key_sig.clone())
                 .set_type(SignatureType::PositiveCertification)
-                .set_key_flags(&KeyFlags::empty().set_certification())?
+                .set_key_flags(KeyFlags::empty().set_certification())?
                 // notation: "openpgp-ca:domain=domain1;domain2"
                 .add_notation(
                     "openpgp-ca@sequoia-pgp.org",

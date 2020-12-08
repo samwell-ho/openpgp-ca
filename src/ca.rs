@@ -454,7 +454,7 @@ impl OpenpgpCa {
             // merge existing and new public key
             let cert_old = Pgp::armored_to_cert(&cert.pub_cert)?;
 
-            let updated = cert_old.merge(cert_new)?;
+            let updated = cert_old.merge_public(cert_new)?;
             let armored = Pgp::cert_to_armored(&updated)?;
 
             cert.pub_cert = armored;
@@ -1115,19 +1115,21 @@ impl OpenpgpCa {
     /// this key
     pub fn update_from_wkd(&self, cert: &models::Cert) -> Result<()> {
         use sequoia_net::wkd;
-        use tokio_core::reactor::Core;
+
+        use tokio::runtime::Runtime;
+        let mut rt = Runtime::new()?;
 
         let emails = self.emails_get(&cert)?;
 
         let mut merge = Pgp::armored_to_cert(&cert.pub_cert)?;
 
         for email in emails {
-            let mut core = Core::new()?;
-            let certs = core.run(wkd::get(&email.addr))?;
+            let certs =
+                rt.block_on(async move { wkd::get(&email.addr).await });
 
-            for c in certs {
+            for c in certs? {
                 if c.fingerprint().to_hex() == cert.fingerprint {
-                    merge = merge.merge(c)?;
+                    merge = merge.merge_public(c)?;
                 }
             }
         }
@@ -1143,7 +1145,8 @@ impl OpenpgpCa {
     /// Pull a key from hagrid and merge any updates into our local version of
     /// this key
     pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<()> {
-        use tokio_core::reactor::Core;
+        use tokio::runtime::Runtime;
+        let mut rt = Runtime::new()?;
 
         let mut merge = Pgp::armored_to_cert(&cert.pub_cert)?;
 
@@ -1151,13 +1154,12 @@ impl OpenpgpCa {
         let c = sequoia_core::Context::new()?;
         let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
 
-        let mut core = Core::new()?;
-
         let f = (cert.fingerprint).parse::<Fingerprint>()?;
-        let c = core.run(hagrid.get(&KeyID::from(f)))?;
+        let c =
+            rt.block_on(async move { hagrid.get(&KeyID::from(f)).await })?;
 
         // update in DB
-        merge = merge.merge(c)?;
+        merge = merge.merge_public(c)?;
 
         let mut updated = cert.clone();
         updated.pub_cert = Pgp::cert_to_armored(&merge)?;

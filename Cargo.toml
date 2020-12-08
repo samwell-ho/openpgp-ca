@@ -45,16 +45,16 @@ publicsuffix = "1.5"
 
 sha2 = "0.9"
 
-futures = "0.1"
-tokio-core = "0.1"
+futures = "0.3"
+futures-util = "0.3"
 
-sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.20.0" }
-sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.20.0" }
-sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.20.0" }
+#sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.20.0" }
+#sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.20.0" }
+#sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v0.20.0" }
 
-#sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "3db679da" }
-#sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "3db679da" }
-#sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "3db679da" }
+sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "e9439f7c4b902265d3f599c224e5e5ac9798014e" }
+sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "e9439f7c4b902265d3f599c224e5e5ac9798014e" }
+sequoia-core = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "e9439f7c4b902265d3f599c224e5e5ac9798014e" }
 
 # restd
 # -> use unreleased rocket 0.5 for now (works with rust stable)
