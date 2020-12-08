@@ -28,7 +28,8 @@ use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
-use sequoia_openpgp::cert::CipherSuite;
+use sequoia_openpgp::cert::{CertParser, CipherSuite};
+use sequoia_openpgp::parse::PacketParser;
 use sha2::Digest;
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
@@ -178,7 +179,20 @@ impl Pgp {
         Ok(String::from_utf8(buffer)?)
     }
 
-    /// make a Cert from an ascii armored key
+    /// make a Vec of Cert from an ascii armored key(ring)
+    pub fn armored_keyring_to_certs(armored: &str) -> Result<Vec<Cert>> {
+        let ppr = PacketParser::from_bytes(armored)?;
+
+        let mut res = vec![];
+        for cert in CertParser::from(ppr) {
+            res.push(cert?);
+        }
+
+        Ok(res)
+    }
+
+    /// make one Cert from an ascii armored key.
+    /// throws an error if more than one Cert is in the armored data.
     pub fn armored_to_cert(armored: &str) -> Result<Cert> {
         let cert =
             Cert::from_bytes(armored).context("Cert::from_bytes failed")?;
