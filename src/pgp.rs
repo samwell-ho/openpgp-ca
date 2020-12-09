@@ -34,6 +34,8 @@ use sha2::Digest;
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
 
+const CA_KEY_NOTATION: &str = "openpgp-ca@notations.sequoia-pgp.org";
+
 pub struct Pgp {}
 
 impl Pgp {
@@ -87,7 +89,7 @@ impl Pgp {
                 .set_key_flags(KeyFlags::empty().set_certification())?
                 // notation: "openpgp-ca:domain=domain1;domain2"
                 .add_notation(
-                    "openpgp-ca@sequoia-pgp.org",
+                    CA_KEY_NOTATION,
                     (format!("domain={}", domainname)).as_bytes(),
                     signature::subpacket::NotationDataFlags::empty()
                         .set_human_readable(),
