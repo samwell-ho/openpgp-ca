@@ -665,6 +665,11 @@ impl OpenpgpCa {
         Pgp::armored_to_cert(armored)
     }
 
+    /// Get a Vec of Cert from an ascii armored keyring
+    pub fn armored_keyring_to_certs(armored: &str) -> Result<Vec<Cert>> {
+        Pgp::armored_keyring_to_certs(armored)
+    }
+
     /// Get the armored "public key" representation of a Cert
     pub fn cert_to_armored(cert: &Cert) -> Result<String> {
         Pgp::cert_to_armored(cert)

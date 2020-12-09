@@ -14,6 +14,27 @@ use serde::{Deserialize, Serialize};
 
 use crate::models;
 
+#[derive(Serialize)]
+pub enum CertResultJSON {
+    #[serde(rename = "good_cert")]
+    Good(ReturnJSON),
+
+    #[serde(rename = "bad_cert")]
+    Bad(ReturnBadJSON),
+}
+
+#[derive(Serialize)]
+pub struct ReturnBadJSON {
+    error: ReturnError,
+    cert_info: Option<CertInfo>,
+}
+
+impl ReturnBadJSON {
+    pub fn new(error: ReturnError, cert_info: Option<CertInfo>) -> Self {
+        Self { error, cert_info }
+    }
+}
+
 /// A container for information about a Cert.
 ///
 /// `cert_info` contains factual information about a cert.
@@ -21,20 +42,20 @@ use crate::models;
 /// Later we may add e.g. `cert_lints` (... ?)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnJSON {
-    /// Factual information about the properties of an OpenPGP Cert
-    pub cert_info: CertInfo,
+    /// OpenPGP CA representation of a Cert (armored cert + metadata)
+    pub certificate: Certificate,
 
     /// +later: cert_lints (e.g. expiry warnings, deprecated crypto, ...)
 
+    /// Factual information about the properties of an OpenPGP Cert
+    pub cert_info: CertInfo,
+
     /// action ("new" or "update")
     pub action: Option<Action>,
-
-    /// OpenPGP CA representation of a Cert (armored cert + metadata)
-    pub certificate: Certificate,
 }
 
-/// Human-readable information about an OpenPGP certificate
-#[derive(Debug, Serialize, Deserialize)]
+/// Human-readable, factual information about an OpenPGP certificate
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CertInfo {
     pub fingerprint: String,
 
@@ -42,8 +63,11 @@ pub struct CertInfo {
 
     pub primary_creation_time: DateTime<Utc>,
     // pk_algo: String,
+
     // pk_size: usize,
+
     // subkeys: Vec<SubkeyInfo>,
+
     // revocation status
 }
 
@@ -76,12 +100,19 @@ pub enum Action {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Certificate {
     pub email: Vec<String>,
+
     pub name: Option<String>,
+
+    // as input, cert may contain multiple certs.
+    // as output, this will always contain exactly one cert.
     pub cert: String,
+
     pub revocations: Vec<String>,
+
     // doesn't need to be provided (default: false),
     // but will always be returned
     pub delisted: Option<bool>,
+
     // doesn't need to be provided (default: false),
     // but will always be returned
     pub inactive: Option<bool>,
@@ -125,6 +156,16 @@ impl ReturnError {
     ) -> BadRequest<Json<ReturnError>> {
         let err = ReturnError::new(status, msg);
         BadRequest(Some(Json(err)))
+    }
+
+    pub fn bad_req_ci(
+        status: ReturnStatus,
+        msg: String,
+        ci: Option<CertInfo>,
+    ) -> BadRequest<Json<ReturnBadJSON>> {
+        let re = ReturnError::new(status, msg);
+        let rbj = ReturnBadJSON::new(re, ci);
+        BadRequest(Some(Json(rbj)))
     }
 }
 

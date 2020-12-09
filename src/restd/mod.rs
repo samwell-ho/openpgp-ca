@@ -9,26 +9,24 @@
 //! REST Interface for OpenPGP CA.
 //! This is an experimental API for use at FSFE.
 
+use std::collections::HashSet;
 use std::ops::Deref;
 
+use once_cell::sync::OnceCell;
+use openpgp::Cert;
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
+use sequoia_openpgp as openpgp;
+
+use oca_json::*;
+
+use super::ca::OpenpgpCa;
+use super::models;
 
 mod cli;
 pub mod client;
 pub mod oca_json;
 mod util;
-
-use std::collections::HashSet;
-
-use openpgp::Cert;
-use sequoia_openpgp as openpgp;
-
-use super::ca::OpenpgpCa;
-use super::models;
-use oca_json::*;
-
-use once_cell::sync::OnceCell;
 
 static DB: OnceCell<Option<String>> = OnceCell::new();
 
@@ -44,115 +42,191 @@ const KEY_SIZE_LIMIT: usize = 1024 * 1024;
 const CERTIFICATION_DAYS: Option<u64> = Some(365);
 
 fn check_and_normalize_cert(
-    ca: &OpenpgpCa,
-    certificate: &Certificate,
-) -> std::result::Result<Cert, ReturnError> {
-    let res = OpenpgpCa::armored_to_cert(&certificate.cert);
+    cert: &Cert,
+    my_domain: &str,
+    email: &[String],
+) -> Result<Cert, ReturnBadJSON> {
+    let ci = CertInfo::from(cert);
 
-    if let Ok(mut cert) = res {
-        // private keys are illegal
-        if cert.is_tsk() {
-            return Err(ReturnError::new(
+    // private keys are illegal
+    if cert.is_tsk() {
+        return Err(ReturnBadJSON::new(
+            ReturnError::new(
                 ReturnStatus::PrivateKey,
                 String::from("The user provided private key material"),
-            ));
-        }
+            ),
+            Some(ci),
+        ));
+    }
 
-        // reject unreasonably big keys
-        if certificate.cert.len() > KEY_SIZE_LIMIT {
-            return Err(ReturnError::new(
-                ReturnStatus::KeySizeLimit,
-                format!(
-                    "User certificate is too long ({} bytes)",
-                    certificate.cert.len(),
+    // reject unreasonably big keys
+    if let Ok(armored) = OpenpgpCa::cert_to_armored(cert) {
+        let len = armored.len();
+        if len > KEY_SIZE_LIMIT {
+            return Err(ReturnBadJSON::new(
+                ReturnError::new(
+                    ReturnStatus::KeySizeLimit,
+                    format!("User cert is too big ({} bytes)", len),
                 ),
+                Some(ci),
+            ));
+        }
+    } else {
+        return Err(ReturnBadJSON::new(
+            ReturnError::new(
+                ReturnStatus::BadKey,
+                "Failed to re-armor cert".to_string(),
+            ),
+            Some(ci),
+        ));
+    }
+
+    // split up user_ids between "external" and "internal" emails, then:
+    if let Ok((int_provided, _)) = util::split_emails(&my_domain, email) {
+        let mut int_remaining: HashSet<_> = int_provided.iter().collect();
+        let mut filter_uid = Vec::new();
+
+        for user_id in cert.userids() {
+            if let Ok(email) = user_id.email() {
+                if let Some(email) = email {
+                    let in_domain = util::is_email_in_domain(
+                        &email, &my_domain,
+                    )
+                    .map_err(|_e| {
+                        ReturnBadJSON::new(
+                            ReturnError::new(
+                                ReturnStatus::BadEmail,
+                                format!(
+                                    "Bad email address provided: '{}'",
+                                    email
+                                ),
+                            ),
+                            Some(ci.clone()),
+                        )
+                    })?;
+
+                    if in_domain {
+                        // a) all provided internal "email" entries must exist in cert user_ids
+                        if int_remaining.contains(&email) {
+                            int_remaining.remove(&email);
+                        } else {
+                            // b) flag additional "internal" emails for removal
+                            filter_uid.push(user_id.userid().clone());
+                        }
+                    }
+                }
+            } else {
+                return Err(ReturnBadJSON::new(
+                    ReturnError::new(
+                        ReturnStatus::BadKey,
+                        format!("Bad user_id '{:?}' in OpenPGP Key", user_id),
+                    ),
+                    Some(ci),
+                ));
+            }
+        }
+
+        let mut normalize = cert.clone();
+
+        // b) strip additional "internal"s user_ids from the Cert
+        for filter in filter_uid {
+            normalize =
+                util::user_id_filter(&normalize, &filter).map_err(|_e| {
+                    ReturnBadJSON::new(
+                        ReturnError::new(
+                            ReturnStatus::InternalError,
+                            format!(
+                                "Error while filtering user_id {:?} from Cert",
+                                filter,
+                            ),
+                        ),
+                        Some(ci.clone()),
+                    )
+                })?;
+        }
+
+        if !int_remaining.is_empty() {
+            // some provided internal "email" entries do not exist in user_ids
+            // -> not ok!
+
+            return Err(ReturnBadJSON::new(
+                ReturnError::new(
+                    ReturnStatus::KeyMissingLocalUserId,
+                    format!(
+                        "User certificate does not contain user_ids for '{:?}'",
+                        int_remaining),
+                ),
+                Some(ci),
             ));
         }
 
+        Ok(normalize)
+    } else {
+        Err(ReturnBadJSON::new(
+            ReturnError::new(
+                ReturnStatus::BadEmail,
+                String::from("Error with provided email addresses"),
+            ),
+            Some(ci),
+        ))
+    }
+}
+
+fn check_and_normalize_certs(
+    ca: &OpenpgpCa,
+    certificate: &Certificate,
+) -> std::result::Result<Vec<CertResultJSON>, ReturnBadJSON> {
+    let res = OpenpgpCa::armored_keyring_to_certs(&certificate.cert);
+
+    if let Ok(certs) = res {
         // get the domain of this CA
         let my_domain = ca
             .get_ca_domain()
             .expect("Error while getting the CA's domain");
+        // FIXME: ^ ReturnError
 
-        // split up user_ids between "external" and "internal" emails, then:
-        if let Ok((int_provided, _)) =
-            util::split_emails(&my_domain, &certificate.email)
-        {
-            let mut int_remaining: HashSet<_> = int_provided.iter().collect();
-            let mut filter_uid = Vec::new();
+        let mut results = vec![];
 
-            for user_id in cert.userids() {
-                if let Ok(email) = user_id.email() {
-                    if let Some(email) = email {
-                        let in_domain =
-                            util::is_email_in_domain(&email, &my_domain)
-                                .map_err(|_e| {
-                                    ReturnError::new(
-                                        ReturnStatus::BadEmail,
-                                        format!(
-                                            "Bad email address provided: '{}'",
-                                            email
-                                        ),
-                                    )
-                                })?;
+        for cert in certs {
+            match check_and_normalize_cert(
+                &cert,
+                &my_domain,
+                &certificate.email,
+            ) {
+                Ok(norm) => {
+                    let mut c = certificate.clone();
 
-                        if in_domain {
-                            // a) all provided internal "email" entries must exist in cert user_ids
-                            if int_remaining.contains(&email) {
-                                int_remaining.remove(&email);
-                            } else {
-                                // b) flag additional "internal" emails for removal
-                                filter_uid.push(user_id.userid().clone());
-                            }
-                        }
-                    }
-                } else {
-                    return Err(ReturnError::new(
-                        ReturnStatus::BadKey,
-                        format!("Bad user_id '{:?}' in OpenPGP Key", user_id),
-                    ));
+                    // FIXME
+                    let armored = OpenpgpCa::cert_to_armored(&norm)
+                        .expect("Unexpected: couldn't re-armor cert"); //
+
+                    c.cert = armored;
+
+                    let rj = ReturnJSON {
+                        certificate: c,
+                        action: None,
+                        cert_info: CertInfo::from(&norm),
+                    };
+
+                    results.push(CertResultJSON::Good(rj));
+                }
+                Err(err) => {
+                    results.push(CertResultJSON::Bad(err));
                 }
             }
-
-            // b) strip additional "internal"s user_ids from the Cert
-            for filter in filter_uid {
-                cert = util::user_id_filter(&cert, &filter).map_err(|_e| {
-                    ReturnError::new(
-                        ReturnStatus::InternalError,
-                        format!(
-                            "Error while filtering user_id {:?} from Cert",
-                            filter,
-                        ),
-                    )
-                })?;
-            }
-
-            if !int_remaining.is_empty() {
-                // some provided internal "email" entries do not exist in user_ids
-                // -> not ok!
-                return Err(ReturnError::new(
-                    ReturnStatus::KeyMissingLocalUserId,
-                    format!(
-                        "User certificate does not contain user_ids for '{:?}'",
-                        int_remaining,
-                    ),
-                ));
-            }
-
-            Ok(cert)
-        } else {
-            // FIXME: return more detailed information
-            Err(ReturnError::new(
-                ReturnStatus::BadEmail,
-                String::from("Error with provided email addresses"),
-            ))
         }
+
+        Ok(results)
     } else {
-        Err(ReturnError::new(
-            ReturnStatus::BadKey,
-            String::from(
-                "Error parsing the user-provided armored OpenPGP key",
+        Err(ReturnBadJSON::new(
+            ReturnError::new(
+                ReturnStatus::BadKey,
+                format!(
+                    "Error parsing the user-provided OpenPGP keyring:\n{:?}",
+                    res.err()
+                ),
             ),
+            None,
         ))
     }
 }
@@ -207,7 +281,7 @@ fn certs_by_email(
     email: String,
 ) -> Result<Json<Vec<ReturnJSON>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
-        let mut certificates = Vec::new();
+        let mut res = Vec::new();
 
         let certs = ca.certs_get(&email).map_err(|e| {
             ReturnError::bad_req(
@@ -232,19 +306,21 @@ fn certs_by_email(
                     )
                 })?;
 
+            let ci: CertInfo = (&cert).into();
+
             let certificate = load_certificate_data(&ca, &c)
                 .map_err(|e| BadRequest(Some(Json(e))))?;
 
             let r = ReturnJSON {
-                cert_info: (&cert).into(),
+                cert_info: ci.clone(),
                 action: None,
                 certificate,
             };
 
-            certificates.push(r);
+            res.push(r);
         }
 
-        Ok(Json(certificates))
+        Ok(Json(res))
     })
 }
 
@@ -295,56 +371,61 @@ fn certs_by_fp(
 ///
 /// Returns information about what the commit would result in.
 #[get("/certs/check", data = "<certificate>", format = "json")]
-fn check_cert(
+fn check_certs(
     certificate: Json<Certificate>,
-) -> Result<Json<ReturnJSON>, BadRequest<Json<ReturnError>>> {
+) -> Result<Json<Vec<CertResultJSON>>, BadRequest<Json<ReturnBadJSON>>> {
     CA.with(|ca| {
         let certificate = certificate.into_inner();
-        let res = check_and_normalize_cert(&ca, &certificate);
+        let checked = check_and_normalize_certs(&ca, &certificate);
 
         // FIXME: do some more linting?
 
-        if let Ok(cert) = res {
-            // check if fingerprint exists in db
-            // -> action "new" or "update"
+        let mut res = vec![];
 
-            let fp = cert.fingerprint().to_hex();
-            let res = ca.cert_get_by_fingerprint(&fp);
-            if let Ok(cert_by_fp) = res {
-                let action = if cert_by_fp.is_some() {
-                    Action::Update
-                } else {
-                    Action::New
-                };
+        match checked {
+            Ok(crjs) => {
+                // check if fingerprint exists in db
+                // -> action "new" or "update"
 
-                let armor = OpenpgpCa::cert_to_armored(&cert);
-                if let Ok(key) = armor {
-                    let mut certificate = certificate;
-                    certificate.cert = key;
+                for crj in crjs {
+                    match crj {
+                        CertResultJSON::Good(mut rj) => {
+                            let fp = &rj.cert_info.fingerprint;
+                            let c = ca.cert_get_by_fingerprint(&fp);
+                            if let Ok(cert_by_fp) = c {
+                                let action = if cert_by_fp.is_some() {
+                                    Action::Update
+                                } else {
+                                    Action::New
+                                };
 
-                    Ok(Json(ReturnJSON {
-                        cert_info: (&cert).into(),
-                        certificate,
-                        action: Some(action),
-                    }))
-                } else {
-                    Err(ReturnError::bad_req(
-                        ReturnStatus::BadKey,
-                        format!("{:?}", armor.err()),
-                    ))
+                                rj.action = Some(action);
+
+                                res.push(CertResultJSON::Good(rj));
+                            } else {
+                                // FIXME
+                                return Err(ReturnError::bad_req_ci(
+                                    ReturnStatus::InternalError,
+                                    format!(
+                                        "Error during database lookup by fingerprint: {:?}",
+                                        c.err(),
+                                    ), Some(rj.cert_info),
+                                ));
+                            }
+                        }
+                        CertResultJSON::Bad(re) => {
+                            res.push(CertResultJSON::Bad(re));
+                        }
+                    }
                 }
-            } else {
-                Err(ReturnError::bad_req(
-                    ReturnStatus::InternalError,
-                    format!(
-                        "Error during database lookup by fingerprint: {:?}",
-                        res.err(),
-                    ),
-                ))
             }
-        } else {
-            Err(BadRequest(Some(Json(res.err().unwrap()))))
+            Err(err) => {
+                // FIXME
+                return Err(BadRequest(Some(Json(err))));
+            }
         }
+
+        Ok(Json(res))
     })
 }
 
@@ -358,96 +439,124 @@ fn check_cert(
 ///     the user adds a revocation to their key (as an update).
 /// 3) store a "new" (i.e. different fingerprint) key for the same user
 #[post("/certs", data = "<certificate>", format = "json")]
-fn post_user(
+fn post_certs(
     certificate: Json<Certificate>,
-) -> Result<(), BadRequest<Json<ReturnError>>> {
+) -> Result<Json<Vec<CertResultJSON>>, BadRequest<Json<ReturnBadJSON>>> {
     CA.with(|ca| {
         let cert = certificate.into_inner();
 
+        let mut res = vec![];
+
         // check and normalize user-provided public key
-        let cert_normalized = check_and_normalize_cert(ca, &cert)
+        let crjs = check_and_normalize_certs(ca, &cert)
             .map_err(|e| BadRequest(Some(Json(e))))?;
 
-        // check if a cert with this fingerprint exists already
-        let fp = cert_normalized.fingerprint().to_hex();
+        for crj in crjs {
+            match crj {
+                CertResultJSON::Good(rj) => {
 
-        let cert_by_fp = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
-            ReturnError::bad_req(
-                ReturnStatus::InternalError,
-                format!(
-                    "Error during database lookup by fingerprint: {:?}",
-                    e
-                ),
-            )
-        })?;
+                    // check if a cert with this fingerprint exists already
+                    let fp = rj.cert_info.fingerprint.clone();
 
-        if let Some(cert_by_fp) = cert_by_fp {
-            // fingerprint of the key already exists
-            //   -> merge data, update existing key
-            let existing = OpenpgpCa::armored_to_cert(&cert_by_fp.pub_cert)
-                .map_err(|_e| {
-                    ReturnError::bad_req(
-                        ReturnStatus::InternalError,
-                        format!(
-                            "Error while deserializing armored Cert: {}",
+                    let cert_by_fp = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
+                        ReturnError::bad_req_ci(
+                            ReturnStatus::InternalError,
+                            format!(
+                                "Error during database lookup by fingerprint: {:?}",
+                                e,
+                            ),
+                            Some(rj.cert_info.clone()),
+                        )
+                    })?;
+
+                    let cert_normalized =
+                        OpenpgpCa::armored_to_cert(&rj.certificate.cert)
+                            .expect("FIXME");                    // FIXME
+
+                    if let Some(cert_by_fp) = cert_by_fp {
+                        // fingerprint of the key already exists
+                        //   -> merge data, update existing key
+                        let existing = OpenpgpCa::armored_to_cert(
                             &cert_by_fp.pub_cert,
-                        ),
-                    )
-                })?;
+                        )
+                            .map_err(|_e| {
+                                // FIXME
+                                ReturnError::bad_req_ci(
+                                    ReturnStatus::InternalError,
+                                    format!(
+                                        "Error while deserializing armored Cert: {}",
+                                        &cert_by_fp.pub_cert,
+                                    ),
+                                    Some(rj.cert_info.clone()),
+                                )
+                            })?;
 
-            let updated =
-                existing.merge_public(cert_normalized).map_err(|_e| {
-                    ReturnError::bad_req(
-                        ReturnStatus::InternalError,
-                        String::from("Error while merging Certs"),
-                    )
-                })?;
+                        let updated =
+                            existing.merge_public(cert_normalized).map_err(|_e| {
+                                ReturnError::bad_req_ci(
+                                    ReturnStatus::InternalError,
+                                    String::from("Error while merging Certs"),
+                                    Some(rj.cert_info.clone()),
+                                )
+                            })?;
 
-            let armored =
-                OpenpgpCa::cert_to_armored(&updated).map_err(|_e| {
-                    ReturnError::bad_req(
-                        ReturnStatus::InternalError,
-                        String::from("Error while serializing merged Cert"),
-                    )
-                })?;
+                        let armored =
+                            OpenpgpCa::cert_to_armored(&updated).map_err(|_e| {
+                                ReturnError::bad_req_ci(
+                                    ReturnStatus::InternalError,
+                                    String::from(
+                                        "Error while serializing merged Cert",
+                                    ),
+                                    Some(rj.cert_info.clone()),
+                                )
+                            })?;
 
-            ca.cert_import_update(&armored).map_err(|e| {
-                ReturnError::bad_req(
-                    ReturnStatus::InternalError,
-                    format!("Error updating Cert in database: {:?}", e),
-                )
-            })?;
-        } else {
-            // fingerprint doesn't exist yet -> new cert
+                        ca.cert_import_update(&armored).map_err(|e| {
+                            ReturnError::bad_req_ci(
+                                ReturnStatus::InternalError,
+                                format!("Error updating Cert in database: {:?}", e),
+                                Some(rj.cert_info.clone()),
+                            )
+                        })?;
+                    } else {
+                        // fingerprint doesn't exist yet -> new cert
 
-            let armored = OpenpgpCa::cert_to_armored(&cert_normalized)
-                .map_err(|_e| {
-                    ReturnError::bad_req(
-                        ReturnStatus::InternalError,
-                        String::from("Error while serializing new Cert"),
-                    )
-                })?;
+                        let armored = OpenpgpCa::cert_to_armored(&cert_normalized)
+                            .map_err(|_e| {
+                                ReturnError::bad_req_ci(
+                                    ReturnStatus::InternalError,
+                                    String::from("Error while serializing new Cert"),
+                                    Some(rj.cert_info.clone()),
+                                )
+                            })?;
 
-            ca.cert_import_new(
-                &armored,
-                vec![],
-                cert.name.as_deref(),
-                cert.email
-                    .iter()
-                    .map(|e| e.deref())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-                CERTIFICATION_DAYS,
-            )
-            .map_err(|e| {
-                ReturnError::bad_req(
-                    ReturnStatus::InternalError,
-                    format!("Error importing Cert into database: {:?}", e),
-                )
-            })?;
+                        ca.cert_import_new(
+                            &armored,
+                            vec![],
+                            cert.name.as_deref(),
+                            cert.email
+                                .iter()
+                                .map(|e| e.deref())
+                                .collect::<Vec<_>>()
+                                .as_slice(),
+                            CERTIFICATION_DAYS,
+                        )
+                            .map_err(|e| {
+                                ReturnError::bad_req_ci(
+                                    ReturnStatus::InternalError,
+                                    format!("Error importing Cert into database: {:?}", e),
+                                    Some(rj.cert_info.clone()),
+                                )
+                            })?;
+                    }
+                }
+                CertResultJSON::Bad(_) => {
+                    res.push(crj)
+                }
+            }
         }
 
-        Ok(())
+        Ok(Json(res))
     })
 }
 
@@ -561,8 +670,8 @@ pub fn run(db: Option<String>) -> rocket::Rocket {
         routes![
             certs_by_email,
             certs_by_fp,
-            check_cert,
-            post_user,
+            check_certs,
+            post_certs,
             deactivate_cert,
             delist_cert,
             refresh_certifications,
