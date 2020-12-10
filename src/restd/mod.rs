@@ -202,7 +202,7 @@ fn check_and_normalize_certs(
 
                     c.cert = armored;
 
-                    let rj = ReturnJSON {
+                    let rj = ReturnGoodJSON {
                         certificate: c,
                         action: None,
                         cert_info: CertInfo::from(&norm),
@@ -279,7 +279,7 @@ fn load_certificate_data(
 #[get("/certs/by_email/<email>")]
 fn certs_by_email(
     email: String,
-) -> Result<Json<Vec<ReturnJSON>>, BadRequest<Json<ReturnError>>> {
+) -> Result<Json<Vec<ReturnGoodJSON>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let mut res = Vec::new();
 
@@ -311,7 +311,7 @@ fn certs_by_email(
             let certificate = load_certificate_data(&ca, &c)
                 .map_err(|e| BadRequest(Some(Json(e))))?;
 
-            let r = ReturnJSON {
+            let r = ReturnGoodJSON {
                 cert_info: ci.clone(),
                 action: None,
                 certificate,
@@ -327,7 +327,7 @@ fn certs_by_email(
 #[get("/certs/by_fp/<fp>")]
 fn certs_by_fp(
     fp: String,
-) -> Result<Json<Option<ReturnJSON>>, BadRequest<Json<ReturnError>>> {
+) -> Result<Json<Option<ReturnGoodJSON>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let c = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::bad_req(
@@ -356,7 +356,7 @@ fn certs_by_fp(
             let certificate = load_certificate_data(&ca, &c)
                 .map_err(|e| BadRequest(Some(Json(e))))?;
 
-            Ok(Json(Some(ReturnJSON {
+            Ok(Json(Some(ReturnGoodJSON {
                 cert_info: (&cert).into(),
                 certificate,
                 action: None,
