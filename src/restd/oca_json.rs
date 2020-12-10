@@ -21,6 +21,13 @@ pub enum CertResultJSON {
     Bad(ReturnBadJSON),
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Action {
+    New,     // this cert can be imported
+    Merge,   // this cert can be imported as an update
+    Revoked, // revoked cert, importing is recommended
+}
+
 /// A container for information about a "good" Cert.
 ///
 /// `cert_info` contains factual information about a cert.
@@ -31,10 +38,10 @@ pub struct ReturnGoodJSON {
     /// OpenPGP CA representation of a Cert (armored cert + metadata)
     pub certificate: Certificate,
 
-    /// +later: cert_lints (e.g. expiry warnings, deprecated crypto, ...)
-
     /// Factual information about the properties of an OpenPGP Cert
     pub cert_info: CertInfo,
+
+    /// +later: cert_lints (e.g. expiry warnings, deprecated crypto, ...)
 
     /// action ("new" or "update")
     pub action: Option<Action>,
@@ -88,12 +95,6 @@ impl From<&Cert> for CertInfo {
             primary_creation_time: cert.primary_key().creation_time().into(),
         }
     }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub enum Action {
-    New,
-    Update,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,6 +176,10 @@ pub enum ReturnStatus {
 
     /// The provided OpenPGP Key exceeds the allowed size limit
     KeySizeLimit,
+
+    /// Sequoia's standard policy rejects this key.
+    /// This probably means the key is using very old, broken crypto.
+    Policy,
 
     /// General problem with an OpenPGP Key
     BadKey,

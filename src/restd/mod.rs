@@ -22,6 +22,8 @@ use oca_json::*;
 
 use super::ca::OpenpgpCa;
 use super::models;
+use sequoia_openpgp::policy::StandardPolicy;
+use sequoia_openpgp::types::RevocationStatus;
 
 mod cli;
 pub mod client;
@@ -29,6 +31,8 @@ pub mod oca_json;
 mod util;
 
 static DB: OnceCell<Option<String>> = OnceCell::new();
+
+const POLICY: &StandardPolicy = &StandardPolicy::new();
 
 thread_local! {
     static CA: OpenpgpCa = OpenpgpCa::new(DB.get().unwrap().as_deref())
@@ -78,6 +82,23 @@ fn check_and_normalize_cert(
                 "Failed to re-armor cert".to_string(),
             ),
             Some(ci),
+        ));
+    }
+
+    // check if cert is valid according to sequoia standard policy
+    let valid_cert = cert.with_policy(POLICY, None);
+    if valid_cert.is_err() {
+        // FIXME: classify "fubar vs repair" - add link?!
+
+        return Err(ReturnBadJSON::new(
+            ReturnError::new(
+                ReturnStatus::Policy,
+                format!(
+                    "Cert is not valid according to policy: '{:?}'",
+                    valid_cert.err()
+                ),
+            ),
+            Some(ci.clone()),
         ));
     }
 
@@ -367,6 +388,15 @@ fn certs_by_fp(
     })
 }
 
+fn fp_exists(fp: &str, ca: &OpenpgpCa) -> Result<bool, anyhow::Error> {
+    let c = ca.cert_get_by_fingerprint(&fp)?;
+    if c.is_some() {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 /// Similar to "post_user", but doesn't commit data to DB.
 ///
 /// Returns information about what the commit would result in.
@@ -390,28 +420,52 @@ fn check_certs(
                 for crj in crjs {
                     match crj {
                         CertResultJSON::Good(mut rj) => {
-                            let fp = &rj.cert_info.fingerprint;
-                            let c = ca.cert_get_by_fingerprint(&fp);
-                            if let Ok(cert_by_fp) = c {
-                                let action = if cert_by_fp.is_some() {
-                                    Action::Update
-                                } else {
-                                    Action::New
-                                };
-
-                                rj.action = Some(action);
-
-                                res.push(CertResultJSON::Good(rj));
-                            } else {
+                            let cert_new = OpenpgpCa::armored_to_cert(
+                                &rj.certificate.cert,
+                            );
+                            if cert_new.is_err() {
                                 // FIXME
                                 return Err(ReturnError::bad_req_ci(
                                     ReturnStatus::InternalError,
                                     format!(
-                                        "Error during database lookup by fingerprint: {:?}",
-                                        c.err(),
-                                    ), Some(rj.cert_info),
+                                        "Error in armored_to_cert(): {:?}",
+                                        cert_new.err()
+                                    ),
+                                    Some(rj.cert_info),
                                 ));
                             }
+
+                            let cert_new = cert_new.unwrap();
+
+                            let revoked =
+                                match cert_new.revocation_status(POLICY, None) {
+                                    RevocationStatus::Revoked(_) => true,
+                                    _ => false,
+                                };
+
+                            if revoked {
+                                rj.action = Some(Action::Revoked);
+                            } else {
+                                let exists = fp_exists(&rj.cert_info
+                                    .fingerprint, &ca);
+                                if exists.is_err() {
+                                    // FIXME
+                                    return Err(ReturnError::bad_req_ci(
+                                        ReturnStatus::InternalError,
+                                        format!(
+                                            "Error during database lookup by fingerprint: {:?}",
+                                            exists.err(),
+                                        ), Some(rj.cert_info),
+                                    ));
+                                }
+                                if exists.unwrap() {
+                                    rj.action = Some(Action::Merge);
+                                } else {
+                                    rj.action = Some(Action::New);
+                                }
+                            }
+
+                            res.push(CertResultJSON::Good(rj));
                         }
                         CertResultJSON::Bad(re) => {
                             res.push(CertResultJSON::Bad(re));
