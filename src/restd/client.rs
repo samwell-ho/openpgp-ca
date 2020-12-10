@@ -123,8 +123,7 @@ impl Client {
             .send()
             .await;
 
-        let foo = Client::map_result_keyring(resp).await?.unwrap();
-        Ok(foo)
+        Ok(Client::map_result_keyring(resp).await?.unwrap())
     }
 
     pub async fn persist(
