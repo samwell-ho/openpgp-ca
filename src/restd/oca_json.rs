@@ -14,34 +14,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::models;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum CertResultJSON {
-    #[serde(rename = "good_cert")]
-    Good(ReturnJSON),
-
-    #[serde(rename = "bad_cert")]
+    Good(ReturnGoodJSON),
     Bad(ReturnBadJSON),
 }
 
-#[derive(Serialize)]
-pub struct ReturnBadJSON {
-    error: ReturnError,
-    cert_info: Option<CertInfo>,
-}
-
-impl ReturnBadJSON {
-    pub fn new(error: ReturnError, cert_info: Option<CertInfo>) -> Self {
-        Self { error, cert_info }
-    }
-}
-
-/// A container for information about a Cert.
+/// A container for information about a "good" Cert.
 ///
 /// `cert_info` contains factual information about a cert.
 ///
 /// Later we may add e.g. `cert_lints` (... ?)
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ReturnJSON {
+pub struct ReturnGoodJSON {
     /// OpenPGP CA representation of a Cert (armored cert + metadata)
     pub certificate: Certificate,
 
@@ -52,6 +38,19 @@ pub struct ReturnJSON {
 
     /// action ("new" or "update")
     pub action: Option<Action>,
+}
+
+/// A container for information about a "bad" Cert.
+#[derive(Serialize, Deserialize)]
+pub struct ReturnBadJSON {
+    pub error: ReturnError,
+    pub cert_info: Option<CertInfo>,
+}
+
+impl ReturnBadJSON {
+    pub fn new(error: ReturnError, cert_info: Option<CertInfo>) -> Self {
+        Self { error, cert_info }
+    }
 }
 
 /// Human-readable, factual information about an OpenPGP certificate

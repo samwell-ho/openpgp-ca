@@ -11,7 +11,9 @@
 
 use reqwest::{Response, StatusCode};
 
-use crate::restd::oca_json::{Certificate, ReturnError, ReturnJSON};
+use crate::restd::oca_json::{
+    CertResultJSON, Certificate, ReturnError, ReturnGoodJSON,
+};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
 pub struct Client {
@@ -29,7 +31,7 @@ impl Client {
 
     async fn map_result(
         resp: Result<Response, reqwest::Error>,
-    ) -> Result<Option<ReturnJSON>, ReturnError> {
+    ) -> Result<Option<ReturnGoodJSON>, ReturnError> {
         match resp {
             Ok(o) => match o.status() {
                 StatusCode::OK => {
@@ -37,7 +39,37 @@ impl Client {
                         Ok(None)
                     } else {
                         let resp =
-                            o.json::<Option<ReturnJSON>>().await.unwrap();
+                            o.json::<Option<ReturnGoodJSON>>().await.unwrap();
+
+                        Ok(resp)
+                    }
+                }
+                StatusCode::BAD_REQUEST => {
+                    let resp = o.json::<ReturnError>().await.unwrap();
+
+                    Err(resp)
+                }
+                _ => panic!("unexpected status code {}", o.status()),
+            },
+            Err(e) => {
+                panic!("error {}", e);
+            }
+        }
+    }
+
+    async fn map_result_keyring(
+        resp: Result<Response, reqwest::Error>,
+    ) -> Result<Option<Vec<CertResultJSON>>, ReturnError> {
+        match resp {
+            Ok(o) => match o.status() {
+                StatusCode::OK => {
+                    if o.content_length() == Some(0) {
+                        Ok(None)
+                    } else {
+                        let resp = o
+                            .json::<Option<Vec<CertResultJSON>>>()
+                            .await
+                            .unwrap();
 
                         Ok(resp)
                     }
@@ -57,11 +89,11 @@ impl Client {
 
     async fn map_result_vec(
         resp: Result<Response, reqwest::Error>,
-    ) -> Result<Vec<ReturnJSON>, ReturnError> {
+    ) -> Result<Vec<ReturnGoodJSON>, ReturnError> {
         match resp {
             Ok(o) => match o.status() {
                 StatusCode::OK => {
-                    let resp = o.json::<Vec<ReturnJSON>>().await.unwrap();
+                    let resp = o.json::<Vec<ReturnGoodJSON>>().await.unwrap();
 
                     Ok(resp)
                 }
@@ -81,7 +113,7 @@ impl Client {
     pub async fn check(
         &self,
         cert: &Certificate,
-    ) -> Result<Option<ReturnJSON>, ReturnError> {
+    ) -> Result<Vec<CertResultJSON>, ReturnError> {
         let cert_json = serde_json::to_string(&cert).unwrap();
 
         let resp = self
@@ -91,13 +123,14 @@ impl Client {
             .send()
             .await;
 
-        Client::map_result(resp).await
+        let foo = Client::map_result_keyring(resp).await?.unwrap();
+        Ok(foo)
     }
 
     pub async fn persist(
         &self,
         cert: &Certificate,
-    ) -> Result<Option<ReturnJSON>, ReturnError> {
+    ) -> Result<Vec<CertResultJSON>, ReturnError> {
         let cert_json = serde_json::to_string(&cert).unwrap();
 
         let mut header_map = HeaderMap::new();
@@ -114,13 +147,13 @@ impl Client {
             .send()
             .await;
 
-        Client::map_result(resp).await
+        Ok(Client::map_result_keyring(resp).await?.unwrap())
     }
 
     pub async fn get_by_email(
         &self,
         email: String,
-    ) -> Result<Vec<ReturnJSON>, ReturnError> {
+    ) -> Result<Vec<ReturnGoodJSON>, ReturnError> {
         let resp = self
             .client
             .get(&format!("{}certs/by_email/{}", &self.uri, email))
@@ -133,7 +166,7 @@ impl Client {
     pub async fn get_by_fp(
         &self,
         fp: String,
-    ) -> Result<Option<ReturnJSON>, ReturnError> {
+    ) -> Result<Option<ReturnGoodJSON>, ReturnError> {
         let resp = self
             .client
             .get(&format!("{}certs/by_fp/{}", &self.uri, fp))
@@ -146,7 +179,7 @@ impl Client {
     pub async fn deactivate(
         &self,
         fp: String,
-    ) -> Result<Option<ReturnJSON>, ReturnError> {
+    ) -> Result<Option<ReturnGoodJSON>, ReturnError> {
         let resp = self
             .client
             .post(&format!("{}certs/deactivate/{}", &self.uri, fp))
@@ -159,7 +192,7 @@ impl Client {
     pub async fn delist(
         &self,
         fp: String,
-    ) -> Result<Option<ReturnJSON>, ReturnError> {
+    ) -> Result<Option<ReturnGoodJSON>, ReturnError> {
         let resp = self
             .client
             .delete(&format!("{}certs/{}", &self.uri, fp))
