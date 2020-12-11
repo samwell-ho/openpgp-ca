@@ -487,7 +487,6 @@ impl Pgp {
                 .clone()
                 .with_policy(POLICY, None)?
                 .certifications()
-                .iter()
                 .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
             {
                 let userid = uid.userid();
