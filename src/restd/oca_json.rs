@@ -179,7 +179,13 @@ pub enum ReturnStatus {
 
     /// Sequoia's standard policy rejects this key.
     /// This probably means the key is using very old, broken crypto.
-    Policy,
+    Policy(String),
+
+    /// Sequoia's standard policy rejects this key, but allows it when SHA1
+    /// is allowed.
+    ///
+    /// This means the key can be "fixed" by replacing the SHA1 hashes.
+    PolicySha1(String),
 
     /// General problem with an OpenPGP Key
     BadKey,

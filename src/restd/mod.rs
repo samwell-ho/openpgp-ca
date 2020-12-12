@@ -23,7 +23,7 @@ use oca_json::*;
 use super::ca::OpenpgpCa;
 use super::models;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::types::RevocationStatus;
+use sequoia_openpgp::types::{HashAlgorithm, RevocationStatus};
 
 mod cli;
 pub mod client;
@@ -33,6 +33,9 @@ mod util;
 static DB: OnceCell<Option<String>> = OnceCell::new();
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
+
+const POLICY_BAD_URL: &str = "FIXME: bad cert (user needs to make a new one)";
+const POLICY_SHA1_BAD_URL: &str = "FIXME: bad cert (uses SHA1 hashes))";
 
 thread_local! {
     static CA: OpenpgpCa = OpenpgpCa::new(DB.get().unwrap().as_deref())
@@ -44,6 +47,54 @@ const KEY_SIZE_LIMIT: usize = 1024 * 1024;
 
 // CA certifications are good for 365 days
 const CERTIFICATION_DAYS: Option<u64> = Some(365);
+
+fn cert_policy_check(cert: &Cert) -> Result<(), ReturnError> {
+    // check if cert is valid according to sequoia standard policy
+    let valid_sp = cert.with_policy(POLICY, None);
+
+    // check if cert is valid according to "sequoia standard policy plus sha1"
+    let mut sp_plus_sha1 = StandardPolicy::new();
+    sp_plus_sha1.accept_hash(HashAlgorithm::SHA1);
+    let valid_sp_plus_sha1 = cert.with_policy(&sp_plus_sha1, None);
+
+    // derive a judgment about the cert from the two policy checks
+    match (&valid_sp, &valid_sp_plus_sha1) {
+        (Ok(_), Ok(_)) => (Ok(())), // cert is good, according to policy
+        (Err(_), Err(e_allowing_sha1)) => {
+            // Cert is considered bad, even allowing for SHA1
+            // -> this Cert cannot be used, the user must make a new one
+
+            Err(ReturnError::new(
+                ReturnStatus::Policy(POLICY_BAD_URL.to_string()),
+                format!(
+                    "Cert invalid according to standard policy: '{:?}'",
+                    e_allowing_sha1
+                ),
+            ))
+        }
+
+        (Err(e), Ok(_)) => {
+            // SHA1 hashes are considered bad, otherwise the standard
+            // policy has no objections to this cert
+            // -> the cert could be repaired
+
+            Err(ReturnError::new(
+                ReturnStatus::PolicySha1(POLICY_SHA1_BAD_URL.to_string()),
+                format!("Cert invalid because it uses SHA1 hashes: '{:?}'", e),
+            ))
+        }
+
+        (Ok(_), Err(e)) => {
+            // standard policy is happy, but relaxing by sha1 shows error
+            // -> this should never happen!
+
+            Err(ReturnError::new(
+                ReturnStatus::InternalError,
+                format!("Unexpected Cert check result: '{:?}'", e),
+            ))
+        }
+    }
+}
 
 fn check_and_normalize_cert(
     cert: &Cert,
@@ -85,21 +136,10 @@ fn check_and_normalize_cert(
         ));
     }
 
-    // check if cert is valid according to sequoia standard policy
-    let valid_cert = cert.with_policy(POLICY, None);
-    if valid_cert.is_err() {
-        // FIXME: classify "fubar vs repair" - add link?!
-
-        return Err(ReturnBadJSON::new(
-            ReturnError::new(
-                ReturnStatus::Policy,
-                format!(
-                    "Cert is not valid according to policy: '{:?}'",
-                    valid_cert.err()
-                ),
-            ),
-            Some(ci.clone()),
-        ));
+    // perform policy checks
+    // (and distinguish fixable vs unfixable problems with cert)
+    if let Err(re) = cert_policy_check(cert) {
+        return Err(ReturnBadJSON::new(re, Some(ci)));
     }
 
     // split up user_ids between "external" and "internal" emails, then:
@@ -438,10 +478,8 @@ fn check_certs(
                             let cert_new = cert_new.unwrap();
 
                             let revoked =
-                                match cert_new.revocation_status(POLICY, None) {
-                                    RevocationStatus::Revoked(_) => true,
-                                    _ => false,
-                                };
+                                matches!(cert_new.revocation_status(POLICY, None),
+                                   RevocationStatus::Revoked(_));
 
                             if revoked {
                                 rj.action = Some(Action::Revoked);
