@@ -101,10 +101,106 @@ fn cert_policy_check(cert: &Cert) -> Result<(), ReturnError> {
     }
 }
 
+fn validate_and_normalize_user_ids(
+    cert: &Cert,
+    my_domain: &str,
+    user_emails: &[String],
+) -> Result<Cert, ReturnError> {
+    // validate user_emails vs. the user ids in cert
+
+    // emails from the cert's user_ids
+    let cert_uid_emails: HashSet<_> = cert
+        .userids()
+        .flat_map(|uid| uid.email().ok())
+        .flatten()
+        .collect();
+
+    // the intersection between "user_emails" and "cert_uid_emails" must
+    // be non-empty
+    if cert_uid_emails
+        .intersection(&user_emails.iter().cloned().collect::<HashSet<_>>())
+        .collect::<Vec<_>>()
+        .is_empty()
+    {
+        return Err(ReturnError::new(
+            ReturnStatus::KeyMissingLocalUserId,
+            format!(
+                "Cert does not contain user_ids for any of '{:?}'",
+                user_emails
+            ),
+        ));
+    }
+
+    // split up user_ids between "external" and "internal" emails, then:
+    if let Ok((int_provided, _)) = util::split_emails(&my_domain, user_emails)
+    {
+        let mut int_remaining: HashSet<_> = int_provided.iter().collect();
+        let mut filter_uid = Vec::new();
+
+        for user_id in cert.userids() {
+            if let Ok(email) = user_id.email() {
+                if let Some(email) = email {
+                    let in_domain = util::is_email_in_domain(
+                        &email, &my_domain,
+                    )
+                    .map_err(|_e| {
+                        ReturnError::new(
+                            ReturnStatus::BadEmail,
+                            format!("Bad email address provided: '{}'", email),
+                        )
+                    })?;
+
+                    if in_domain {
+                        // a) all provided internal "email" entries must exist in cert user_ids
+                        if int_remaining.contains(&email) {
+                            int_remaining.remove(&email);
+                        } else {
+                            // b) flag additional "internal" emails for removal
+                            filter_uid.push(user_id.userid().clone());
+                        }
+                    }
+                }
+            } else {
+                return Err(ReturnError::new(
+                    ReturnStatus::BadKey,
+                    format!("Bad user_id '{:?}' in OpenPGP Key", user_id),
+                ));
+            }
+        }
+
+        let mut normalize = cert.clone();
+
+        // b) strip additional "internal"s user_ids from the Cert
+        for filter in filter_uid {
+            normalize = util::user_id_filter(normalize, &filter);
+        }
+
+        if !int_remaining.is_empty() {
+            // some provided internal "email" entries do not exist in user_ids
+            // -> not ok!
+
+            return Err(ReturnError::new(
+                ReturnStatus::KeyMissingLocalUserId,
+                format!(
+                    "User certificate does not contain user_ids for '{:?}'",
+                    int_remaining
+                ),
+            ));
+        }
+
+        Ok(normalize)
+    } else {
+        Err(ReturnError::new(
+            ReturnStatus::BadEmail,
+            String::from("Error with provided email addresses"),
+        ))
+    }
+}
+
 fn check_and_normalize_cert(
     cert: &Cert,
     my_domain: &str,
-    email: &[String],
+    user_emails: &[String],
 ) -> Result<Cert, ReturnBadJSON> {
     let ci = CertInfo::from(cert);
 
@@ -147,83 +243,9 @@ fn check_and_normalize_cert(
         return Err(ReturnBadJSON::new(re, Some(ci)));
     }
 
-    // split up user_ids between "external" and "internal" emails, then:
-    if let Ok((int_provided, _)) = util::split_emails(&my_domain, email) {
-        let mut int_remaining: HashSet<_> = int_provided.iter().collect();
-        let mut filter_uid = Vec::new();
-
-        for user_id in cert.userids() {
-            if let Ok(email) = user_id.email() {
-                if let Some(email) = email {
-                    let in_domain = util::is_email_in_domain(
-                        &email, &my_domain,
-                    )
-                    .map_err(|_e| {
-                        ReturnBadJSON::new(
-                            ReturnError::new(
-                                ReturnStatus::BadEmail,
-                                format!(
-                                    "Bad email address provided: '{}'",
-                                    email
-                                ),
-                            ),
-                            Some(ci.clone()),
-                        )
-                    })?;
-
-                    if in_domain {
-                        // a) all provided internal "email" entries must exist in cert user_ids
-                        if int_remaining.contains(&email) {
-                            int_remaining.remove(&email);
-                        } else {
-                            // b) flag additional "internal" emails for removal
-                            filter_uid.push(user_id.userid().clone());
-                        }
-                    }
-                }
-            } else {
-                return Err(ReturnBadJSON::new(
-                    ReturnError::new(
-                        ReturnStatus::BadKey,
-                        format!("Bad user_id '{:?}' in OpenPGP Key", user_id),
-                    ),
-                    Some(ci),
-                ));
-            }
-        }
-
-        let mut normalize = cert.clone();
-
-        // b) strip additional "internal"s user_ids from the Cert
-        for filter in filter_uid {
-            normalize = util::user_id_filter(normalize, &filter);
-        }
-
-        if !int_remaining.is_empty() {
-            // some provided internal "email" entries do not exist in user_ids
-            // -> not ok!
-
-            return Err(ReturnBadJSON::new(
-                ReturnError::new(
-                    ReturnStatus::KeyMissingLocalUserId,
-                    format!(
-                        "User certificate does not contain user_ids for '{:?}'",
-                        int_remaining),
-                ),
-                Some(ci),
-            ));
-        }
-
-        Ok(normalize)
-    } else {
-        Err(ReturnBadJSON::new(
-            ReturnError::new(
-                ReturnStatus::BadEmail,
-                String::from("Error with provided email addresses"),
-            ),
-            Some(ci),
-        ))
-    }
+    // check and normalize user_ids
+    validate_and_normalize_user_ids(cert, my_domain, user_emails)
+        .map_err(|re| ReturnBadJSON::new(re, Some(ci)))
 }
 
 fn check_and_normalize_certs(
