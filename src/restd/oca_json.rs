@@ -23,9 +23,27 @@ pub enum CertResultJSON {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Action {
-    New,     // this cert can be imported
-    Merge,   // this cert can be imported as an update
-    Revoked, // revoked cert, importing is recommended
+    /// This cert can be imported, it is "new" to this CA:
+    /// We don't have a cert with this fingerprint yet.
+    ///
+    /// The UI should instruct the user to double-check this cert and
+    /// explicitly confirm that it should be uploaded (and thus certified
+    /// by the CA).
+    New,
+
+    /// This cert can be imported as an update, we already have a cert
+    /// with this fingerprint.
+    ///
+    /// The UI should recommend that this cert be uploaded.
+    ///
+    /// The existing and new version of the cert will be merged.
+    Merge,
+
+    /// This is a revoked cert.
+    ///
+    /// The UI should recommended uploading this cert (even if we don't
+    /// have a cert with this fingerprint yet).
+    Revoked,
 }
 
 /// A container for information about a "good" Cert.
