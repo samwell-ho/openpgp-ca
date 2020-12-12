@@ -34,8 +34,9 @@ static DB: OnceCell<Option<String>> = OnceCell::new();
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
 
-const POLICY_BAD_URL: &str = "FIXME: bad cert (user needs to make a new one)";
-const POLICY_SHA1_BAD_URL: &str = "FIXME: bad cert (uses SHA1 hashes))";
+const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org";
+// FIXME
+const POLICY_SHA1_BAD_URL: &str = "https://bad-cert-with-sha1.example.org"; // FIXME
 
 thread_local! {
     static CA: OpenpgpCa = OpenpgpCa::new(DB.get().unwrap().as_deref())
@@ -62,10 +63,12 @@ fn cert_policy_check(cert: &Cert) -> Result<(), ReturnError> {
         (Ok(_), Ok(_)) => (Ok(())), // cert is good, according to policy
         (Err(_), Err(e_allowing_sha1)) => {
             // Cert is considered bad, even allowing for SHA1
-            // -> this Cert cannot be used, the user must make a new one
 
             Err(ReturnError::new(
-                ReturnStatus::Policy(POLICY_BAD_URL.to_string()),
+                ReturnStatus::Policy {
+                    severity: Severity::Unusable,
+                    url: POLICY_BAD_URL.to_string(),
+                },
                 format!(
                     "Cert invalid according to standard policy: '{:?}'",
                     e_allowing_sha1
@@ -74,12 +77,14 @@ fn cert_policy_check(cert: &Cert) -> Result<(), ReturnError> {
         }
 
         (Err(e), Ok(_)) => {
-            // SHA1 hashes are considered bad, otherwise the standard
-            // policy has no objections to this cert
-            // -> the cert could be repaired
+            // SHA1 hashes are used, otherwise the standard policy has no
+            // objections to this cert (so this cert could be repaired)
 
             Err(ReturnError::new(
-                ReturnStatus::PolicySha1(POLICY_SHA1_BAD_URL.to_string()),
+                ReturnStatus::Policy {
+                    severity: Severity::UsesSha1,
+                    url: POLICY_SHA1_BAD_URL.to_string(),
+                },
                 format!("Cert invalid because it uses SHA1 hashes: '{:?}'", e),
             ))
         }

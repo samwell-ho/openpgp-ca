@@ -170,6 +170,24 @@ impl ReturnError {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub enum Severity {
+    /// Sequoia's standard policy rejects this cert, even when allowing for
+    /// SHA1 hashes.
+    ///
+    /// This probably means the cert is using very old, broken crypto.
+    ///
+    /// The cert should be replaced with a new one.
+    Unusable,
+
+    /// Sequoia's standard policy rejects this cert, but allows it when SHA1
+    /// is allowed.
+    ///
+    /// This means the cert can be "fixed" by replacing the SHA1 hashes.
+    /// (E.g. using https://gitlab.com/sequoia-pgp/keyring-linter)
+    UsesSha1,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum ReturnStatus {
     /// A private OpenPGP Key was provided - this is not allowed
     PrivateKey,
@@ -177,15 +195,15 @@ pub enum ReturnStatus {
     /// The provided OpenPGP Key exceeds the allowed size limit
     KeySizeLimit,
 
-    /// Sequoia's standard policy rejects this key.
-    /// This probably means the key is using very old, broken crypto.
-    Policy(String),
-
-    /// Sequoia's standard policy rejects this key, but allows it when SHA1
-    /// is allowed.
+    /// The cert failed a policy check, it cannot be used as is
+    /// (this probably means the key is using very old, broken crypto).
     ///
-    /// This means the key can be "fixed" by replacing the SHA1 hashes.
-    PolicySha1(String),
+    /// The "severity" field indicates how to explain the problem to the user
+    /// (some keys can be repaired, other keys must be discarded).
+    ///
+    /// The "url" may be used to point users to a more verbose explanation
+    /// of the problem, including suggestions for how to proceed.
+    Policy { severity: Severity, url: String },
 
     /// General problem with an OpenPGP Key
     BadKey,
