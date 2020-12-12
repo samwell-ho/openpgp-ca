@@ -203,7 +203,7 @@ async fn test_restd() {
             "B702503FBB24BDB1656270786CC91D1754643106".to_string()
         );
 
-        // 2a. Alice, uid/email mismatch
+        // 2. Alice, uid/email mismatch
         let cert = Certificate {
             cert: ALICE_CERT.to_owned(),
             delisted: None,
@@ -222,29 +222,6 @@ async fn test_restd() {
 
         if let CertResultJSON::Bad(res) = res {
             assert_eq!(res.error.status, ReturnStatus::KeyMissingLocalUserId);
-        } else {
-            panic!("error");
-        }
-
-        // 2b. Alice, bad email
-        let cert = Certificate {
-            cert: ALICE_CERT.to_owned(),
-            delisted: None,
-            inactive: None,
-            email: vec!["alice@example@org".to_owned()],
-            name: Some("Alice Adams".to_owned()),
-            revocations: vec![],
-        };
-
-        let res = c.check(&cert).await;
-
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert_eq!(res.len(), 1);
-        let res = res.get(0).unwrap();
-
-        if let CertResultJSON::Bad(res) = res {
-            assert_eq!(res.error.status, ReturnStatus::BadEmail);
         } else {
             panic!("error");
         }
