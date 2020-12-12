@@ -78,6 +78,12 @@ impl ReturnBadJSON {
     }
 }
 
+impl From<ReturnError> for ReturnBadJSON {
+    fn from(re: ReturnError) -> ReturnBadJSON {
+        ReturnBadJSON::new(re, None)
+    }
+}
+
 /// Human-readable, factual information about an OpenPGP certificate
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CertInfo {
@@ -164,8 +170,14 @@ pub struct ReturnError {
 }
 
 impl ReturnError {
-    pub fn new(status: ReturnStatus, msg: String) -> Self {
-        ReturnError { status, msg }
+    pub fn new<S>(status: ReturnStatus, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        ReturnError {
+            status,
+            msg: msg.into(),
+        }
     }
 
     pub fn bad_req(

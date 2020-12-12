@@ -229,10 +229,7 @@ fn check_and_normalize_cert(
         }
     } else {
         return Err(ReturnBadJSON::new(
-            ReturnError::new(
-                ReturnStatus::BadKey,
-                "Failed to re-armor cert".to_string(),
-            ),
+            ReturnError::new(ReturnStatus::BadKey, "Failed to re-armor cert"),
             Some(ci),
         ));
     }
@@ -252,59 +249,66 @@ fn check_and_normalize_certs(
     ca: &OpenpgpCa,
     certificate: &Certificate,
 ) -> std::result::Result<Vec<CertResultJSON>, ReturnBadJSON> {
-    let res = OpenpgpCa::armored_keyring_to_certs(&certificate.cert);
+    let certs = OpenpgpCa::armored_keyring_to_certs(&certificate.cert)
+        .map_err(|e| {
+            ReturnBadJSON::from(ReturnError::new(
+                ReturnStatus::BadKey,
+                format!(
+                    "Error parsing the user-provided OpenPGP keyring:\n{:?}",
+                    e
+                ),
+            ))
+        })?;
 
-    if let Ok(certs) = res {
-        // get the domain of this CA
-        let my_domain = ca
-            .get_ca_domain()
-            .expect("Error while getting the CA's domain");
-        // FIXME: ^ ReturnError
+    // get the domain of this CA
+    let my_domain = ca.get_ca_domain().map_err(|e| {
+        ReturnBadJSON::from(ReturnError::new(
+            ReturnStatus::InternalError,
+            format!("Error while getting the CA's domain {:?}", e),
+        ))
+    })?;
 
-        let mut results = vec![];
+    // collects results for each cert
+    let mut results = vec![];
 
-        for cert in certs {
-            match check_and_normalize_cert(
-                &cert,
-                &my_domain,
-                &certificate.email,
-            ) {
-                Ok(norm) => {
-                    let mut c = certificate.clone();
+    for cert in certs {
+        match check_and_normalize_cert(&cert, &my_domain, &certificate.email) {
+            Ok(norm) => {
+                let cert_info = CertInfo::from(&norm);
 
-                    // FIXME
-                    let armored = OpenpgpCa::cert_to_armored(&norm)
-                        .expect("Unexpected: couldn't re-armor cert"); //
+                let mut c = certificate.clone();
 
+                let armored = OpenpgpCa::cert_to_armored(&norm);
+                if let Ok(armored) = armored {
                     c.cert = armored;
 
                     let rj = ReturnGoodJSON {
                         certificate: c,
                         action: None,
-                        cert_info: CertInfo::from(&norm),
+                        cert_info,
                     };
 
                     results.push(CertResultJSON::Good(rj));
-                }
-                Err(err) => {
-                    results.push(CertResultJSON::Bad(err));
+                } else {
+                    // this should probably never happen?
+                    let rj = ReturnBadJSON {
+                        error: ReturnError::new(
+                            ReturnStatus::InternalError,
+                            "Unexpected: couldn't re-armor cert",
+                        ),
+                        cert_info: Some(cert_info),
+                    };
+
+                    results.push(CertResultJSON::Bad(rj));
                 }
             }
+            Err(err) => {
+                results.push(CertResultJSON::Bad(err));
+            }
         }
-
-        Ok(results)
-    } else {
-        Err(ReturnBadJSON::new(
-            ReturnError::new(
-                ReturnStatus::BadKey,
-                format!(
-                    "Error parsing the user-provided OpenPGP keyring:\n{:?}",
-                    res.err()
-                ),
-            ),
-            None,
-        ))
     }
+
+    Ok(results)
 }
 
 fn load_certificate_data(
