@@ -191,19 +191,7 @@ fn check_and_normalize_cert(
 
         // b) strip additional "internal"s user_ids from the Cert
         for filter in filter_uid {
-            normalize =
-                util::user_id_filter(&normalize, &filter).map_err(|_e| {
-                    ReturnBadJSON::new(
-                        ReturnError::new(
-                            ReturnStatus::InternalError,
-                            format!(
-                                "Error while filtering user_id {:?} from Cert",
-                                filter,
-                            ),
-                        ),
-                        Some(ci.clone()),
-                    )
-                })?;
+            normalize = util::user_id_filter(normalize, &filter);
         }
 
         if !int_remaining.is_empty() {
