@@ -137,7 +137,7 @@ fn check_and_normalize_cert(
     }
 
     // perform policy checks
-    // (and distinguish fixable vs unfixable problems with cert)
+    // (and distinguish/notify fixable vs unfixable problems with cert)
     if let Err(re) = cert_policy_check(cert) {
         return Err(ReturnBadJSON::new(re, Some(ci)));
     }
