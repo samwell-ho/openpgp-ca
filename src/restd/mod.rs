@@ -13,18 +13,20 @@ use std::collections::HashSet;
 use std::ops::Deref;
 
 use once_cell::sync::OnceCell;
-use openpgp::Cert;
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
-use sequoia_openpgp as openpgp;
+
+use sequoia_openpgp::policy::StandardPolicy;
+use sequoia_openpgp::types::{HashAlgorithm, RevocationStatus};
+use sequoia_openpgp::Cert;
 
 use oca_json::*;
 
 use super::ca::OpenpgpCa;
 use super::models;
-use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::types::{HashAlgorithm, RevocationStatus};
+use crate::restd::certinfo::CertInfo;
 
+pub mod certinfo;
 mod cli;
 pub mod client;
 pub mod oca_json;
@@ -34,9 +36,9 @@ static DB: OnceCell<Option<String>> = OnceCell::new();
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
 
-const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org";
 // FIXME
-const POLICY_SHA1_BAD_URL: &str = "https://bad-cert-with-sha1.example.org"; // FIXME
+const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org";
+const POLICY_SHA1_BAD_URL: &str = "https://bad-cert-with-sha1.example.org";
 
 thread_local! {
     static CA: OpenpgpCa = OpenpgpCa::new(DB.get().unwrap().as_deref())
@@ -162,7 +164,7 @@ fn validate_and_normalize_user_ids(
                 }
             } else {
                 return Err(ReturnError::new(
-                    ReturnStatus::BadKey,
+                    ReturnStatus::BadCert,
                     format!("Bad user_id '{:?}' in OpenPGP Key", user_id),
                 ));
             }
@@ -229,7 +231,10 @@ fn check_and_normalize_cert(
         }
     } else {
         return Err(ReturnBadJSON::new(
-            ReturnError::new(ReturnStatus::BadKey, "Failed to re-armor cert"),
+            ReturnError::new(
+                ReturnStatus::InternalError,
+                "Failed to re-armor cert",
+            ),
             Some(ci),
         ));
     }
@@ -252,7 +257,7 @@ fn check_and_normalize_certs(
     let certs = OpenpgpCa::armored_keyring_to_certs(&certificate.cert)
         .map_err(|e| {
             ReturnBadJSON::from(ReturnError::new(
-                ReturnStatus::BadKey,
+                ReturnStatus::BadCert,
                 format!(
                     "Error parsing the user-provided OpenPGP keyring:\n{:?}",
                     e

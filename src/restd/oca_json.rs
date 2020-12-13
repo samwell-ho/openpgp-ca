@@ -6,13 +6,12 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use chrono::{DateTime, Utc};
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
-use sequoia_openpgp::Cert;
 use serde::{Deserialize, Serialize};
 
 use crate::models;
+use crate::restd::certinfo::CertInfo;
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -81,43 +80,6 @@ impl ReturnBadJSON {
 impl From<ReturnError> for ReturnBadJSON {
     fn from(re: ReturnError) -> ReturnBadJSON {
         ReturnBadJSON::new(re, None)
-    }
-}
-
-/// Human-readable, factual information about an OpenPGP certificate
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CertInfo {
-    pub fingerprint: String,
-
-    pub user_ids: Vec<String>,
-
-    pub primary_creation_time: DateTime<Utc>,
-    // pk_algo: String,
-
-    // pk_size: usize,
-
-    // subkeys: Vec<SubkeyInfo>,
-
-    // revocation status
-}
-
-// #[derive(Debug, Serialize, Deserialize)]
-// struct SubkeyInfo {}
-
-impl From<&Cert> for CertInfo {
-    fn from(cert: &Cert) -> Self {
-        let emails = cert
-            .userids()
-            .filter_map(|uid| {
-                uid.email().expect("ERROR while converting user_id")
-            })
-            .collect();
-
-        CertInfo {
-            fingerprint: cert.fingerprint().to_hex(),
-            user_ids: emails,
-            primary_creation_time: cert.primary_key().creation_time().into(),
-        }
     }
 }
 
@@ -235,8 +197,8 @@ pub enum ReturnStatus {
     /// of the problem, including suggestions for how to proceed.
     Policy { severity: Severity, url: String },
 
-    /// General problem with an OpenPGP Key
-    BadKey,
+    /// General problem with the user-provided OpenPGP Cert/Keyring
+    BadCert,
 
     /// Problem with a provided email address
     BadEmail,
@@ -248,12 +210,12 @@ pub enum ReturnStatus {
     /// not suitable for use in this service.
     KeyMissingLocalUserId,
 
+    /// requested entity couldn't be found (e.g. lookup by fingerprint)
+    NotFound,
+
     /// A problem occurred that wasn't caused by external data.
     ///
     /// This should not happen - if it happens, it should probably be
     /// handled similar to HTTP 500, and investigated.
     InternalError,
-
-    /// requested entity couldn't be found (e.g. lookup by fingerprint)
-    NotFound,
 }
