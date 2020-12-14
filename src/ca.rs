@@ -712,12 +712,21 @@ impl OpenpgpCa {
         self.db.get_certs_by_email(email)
     }
 
-    /// Get Cert by fingerprint
+    /// Filter spaces so that pretty-printed fingerprint strings can be used
+    fn normalize_fp(fp: &str) -> String {
+        fp.chars().filter(|&c| c != ' ').collect()
+    }
+
+    /// Get Cert by fingerprint.
+    ///
+    /// If 'fingerprint' contains spaces, they will be
+    /// filtered out.
     pub fn cert_get_by_fingerprint(
         &self,
         fingerprint: &str,
     ) -> Result<Option<models::Cert>> {
-        self.db.get_cert(fingerprint)
+        let norm = OpenpgpCa::normalize_fp(fingerprint);
+        self.db.get_cert(&norm)
     }
 
     /// Get a Cert by id
