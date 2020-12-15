@@ -200,7 +200,7 @@ async fn test_restd() {
         assert_eq!(ret.action, Some(Action::New));
         assert_eq!(
             ret.cert_info.fingerprint,
-            "B702503FBB24BDB1656270786CC91D1754643106".to_string()
+            "B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106".to_string()
         );
 
         // 2. Alice, uid/email mismatch
