@@ -67,8 +67,7 @@ fn cert_policy_check(cert: &Cert) -> Result<(), ReturnError> {
             // Cert is considered bad, even allowing for SHA1
 
             Err(ReturnError::new(
-                ReturnStatus::Policy {
-                    severity: Severity::Unusable,
+                ReturnStatus::CertUnusable {
                     url: POLICY_BAD_URL.to_string(),
                 },
                 format!(
@@ -83,8 +82,7 @@ fn cert_policy_check(cert: &Cert) -> Result<(), ReturnError> {
             // objections to this cert (so this cert could be repaired)
 
             Err(ReturnError::new(
-                ReturnStatus::Policy {
-                    severity: Severity::UsesSha1,
+                ReturnStatus::CertFixable {
                     url: POLICY_SHA1_BAD_URL.to_string(),
                 },
                 format!("Cert invalid because it uses SHA1 hashes: '{:?}'", e),
@@ -121,8 +119,8 @@ fn validate_and_normalize_user_ids(
     // be non-empty
     if cert_uid_emails
         .intersection(&user_emails.iter().cloned().collect::<HashSet<_>>())
-        .collect::<Vec<_>>()
-        .is_empty()
+        .next()
+        .is_none()
     {
         return Err(ReturnError::new(
             ReturnStatus::KeyMissingLocalUserId,
@@ -203,8 +201,16 @@ fn check_and_normalize_cert(
     cert: &Cert,
     my_domain: &str,
     user_emails: &[String],
-) -> Result<Cert, ReturnBadJSON> {
-    let ci = CertInfo::from(cert);
+) -> Result<(Cert, CertInfo), ReturnBadJSON> {
+    let ci = CertInfo::from_cert(cert).map_err(|e| {
+        ReturnBadJSON::new(
+            ReturnError::new(
+                ReturnStatus::InternalError,
+                format!["CertInfo::from_cert() failed {:?}", e],
+            ),
+            None,
+        )
+    })?;
 
     // private keys are illegal
     if cert.is_tsk() {
@@ -246,8 +252,10 @@ fn check_and_normalize_cert(
     }
 
     // check and normalize user_ids
-    validate_and_normalize_user_ids(cert, my_domain, user_emails)
-        .map_err(|re| ReturnBadJSON::new(re, Some(ci)))
+    let norm = validate_and_normalize_user_ids(cert, my_domain, user_emails)
+        .map_err(|re| ReturnBadJSON::new(re, Some(ci.clone())))?;
+
+    Ok((norm, ci))
 }
 
 fn check_and_normalize_certs(
@@ -278,9 +286,7 @@ fn check_and_normalize_certs(
 
     for cert in certs {
         match check_and_normalize_cert(&cert, &my_domain, &certificate.email) {
-            Ok(norm) => {
-                let cert_info = CertInfo::from(&norm);
-
+            Ok((norm, cert_info)) => {
                 let mut c = certificate.clone();
 
                 let armored = OpenpgpCa::cert_to_armored(&norm);
@@ -361,6 +367,17 @@ fn load_certificate_data(
     Ok(res)
 }
 
+fn cert_to_cert_info(
+    cert: &Cert,
+) -> Result<CertInfo, BadRequest<Json<ReturnError>>> {
+    CertInfo::from_cert(cert).map_err(|e| {
+        ReturnError::bad_req(
+            ReturnStatus::InternalError,
+            format!("Error in CertInfo::from_cert() '{:?}'", e),
+        )
+    })
+}
+
 #[get("/certs/by_email/<email>")]
 fn certs_by_email(
     email: String,
@@ -391,17 +408,16 @@ fn certs_by_email(
                     )
                 })?;
 
-            let ci: CertInfo = (&cert).into();
+            let cert_info = cert_to_cert_info(&cert)?;
 
             let certificate = load_certificate_data(&ca, &c)
                 .map_err(|e| BadRequest(Some(Json(e))))?;
 
             let r = ReturnGoodJSON {
-                cert_info: ci.clone(),
+                cert_info,
                 action: None,
                 certificate,
             };
-
             res.push(r);
         }
 
@@ -441,8 +457,10 @@ fn certs_by_fp(
             let certificate = load_certificate_data(&ca, &c)
                 .map_err(|e| BadRequest(Some(Json(e))))?;
 
+            let cert_info = cert_to_cert_info(&cert)?;
+
             Ok(Json(Some(ReturnGoodJSON {
-                cert_info: (&cert).into(),
+                cert_info,
                 certificate,
                 action: None,
             })))

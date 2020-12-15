@@ -187,18 +187,22 @@ pub enum ReturnStatus {
     /// The provided OpenPGP Key exceeds the allowed size limit
     KeySizeLimit,
 
-    /// The cert failed a policy check, it cannot be used as is
+    /// The cert failed a policy check, it cannot be used
     /// (this probably means the key is using very old, broken crypto).
-    ///
-    /// The "severity" field indicates how to explain the problem to the user
-    /// (some keys can be repaired, other keys must be discarded).
     ///
     /// The "url" may be used to point users to a more verbose explanation
     /// of the problem, including suggestions for how to proceed.
-    Policy { severity: Severity, url: String },
+    CertUnusable { url: String },
+
+    /// The cert failed a policy check, it is possible to repair it
+    /// (this probably means the key is using very old, broken crypto).
+    ///
+    /// The "url" may be used to point users to a more verbose explanation
+    /// of the problem, including suggestions for how to proceed.
+    CertFixable { url: String },
 
     /// General problem with the user-provided OpenPGP Cert/Keyring
-    BadCert,
+    BadCert, // FIXME: can we remove this code?
 
     /// Problem with a provided email address
     BadEmail,
