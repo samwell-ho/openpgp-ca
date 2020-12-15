@@ -59,19 +59,16 @@ impl Client {
 
     async fn map_result_keyring(
         resp: Result<Response, reqwest::Error>,
-    ) -> Result<Option<Vec<CertResultJSON>>, ReturnError> {
+    ) -> Result<Vec<CertResultJSON>, ReturnError> {
         match resp {
             Ok(o) => match o.status() {
                 StatusCode::OK => {
                     if o.content_length() == Some(0) {
-                        Ok(None)
+                        Ok(vec![])
                     } else {
-                        let resp = o
-                            .json::<Option<Vec<CertResultJSON>>>()
+                        Ok(o.json::<Vec<CertResultJSON>>()
                             .await
-                            .unwrap();
-
-                        Ok(resp)
+                            .expect("Ok Status, but JSON mapping failed"))
                     }
                 }
                 StatusCode::BAD_REQUEST => {
@@ -123,7 +120,9 @@ impl Client {
             .send()
             .await;
 
-        Ok(Client::map_result_keyring(resp).await?.unwrap())
+        println!("resp: {:?}", resp);
+
+        Ok(Client::map_result_keyring(resp).await?)
     }
 
     pub async fn persist(
@@ -146,7 +145,7 @@ impl Client {
             .send()
             .await;
 
-        Ok(Client::map_result_keyring(resp).await?.unwrap())
+        Ok(Client::map_result_keyring(resp).await?)
     }
 
     pub async fn get_by_email(
