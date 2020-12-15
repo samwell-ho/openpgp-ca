@@ -261,24 +261,24 @@ fn check_and_normalize_cert(
 fn check_and_normalize_certs(
     ca: &OpenpgpCa,
     certificate: &Certificate,
-) -> std::result::Result<Vec<CertResultJSON>, ReturnBadJSON> {
+) -> std::result::Result<Vec<CertResultJSON>, ReturnError> {
     let certs = OpenpgpCa::armored_keyring_to_certs(&certificate.cert)
         .map_err(|e| {
-            ReturnBadJSON::from(ReturnError::new(
+            ReturnError::new(
                 ReturnStatus::BadCert,
                 format!(
                     "Error parsing the user-provided OpenPGP keyring:\n{:?}",
                     e
                 ),
-            ))
+            )
         })?;
 
     // get the domain of this CA
     let my_domain = ca.get_ca_domain().map_err(|e| {
-        ReturnBadJSON::from(ReturnError::new(
+        ReturnError::new(
             ReturnStatus::InternalError,
             format!("Error while getting the CA's domain {:?}", e),
-        ))
+        )
     })?;
 
     // collects results for each cert
@@ -485,7 +485,7 @@ fn fp_exists(fp: &str, ca: &OpenpgpCa) -> Result<bool, anyhow::Error> {
 #[get("/certs/check", data = "<certificate>", format = "json")]
 fn check_certs(
     certificate: Json<Certificate>,
-) -> Result<Json<Vec<CertResultJSON>>, BadRequest<Json<ReturnBadJSON>>> {
+) -> Result<Json<Vec<CertResultJSON>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let certificate = certificate.into_inner();
         let checked = check_and_normalize_certs(&ca, &certificate);
@@ -506,15 +506,17 @@ fn check_certs(
                                 &rj.certificate.cert,
                             );
                             if cert_new.is_err() {
-                                // FIXME
-                                return Err(ReturnError::bad_req_ci(
+                                let error = ReturnError::new(
                                     ReturnStatus::InternalError,
                                     format!(
                                         "Error in armored_to_cert(): {:?}",
                                         cert_new.err()
                                     ),
-                                    Some(rj.cert_info),
-                                ));
+                                );
+                                let cert_info = Some(rj.cert_info);
+                                let rbj = ReturnBadJSON { error, cert_info };
+                                res.push(CertResultJSON::Bad(rbj));
+                                continue;
                             }
 
                             let cert_new = cert_new.unwrap();
@@ -529,14 +531,17 @@ fn check_certs(
                                 let exists = fp_exists(&rj.cert_info
                                     .fingerprint, &ca);
                                 if exists.is_err() {
-                                    // FIXME
-                                    return Err(ReturnError::bad_req_ci(
+                                    let error = ReturnError::new(
                                         ReturnStatus::InternalError,
                                         format!(
                                             "Error during database lookup by fingerprint: {:?}",
-                                            exists.err(),
-                                        ), Some(rj.cert_info),
-                                    ));
+                                            exists.err()
+                                        ),
+                                    );
+                                    let cert_info = Some(rj.cert_info);
+                                    let rbj = ReturnBadJSON { error, cert_info };
+                                    res.push(CertResultJSON::Bad(rbj));
+                                    continue;
                                 }
                                 if exists.unwrap() {
                                     rj.action = Some(Action::Merge);
@@ -575,7 +580,7 @@ fn check_certs(
 #[post("/certs", data = "<certificate>", format = "json")]
 fn post_certs(
     certificate: Json<Certificate>,
-) -> Result<Json<Vec<CertResultJSON>>, BadRequest<Json<ReturnBadJSON>>> {
+) -> Result<Json<Vec<CertResultJSON>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let cert = certificate.into_inner();
 
@@ -592,16 +597,21 @@ fn post_certs(
                     // check if a cert with this fingerprint exists already
                     let fp = rj.cert_info.fingerprint.clone();
 
-                    let cert_by_fp = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
-                        ReturnError::bad_req_ci(
+                    let cert_by_fp = ca.cert_get_by_fingerprint(&fp);
+                    if cert_by_fp.is_err() {
+                        let error = ReturnError::new(
                             ReturnStatus::InternalError,
                             format!(
                                 "Error during database lookup by fingerprint: {:?}",
-                                e,
+                                cert_by_fp.err()
                             ),
-                            Some(rj.cert_info.clone()),
-                        )
-                    })?;
+                        );
+                        let cert_info = Some(rj.cert_info);
+                        let rbj = ReturnBadJSON { error, cert_info };
+                        res.push(CertResultJSON::Bad(rbj));
+                        continue;
+                    }
+                    let cert_by_fp = cert_by_fp.unwrap();
 
                     let cert_normalized =
                         OpenpgpCa::armored_to_cert(&rj.certificate.cert)
@@ -612,59 +622,82 @@ fn post_certs(
                         //   -> merge data, update existing key
                         let existing = OpenpgpCa::armored_to_cert(
                             &cert_by_fp.pub_cert,
-                        )
-                            .map_err(|_e| {
-                                // FIXME
-                                ReturnError::bad_req_ci(
-                                    ReturnStatus::InternalError,
-                                    format!(
-                                        "Error while deserializing armored Cert: {}",
-                                        &cert_by_fp.pub_cert,
-                                    ),
-                                    Some(rj.cert_info.clone()),
-                                )
-                            })?;
+                        );
+
+                        if existing.is_err() {
+                            let error = ReturnError::new(
+                                ReturnStatus::InternalError,
+                                format!(
+                                    "Error while deserializing armored Cert: {}",
+                                    &cert_by_fp.pub_cert,
+                                ),
+                            );
+                            let cert_info = Some(rj.cert_info);
+                            let rbj = ReturnBadJSON { error, cert_info };
+                            res.push(CertResultJSON::Bad(rbj));
+                            continue;
+                        }
+
+                        let existing = existing.unwrap();
 
                         let updated =
-                            existing.merge_public(cert_normalized).map_err(|_e| {
-                                ReturnError::bad_req_ci(
-                                    ReturnStatus::InternalError,
-                                    String::from("Error while merging Certs"),
-                                    Some(rj.cert_info.clone()),
-                                )
-                            })?;
+                            existing.merge_public(cert_normalized);
+                        if updated.is_err() {
+                            let error = ReturnError::new(
+                                ReturnStatus::InternalError,
+                                String::from("Error while merging Certs"),
+                            );
+                            let cert_info = Some(rj.cert_info);
+                            let rbj = ReturnBadJSON { error, cert_info };
+                            res.push(CertResultJSON::Bad(rbj));
+                            continue;
+                        }
+                        let updated = updated.unwrap();
 
                         let armored =
-                            OpenpgpCa::cert_to_armored(&updated).map_err(|_e| {
-                                ReturnError::bad_req_ci(
-                                    ReturnStatus::InternalError,
-                                    String::from(
-                                        "Error while serializing merged Cert",
-                                    ),
-                                    Some(rj.cert_info.clone()),
-                                )
-                            })?;
-
-                        ca.cert_import_update(&armored).map_err(|e| {
-                            ReturnError::bad_req_ci(
+                            OpenpgpCa::cert_to_armored(&updated);
+                        if armored.is_err() {
+                            let error = ReturnError::new(
                                 ReturnStatus::InternalError,
-                                format!("Error updating Cert in database: {:?}", e),
-                                Some(rj.cert_info.clone()),
-                            )
-                        })?;
+                                String::from(
+                                    "Error while serializing merged Cert",
+                                ),
+                            );
+                            let cert_info = Some(rj.cert_info);
+                            let rbj = ReturnBadJSON { error, cert_info };
+                            res.push(CertResultJSON::Bad(rbj));
+                            continue;
+                        }
+                        let armored = armored.unwrap();
+
+                        let r = ca.cert_import_update(&armored);
+                        if r.is_err() {
+                            let error = ReturnError::new(
+                                ReturnStatus::InternalError,
+                                format!("Error updating Cert in database: {:?}", r.err()),
+                            );
+                            let cert_info = Some(rj.cert_info);
+                            let rbj = ReturnBadJSON { error, cert_info };
+                            res.push(CertResultJSON::Bad(rbj));
+                            continue;
+                        }
                     } else {
                         // fingerprint doesn't exist yet -> new cert
 
-                        let armored = OpenpgpCa::cert_to_armored(&cert_normalized)
-                            .map_err(|_e| {
-                                ReturnError::bad_req_ci(
-                                    ReturnStatus::InternalError,
-                                    String::from("Error while serializing new Cert"),
-                                    Some(rj.cert_info.clone()),
-                                )
-                            })?;
+                        let armored = OpenpgpCa::cert_to_armored(&cert_normalized);
+                        if armored.is_err() {
+                            let error = ReturnError::new(
+                                ReturnStatus::InternalError,
+                                String::from("Error while serializing new Cert"),
+                            );
+                            let cert_info = Some(rj.cert_info);
+                            let rbj = ReturnBadJSON { error, cert_info };
+                            res.push(CertResultJSON::Bad(rbj));
+                            continue;
+                        }
+                        let armored = armored.unwrap();
 
-                        ca.cert_import_new(
+                        let r = ca.cert_import_new(
                             &armored,
                             vec![],
                             cert.name.as_deref(),
@@ -674,14 +707,17 @@ fn post_certs(
                                 .collect::<Vec<_>>()
                                 .as_slice(),
                             CERTIFICATION_DAYS,
-                        )
-                            .map_err(|e| {
-                                ReturnError::bad_req_ci(
-                                    ReturnStatus::InternalError,
-                                    format!("Error importing Cert into database: {:?}", e),
-                                    Some(rj.cert_info.clone()),
-                                )
-                            })?;
+                        );
+                        if r.is_err() {
+                            let error = ReturnError::new(
+                                ReturnStatus::InternalError,
+                                format!("Error importing Cert into database: {:?}", r.err()),
+                            );
+                            let cert_info = Some(rj.cert_info);
+                            let rbj = ReturnBadJSON { error, cert_info };
+                            res.push(CertResultJSON::Bad(rbj));
+                            continue;
+                        }
                     }
                 }
                 CertResultJSON::Bad(_) => {

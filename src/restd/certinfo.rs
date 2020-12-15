@@ -30,16 +30,16 @@ pub struct UserID {
     pub email: Option<String>,
     pub name: Option<String>,
 
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub revocations: Vec<Revocation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revocations: Option<Vec<Revocation>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Key {
     pub keyid: String,
 
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub flags: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flags: Option<String>,
 
     pub creation_time: DateTime<Utc>,
 
@@ -49,8 +49,8 @@ pub struct Key {
     pub algo: String,
     pub bits: usize,
 
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub revocations: Vec<Revocation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revocations: Option<Vec<Revocation>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -103,11 +103,17 @@ impl UserID {
 
         let name = uid.name().context("ERROR while converting userid.name")?;
 
-        let revocations = uid
+        let revocations: Vec<_> = uid
             .self_revocations()
             .iter()
             .map(|rev| Revocation::from_sig(rev))
             .collect();
+
+        let revocations = if revocations.is_empty() {
+            None
+        } else {
+            Some(revocations)
+        };
 
         Ok(UserID {
             email,
@@ -135,18 +141,28 @@ impl Key {
         let bits = ka.key().mpis().bits().unwrap_or(0);
 
         let flags = if let Some(f) = flags {
-            format!("{:?}", f)
+            if !f.is_empty() {
+                Some(format!("{:?}", f))
+            } else {
+                None
+            }
         } else {
-            "".to_string()
+            None
         };
 
         let keyid = ka.keyid().to_string();
 
-        let revocations = ka
+        let revocations: Vec<_> = ka
             .self_revocations()
             .iter()
             .map(|rev| Revocation::from_sig(rev))
             .collect();
+
+        let revocations = if revocations.is_empty() {
+            None
+        } else {
+            Some(revocations)
+        };
 
         Key {
             keyid,
