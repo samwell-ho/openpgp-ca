@@ -123,7 +123,7 @@ fn validate_and_normalize_user_ids(
         .is_none()
     {
         return Err(ReturnError::new(
-            ReturnStatus::KeyMissingLocalUserId,
+            ReturnStatus::CertMissingLocalUserId,
             format!(
                 "Cert does not contain user_ids for any of '{:?}'",
                 user_emails
@@ -132,68 +132,67 @@ fn validate_and_normalize_user_ids(
     }
 
     // split up user_ids between "external" and "internal" emails, then:
-    if let Ok((int_provided, _)) = util::split_emails(&my_domain, user_emails)
-    {
-        let mut int_remaining: HashSet<_> = int_provided.iter().collect();
-        let mut filter_uid = Vec::new();
+    match util::split_emails(&my_domain, user_emails) {
+        Ok((int_provided, _)) => {
+            let mut int_remaining: HashSet<_> = int_provided.iter().collect();
+            let mut filter_uid = Vec::new();
 
-        for user_id in cert.userids() {
-            if let Ok(email) = user_id.email() {
-                if let Some(email) = email {
+            for user_id in cert.userids() {
+                if let Ok(Some(email)) = user_id.email() {
                     let in_domain = util::is_email_in_domain(
                         &email, &my_domain,
                     )
                     .map_err(|_e| {
+                        // FIXME?
                         ReturnError::new(
                             ReturnStatus::BadEmail,
-                            format!("Bad email address provided: '{}'", email),
+                            format!("Bad email in User ID '{:?}'", user_id),
                         )
                     })?;
 
                     if in_domain {
+                        // FIXME
+                        // handle emails that are used in multiple User IDs
+
                         // a) all provided internal "email" entries must exist in cert user_ids
                         if int_remaining.contains(&email) {
                             int_remaining.remove(&email);
                         } else {
                             // b) flag additional "internal" emails for removal
-                            filter_uid.push(user_id.userid().clone());
+                            filter_uid.push(user_id.userid());
                         }
                     }
+                } else {
+                    // Filter out User IDs with bad emails
+                    filter_uid.push(user_id.userid());
                 }
-            } else {
+            }
+
+            // b) strip additional "internal"s user_ids from the Cert
+            let mut normalize = cert.clone();
+            for filter in filter_uid {
+                normalize = util::user_id_filter(normalize, &filter)
+            }
+
+            if !int_remaining.is_empty() {
+                // some provided internal "email" entries do not exist in user_ids
+                // -> not ok!
+
                 return Err(ReturnError::new(
-                    ReturnStatus::BadCert,
-                    format!("Bad user_id '{:?}' in OpenPGP Key", user_id),
+                    ReturnStatus::CertMissingLocalUserId,
+                    format!(
+                        "User certificate does not contain user_ids for '{:?}'",
+                        int_remaining
+                    ),
                 ));
             }
+
+            Ok(normalize)
         }
-
-        let mut normalize = cert.clone();
-
-        // b) strip additional "internal"s user_ids from the Cert
-        for filter in filter_uid {
-            normalize = util::user_id_filter(normalize, &filter);
-        }
-
-        if !int_remaining.is_empty() {
-            // some provided internal "email" entries do not exist in user_ids
-            // -> not ok!
-
-            return Err(ReturnError::new(
-                ReturnStatus::KeyMissingLocalUserId,
-                format!(
-                    "User certificate does not contain user_ids for '{:?}'",
-                    int_remaining
-                ),
-            ));
-        }
-
-        Ok(normalize)
-    } else {
-        Err(ReturnError::new(
+        Err(e) => Err(ReturnError::new(
             ReturnStatus::BadEmail,
-            String::from("Error with provided email addresses"),
-        ))
+            format!("Error with provided email addresses {:?}", e),
+        )),
     }
 }
 
@@ -229,7 +228,7 @@ fn check_and_normalize_cert(
         if len > KEY_SIZE_LIMIT {
             return Err(ReturnBadJSON::new(
                 ReturnError::new(
-                    ReturnStatus::KeySizeLimit,
+                    ReturnStatus::CertSizeLimit,
                     format!("User cert is too big ({} bytes)", len),
                 ),
                 Some(ci),
@@ -265,7 +264,7 @@ fn check_and_normalize_certs(
     let certs = OpenpgpCa::armored_keyring_to_certs(&certificate.cert)
         .map_err(|e| {
             ReturnError::new(
-                ReturnStatus::BadCert,
+                ReturnStatus::InternalError,
                 format!(
                     "Error parsing the user-provided OpenPGP keyring:\n{:?}",
                     e
@@ -305,7 +304,7 @@ fn check_and_normalize_certs(
                     let rj = ReturnBadJSON {
                         error: ReturnError::new(
                             ReturnStatus::InternalError,
-                            "Unexpected: couldn't re-armor cert",
+                            "Couldn't re-armor cert",
                         ),
                         cert_info: Some(cert_info),
                     };
@@ -490,7 +489,7 @@ fn check_certs(
         let certificate = certificate.into_inner();
         let checked = check_and_normalize_certs(&ca, &certificate);
 
-        // FIXME: do some more linting?
+        // FIXME: do more linting?
 
         let mut res = vec![];
 
@@ -559,7 +558,8 @@ fn check_certs(
                 }
             }
             Err(err) => {
-                // FIXME
+                // We can't return information for individual Certs
+                // -> return one general error
                 return Err(BadRequest(Some(Json(err))));
             }
         }
@@ -614,8 +614,21 @@ fn post_certs(
                     let cert_by_fp = cert_by_fp.unwrap();
 
                     let cert_normalized =
-                        OpenpgpCa::armored_to_cert(&rj.certificate.cert)
-                            .expect("FIXME");                    // FIXME
+                        OpenpgpCa::armored_to_cert(&rj.certificate.cert);
+                    if cert_normalized.is_err() {
+                        let error = ReturnError::new(
+                            ReturnStatus::InternalError,
+                            format!(
+                                "Error unarmoring the normalized cert: {:?}",
+                                cert_normalized.err()
+                            ),
+                        );
+                        let cert_info = Some(rj.cert_info);
+                        let rbj = ReturnBadJSON { error, cert_info };
+                        res.push(CertResultJSON::Bad(rbj));
+                        continue;
+                    }
+                    let cert_normalized = cert_normalized.unwrap();
 
                     if let Some(cert_by_fp) = cert_by_fp {
                         // fingerprint of the key already exists

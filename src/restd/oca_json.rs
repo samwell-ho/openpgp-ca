@@ -184,8 +184,8 @@ pub enum ReturnStatus {
     /// A private OpenPGP Key was provided - this is not allowed
     PrivateKey,
 
-    /// The provided OpenPGP Key exceeds the allowed size limit
-    KeySizeLimit,
+    /// The provided OpenPGP Cert exceeds the allowed size limit
+    CertSizeLimit,
 
     /// The cert failed a policy check, it cannot be used
     /// (this probably means the key is using very old, broken crypto).
@@ -201,9 +201,6 @@ pub enum ReturnStatus {
     /// of the problem, including suggestions for how to proceed.
     CertFixable { url: String },
 
-    /// General problem with the user-provided OpenPGP Cert/Keyring
-    BadCert, // FIXME: can we remove this code?
-
     /// Problem with a provided email address
     BadEmail,
 
@@ -212,7 +209,7 @@ pub enum ReturnStatus {
     ///
     /// This probably means that the user provided an OpenPGP key that is
     /// not suitable for use in this service.
-    KeyMissingLocalUserId,
+    CertMissingLocalUserId,
 
     /// requested entity couldn't be found (e.g. lookup by fingerprint)
     NotFound,
