@@ -108,7 +108,7 @@ fn test_expiring_certification() -> Result<()> {
 
     let uid = c.userids().last().unwrap();
 
-    let certs = uid.certifications();
+    let certs: Vec<_> = uid.certifications().collect();
     assert_eq!(certs.len(), 1);
 
     let ca_certification = &certs[0];
@@ -916,7 +916,6 @@ fn test_refresh() -> Result<()> {
         let uid = c.userids().last().unwrap();
         let ca_sigs: Vec<_> = uid
             .certifications()
-            .iter()
             .filter(|s| s.issuer_fingerprints().any(|fp| *fp == ca_fp))
             .collect();
 

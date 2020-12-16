@@ -504,7 +504,6 @@ impl OpenpgpCa {
                 for uid in c.userids() {
                     let ca_certifications: Vec<_> = uid
                         .certifications()
-                        .iter()
                         .filter(|c| {
                             c.issuer_fingerprints().any(|fp| *fp == ca_fp)
                         })
@@ -789,11 +788,11 @@ impl OpenpgpCa {
         cert: &Cert,
         revoc_cert: &mut Signature,
     ) -> Result<bool> {
-        let before = cert.primary_key().self_revocations().len();
+        let before = cert.primary_key().self_revocations().count();
 
         let revoked = cert.to_owned().insert_packets(revoc_cert.to_owned())?;
 
-        let after = revoked.primary_key().self_revocations().len();
+        let after = revoked.primary_key().self_revocations().count();
 
         // expecting an additional self_revocation after merging revoc_cert
         if before + 1 != after {

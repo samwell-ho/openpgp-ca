@@ -113,7 +113,6 @@ impl UserID {
 
         let revocations: Vec<_> = uid
             .self_revocations()
-            .iter()
             .map(|rev| Revocation::from_sig(rev))
             .collect();
 
@@ -162,7 +161,6 @@ impl Key {
 
         let revocations: Vec<_> = ka
             .self_revocations()
-            .iter()
             .map(|rev| Revocation::from_sig(rev))
             .collect();
 
