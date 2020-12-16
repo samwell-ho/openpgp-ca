@@ -127,7 +127,17 @@ impl Certificate {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnError {
+    /// This status code should be mapped to a message that is shown to end
+    /// users.
     pub status: ReturnStatus,
+
+    /// If set, this URL can be offered to users for more information about
+    /// the Error that occurred.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub info_url: Option<String>,
+
+    /// this field is intended for debugging purposes only, it should
+    /// probably not be displayed to end-users.
     pub msg: String,
 }
 
@@ -139,6 +149,18 @@ impl ReturnError {
         ReturnError {
             status,
             msg: msg.into(),
+            info_url: None,
+        }
+    }
+
+    pub fn new_with_url<S>(status: ReturnStatus, url: String, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        ReturnError {
+            status,
+            msg: msg.into(),
+            info_url: Some(url),
         }
     }
 
@@ -162,24 +184,6 @@ impl ReturnError {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub enum Severity {
-    /// Sequoia's standard policy rejects this cert, even when allowing for
-    /// SHA1 hashes.
-    ///
-    /// This probably means the cert is using very old, broken crypto.
-    ///
-    /// The cert should be replaced with a new one.
-    Unusable,
-
-    /// Sequoia's standard policy rejects this cert, but allows it when SHA1
-    /// is allowed.
-    ///
-    /// This means the cert can be "fixed" by replacing the SHA1 hashes.
-    /// (E.g. using https://gitlab.com/sequoia-pgp/keyring-linter)
-    UsesSha1,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum ReturnStatus {
     /// A private OpenPGP Key was provided - this is not allowed
     PrivateKey,
@@ -190,16 +194,22 @@ pub enum ReturnStatus {
     /// The cert failed a policy check, it cannot be used
     /// (this probably means the key is using very old, broken crypto).
     ///
+    /// [Sequoia's standard policy rejects this cert, even when allowing for
+    /// SHA1 hashes]
+    ///
     /// The "url" may be used to point users to a more verbose explanation
     /// of the problem, including suggestions for how to proceed.
-    CertUnusable { url: String },
+    CertUnusable,
 
     /// The cert failed a policy check, it is possible to repair it
     /// (this probably means the key is using very old, broken crypto).
     ///
+    /// [Sequoia's standard policy rejects this cert, but allows it when SHA1
+    /// is allowed]
+    ///
     /// The "url" may be used to point users to a more verbose explanation
     /// of the problem, including suggestions for how to proceed.
-    CertFixable { url: String },
+    CertFixable,
 
     /// Problem with a provided email address
     BadEmail,

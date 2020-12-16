@@ -66,10 +66,9 @@ fn cert_policy_check(cert: &Cert) -> Result<(), ReturnError> {
         (Err(_), Err(e_allowing_sha1)) => {
             // Cert is considered bad, even allowing for SHA1
 
-            Err(ReturnError::new(
-                ReturnStatus::CertUnusable {
-                    url: POLICY_BAD_URL.to_string(),
-                },
+            Err(ReturnError::new_with_url(
+                ReturnStatus::CertUnusable,
+                POLICY_BAD_URL.to_string(),
                 format!(
                     "Cert invalid according to standard policy: '{:?}'",
                     e_allowing_sha1
@@ -81,10 +80,9 @@ fn cert_policy_check(cert: &Cert) -> Result<(), ReturnError> {
             // SHA1 hashes are used, otherwise the standard policy has no
             // objections to this cert (so this cert could be repaired)
 
-            Err(ReturnError::new(
-                ReturnStatus::CertFixable {
-                    url: POLICY_SHA1_BAD_URL.to_string(),
-                },
+            Err(ReturnError::new_with_url(
+                ReturnStatus::CertFixable,
+                POLICY_SHA1_BAD_URL.to_string(),
                 format!("Cert invalid because it uses SHA1 hashes: '{:?}'", e),
             ))
         }
