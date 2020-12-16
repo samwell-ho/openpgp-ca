@@ -221,7 +221,7 @@ async fn test_restd() {
         let res = res.get(0).unwrap();
 
         if let CertResultJSON::Bad(res) = res {
-            assert_eq!(res.error.status, ReturnStatus::KeyMissingLocalUserId);
+            assert_eq!(res.error.status, ReturnStatus::CertMissingLocalUserId);
         } else {
             panic!("error");
         }
