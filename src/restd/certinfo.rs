@@ -25,8 +25,6 @@ const POLICY: &StandardPolicy = &StandardPolicy::new();
 /// Human-readable, factual information about an OpenPGP certificate
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CertInfo {
-    pub fingerprint: String,
-
     pub user_ids: Vec<UserID>,
 
     pub primary: Key,
@@ -45,6 +43,8 @@ pub struct UserID {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Key {
     pub keyid: String,
+
+    pub fingerprint: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<String>,
@@ -73,8 +73,6 @@ pub struct Revocation {
 
 impl CertInfo {
     pub fn from_cert(cert: &Cert) -> Result<CertInfo, anyhow::Error> {
-        let fingerprint = cert.fingerprint().to_string();
-
         let mut user_ids: Vec<UserID> = vec![];
 
         for userid in cert.userids() {
@@ -92,7 +90,6 @@ impl CertInfo {
         let primary = Key::from_key_amalgamation(&cert.primary_key().into());
 
         let ci = CertInfo {
-            fingerprint,
             user_ids,
             primary,
             subkeys,
@@ -141,6 +138,8 @@ impl Key {
                 (None, None)
             };
 
+        let fingerprint = ka.fingerprint().to_string();
+
         let creation = ka.creation_time();
 
         let algo = ka.pk_algo();
@@ -172,6 +171,7 @@ impl Key {
 
         Key {
             keyid,
+            fingerprint,
             flags,
             creation_time: creation.into(),
             expiration_time: expiration.map(|time| time.into()),

@@ -526,7 +526,7 @@ fn check_certs(
                                 rj.action = Some(Action::Revoked);
                             } else {
                                 let exists = fp_exists(&rj.cert_info
-                                    .fingerprint, &ca);
+                                    .primary.fingerprint, &ca);
                                 if exists.is_err() {
                                     let error = ReturnError::new(
                                         ReturnStatus::InternalError,
@@ -593,7 +593,7 @@ fn post_certs(
                 CertResultJSON::Good(rj) => {
 
                     // check if a cert with this fingerprint exists already
-                    let fp = rj.cert_info.fingerprint.clone();
+                    let fp = rj.cert_info.primary.fingerprint.clone();
 
                     let cert_by_fp = ca.cert_get_by_fingerprint(&fp);
                     if cert_by_fp.is_err() {
