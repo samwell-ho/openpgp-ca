@@ -36,6 +36,10 @@ pub struct UserID {
     pub email: Option<String>,
     pub name: Option<String>,
 
+    // If the UserID consists of valid utf8, this field contains the raw data
+    // (in many cases this will be redundant with the data in email + name).
+    pub raw: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revocations: Option<Vec<Revocation>>,
 }
@@ -108,6 +112,8 @@ impl UserID {
 
         let name = uid.name().context("ERROR while converting userid.name")?;
 
+        let raw = String::from_utf8(uid.value().to_vec()).ok();
+
         let revocations: Vec<_> = uid
             .self_revocations()
             .map(|rev| Revocation::from_sig(rev))
@@ -122,6 +128,7 @@ impl UserID {
         Ok(UserID {
             email,
             name,
+            raw,
             revocations,
         })
     }
