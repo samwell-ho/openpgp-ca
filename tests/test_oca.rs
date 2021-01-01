@@ -125,7 +125,7 @@ fn test_expiring_certification() -> Result<()> {
     let days = validity.unwrap().as_secs() / 60 / 60 / 24;
 
     // check that the certification by the CA is valid for ~365 days
-    assert!((364 <= days) && (366 >= days));
+    assert!((364..=366).contains(&days));
 
     Ok(())
 }
