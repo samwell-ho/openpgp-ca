@@ -1,9 +1,9 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use rocket::response::status::BadRequest;
@@ -11,7 +11,7 @@ use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::models;
-use crate::restd::certinfo::CertInfo;
+use crate::restd::cert_info::CertInfo;
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -20,29 +20,13 @@ pub enum CertResultJSON {
     Bad(ReturnBadJSON),
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub enum Action {
-    /// This cert can be imported, it is "new" to this CA:
-    /// We don't have a cert with this fingerprint yet.
-    ///
-    /// The UI should instruct the user to double-check this cert and
-    /// explicitly confirm that it should be uploaded (and thus certified
-    /// by the CA).
-    New,
-
-    /// This cert can be imported as an update, we already have a cert
-    /// with this fingerprint.
-    ///
-    /// The UI should recommend that this cert be uploaded.
-    ///
-    /// The existing and new version of the cert will be merged.
-    Merge,
-
-    /// This is a revoked cert.
-    ///
-    /// The UI should recommended uploading this cert (even if we don't
-    /// have a cert with this fingerprint yet).
-    Revoked,
+impl From<Result<ReturnGoodJSON, ReturnBadJSON>> for CertResultJSON {
+    fn from(res: Result<ReturnGoodJSON, ReturnBadJSON>) -> Self {
+        match res {
+            Ok(rgj) => CertResultJSON::Good(rgj),
+            Err(rbj) => CertResultJSON::Bad(rbj),
+        }
+    }
 }
 
 /// A container for information about a "good" Cert.
@@ -61,25 +45,69 @@ pub struct ReturnGoodJSON {
     /// +later: cert_lints (e.g. expiry warnings, deprecated crypto, ...)
 
     /// action ("new" or "update")
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<Action>,
+
+    /// hint for the UI, shows if the Cert should/can/cannot be uploaded
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upload: Option<Upload>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Action {
+    /// This cert can be imported, it is "new" to this CA:
+    /// We don't have a cert with this fingerprint yet.
+    New,
+
+    /// This cert can be imported as an update (we already have a cert
+    /// with this fingerprint).
+    ///
+    /// The existing and new version of the cert will be merged.
+    Update,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Upload {
+    /// The UI recommends uploading this cert
+    ///
+    /// This will happen e.g. for:
+    ///
+    /// - Upload of updates for existing certs will be recommended.
+    ///
+    /// - Upload of revoked certs will be recommended, even if we don't
+    /// have a cert with this fingerprint yet.
+    Recommended,
+
+    /// The UI should instruct the user to double-check this cert and
+    /// explicitly confirm that it should be uploaded (and thus certified
+    /// by the CA).
+    Possible,
+
+    /// This Cert cannot be uploaded
+    Impossible,
 }
 
 /// A container for information about a "bad" Cert.
 #[derive(Serialize, Deserialize)]
 pub struct ReturnBadJSON {
-    pub error: ReturnError,
-    pub cert_info: Option<CertInfo>,
+    pub error: Vec<CertError>, // FIXME: read/write access methods?
+    cert_info: Option<CertInfo>,
+    upload: Upload,
 }
 
 impl ReturnBadJSON {
-    pub fn new(error: ReturnError, cert_info: Option<CertInfo>) -> Self {
-        Self { error, cert_info }
+    pub fn new(error: CertError, cert_info: Option<CertInfo>) -> Self {
+        Self {
+            error: vec![error],
+            cert_info,
+            upload: Upload::Impossible,
+        }
     }
 }
 
-impl From<ReturnError> for ReturnBadJSON {
-    fn from(re: ReturnError) -> ReturnBadJSON {
-        ReturnBadJSON::new(re, None)
+impl From<CertError> for ReturnBadJSON {
+    fn from(error: CertError) -> ReturnBadJSON {
+        ReturnBadJSON::new(error, None)
     }
 }
 
@@ -125,20 +153,23 @@ impl Certificate {
     }
 }
 
+/// A ReturnError is returned when a request fails before OpenPGP CA RESTD
+/// identifies individual Certs.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnError {
     /// This status code should be mapped to a message that is shown to end
     /// users.
     pub status: ReturnStatus,
 
-    /// If set, this URL can be offered to users for more information about
-    /// the Error that occurred.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub info_url: Option<String>,
-
     /// this field is intended for debugging purposes only, it should
     /// probably not be displayed to end-users.
     pub msg: String,
+}
+
+impl From<ReturnError> for BadRequest<Json<ReturnError>> {
+    fn from(re: ReturnError) -> Self {
+        BadRequest(Some(Json(re)))
+    }
 }
 
 impl ReturnError {
@@ -149,42 +180,77 @@ impl ReturnError {
         ReturnError {
             status,
             msg: msg.into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub enum ReturnStatus {
+    InternalError,
+    NotFound,
+}
+
+/// A ReturnError is attached to a specific Cert (via ReturnBadJSON).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CertError {
+    /// This status code should be mapped to a message that is shown to end
+    /// users.
+    pub status: CertStatus,
+
+    /// this field is intended for debugging purposes only, it should
+    /// probably not be displayed to end-users.
+    pub msg: String,
+
+    /// If set, this URL can be offered to users for more information about
+    /// the Error that occurred.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub info_url: Option<String>,
+}
+
+impl CertError {
+    pub fn new<S>(status: CertStatus, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            status,
+            msg: msg.into(),
             info_url: None,
         }
     }
 
-    pub fn new_with_url<S>(status: ReturnStatus, url: String, msg: S) -> Self
+    pub fn new_with_url<S>(status: CertStatus, url: String, msg: S) -> Self
     where
         S: Into<String>,
     {
-        ReturnError {
+        CertError {
             status,
             msg: msg.into(),
             info_url: Some(url),
         }
     }
 
-    pub fn bad_req(
-        status: ReturnStatus,
-        msg: String,
-    ) -> BadRequest<Json<ReturnError>> {
-        let err = ReturnError::new(status, msg);
-        BadRequest(Some(Json(err)))
-    }
-
     pub fn bad_req_ci(
-        status: ReturnStatus,
+        status: CertStatus,
         msg: String,
         ci: Option<CertInfo>,
     ) -> BadRequest<Json<ReturnBadJSON>> {
-        let re = ReturnError::new(status, msg);
+        let re = CertError::new(status, msg);
         let rbj = ReturnBadJSON::new(re, ci);
         BadRequest(Some(Json(rbj)))
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub enum ReturnStatus {
+pub enum CertStatus {
+    // actionable:
+    // - internal (contact admin)
+    //   - invalid input (not a cert) [4xx]
+    // - bad cert
+    //
+
+    // specific set of status codes for cert ingestion
+    // CertStatus
     /// A private OpenPGP Key was provided - this is not allowed
     PrivateKey,
 

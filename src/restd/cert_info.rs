@@ -1,9 +1,9 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use chrono::{DateTime, Utc};
@@ -85,13 +85,13 @@ impl CertInfo {
             user_ids.push(uid)
         }
 
-        let mut subkeys = vec![];
-        for ka in cert.keys().subkeys() {
-            let key = Key::from_key_amalgamation(&ka.into());
-            subkeys.push(key);
-        }
-
         let primary = Key::from_key_amalgamation(&cert.primary_key().into());
+
+        let subkeys = cert
+            .keys()
+            .subkeys()
+            .map(|ka| Key::from_key_amalgamation(&ka.into()))
+            .collect();
 
         let ci = CertInfo {
             user_ids,

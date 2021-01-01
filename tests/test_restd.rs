@@ -10,7 +10,7 @@ use openpgp_ca_lib::ca::OpenpgpCa;
 use openpgp_ca_lib::restd;
 use openpgp_ca_lib::restd::client::Client;
 use openpgp_ca_lib::restd::oca_json::{
-    Action, CertResultJSON, Certificate, ReturnStatus,
+    Action, CertResultJSON, CertStatus, Certificate,
 };
 
 use rocket::futures::prelude::future::{AbortHandle, Abortable};
@@ -221,7 +221,10 @@ async fn test_restd() {
         let res = res.get(0).unwrap();
 
         if let CertResultJSON::Bad(res) = res {
-            assert_eq!(res.error.status, ReturnStatus::CertMissingLocalUserId);
+            assert_eq!(
+                res.error[0].status,
+                CertStatus::CertMissingLocalUserId
+            );
         } else {
             panic!("error");
         }
@@ -248,7 +251,7 @@ async fn test_restd() {
         let res = res.get(0).unwrap();
 
         if let CertResultJSON::Bad(res) = res {
-            assert_eq!(res.error.status, ReturnStatus::PrivateKey);
+            assert_eq!(res.error[0].status, CertStatus::PrivateKey);
         } else {
             panic!("error");
         }
