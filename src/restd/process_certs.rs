@@ -328,18 +328,23 @@ fn process_cert(
                         // update cert in db
                         action = Some(Action::Update);
 
-                        let r = ca.cert_import_update(&certificate.cert);
-                        if r.is_err() {
-                            let error = CertError::new(
-                                CertStatus::InternalError,
-                                format!(
-                                    "Error updating Cert in database: {:?}",
-                                    r.err()
-                                ),
-                            );
+                        ca.cert_import_update(&certificate.cert)
+                            .map_err(|e|
+                                {
+                                    let error = CertError::new(
+                                        CertStatus::InternalError,
+                                        format!(
+                                            "Error updating Cert in database: {:?}",
+                                            e
+                                        ),
+                                    );
 
-                            return Err(ReturnBadJSON::new(error, cert_info));
-                        }
+                                    ReturnBadJSON::new(
+                                        error,
+                                        cert_info,
+                                    )
+                                }
+                            )?;
                     } else {
                         // add new cert to db
                         action = Some(Action::New);
