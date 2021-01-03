@@ -13,19 +13,15 @@ use sequoia_openpgp::Cert;
 use crate::ca::OpenpgpCa;
 use crate::restd::cert_info::CertInfo;
 use crate::restd::oca_json::*;
-use crate::restd::{util, CERTIFICATION_DAYS};
+use crate::restd::{
+    util, CERTIFICATION_DAYS, CERT_SIZE_LIMIT, POLICY_BAD_URL,
+    POLICY_SHA1_BAD_URL,
+};
 
 use std::collections::HashSet;
 use std::ops::Deref;
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
-
-// cert size limit (armored): 1 mbyte
-const CERT_SIZE_LIMIT: usize = 1024 * 1024;
-
-// FIXME
-const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org";
-const POLICY_SHA1_BAD_URL: &str = "https://bad-cert-with-sha1.example.org";
 
 pub fn cert_to_cert_info(cert: &Cert) -> Result<CertInfo, ReturnError> {
     CertInfo::from_cert(cert).map_err(|e| {
@@ -361,7 +357,7 @@ fn process_cert(
                             vec![],
                             name,
                             emails.as_slice(),
-                            CERTIFICATION_DAYS,
+                            Some(CERTIFICATION_DAYS),
                         )
                         .map_err(|e| {
                             let error = CertError::new(

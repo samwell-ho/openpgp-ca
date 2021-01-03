@@ -34,7 +34,15 @@ thread_local! {
 }
 
 // CA certifications are good for 365 days
-pub const CERTIFICATION_DAYS: Option<u64> = Some(365);
+const CERTIFICATION_DAYS: u64 = 365;
+
+// armored cert size limit (1 MiB)
+const CERT_SIZE_LIMIT: usize = 1024 * 1024;
+
+// FIXME
+// links for information about bad certificates - and what to do about them
+const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org";
+const POLICY_SHA1_BAD_URL: &str = "https://bad-cert-with-sha1.example.org";
 
 pub fn load_certificate_data(
     ca: &OpenpgpCa,
@@ -285,15 +293,16 @@ fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
 #[post("/refresh_ca_certifications")]
 fn refresh_certifications() -> Result<(), BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
-        ca.certs_refresh_ca_certifications(30, 365).map_err(|e| {
-            ReturnError::new(
-                ReturnStatus::InternalError,
-                format!(
-                    "Error during certs_refresh_ca_certifications '{:?}'",
-                    e
-                ),
-            )
-        })?;
+        ca.certs_refresh_ca_certifications(30, CERTIFICATION_DAYS)
+            .map_err(|e| {
+                ReturnError::new(
+                    ReturnStatus::InternalError,
+                    format!(
+                        "Error during certs_refresh_ca_certifications '{:?}'",
+                        e
+                    ),
+                )
+            })?;
 
         Ok(())
     })
