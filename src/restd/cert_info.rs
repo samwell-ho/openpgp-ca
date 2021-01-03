@@ -36,8 +36,11 @@ pub struct UserID {
     pub email: Option<String>,
     pub name: Option<String>,
 
-    // If the UserID consists of valid utf8, this field contains the raw data
-    // (in many cases this will be redundant with the data in email + name).
+    /// If the UserID consists of valid utf8, this field contains the raw data
+    /// (in many cases this will be redundant with the data in email + name).
+    ///
+    /// NOTE: this field contains user-provided utf8. It may contain html or
+    /// quotes, which the frontend might need to protect itself against.
     pub raw: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
