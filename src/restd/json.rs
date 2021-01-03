@@ -204,7 +204,7 @@ pub struct CertError {
     /// If set, this URL can be offered to users for more information about
     /// the Error that occurred.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub info_url: Option<String>,
+    pub url: Option<String>,
 }
 
 impl CertError {
@@ -215,7 +215,7 @@ impl CertError {
         Self {
             status,
             msg: msg.into(),
-            info_url: None,
+            url: None,
         }
     }
 
@@ -226,7 +226,7 @@ impl CertError {
         CertError {
             status,
             msg: msg.into(),
-            info_url: Some(url),
+            url: Some(url),
         }
     }
 
@@ -268,7 +268,7 @@ pub enum CertStatus {
     CertUnusable,
 
     /// The cert failed a policy check, it is possible to repair it
-    /// (this probably means the key is using very old, broken crypto).
+    /// (this probably means the key is using bad cryptography).
     ///
     /// [Sequoia's standard policy rejects this cert, but allows it when SHA1
     /// is allowed]

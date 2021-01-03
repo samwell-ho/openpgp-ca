@@ -11,7 +11,7 @@
 
 use reqwest::{Response, StatusCode};
 
-use crate::restd::oca_json::{
+use crate::restd::json::{
     CertResultJSON, Certificate, ReturnError, ReturnGoodJSON,
 };
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};

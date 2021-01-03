@@ -15,7 +15,7 @@ use rocket_contrib::json::Json;
 
 use crate::ca::OpenpgpCa;
 use crate::models;
-use crate::restd::oca_json::*;
+use crate::restd::json::*;
 use crate::restd::process_certs::{cert_to_cert_info, process_certs};
 
 mod cli;
@@ -24,7 +24,7 @@ mod util;
 
 pub mod cert_info;
 pub mod client;
-pub mod oca_json;
+pub mod json;
 
 static DB: OnceCell<Option<String>> = OnceCell::new();
 

@@ -9,7 +9,7 @@
 use openpgp_ca_lib::ca::OpenpgpCa;
 use openpgp_ca_lib::restd;
 use openpgp_ca_lib::restd::client::Client;
-use openpgp_ca_lib::restd::oca_json::{
+use openpgp_ca_lib::restd::json::{
     Action, CertResultJSON, CertStatus, Certificate,
 };
 

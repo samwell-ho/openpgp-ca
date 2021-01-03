@@ -12,7 +12,7 @@ use sequoia_openpgp::Cert;
 
 use crate::ca::OpenpgpCa;
 use crate::restd::cert_info::CertInfo;
-use crate::restd::oca_json::*;
+use crate::restd::json::*;
 use crate::restd::{
     util, CERTIFICATION_DAYS, CERT_SIZE_LIMIT, POLICY_BAD_URL,
     POLICY_SHA1_BAD_URL,
