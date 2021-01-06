@@ -6,22 +6,21 @@
 // SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::types::{HashAlgorithm, RevocationStatus};
-use sequoia_openpgp::Cert;
-
-use crate::ca::OpenpgpCa;
-use crate::restd::cert_info::CertInfo;
-use crate::restd::json::*;
-use crate::restd::{
-    util, CERTIFICATION_DAYS, CERT_SIZE_LIMIT, POLICY_BAD_URL,
-    POLICY_SHA1_BAD_URL,
-};
-
 use std::collections::HashSet;
 use std::ops::Deref;
 
-const POLICY: &StandardPolicy = &StandardPolicy::new();
+use sequoia_openpgp::cert::ValidCert;
+use sequoia_openpgp::policy::StandardPolicy;
+use sequoia_openpgp::types::RevocationStatus;
+use sequoia_openpgp::Cert;
+
+use crate::ca::OpenpgpCa;
+use crate::restd;
+use crate::restd::cert_info::CertInfo;
+use crate::restd::json::*;
+use crate::restd::util::{is_email_in_domain, split_emails, user_id_filter};
+
+const STANDARD_POLICY: &StandardPolicy = &StandardPolicy::new();
 
 pub fn cert_to_cert_info(cert: &Cert) -> Result<CertInfo, ReturnError> {
     CertInfo::from_cert(cert).map_err(|e| {
@@ -32,55 +31,26 @@ pub fn cert_to_cert_info(cert: &Cert) -> Result<CertInfo, ReturnError> {
     })
 }
 
-fn cert_policy_check(cert: &Cert) -> Result<(), CertError> {
+fn cert_policy_check(cert: &Cert) -> Result<ValidCert, CertError> {
     // check if cert is valid according to sequoia standard policy
-    let valid_sp = cert.with_policy(POLICY, None);
-
-    // check if cert is valid according to "sequoia standard policy plus sha1"
-    let mut sp_plus_sha1 = StandardPolicy::new();
-    sp_plus_sha1.accept_hash(HashAlgorithm::SHA1);
-    let valid_sp_plus_sha1 = cert.with_policy(&sp_plus_sha1, None);
-
-    // derive a judgment about the cert from the two policy checks
-    match (&valid_sp, &valid_sp_plus_sha1) {
-        (Ok(_), Ok(_)) => (Ok(())), // cert is good, according to policy
-        (Err(_), Err(e_allowing_sha1)) => {
-            // Cert is considered bad, even allowing for SHA1
-
-            Err(CertError::new_with_url(
-                CertStatus::CertUnusable,
-                POLICY_BAD_URL.to_string(),
-                format!(
-                    "Cert invalid according to standard policy: '{:?}'",
-                    e_allowing_sha1
-                ),
-            ))
-        }
-
-        (Err(e), Ok(_)) => {
-            // SHA1 hashes are used, otherwise the standard policy has no
-            // objections to this cert (so this cert could be repaired)
-
-            Err(CertError::new_with_url(
-                CertStatus::CertFixable,
-                POLICY_SHA1_BAD_URL.to_string(),
-                format!("Cert invalid because it uses SHA1 hashes: '{:?}'", e),
-            ))
-        }
-
-        (Ok(_), Err(e)) => {
-            // standard policy is happy, but relaxing by sha1 shows error
-            // -> this should never happen!
-
-            Err(CertError::new(
-                CertStatus::InternalError,
-                format!("Unexpected Cert check result: '{:?}'", e),
-            ))
-        }
-    }
+    cert.with_policy(STANDARD_POLICY, None).map_err(|e| {
+        CertError::new_with_url(
+            CertStatus::BadCert,
+            restd::POLICY_BAD_URL.to_string(),
+            format!("Cert invalid according to standard policy: '{:?}'", e),
+        )
+    })
 }
 
-fn validate_and_normalize_user_ids(
+// 'my_domain' is the domain that this CA is used over (like 'example.org').
+//
+// 'user_emails' is a list of email addresses that the client considers to
+// be correctly used by this user (typically this will be local emails, such
+// as ('alice@example.org').
+//
+// remove all user_ids with emails in "my_domain" that aren't contained in
+// 'user_emails'
+fn validate_and_strip_user_ids(
     cert: &Cert,
     my_domain: &str,
     user_emails: &[String],
@@ -104,72 +74,43 @@ fn validate_and_normalize_user_ids(
         return Err(CertError::new(
             CertStatus::CertMissingLocalUserId,
             format!(
-                "Cert does not contain user_ids for any of '{:?}'",
+                "Cert does not contain user_ids matching '{:?}'",
                 user_emails
             ),
         ));
     }
 
     // split up user_ids between "external" and "internal" emails, then:
-    match util::split_emails(&my_domain, user_emails) {
+    match split_emails(&my_domain, user_emails) {
         Ok((int_provided, _)) => {
-            let mut int_remaining: HashSet<_> = int_provided.iter().collect();
             let mut filter_uid = Vec::new();
 
             for user_id in cert.userids() {
                 if let Ok(Some(email)) = user_id.email() {
-                    let in_domain = util::is_email_in_domain(
-                        &email, &my_domain,
-                    )
-                    .map_err(|_e| {
-                        // FIXME?
-                        CertError::new(
-                            CertStatus::BadEmail,
-                            format!("Bad email in User ID '{:?}'", user_id),
-                        )
-                    })?;
+                    let in_domain = is_email_in_domain(&email, &my_domain);
 
-                    if in_domain {
-                        // FIXME
-                        // handle emails that are used in multiple User IDs
+                    if in_domain.is_ok() && in_domain.unwrap() {
+                        // this is a User ID with an email in the domain
+                        // "my_domain"
 
-                        // a) all provided internal "email" entries must exist in cert user_ids
-                        if int_remaining.contains(&email) {
-                            int_remaining.remove(&email);
-                        } else {
-                            // b) flag additional "internal" emails for removal
+                        if !int_provided.contains(&email) {
+                            // flag unexpected "internal" emails for removal
                             filter_uid.push(user_id.userid());
                         }
                     }
-                } else {
-                    // Filter out User IDs with bad emails
-                    filter_uid.push(user_id.userid());
                 }
             }
 
-            // b) strip additional "internal"s user_ids from the Cert
-            let mut normalize = cert.clone();
+            // strip unexpected "internal" user_ids from the Cert
+            let mut stripped = cert.clone();
             for filter in filter_uid {
-                normalize = util::user_id_filter(normalize, &filter)
+                stripped = user_id_filter(stripped, &filter)
             }
 
-            if !int_remaining.is_empty() {
-                // some provided internal "email" entries do not exist in user_ids
-                // -> not ok!
-
-                return Err(CertError::new(
-                    CertStatus::CertMissingLocalUserId,
-                    format!(
-                        "User certificate does not contain user_ids for '{:?}'",
-                        int_remaining
-                    ),
-                ));
-            }
-
-            Ok(normalize)
+            Ok(stripped)
         }
         Err(e) => Err(CertError::new(
-            CertStatus::BadEmail,
+            CertStatus::BadUserID,
             format!("Error with provided email addresses {:?}", e),
         )),
     }
@@ -200,7 +141,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
     // reject unreasonably big keys
     if let Ok(armored) = OpenpgpCa::cert_to_armored(cert) {
         let len = armored.len();
-        if len > CERT_SIZE_LIMIT {
+        if len > restd::CERT_SIZE_LIMIT {
             return Err(ReturnBadJSON::new(
                 CertError::new(
                     CertStatus::CertSizeLimit,
@@ -220,19 +161,6 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
     }
 
     Ok(ci)
-}
-
-fn policy_check_and_uid_normalize(
-    cert: &Cert,
-    my_domain: &str,
-    user_emails: &[String],
-) -> Result<Cert, CertError> {
-    // perform policy checks
-    // (and distinguish/notify fixable vs unfixable problems with cert)
-    cert_policy_check(cert)?;
-
-    // check and normalize user_ids
-    validate_and_normalize_user_ids(cert, my_domain, user_emails)
 }
 
 fn process_cert(
@@ -256,6 +184,7 @@ fn process_cert(
         ReturnBadJSON::new(ce, Some(cert_info.clone()))
     })?;
 
+    // will this cert be processed as an update to an existing version of it?
     let is_update = cert_in_ca_db.is_some();
 
     // merge new cert with existing cert, if any
@@ -282,133 +211,114 @@ fn process_cert(
             })?
         }
     };
+    let _ = cert; // drop this version of the cert
+
+    // perform policy checks
+    let valid_cert = cert_policy_check(&merged)?;
+    let _ = merged; // drop this version of the cert
 
     // check if the cert is revoked
-    let is_revoked = matches!(
-        merged.revocation_status(POLICY, None),
-        RevocationStatus::Revoked(_)
-    );
+    let is_revoked =
+        matches!(valid_cert.revocation_status(), RevocationStatus::Revoked(_));
 
-    // policy checks, normalization and further processing
-    match policy_check_and_uid_normalize(
-        &merged,
+    // check and normalize user_ids
+    let norm = validate_and_strip_user_ids(
+        &valid_cert,
         &my_domain,
         &certificate.email,
-    ) {
-        Ok(norm) => {
-            let cert_info_norm = CertInfo::from_cert(&norm).map_err(|e| {
-                ReturnBadJSON::new(
-                    CertError::new(
-                        CertStatus::InternalError,
-                        format![
-                            "CertInfo::from_cert() failed for 'norm' {:?}",
-                            e
-                        ],
-                    ),
-                    None,
-                )
+    )
+    .map_err(|e| ReturnBadJSON::new(e, Some(cert_info.clone())))?;
+
+    let cert_info_norm = CertInfo::from_cert(&norm).map_err(|e| {
+        CertError::new(
+            CertStatus::InternalError,
+            format!["CertInfo::from_cert() failed for 'norm' {:?}", e],
+        )
+    })?;
+
+    let armored = OpenpgpCa::cert_to_armored(&norm).map_err(|e|
+        // this should probably never happen?
+        ReturnBadJSON::new(
+            CertError::new(
+                CertStatus::InternalError,
+                format!("Couldn't re-armor cert {:?}", e),
+            ),
+            Some(cert_info),
+        ))?;
+
+    let mut certificate = certificate.clone();
+
+    certificate.cert = armored;
+
+    let action;
+    let upload;
+
+    if persist {
+        // "post" run
+        upload = None; // don't recommend action after persisting
+
+        let cert_info = Some(cert_info_norm.clone());
+
+        if is_update {
+            // update cert in db
+            action = Some(Action::Update);
+
+            ca.cert_import_update(&certificate.cert).map_err(|e| {
+                let error = CertError::new(
+                    CertStatus::InternalError,
+                    format!("Error updating Cert in database: {:?}", e),
+                );
+
+                ReturnBadJSON::new(error, cert_info)
             })?;
+        } else {
+            // add new cert to db
+            action = Some(Action::New);
 
-            let armored = OpenpgpCa::cert_to_armored(&norm);
-            if let Ok(armored) = armored {
-                let mut certificate = certificate.clone();
+            let key = &certificate.cert;
+            let name = certificate.name.as_deref();
+            let emails = certificate
+                .email
+                .iter()
+                .map(|e| e.deref())
+                .collect::<Vec<_>>();
 
-                certificate.cert = armored;
-
-                let action;
-                let upload;
-
-                if persist {
-                    // "post" run
-                    upload = None; // don't recommend action after persisting
-
-                    let cert_info = Some(cert_info_norm.clone());
-
-                    if is_update {
-                        // update cert in db
-                        action = Some(Action::Update);
-
-                        ca.cert_import_update(&certificate.cert)
-                            .map_err(|e|
-                                {
-                                    let error = CertError::new(
-                                        CertStatus::InternalError,
-                                        format!(
-                                            "Error updating Cert in database: {:?}",
-                                            e
-                                        ),
-                                    );
-
-                                    ReturnBadJSON::new(
-                                        error,
-                                        cert_info,
-                                    )
-                                }
-                            )?;
-                    } else {
-                        // add new cert to db
-                        action = Some(Action::New);
-
-                        let key = &certificate.cert;
-                        let name = certificate.name.as_deref();
-                        let emails = certificate
-                            .email
-                            .iter()
-                            .map(|e| e.deref())
-                            .collect::<Vec<_>>();
-
-                        ca.cert_import_new(
-                            key,
-                            vec![],
-                            name,
-                            emails.as_slice(),
-                            Some(CERTIFICATION_DAYS),
-                        )
-                        .map_err(|e| {
-                            let error = CertError::new(
-                                CertStatus::InternalError,
-                                format!(
-                                    "Error importing Cert into database: {:?}",
-                                    e
-                                ),
-                            );
-                            ReturnBadJSON::new(error, cert_info)
-                        })?;
-                    }
-                } else {
-                    // "check" run
-                    if is_update {
-                        action = Some(Action::Update);
-                        upload = Some(Upload::Recommended);
-                    } else {
-                        action = Some(Action::New);
-                        if is_revoked {
-                            upload = Some(Upload::Recommended);
-                        } else {
-                            upload = Some(Upload::Possible);
-                        }
-                    }
-                }
-
-                Ok(ReturnGoodJSON {
-                    certificate,
-                    action,
-                    upload,
-                    cert_info: cert_info_norm,
-                })
+            ca.cert_import_new(
+                key,
+                vec![],
+                name,
+                emails.as_slice(),
+                Some(restd::CERTIFICATION_DAYS),
+            )
+            .map_err(|e| {
+                let error = CertError::new(
+                    CertStatus::InternalError,
+                    format!("Error importing Cert into database: {:?}", e),
+                );
+                ReturnBadJSON::new(error, cert_info)
+            })?;
+        }
+    } else {
+        // "check" run: set action and upload
+        if is_update {
+            action = Some(Action::Update);
+            upload = Some(Upload::Recommended);
+        } else {
+            action = Some(Action::New);
+            if is_revoked {
+                upload = Some(Upload::Recommended);
             } else {
-                // this should probably never happen?
-                Err(ReturnBadJSON::new(
-                    CertError::new(
-                        CertStatus::InternalError,
-                        "Couldn't re-armor cert",
-                    ),
-                    Some(cert_info),
-                ))
+                upload = Some(Upload::Possible);
             }
         }
-        Err(err) => Err(ReturnBadJSON::new(err, Some(cert_info))),
     }
+
+    Ok(ReturnGoodJSON {
+        certificate,
+        action,
+        upload,
+        cert_info: cert_info_norm,
+    })
 }
 
 pub fn process_certs(

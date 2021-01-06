@@ -243,14 +243,6 @@ impl CertError {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum CertStatus {
-    // actionable:
-    // - internal (contact admin)
-    //   - invalid input (not a cert) [4xx]
-    // - bad cert
-    //
-
-    // specific set of status codes for cert ingestion
-    // CertStatus
     /// A private OpenPGP Key was provided - this is not allowed
     PrivateKey,
 
@@ -265,20 +257,10 @@ pub enum CertStatus {
     ///
     /// The "url" may be used to point users to a more verbose explanation
     /// of the problem, including suggestions for how to proceed.
-    CertUnusable,
+    BadCert,
 
-    /// The cert failed a policy check, it is possible to repair it
-    /// (this probably means the key is using bad cryptography).
-    ///
-    /// [Sequoia's standard policy rejects this cert, but allows it when SHA1
-    /// is allowed]
-    ///
-    /// The "url" may be used to point users to a more verbose explanation
-    /// of the problem, including suggestions for how to proceed.
-    CertFixable,
-
-    /// Problem with a provided email address
-    BadEmail,
+    /// Problem with an email address in a User ID
+    BadUserID,
 
     /// The OpenPGP key does not include a user_id that corresponds to an
     /// email address that was provided in "Certificate".
@@ -286,9 +268,6 @@ pub enum CertStatus {
     /// This probably means that the user provided an OpenPGP key that is
     /// not suitable for use in this service.
     CertMissingLocalUserId,
-
-    /// requested entity couldn't be found (e.g. lookup by fingerprint)
-    NotFound,
 
     /// A problem occurred that wasn't caused by external data.
     ///
