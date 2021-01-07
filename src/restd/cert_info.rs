@@ -49,8 +49,6 @@ pub struct UserID {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Key {
-    pub keyid: String,
-
     pub fingerprint: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -166,8 +164,6 @@ impl Key {
             None
         };
 
-        let keyid = ka.keyid().to_string();
-
         let revocations: Vec<_> = ka
             .self_revocations()
             .map(|rev| Revocation::from_sig(rev))
@@ -180,7 +176,6 @@ impl Key {
         };
 
         Key {
-            keyid,
             fingerprint,
             flags,
             creation_time: creation.into(),
