@@ -13,7 +13,11 @@ use serde::{Deserialize, Serialize};
 use crate::models;
 use crate::restd::cert_info::CertInfo;
 
-#[derive(Serialize, Deserialize)]
+/// A container for return-data about one Cert.
+///
+/// This data structure binds together two different variants of result:
+/// One if the Cert can be processed, and another if Cert cannot be processed.
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CertResultJSON {
     Good(ReturnGoodJSON),
@@ -30,10 +34,6 @@ impl From<Result<ReturnGoodJSON, ReturnBadJSON>> for CertResultJSON {
 }
 
 /// A container for information about a "good" Cert.
-///
-/// `cert_info` contains factual information about a cert.
-///
-/// Later we may add e.g. `cert_lints` (... ?)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnGoodJSON {
     /// OpenPGP CA representation of a Cert (armored cert + metadata)
@@ -88,7 +88,7 @@ pub enum Upload {
 }
 
 /// A container for information about a "bad" Cert.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnBadJSON {
     pub error: Vec<CertError>, // FIXME: read/write access methods?
     cert_info: Option<CertInfo>,
@@ -111,24 +111,28 @@ impl From<CertError> for ReturnBadJSON {
     }
 }
 
+/// User-provided input data for OpenPGP CA RESTD
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Certificate {
+    /// email addresses that the organization associates with this user
     pub email: Vec<String>,
 
+    /// the name that the organization associates with this user
     pub name: Option<String>,
 
-    // as input, cert may contain multiple certs.
-    // as output, this will always contain exactly one cert.
+    /// as input, cert may contain a keyring consisting of multiple certs.
+    /// as output, this will always contain exactly one cert.
     pub cert: String,
 
+    /// optional: store revocations for this cert.
     pub revocations: Vec<String>,
 
-    // doesn't need to be provided (default: false),
-    // but will always be returned
+    /// doesn't need to be provided (default: false),
+    /// but will always be returned.
     pub delisted: Option<bool>,
 
-    // doesn't need to be provided (default: false),
-    // but will always be returned
+    /// doesn't need to be provided (default: false),
+    /// but will always be returned.
     pub inactive: Option<bool>,
 }
 
@@ -153,15 +157,13 @@ impl Certificate {
     }
 }
 
-/// A ReturnError is returned when a request fails before OpenPGP CA RESTD
-/// identifies individual Certs.
+/// A ReturnError gets returned when a request fails before OpenPGP CA RESTD
+/// splits the input "Certificate" data into individual Certs.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnError {
-    /// This status code should be mapped to a message that is shown to end
-    /// users.
     pub status: ReturnStatus,
 
-    /// this field is intended for debugging purposes only, it should
+    /// This field is intended for debugging purposes only, it should
     /// probably not be displayed to end-users.
     pub msg: String,
 }
@@ -190,7 +192,7 @@ pub enum ReturnStatus {
     NotFound,
 }
 
-/// A ReturnError is attached to a specific Cert (via ReturnBadJSON).
+/// A CertError gives error information about one specific Cert.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CertError {
     /// This status code should be mapped to a message that is shown to end
@@ -201,8 +203,9 @@ pub struct CertError {
     /// probably not be displayed to end-users.
     pub msg: String,
 
-    /// If set, this URL can be offered to users for more information about
-    /// the Error that occurred.
+    /// If set, this URL can be offered to users for more verbose information
+    /// about the Error that occurred (if possible: including suggestions for
+    /// how to proceed).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
@@ -243,20 +246,10 @@ impl CertError {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum CertStatus {
-    /// A private OpenPGP Key was provided - this is not allowed
-    PrivateKey,
-
-    /// The provided OpenPGP Cert exceeds the allowed size limit
-    CertSizeLimit,
-
     /// The cert failed a policy check, it cannot be used
     /// (this probably means the key is using very old, broken crypto).
     ///
-    /// [Sequoia's standard policy rejects this cert, even when allowing for
-    /// SHA1 hashes]
-    ///
-    /// The "url" may be used to point users to a more verbose explanation
-    /// of the problem, including suggestions for how to proceed.
+    /// This means that Sequoia's standard policy rejects this cert.
     BadCert,
 
     /// Problem with an email address in a User ID
@@ -268,6 +261,12 @@ pub enum CertStatus {
     /// This probably means that the user provided an OpenPGP key that is
     /// not suitable for use in this service.
     CertMissingLocalUserId,
+
+    /// The provided OpenPGP Cert exceeds the allowed size limit
+    CertSizeLimit,
+
+    /// A private OpenPGP Key was provided - this is not allowed
+    PrivateKey,
 
     /// A problem occurred that wasn't caused by external data.
     ///
