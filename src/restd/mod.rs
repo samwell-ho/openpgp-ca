@@ -42,49 +42,50 @@ const CERT_SIZE_LIMIT: usize = 1024 * 1024;
 // link for information about bad certificates - and what to do about them
 const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org"; // FIXME
 
-pub fn load_certificate_data(
+/// Load all of the associated data for a Cert from the CA database
+fn load_certificate_data(
     ca: &OpenpgpCa,
     cert: &models::Cert,
 ) -> Result<Certificate, ReturnError> {
-    let res = {
-        let user =
-            ca.cert_get_users(&cert)
-                .map_err(|e| {
-                    ReturnError::new(
-                        ReturnStatus::InternalError,
-                        format!(
-                            "load_certificate_data: error while loading users \
-                        '{:?}'", e
-                        ),
-                    )
-                })?
-                .unwrap();
+    let user = ca.cert_get_users(&cert).map_err(|e| {
+        ReturnError::new(
+            ReturnStatus::InternalError,
+            format!(
+                "load_certificate_data: error while loading users '{:?}'",
+                e
+            ),
+        )
+    })?;
 
-        let emails = ca.emails_get(&cert).map_err(|e| {
-            ReturnError::new(
-                ReturnStatus::InternalError,
-                format!(
-                    "load_certificate_data: error while loading emails '{:?}'",
-                    e
-                ),
-            )
-        })?;
+    if user.is_none() {
+        return Err(ReturnError::new(
+            ReturnStatus::InternalError,
+            format!("load_certificate_data: not found while loading users'"),
+        ));
+    }
 
-        let rev = ca.revocations_get(&cert).map_err(|e| {
-            ReturnError::new(
-                ReturnStatus::InternalError,
-                format!(
-                    "load_certificate_data: error while loading revocations\
+    let emails = ca.emails_get(&cert).map_err(|e| {
+        ReturnError::new(
+            ReturnStatus::InternalError,
+            format!(
+                "load_certificate_data: error while loading emails '{:?}'",
+                e
+            ),
+        )
+    })?;
+
+    let rev = ca.revocations_get(&cert).map_err(|e| {
+        ReturnError::new(
+            ReturnStatus::InternalError,
+            format!(
+                "load_certificate_data: error while loading revocations\
                      '{:?}'",
-                    e
-                ),
-            )
-        })?;
+                e
+            ),
+        )
+    })?;
 
-        Certificate::from(&cert, &user, &emails, &rev)
-    };
-
-    Ok(res)
+    Ok(Certificate::from(&cert, &user.unwrap(), &emails, &rev))
 }
 
 #[get("/certs/by_email/<email>")]
@@ -98,7 +99,7 @@ fn certs_by_email(
             ReturnError::new(
                 ReturnStatus::InternalError,
                 format!(
-                    "certs_by_email: error loading certificates data '{:?}'",
+                    "certs_by_email: error loading certs from db '{:?}'",
                     e
                 ),
             )
@@ -121,13 +122,12 @@ fn certs_by_email(
 
             let certificate = load_certificate_data(&ca, &c)?;
 
-            let r = ReturnGoodJSON {
+            res.push(ReturnGoodJSON {
+                certificate,
                 cert_info,
                 action: None,
                 upload: None,
-                certificate,
-            };
-            res.push(r);
+            });
         }
 
         Ok(Json(res))
@@ -135,39 +135,36 @@ fn certs_by_email(
 }
 
 #[get("/certs/by_fp/<fp>")]
-fn certs_by_fp(
+fn cert_by_fp(
     fp: String,
 ) -> Result<Json<Option<ReturnGoodJSON>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let c = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
-                format!(
-                    "certs_by_fp: error loading certificate data '{:?}'",
-                    e
-                ),
+                format!("cert_by_fp: error loading certs from db '{:?}'", e),
             )
         })?;
 
         if let Some(c) = c {
+            let certificate = load_certificate_data(&ca, &c)?;
+
             let cert =
                 OpenpgpCa::armored_to_cert(&c.pub_cert).map_err(|e| {
                     ReturnError::new(
                         ReturnStatus::InternalError,
                         format!(
-                            "certs_by_fp: error during armored_to_cert '{:?}'",
+                            "cert_by_fp: error during armored_to_cert '{:?}'",
                             e
                         ),
                     )
                 })?;
 
-            let certificate = load_certificate_data(&ca, &c)?;
-
             let cert_info = cert_to_cert_info(&cert)?;
 
             Ok(Json(Some(ReturnGoodJSON {
-                cert_info,
                 certificate,
+                cert_info,
                 action: None,
                 upload: None,
             })))
@@ -219,28 +216,29 @@ fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
         let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
-                format!("Error looking up Fingerprint '{:?}'", e),
+                format!(
+                    "deactivate_cert: Error looking up Fingerprint '{:?}'",
+                    e
+                ),
             )
         })?;
 
         if let Some(mut cert) = cert {
             cert.inactive = true;
 
-            ca.cert_update(&cert).map_err(|e| {
+            Ok(ca.cert_update(&cert).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
-                    format!("Error updating Cert '{:?}'", e),
+                    format!("deactivate_cert: Error updating Cert '{:?}'", e),
                 )
-            })?;
+            })?)
         } else {
-            return Err(ReturnError::new(
+            Err(ReturnError::new(
                 ReturnStatus::NotFound,
-                format!("Fingerprint '{}' not found", fp),
+                format!("deactivate_cert: Fingerprint '{}' not found", fp),
             )
-            .into());
+            .into())
         }
-
-        Ok(())
     })
 }
 
@@ -259,7 +257,7 @@ fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
         let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
-                format!("Error looking up Fingerprint '{:?}'", e),
+                format!("delist_cert: Error looking up Fingerprint '{:?}'", e),
             )
         })?;
 
@@ -269,13 +267,13 @@ fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
             ca.cert_update(&cert).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
-                    format!("Error updating Cert '{:?}'", e),
+                    format!("delist_cert: Error updating Cert '{:?}'", e),
                 )
             })?;
         } else {
             return Err(ReturnError::new(
                 ReturnStatus::NotFound,
-                format!("Fingerprint '{}' not found", fp),
+                format!("delist_cert: Fingerprint '{}' not found", fp),
             )
             .into());
         }
@@ -291,7 +289,8 @@ fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
 #[post("/refresh_ca_certifications")]
 fn refresh_certifications() -> Result<(), BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
-        ca.certs_refresh_ca_certifications(30, CERTIFICATION_DAYS)
+        Ok(ca
+            .certs_refresh_ca_certifications(30, CERTIFICATION_DAYS)
             .map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
@@ -300,9 +299,7 @@ fn refresh_certifications() -> Result<(), BadRequest<Json<ReturnError>>> {
                         e
                     ),
                 )
-            })?;
-
-        Ok(())
+            })?)
     })
 }
 
@@ -319,7 +316,7 @@ pub fn run(db: Option<String>) -> rocket::Rocket {
         "/",
         routes![
             certs_by_email,
-            certs_by_fp,
+            cert_by_fp,
             check_certs,
             post_certs,
             deactivate_cert,

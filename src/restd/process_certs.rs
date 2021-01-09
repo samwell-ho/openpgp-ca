@@ -121,7 +121,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
         ReturnBadJSON::new(
             CertError::new(
                 CertStatus::InternalError,
-                format!["CertInfo::from_cert() failed {:?}", e],
+                format!["check_cert: CertInfo::from_cert() failed {:?}", e],
             ),
             None,
         )
@@ -132,20 +132,25 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
         return Err(ReturnBadJSON::new(
             CertError::new(
                 CertStatus::PrivateKey,
-                String::from("The user provided private key material"),
+                String::from(
+                    "check_cert: The user provided private key material",
+                ),
             ),
             Some(ci),
         ));
     }
 
-    // reject unreasonably big keys
+    // reject unreasonably big certificates
     if let Ok(armored) = OpenpgpCa::cert_to_armored(cert) {
         let len = armored.len();
         if len > restd::CERT_SIZE_LIMIT {
             return Err(ReturnBadJSON::new(
                 CertError::new(
                     CertStatus::CertSizeLimit,
-                    format!("User cert is too big ({} bytes)", len),
+                    format!(
+                        "check_cert: User cert is too big ({} bytes)",
+                        len
+                    ),
                 ),
                 Some(ci),
             ));
@@ -154,7 +159,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
         return Err(ReturnBadJSON::new(
             CertError::new(
                 CertStatus::InternalError,
-                "Failed to re-armor cert",
+                "check_cert: Failed to re-armor cert",
             ),
             Some(ci),
         ));
@@ -195,7 +200,7 @@ fn process_cert(
                 OpenpgpCa::armored_to_cert(&c.pub_cert).map_err(|e| {
                     let error = CertError::new(
                         CertStatus::InternalError,
-                        format!("Error unarmoring cert from CA DB: {:?}", e),
+                        format!("Error un-armoring cert from CA DB: {:?}", e),
                     );
 
                     ReturnBadJSON::new(error, Some(cert_info.clone()))
@@ -211,11 +216,11 @@ fn process_cert(
             })?
         }
     };
-    let _ = cert; // drop this version of the cert
+    let _ = cert; // drop previous version of the cert
 
     // perform policy checks
     let valid_cert = cert_policy_check(&merged)?;
-    let _ = merged; // drop this version of the cert
+    let _ = merged; // drop previous version of the cert
 
     // check if the cert is revoked
     let is_revoked =
