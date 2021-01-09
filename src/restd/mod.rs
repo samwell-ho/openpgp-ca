@@ -60,7 +60,8 @@ fn load_certificate_data(
     if user.is_none() {
         return Err(ReturnError::new(
             ReturnStatus::InternalError,
-            format!("load_certificate_data: not found while loading users'"),
+            "load_certificate_data: not found while loading users'"
+                .to_string(),
         ));
     }
 
