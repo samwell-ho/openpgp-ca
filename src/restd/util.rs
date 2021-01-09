@@ -16,7 +16,10 @@ pub fn is_email_in_domain(email: &str, domain: &str) -> Result<bool> {
     let split: Vec<_> = email.split('@').collect();
 
     if split.len() != 2 {
-        Err(anyhow::anyhow!("ERROR: unexpected email syntax {}", email))
+        Err(anyhow::anyhow!(
+            "is_email_in_domain: unexpected email syntax {}",
+            email
+        ))
     } else {
         Ok(split[1] == domain)
     }

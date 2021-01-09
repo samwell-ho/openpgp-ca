@@ -184,7 +184,10 @@ fn process_cert(
     let cert_in_ca_db = ca.cert_get_by_fingerprint(fp).map_err(|e| {
         let ce = CertError::new(
             CertStatus::InternalError,
-            format!("Error during database lookup by fingerprint: {:?}", e),
+            format!(
+                "process_cert: Error during db lookup by fingerprint: {:?}",
+                e
+            ),
         );
         ReturnBadJSON::new(ce, Some(cert_info.clone()))
     })?;
@@ -200,7 +203,10 @@ fn process_cert(
                 OpenpgpCa::armored_to_cert(&c.pub_cert).map_err(|e| {
                     let error = CertError::new(
                         CertStatus::InternalError,
-                        format!("Error un-armoring cert from CA DB: {:?}", e),
+                        format!(
+                            "process_cert: Error un-armoring cert from CA DB: {:?}",
+                            e
+                        ),
                     );
 
                     ReturnBadJSON::new(error, Some(cert_info.clone()))
@@ -209,7 +215,11 @@ fn process_cert(
             db_cert.merge_public(cert.clone()).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
-                    format!("Error merging new cert with DB cert: {:?}", e),
+                    format!(
+                        "process_cert: Error merging new cert with DB \
+                        cert: {:?}",
+                        e
+                    ),
                 );
 
                 ReturnBadJSON::new(error, Some(cert_info.clone()))
@@ -237,7 +247,10 @@ fn process_cert(
     let cert_info_norm = CertInfo::from_cert(&norm).map_err(|e| {
         CertError::new(
             CertStatus::InternalError,
-            format!["CertInfo::from_cert() failed for 'norm' {:?}", e],
+            format!(
+                "process_cert: CertInfo::from_cert() failed for 'norm' {:?}",
+                e
+            ),
         )
     })?;
 
@@ -246,14 +259,10 @@ fn process_cert(
         ReturnBadJSON::new(
             CertError::new(
                 CertStatus::InternalError,
-                format!("Couldn't re-armor cert {:?}", e),
+                format!("process_cert: Couldn't re-armor cert {:?}", e),
             ),
             Some(cert_info),
         ))?;
-
-    let mut certificate = certificate.clone();
-
-    certificate.cert = armored;
 
     let action;
     let upload;
@@ -268,10 +277,13 @@ fn process_cert(
             // update cert in db
             action = Some(Action::Update);
 
-            ca.cert_import_update(&certificate.cert).map_err(|e| {
+            ca.cert_import_update(&armored).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
-                    format!("Error updating Cert in database: {:?}", e),
+                    format!(
+                        "process_cert: Error updating Cert in database: {:?}",
+                        e
+                    ),
                 );
 
                 ReturnBadJSON::new(error, cert_info)
@@ -280,7 +292,6 @@ fn process_cert(
             // add new cert to db
             action = Some(Action::New);
 
-            let key = &certificate.cert;
             let name = certificate.name.as_deref();
             let emails = certificate
                 .email
@@ -289,8 +300,8 @@ fn process_cert(
                 .collect::<Vec<_>>();
 
             ca.cert_import_new(
-                key,
-                vec![],
+                &armored,
+                certificate.revocations.clone(),
                 name,
                 emails.as_slice(),
                 Some(restd::CERTIFICATION_DAYS),
@@ -298,7 +309,10 @@ fn process_cert(
             .map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
-                    format!("Error importing Cert into database: {:?}", e),
+                    format!(
+                        "process_cert: Error importing Cert into db: {:?}",
+                        e
+                    ),
                 );
                 ReturnBadJSON::new(error, cert_info)
             })?;
@@ -318,11 +332,20 @@ fn process_cert(
         }
     }
 
+    let certificate = Certificate {
+        cert: armored,
+        email: certificate.email.clone(),
+        name: certificate.name.clone(),
+        revocations: certificate.revocations.clone(),
+        delisted: certificate.delisted, // FIXME - get current status from db
+        inactive: certificate.inactive, // FIXME - get current status from db
+    };
+
     Ok(ReturnGoodJSON {
         certificate,
+        cert_info: cert_info_norm,
         action,
         upload,
-        cert_info: cert_info_norm,
     })
 }
 
@@ -336,7 +359,8 @@ pub fn process_certs(
             ReturnError::new(
                 ReturnStatus::InternalError,
                 format!(
-                    "Error parsing the user-provided OpenPGP keyring:\n{:?}",
+                    "process_certs: Error parsing user-provided \
+                    keyring:\n{:?}",
                     e
                 ),
             )
@@ -346,7 +370,7 @@ pub fn process_certs(
     let my_domain = ca.get_ca_domain().map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
-            format!("Error while getting the CA's domain {:?}", e),
+            format!("process_certs: Error getting the CA's domain {:?}", e),
         )
     })?;
 
