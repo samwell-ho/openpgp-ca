@@ -110,7 +110,7 @@ fn validate_and_strip_user_ids(
             Ok(stripped)
         }
         Err(e) => Err(CertError::new(
-            CertStatus::BadUserID,
+            CertStatus::BadEmail,
             format!("Error with provided email addresses {:?}", e),
         )),
     }

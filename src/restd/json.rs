@@ -252,15 +252,15 @@ pub enum CertStatus {
     /// This means that Sequoia's standard policy rejects this cert.
     BadCert,
 
-    /// Problem with an email address in a User ID
-    BadUserID,
-
     /// The OpenPGP key does not include a user_id that corresponds to an
     /// email address that was provided in "Certificate".
     ///
     /// This probably means that the user provided an OpenPGP key that is
     /// not suitable for use in this service.
     CertMissingLocalUserId,
+
+    /// A bad email address was provided in 'Certificate'
+    BadEmail,
 
     /// The provided OpenPGP Cert exceeds the allowed size limit
     CertSizeLimit,
