@@ -72,9 +72,7 @@ impl Client {
                     }
                 }
                 StatusCode::BAD_REQUEST => {
-                    let resp = o.json::<ReturnError>().await.unwrap();
-
-                    Err(resp)
+                    Err(o.json::<ReturnError>().await.unwrap())
                 }
                 _ => panic!("unexpected status code {}", o.status()),
             },
@@ -90,14 +88,10 @@ impl Client {
         match resp {
             Ok(o) => match o.status() {
                 StatusCode::OK => {
-                    let resp = o.json::<Vec<ReturnGoodJSON>>().await.unwrap();
-
-                    Ok(resp)
+                    Ok(o.json::<Vec<ReturnGoodJSON>>().await.unwrap())
                 }
                 StatusCode::BAD_REQUEST => {
-                    let resp = o.json::<ReturnError>().await.unwrap();
-
-                    Err(resp)
+                    Err(o.json::<ReturnError>().await.unwrap())
                 }
                 _ => panic!("unexpected status code {}", o.status()),
             },
@@ -120,9 +114,7 @@ impl Client {
             .send()
             .await;
 
-        println!("resp: {:?}", resp);
-
-        Ok(Client::map_result_keyring(resp).await?)
+        Client::map_result_keyring(resp).await
     }
 
     pub async fn persist(
@@ -145,7 +137,7 @@ impl Client {
             .send()
             .await;
 
-        Ok(Client::map_result_keyring(resp).await?)
+        Client::map_result_keyring(resp).await
     }
 
     pub async fn get_by_email(
