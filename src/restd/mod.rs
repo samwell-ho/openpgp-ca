@@ -39,8 +39,9 @@ const CERTIFICATION_DAYS: u64 = 365;
 // armored cert size limit (1 MiB)
 const CERT_SIZE_LIMIT: usize = 1024 * 1024;
 
-// link for information about bad certificates - and what to do about them
-const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org"; // FIXME
+// FIXME: link for information about bad certificates
+// - and what to do about them
+// const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org";
 
 /// Load all of the associated data for a Cert from the CA database
 fn load_certificate_data(

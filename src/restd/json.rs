@@ -222,14 +222,18 @@ impl CertError {
         }
     }
 
-    pub fn new_with_url<S>(status: CertStatus, url: String, msg: S) -> Self
+    pub fn new_with_url<S>(
+        status: CertStatus,
+        url: Option<String>,
+        msg: S,
+    ) -> Self
     where
         S: Into<String>,
     {
         CertError {
             status,
             msg: msg.into(),
-            url: Some(url),
+            url,
         }
     }
 

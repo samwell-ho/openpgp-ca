@@ -36,7 +36,8 @@ fn cert_policy_check(cert: &Cert) -> Result<ValidCert, CertError> {
     cert.with_policy(STANDARD_POLICY, None).map_err(|e| {
         CertError::new_with_url(
             CertStatus::BadCert,
-            restd::POLICY_BAD_URL.to_string(),
+            // restd::POLICY_BAD_URL.to_string(),
+            None,
             format!("Cert invalid according to standard policy: '{:?}'", e),
         )
     })
