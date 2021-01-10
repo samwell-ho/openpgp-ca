@@ -127,11 +127,11 @@ pub struct Certificate {
     /// optional: store revocations for this cert.
     pub revocations: Vec<String>,
 
-    /// doesn't need to be provided (default: false),
+    /// must not be changed by input data (default for new certs: false),
     /// but will always be returned.
     pub delisted: Option<bool>,
 
-    /// doesn't need to be provided (default: false),
+    /// must not be changed by input data (default for new certs: false),
     /// but will always be returned.
     pub inactive: Option<bool>,
 }

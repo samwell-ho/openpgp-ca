@@ -195,10 +195,33 @@ fn process_cert(
     // will this cert be processed as an update to an existing version of it?
     let is_update = cert_in_ca_db.is_some();
 
+    if is_update {
+        // input sanity check: delisted/inactive may not be changed by
+        // input parameter, for now
+
+        if (certificate.delisted.is_some()
+            && certificate.delisted
+                != Some(cert_in_ca_db.as_ref().unwrap().delisted))
+            || (certificate.inactive.is_some()
+                && certificate.inactive
+                    != Some(cert_in_ca_db.as_ref().unwrap().inactive))
+        {
+            let ce = CertError::new(
+                CertStatus::InternalError,
+                format!(
+                    "process_cert: changing delisted and inactive is \
+                    not currently allowed via this call {:?}",
+                    certificate
+                ),
+            );
+            return Err(ReturnBadJSON::new(ce, Some(cert_info.clone())));
+        }
+    }
+
     // merge new cert with existing cert, if any
     let merged = match cert_in_ca_db {
         None => cert.clone(),
-        Some(c) => {
+        Some(ref c) => {
             let db_cert =
                 OpenpgpCa::armored_to_cert(&c.pub_cert).map_err(|e| {
                     let error = CertError::new(
@@ -332,13 +355,26 @@ fn process_cert(
         }
     }
 
+    // get the last known value of delisted/inactive
+    // (either from db lookup, above - or assume the default 'false')
+    let delisted = if is_update {
+        cert_in_ca_db.as_ref().unwrap().delisted
+    } else {
+        false
+    };
+    let inactive = if is_update {
+        cert_in_ca_db.as_ref().unwrap().inactive
+    } else {
+        false
+    };
+
     let certificate = Certificate {
         cert: armored,
         email: certificate.email.clone(),
         name: certificate.name.clone(),
         revocations: certificate.revocations.clone(),
-        delisted: certificate.delisted, // FIXME - get current status from db
-        inactive: certificate.inactive, // FIXME - get current status from db
+        delisted: Some(delisted),
+        inactive: Some(inactive),
     };
 
     Ok(ReturnGoodJSON {
