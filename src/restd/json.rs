@@ -188,8 +188,9 @@ impl ReturnError {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum ReturnStatus {
-    InternalError,
+    BadKeyring,
     NotFound,
+    InternalError,
 }
 
 /// A CertError gives error information about one specific Cert.

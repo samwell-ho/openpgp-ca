@@ -410,7 +410,7 @@ pub fn process_certs(
     let certs = OpenpgpCa::armored_keyring_to_certs(&certificate.cert)
         .map_err(|e| {
             ReturnError::new(
-                ReturnStatus::InternalError,
+                ReturnStatus::BadKeyring,
                 format!(
                     "process_certs: Error parsing user-provided \
                     keyring:\n{:?}",
