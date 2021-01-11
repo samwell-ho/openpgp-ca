@@ -285,6 +285,30 @@ async fn test_restd() {
             );
         }
 
+        // Alice, illegal "delisted" value (check/post may not
+        // update the field)
+        let cert = Certificate {
+            cert: ALICE_CERT.to_owned(),
+            delisted: Some(true),
+            inactive: None,
+            email: vec!["alice@example.org".to_owned()],
+            name: Some("Alice Adams".to_owned()),
+            revocations: vec![],
+        };
+
+        let res = c.check(&cert).await;
+        assert!(res.is_ok());
+        let ret = res.unwrap();
+        assert_eq!(ret.len(), 1);
+        let ret = ret.get(0).unwrap();
+        if let CertResultJSON::Bad(bad) = ret {
+            assert_eq!(bad.error.len(), 1);
+            assert_eq!(bad.error[0].status, CertStatus::InternalError);
+            assert!(bad.error[0].msg.starts_with("process_cert: changing delisted and inactive is not currently allowed via this call Certificate"));
+        } else {
+            panic!("this result should not be good");
+        }
+
         // look up by email
         let res = c.get_by_email("alice@example.org".into()).await;
         assert!(res.is_ok());
