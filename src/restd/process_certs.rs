@@ -301,6 +301,8 @@ fn process_cert(
             // update cert in db
             action = Some(Action::Update);
 
+            // FIXME: how/when should changes to name/email be persisted?
+
             ca.cert_import_update(&armored).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
