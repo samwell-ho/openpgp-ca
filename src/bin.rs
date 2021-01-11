@@ -35,7 +35,7 @@ fn main() -> Result<()> {
                 ca.user_new(name.as_deref(), &email[..], None, true)?;
             }
             UserCommand::AddRevocation { revocation_file } => {
-                ca.revocation_add(&revocation_file)?
+                ca.revocation_add_from_file(&revocation_file)?
             }
 
             UserCommand::Check { cmd } => match cmd {

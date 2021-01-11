@@ -495,8 +495,8 @@ fn test_ca_multiple_revocations() -> Result<()> {
     let revoc_file3 = format!("{}/alice.revoc3", home_path);
     gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file3, 3)?;
 
-    ca.revocation_add(&PathBuf::from(revoc_file1))?;
-    ca.revocation_add(&PathBuf::from(revoc_file3))?;
+    ca.revocation_add_from_file(&PathBuf::from(revoc_file1))?;
+    ca.revocation_add_from_file(&PathBuf::from(revoc_file3))?;
 
     // check data in CA
     let certs = ca.user_certs_get_all()?;
@@ -806,7 +806,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     std::fs::write(&revoc_file, &armored)?;
 
     // ... and import into the CA
-    ca.revocation_add(&PathBuf::from(&revoc_file))
+    ca.revocation_add_from_file(&PathBuf::from(&revoc_file))
         .context("Storing Bob's revocation in OpenPGP CA")?;
 
     //

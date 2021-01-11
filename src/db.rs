@@ -397,6 +397,12 @@ impl Db {
         })
     }
 
+    /// check if this exact revocation (bitwise) already exists in the db
+    pub fn check_for_revocation(&self, revocation: &str) -> Result<bool> {
+        let hash = &Pgp::revocation_to_hash(revocation)?;
+        Ok(self.get_revocation_by_hash(hash)?.is_some())
+    }
+
     pub fn get_revocation_by_hash(
         &self,
         hash: &str,

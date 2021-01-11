@@ -53,6 +53,8 @@ use diesel::prelude::*;
 use crate::models::Revocation;
 use anyhow::{Context, Result};
 use sequoia_openpgp::KeyHandle;
+use std::fs::File;
+use std::io::Read;
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
@@ -736,15 +738,27 @@ impl OpenpgpCa {
     // -------- revocations
 
     /// Add a revocation certificate to the OpenPGP CA database (from a file).
+    pub fn revocation_add_from_file(&self, filename: &PathBuf) -> Result<()> {
+        let mut s = String::new();
+        File::open(filename)?.read_to_string(&mut s)?;
+        self.revocation_add(&s)
+    }
+
+    /// Add a revocation certificate to the OpenPGP CA database.
     ///
     /// The matching cert is looked up by issuer Fingerprint, if
     /// possible - or by exhaustive search otherwise.
     ///
     /// Verifies that applying the revocation cert can be validated by the
     /// cert. Only if this is successful is the revocation stored.
-    pub fn revocation_add(&self, revoc_file: &PathBuf) -> Result<()> {
-        let mut revoc_cert = Pgp::load_revocation_cert(Some(revoc_file))
-            .context("Couldn't load revocation cert")?;
+    pub fn revocation_add(&self, revoc_cert_str: &str) -> Result<()> {
+        // check if the exact same revocation already exists in db
+        if self.db.check_for_revocation(revoc_cert_str)? {
+            return Ok(()); // this revocation is already stored -> do nothing
+        }
+
+        let mut revoc_cert = Pgp::armored_to_signature(revoc_cert_str)
+            .context("Couldn't process revocation cert")?;
 
         // find the matching cert for this revocation certificate
         let mut cert = None;

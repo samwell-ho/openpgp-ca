@@ -118,7 +118,7 @@ v9x/AABUQAEA0y+EauezWO15y9YF3WVP3Vo3y3440bVgGroFESvYNiMA/j1fQw+z
 -----END PGP PUBLIC KEY BLOCK-----"#;
 
 /// this is a private key, it's an error to provide it to this service
-const CAROL_PRIV_CERT: &str = r#"-----BEGIN PGP PRIVATE KEY BLOCK-----
+const CAROL_PRIV_KEY: &str = r#"-----BEGIN PGP PRIVATE KEY BLOCK-----
 Comment: 4B89 C2EF 2CF2 B05D D3B4  6561 E59E 83D5 33FF 1822
 Comment: carol@example.org
 
@@ -144,6 +144,48 @@ BEuJwu8s8rBd07RlYeWeg9Uz/xgiAAB5TQEAvffwZaXUmb+KnADMXtDPTNyCih5S
 p+gH+Ket/uaC6dQA/R5u0cZNF4A7piWf7G+L8u+oztvjhFjZEEWqpvo9RFcJ
 =SyJn
 -----END PGP PRIVATE KEY BLOCK-----"#;
+
+const CAROL_CERT: &str = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEX52PFhYJKwYBBAHaRw8BAQdAeBt8mYIJjFdtZWCbjEM7aW+eLbwOoEyO4jca
+k8FnMCSIiQQfFgoAOwWCX52PFgWJBaSPvQMLCQcJEOWeg9Uz/xgiAxUKCAKbAQIe
+ARYhBEuJwu8s8rBd07RlYeWeg9Uz/xgiAAATXAD/S0CoAfwK63XcDN5R53t/cCnV
+aKnl559E6AWG7flFD4sA/32pTw7hJYb8arBPIYzNLiy/tHXeMo5MDGohCgezCE8C
+tBFjYXJvbEBleGFtcGxlLm9yZ4iMBBMWCgA+BYJfnY8WBYkFpI+9AwsJBwkQ5Z6D
+1TP/GCIDFQoIApkBApsBAh4BFiEES4nC7yzysF3TtGVh5Z6D1TP/GCIAAFgTAP47
+ThpsSOXf6zJdcMfLDGfj179C35tEz1k6GZxR/fCBHQEApVdedbCjzoFHNWOkcN1z
+M8SmGv9CnFKWMZL/3yZ2ugK4MwRfnY8WFgkrBgEEAdpHDwEBB0CM7+cng9fCaO+1
+u3Kuw6mrHZiZC/4FOI2wge+bxUQG54j4BBgWCgCqBYJfnY8WBYkFpI+9CRDlnoPV
+M/8YIgKbAgIeAXagBBkWCgAnBYJfnY8WCRBbZN1Fkk+i6RYhBIzBMUhgtvuqYRCp
+b1tk3UWST6LpAAB40QEAotMDj6NBAW6YKxFf+s97zi9EBi8HsCbg5JjuJsdlxU0B
+APmfzVeHM+DGJI4vEh00NeRmp0wV06iBwgBYxpjlmKUPFiEES4nC7yzysF3TtGVh
+5Z6D1TP/GCIAANIGAP9cxDzjcBUXbxsll+QzpCrenR+K2yMBj2NDFiao0HXRcwD+
+K4c24l2zthL4vSwzMIYrfuWwQ5Oi9c/X8FKxTQB2/Qi4OARfnY8WEgorBgEEAZdV
+AQUBAQdAET7RhTCWZ6gaAKn1xy9/C6jWKkpkIBBjp+SihA1EuQwDAQgJiIEEGBYK
+ADMFgl+djxYFiQWkj70JEOWeg9Uz/xgiApsMAh4BFiEES4nC7yzysF3TtGVh5Z6D
+1TP/GCIAAHlNAQC99/BlpdSZv4qcAMxe0M9M3IKKHlKn6Af4p63+5oLp1AD9Hm7R
+xk0XgDumJZ/sb4vy76jO2+OEWNkQRaqm+j1EVwk=
+=+n3j
+-----END PGP PUBLIC KEY BLOCK-----"#;
+
+const CAROL_REV1: &str = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----
+Comment: This is a revocation certificate
+
+iIcEIBYIAC8WIQRLicLvLPKwXdO0ZWHlnoPVM/8YIgUCX/x+AxEdA3NvZnQgcmV2
+b2NhdGlvbgAKCRDlnoPVM/8YItANAQDWtKwGq8gM9YUGnew0FK1TyIbunGUgokWf
+VXO/ZP3KdwD/d+37VKfHBqKXmBFCyKCqablDDWnBLNyhBxlko9cztAU=
+=5jbd
+-----END PGP PUBLIC KEY BLOCK-----"#;
+
+const CAROL_REV2: &str = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----
+Comment: This is a revocation certificate
+
+iJUEIBYIAD0WIQRLicLvLPKwXdO0ZWHlnoPVM/8YIgUCX/x+Fx8dAmhhcmQgcmV2
+b2NhdGlvbiAoY29tcHJvbWlzZWQpAAoJEOWeg9Uz/xgiOUkA/AxH9dv7nMuddBD7
+v7c9/DyhcEP1tcqDsfcoK2XzuHwaAQDFPaeoRHEH2Wd843iaNfEGwp2KfBD6oR5C
+hq6syHDJBA==
+=ZQ+Y
+-----END PGP PUBLIC KEY BLOCK-----"#;
 
 fn start_restd(db: String) -> AbortHandle {
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -194,230 +236,269 @@ async fn test_restd() {
     assert_eq!(ret.len(), 1);
     let ret = ret.get(0).unwrap();
 
-    if let CertResultJSON::Good(ret) = ret {
-        let alice_fp = ret.cert_info.primary.fingerprint.clone();
+    let alice_fp = if let CertResultJSON::Good(ret) = ret {
+        assert_eq!(ret.action, Some(Action::New));
+        assert_eq!(
+            &ret.cert_info.primary.fingerprint,
+            "B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106"
+        );
 
+        ret.cert_info.primary.fingerprint.clone()
+    } else {
+        panic!("error");
+    };
+
+    // 2. Alice, uid/email mismatch
+    let cert = Certificate {
+        cert: ALICE_CERT.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["alice2@example.org".to_owned()],
+        name: Some("Alice Adams".to_owned()),
+        revocations: vec![],
+    };
+
+    let res = c.check(&cert).await;
+
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert_eq!(res.len(), 1);
+    let res = res.get(0).unwrap();
+
+    if let CertResultJSON::Bad(res) = res {
+        assert_eq!(res.error[0].status, CertStatus::CertMissingLocalUserId);
+    } else {
+        panic!("error");
+    }
+
+    // 3. Carol, private key is bad
+    let cert = Certificate {
+        cert: CAROL_PRIV_KEY.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["carol@example.org".to_owned()],
+        name: Some("Carol".to_owned()),
+        revocations: vec![],
+    };
+
+    let res = c.check(&cert).await;
+
+    // assert!(res.is_err());
+    // let ret = res.err().unwrap();
+    // assert_eq!(ret.status, ReturnStatus::PrivateKey);
+
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert_eq!(res.len(), 1);
+    let res = res.get(0).unwrap();
+
+    if let CertResultJSON::Bad(res) = res {
+        assert_eq!(res.error[0].status, CertStatus::PrivateKey);
+    } else {
+        panic!("error");
+    }
+
+    // --- Persist, Modify, Read ---
+    let cert = Certificate {
+        cert: ALICE_CERT.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["alice@example.org".to_owned()],
+        name: Some("Alice Adams".to_owned()),
+        revocations: vec![],
+    };
+
+    let res = c.persist(&cert).await;
+    assert!(res.is_ok());
+    // check that return data has the expected shape
+    let ret = res.unwrap();
+    assert_eq!(ret.len(), 1);
+    let ret = ret.get(0).unwrap();
+    if let CertResultJSON::Good(ret) = ret {
         assert_eq!(ret.action, Some(Action::New));
         assert_eq!(
             ret.cert_info.primary.fingerprint,
             "B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106".to_string()
         );
+    }
 
-        // 2. Alice, uid/email mismatch
-        let cert = Certificate {
-            cert: ALICE_CERT.to_owned(),
-            delisted: None,
-            inactive: None,
-            email: vec!["alice2@example.org".to_owned()],
-            name: Some("Alice Adams".to_owned()),
-            revocations: vec![],
-        };
+    // check that ALICE_CERT is now considered an "Update"
+    let res = c.check(&cert).await;
+    assert!(res.is_ok());
+    let ret = res.unwrap();
+    assert_eq!(ret.len(), 1);
+    let ret = ret.get(0).unwrap();
 
-        let res = c.check(&cert).await;
+    if let CertResultJSON::Good(ret) = ret {
+        assert_eq!(ret.action, Some(Action::Update));
+        assert_eq!(
+            ret.cert_info.primary.fingerprint,
+            "B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106".to_string()
+        );
+    }
 
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert_eq!(res.len(), 1);
-        let res = res.get(0).unwrap();
-
-        if let CertResultJSON::Bad(res) = res {
-            assert_eq!(
-                res.error[0].status,
-                CertStatus::CertMissingLocalUserId
-            );
-        } else {
-            panic!("error");
-        }
-
-        // 3. Carol, private key is bad
-        let cert = Certificate {
-            cert: CAROL_PRIV_CERT.to_owned(),
-            delisted: None,
-            inactive: None,
-            email: vec!["carol@example.org".to_owned()],
-            name: Some("Carol".to_owned()),
-            revocations: vec![],
-        };
-
-        let res = c.check(&cert).await;
-
-        // assert!(res.is_err());
-        // let ret = res.err().unwrap();
-        // assert_eq!(ret.status, ReturnStatus::PrivateKey);
-
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert_eq!(res.len(), 1);
-        let res = res.get(0).unwrap();
-
-        if let CertResultJSON::Bad(res) = res {
-            assert_eq!(res.error[0].status, CertStatus::PrivateKey);
-        } else {
-            panic!("error");
-        }
-
-        // --- Persist, Modify, Read ---
-        let cert = Certificate {
-            cert: ALICE_CERT.to_owned(),
-            delisted: None,
-            inactive: None,
-            email: vec!["alice@example.org".to_owned()],
-            name: Some("Alice Adams".to_owned()),
-            revocations: vec![],
-        };
-
-        let res = c.persist(&cert).await;
-        assert!(res.is_ok());
-        // check that return data has the expected shape
-        let ret = res.unwrap();
-        assert_eq!(ret.len(), 1);
-        let ret = ret.get(0).unwrap();
-        if let CertResultJSON::Good(ret) = ret {
-            assert_eq!(ret.action, Some(Action::New));
-            assert_eq!(
-                ret.cert_info.primary.fingerprint,
-                "B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106"
-                    .to_string()
-            );
-        }
-
-        // check that ALICE_CERT is now considered an "Update"
-        let res = c.check(&cert).await;
-        assert!(res.is_ok());
-        let ret = res.unwrap();
-        assert_eq!(ret.len(), 1);
-        let ret = ret.get(0).unwrap();
-
-        if let CertResultJSON::Good(ret) = ret {
-            assert_eq!(ret.action, Some(Action::Update));
-            assert_eq!(
-                ret.cert_info.primary.fingerprint,
-                "B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106"
-                    .to_string()
-            );
-        }
-
-        // Alice, illegal "delisted" value (check/post may not
-        // update the field)
-        let cert = Certificate {
-            cert: ALICE_CERT.to_owned(),
-            delisted: Some(true),
-            inactive: None,
-            email: vec!["alice@example.org".to_owned()],
-            name: Some("Alice Adams".to_owned()),
-            revocations: vec![],
-        };
-
-        let res = c.check(&cert).await;
-        assert!(res.is_ok());
-        let ret = res.unwrap();
-        assert_eq!(ret.len(), 1);
-        let ret = ret.get(0).unwrap();
-        if let CertResultJSON::Bad(bad) = ret {
-            assert_eq!(bad.error.len(), 1);
-            assert_eq!(bad.error[0].status, CertStatus::InternalError);
-            assert!(bad.error[0].msg.starts_with("process_cert: changing delisted and inactive is not currently allowed via this call Certificate"));
-        } else {
-            panic!("this result should not be good");
-        }
-
-        // look up by email
-        let res = c.get_by_email("alice@example.org".into()).await;
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert_eq!(res.len(), 1);
-
-        // email doesn't exist
-        let res = c.get_by_email("bob@example.org".into()).await;
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert_eq!(res.len(), 0);
-
-        // look up by fingerprint
-        let res = c.get_by_fp(alice_fp.clone()).await;
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert!(res.is_some());
-
-        // fingerprint doesn't exist
-        let res = c.get_by_fp("123456".into()).await;
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert!(res.is_none());
-
-        // => POST /certs/deactivate/<fp> (deactivate_cert)
-        let res = c.deactivate(alice_fp.clone()).await;
-        assert!(res.is_ok());
-
-        let res = c.get_by_fp(alice_fp.clone()).await;
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert!(res.is_some());
-        let res = res.unwrap();
-        assert!(res.certificate.inactive.unwrap());
-
-        // => DELETE /certs/<fp> (delist_cert)
-        let res = c.delist(alice_fp.clone()).await;
-        assert!(res.is_ok());
-
-        let res = c.get_by_fp(alice_fp.clone()).await;
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert!(res.is_some());
-        let res = res.unwrap();
-        assert!(res.certificate.delisted.unwrap());
-
-        // 4. persist key for bob; a new key for alice, an update for alice's key
-
-        let cert = Certificate {
-            cert: BOB_CERT.to_owned(),
-            delisted: None,
-            inactive: None,
-            email: vec!["bob@example.org".to_owned()],
-            name: Some("Bob Baker".to_owned()),
-            revocations: vec![],
-        };
-        let res = c.persist(&cert).await;
-        assert!(res.is_ok());
-
-        let cert = Certificate {
-            cert: ALICE2_CERT.to_owned(),
-            delisted: None,
-            inactive: None,
-            email: vec!["alice@example.org".to_owned()],
-            name: Some("Alice Adams".to_owned()),
-            revocations: vec![],
-        };
-        let res = c.persist(&cert).await;
-        assert!(res.is_ok());
-
-        let cert = Certificate {
-            cert: ALICE2_CERT_REV.to_owned(),
-            delisted: None,
-            inactive: None,
-            email: vec!["alice@example.org".to_owned()],
-            name: Some("Alice Adams".to_owned()),
-            revocations: vec![],
-        };
-        let res = c.persist(&cert).await;
-        assert!(res.is_ok());
-
-        // assert that there are now 2 entries for "alice@example.org"
-        let res = c.get_by_email("alice@example.org".into()).await;
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert_eq!(res.len(), 2);
-
-        // FIXME: check that the new key is considered revoked
-
-        // ... and 1 entry for "bob@example.org"
-        let res = c.get_by_email("bob@example.org".into()).await;
-        assert!(res.is_ok());
-        let res = res.unwrap();
-        assert_eq!(res.len(), 1);
-    } else {
-        panic!("error");
+    // Alice, illegal "delisted" value (check/post may not
+    // update the field)
+    let cert = Certificate {
+        cert: ALICE_CERT.to_owned(),
+        delisted: Some(true),
+        inactive: None,
+        email: vec!["alice@example.org".to_owned()],
+        name: Some("Alice Adams".to_owned()),
+        revocations: vec![],
     };
+
+    let res = c.check(&cert).await;
+    assert!(res.is_ok());
+    let ret = res.unwrap();
+    assert_eq!(ret.len(), 1);
+    let ret = ret.get(0).unwrap();
+    if let CertResultJSON::Bad(bad) = ret {
+        assert_eq!(bad.error.len(), 1);
+        assert_eq!(bad.error[0].status, CertStatus::InternalError);
+        assert!(bad.error[0].msg.starts_with("process_cert: changing delisted and inactive is not currently allowed via this call Certificate"));
+    } else {
+        panic!("this result should not be good");
+    }
+
+    // look up by email
+    let res = c.get_by_email("alice@example.org".into()).await;
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert_eq!(res.len(), 1);
+
+    // email doesn't exist
+    let res = c.get_by_email("bob@example.org".into()).await;
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert_eq!(res.len(), 0);
+
+    // look up by fingerprint
+    let res = c.get_by_fp(alice_fp.clone()).await;
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert!(res.is_some());
+
+    // fingerprint doesn't exist
+    let res = c.get_by_fp("123456".into()).await;
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert!(res.is_none());
+
+    // => POST /certs/deactivate/<fp> (deactivate_cert)
+    let res = c.deactivate(alice_fp.clone()).await;
+    assert!(res.is_ok());
+
+    let res = c.get_by_fp(alice_fp.clone()).await;
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert!(res.is_some());
+    let res = res.unwrap();
+    assert!(res.certificate.inactive.unwrap());
+
+    // => DELETE /certs/<fp> (delist_cert)
+    let res = c.delist(alice_fp.clone()).await;
+    assert!(res.is_ok());
+
+    let res = c.get_by_fp(alice_fp.clone()).await;
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert!(res.is_some());
+    let res = res.unwrap();
+    assert!(res.certificate.delisted.unwrap());
+
+    // 4. persist key for bob; a new key for alice, an update for alice's key
+
+    let cert = Certificate {
+        cert: BOB_CERT.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["bob@example.org".to_owned()],
+        name: Some("Bob Baker".to_owned()),
+        revocations: vec![],
+    };
+    let res = c.persist(&cert).await;
+    assert!(res.is_ok());
+
+    let cert = Certificate {
+        cert: ALICE2_CERT.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["alice@example.org".to_owned()],
+        name: Some("Alice Adams".to_owned()),
+        revocations: vec![],
+    };
+    let res = c.persist(&cert).await;
+    assert!(res.is_ok());
+
+    let cert = Certificate {
+        cert: ALICE2_CERT_REV.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["alice@example.org".to_owned()],
+        name: Some("Alice Adams".to_owned()),
+        revocations: vec![],
+    };
+    let res = c.persist(&cert).await;
+    assert!(res.is_ok());
+
+    // assert that there are now 2 entries for "alice@example.org"
+    let res = c.get_by_email("alice@example.org".into()).await;
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert_eq!(res.len(), 2);
+
+    // FIXME: check that the new key is considered revoked
+
+    // ... and 1 entry for "bob@example.org"
+    let res = c.get_by_email("bob@example.org".into()).await;
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert_eq!(res.len(), 1);
+
+    // 5. test handling of revocation certs
+    let cert = Certificate {
+        cert: CAROL_CERT.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["carol@example.org".to_owned()],
+        name: Some("Carol".to_owned()),
+        revocations: vec![CAROL_REV1.to_string()],
+    };
+
+    // push rev1 to db with a "new" Cert
+    let res = c.persist(&cert).await;
+    assert!(res.is_ok());
+    let carol = c
+        .get_by_email("carol@example.org".to_string())
+        .await
+        .expect("failed to load carol");
+    assert_eq!(carol.len(), 1);
+    assert_eq!(carol[0].certificate.revocations.len(), 1);
+
+    // push rev2 to db with a Cert "update"
+    let cert = Certificate {
+        cert: CAROL_CERT.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["carol@example.org".to_owned()],
+        name: Some("Carol".to_owned()),
+        revocations: vec![CAROL_REV1.to_string(), CAROL_REV2.to_string()],
+    };
+    let res = c
+        .persist(&cert)
+        .await
+        .expect("failed to persist carol update");
+
+    assert_eq!(res.len(), 1);
+    assert!(matches!(res[0], CertResultJSON::Good{..}));
+
+    let carol = c
+        .get_by_email("carol@example.org".to_string())
+        .await
+        .expect("failed to load carol");
+    assert_eq!(carol.len(), 1);
+    assert_eq!(carol[0].certificate.revocations.len(), 2);
 
     // -- abort restd --
     abort_handle.abort();

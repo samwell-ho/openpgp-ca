@@ -310,8 +310,22 @@ fn process_cert(
                     ),
                 );
 
-                ReturnBadJSON::new(error, cert_info)
+                ReturnBadJSON::new(error, cert_info.clone())
             })?;
+
+            for rev in &certificate.revocations {
+                ca.revocation_add(rev).map_err(|e| {
+                    let ce = CertError::new(
+                        CertStatus::InternalError,
+                        format!(
+                            "process_cert: Error adding revocation to db: \
+                                {:?}",
+                            e
+                        ),
+                    );
+                    ReturnBadJSON::new(ce, cert_info.clone())
+                })?;
+            }
         } else {
             // add new cert to db
             action = Some(Action::New);

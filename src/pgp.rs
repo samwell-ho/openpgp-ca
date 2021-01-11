@@ -23,7 +23,6 @@ use openpgp::types::{
 use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
 use std::convert::identity;
-use std::path::PathBuf;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
@@ -239,23 +238,6 @@ impl Pgp {
     pub fn is_possibly_revoked(cert: &Cert) -> bool {
         RevocationStatus::NotAsFarAsWeKnow
             != cert.revocation_status(POLICY, None)
-    }
-
-    /// Load Revocation Cert from file
-    pub fn load_revocation_cert(
-        revoc_file: Option<&PathBuf>,
-    ) -> Result<Signature> {
-        if let Some(filename) = revoc_file {
-            let p = openpgp::Packet::from_file(filename)
-                .context("Input could not be parsed")?;
-
-            if let Packet::Signature(s) = p {
-                return Ok(s);
-            } else {
-                return Err(anyhow::anyhow!("Couldn't convert to revocation"));
-            }
-        };
-        Err(anyhow::anyhow!("Couldn't load revocation from file"))
     }
 
     pub fn get_revoc_issuer_fp(revoc_cert: &Signature) -> Option<Fingerprint> {
