@@ -268,6 +268,18 @@ async fn test_restd() {
 
         let res = c.persist(&cert).await;
         assert!(res.is_ok());
+        // check that return data has the expected shape
+        let ret = res.unwrap();
+        assert_eq!(ret.len(), 1);
+        let ret = ret.get(0).unwrap();
+        if let CertResultJSON::Good(ret) = ret {
+            assert_eq!(ret.action, Some(Action::New));
+            assert_eq!(
+                ret.cert_info.primary.fingerprint,
+                "B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106"
+                    .to_string()
+            );
+        }
 
         // check that ALICE_CERT is now considered an "Update"
         let res = c.check(&cert).await;
