@@ -744,6 +744,25 @@ impl OpenpgpCa {
         self.revocation_add(&s)
     }
 
+    /// Check if the CA database has a variant of the revocation
+    /// certificate 'rev_cert' (according to Signature::normalized_eq()).
+    fn check_for_equivalent_revocation(
+        &self,
+        rev_cert: &Signature,
+        cert: &models::Cert,
+    ) -> Result<bool> {
+        for db_rev in self.db.get_revocations(cert)? {
+            let r = Pgp::armored_to_signature(&db_rev.revocation)
+                .context("Couldn't re-armor revocation cert from CA db")?;
+
+            if rev_cert.normalized_eq(&r) {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
     /// Add a revocation certificate to the OpenPGP CA database.
     ///
     /// The matching cert is looked up by issuer Fingerprint, if
@@ -776,11 +795,13 @@ impl OpenpgpCa {
 
             // verify that revocation certificate validates with cert
             if Self::validate_revocation(&c, &mut revoc_cert)? {
-                // update sig in DB
-                let armored = Pgp::sig_to_armored(&revoc_cert)
-                    .context("couldn't armor revocation cert")?;
+                if !self.check_for_equivalent_revocation(&revoc_cert, &cert)? {
+                    // update sig in DB
+                    let armored = Pgp::sig_to_armored(&revoc_cert)
+                        .context("couldn't armor revocation cert")?;
 
-                self.db.add_revocation(&armored, &cert)?;
+                    self.db.add_revocation(&armored, &cert)?;
+                }
 
                 Ok(())
             } else {
