@@ -405,22 +405,8 @@ impl OpenpgpCa {
             }
         };
 
-        // use emails from User IDs, if no emails were passed
-        let emails = if !emails.is_empty() {
-            emails.iter().map(|&s| s.to_owned()).collect()
-        } else {
-            let userids: Vec<_> = c.userids().collect();
-            let emails: Vec<String> = userids
-                .iter()
-                .filter_map(|uid| uid.userid().email().ok().flatten())
-                .collect();
-            emails
-        };
-
         let pub_key = &Pgp::cert_to_armored(&certified)
             .context("cert_import_new: couldn't re-armor key")?;
-
-        let emails: Vec<&str> = emails.iter().map(|s| &**s).collect();
 
         self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
             let res = self.db.add_user(

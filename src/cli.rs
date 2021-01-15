@@ -118,6 +118,7 @@ pub enum UserCommand {
         #[structopt(
             short = "e",
             long = "email",
+            required = true,
             number_of_values = 1,
             multiple = true,
             help = "Email address"
