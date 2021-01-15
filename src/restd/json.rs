@@ -105,12 +105,6 @@ impl ReturnBadJSON {
     }
 }
 
-impl From<CertError> for ReturnBadJSON {
-    fn from(error: CertError) -> ReturnBadJSON {
-        ReturnBadJSON::new(error, None)
-    }
-}
-
 /// User-provided input data for OpenPGP CA RESTD
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Certificate {

@@ -253,7 +253,8 @@ fn process_cert(
     let _ = cert; // drop previous version of the cert
 
     // perform policy checks
-    let valid_cert = cert_policy_check(&merged)?;
+    let valid_cert = cert_policy_check(&merged)
+        .map_err(|ce| ReturnBadJSON::new(ce, Some(cert_info.clone())))?;
     let _ = merged; // drop previous version of the cert
 
     // check if the cert is revoked
@@ -268,15 +269,17 @@ fn process_cert(
     )
     .map_err(|e| ReturnBadJSON::new(e, Some(cert_info.clone())))?;
 
-    let cert_info_norm = CertInfo::from_cert(&norm).map_err(|e| {
-        CertError::new(
-            CertStatus::InternalError,
-            format!(
-                "process_cert: CertInfo::from_cert() failed for 'norm' {:?}",
-                e
-            ),
-        )
-    })?;
+    let cert_info_norm = CertInfo::from_cert(&norm)
+        .map_err(|e| {
+            CertError::new(
+                CertStatus::InternalError,
+                format!(
+                    "process_cert: CertInfo::from_cert() failed for 'norm' {:?}",
+                    e
+                ),
+            )
+        })
+        .map_err(|ce| ReturnBadJSON::new(ce, None))?;
 
     let armored = OpenpgpCa::cert_to_armored(&norm).map_err(|e|
         // this should probably never happen?
