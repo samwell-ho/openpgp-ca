@@ -91,7 +91,7 @@ pub enum Upload {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReturnBadJSON {
     pub error: Vec<CertError>, // FIXME: read/write access methods?
-    cert_info: Option<CertInfo>,
+    pub cert_info: Option<CertInfo>,
     upload: Upload,
 }
 

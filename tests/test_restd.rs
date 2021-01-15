@@ -187,6 +187,32 @@ hq6syHDJBA==
 =ZQ+Y
 -----END PGP PUBLIC KEY BLOCK-----"#;
 
+// A DSA1024 cert (invalid according to standard policy)
+const METHUSALEM_CERT: &str = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQGiBGAA5lIRBACcfTjNIyId7yTEolq+NAspEb5fBjYIvf0mQQ1AykYWy73PvP6+
+P1kXAFs5n2wlvRAPxRWL4fYRSqLF+t5WOqePdj3HHGlpBmlc8qOuq3rmLXkiH1Zf
+BW/UYaGvxDcK7xfd7lXOI/Vs5yiXvmoP/ljb1TOJrQlahSCu/qW9qA0rEwCgumWq
+P7DIw5RtTtj+zEdPGtZA82MD/3U5aRNIfj6WlJE0hlM0oQF8oLwIfa1QEuxQKhGG
+yFxiYKkTx4vbXHPFtOTrivnQlIUuAGHplR01lx0Xw/0vVKB+0b7KlcxaBFG14p+s
+xvL0HQ3e9FUrcN1ehWcdEAyOy2XxGDeYlV5qMnkWC5WTiYLP3CDQF+ORW781d2Su
++gzfA/48WJPX9RBHAwXQkaytyN6cAdtP4bks75zmYlIhhIQVOcuaucDWd8wRixXL
+GX7fsR3RASAm5BhHX6uKvRJVSA1GdV69ZaHKEGiPPE8Kb7bM/FjiN6SMVCmwyo24
+StvNs3f/Up9MXugFtkpB5BxFWzg7/U2/Y03EinJUf63VxRCBd7QjTWV0aHVzYWxl
+bSA8bWV0aHVzYWxlbUBleGFtcGxlLm9yZz6IeAQTEQIAOBYhBEW7NpSYo4f47p4w
+kQkAh8n4B1uBBQJgAOZSAhsDBQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJEAkA
+h8n4B1uBcxcAn0XnuFQ0Dl5WbclZB/e54DTSs2M/AJ9sfCad7JxfwpnuHI6zWxyK
+2crUcbkBDQRgAOZSEAQAqDcs5pIFyH/HpS59H0fypM4Euhw3r/eNj+U9F8on/rlN
+Pw8VTC8QxZsel5iHeGNVKar+svzNcDJc6vVDT0lgK50Kd1XGRAGTLLRbZ/IHccFK
+u0H+7RHzlKb42GbVY+KULhz9m3+Tw/DpxKDe4JqxmjvWI81yqW5yrPo1zeAabu8A
+AwUEAJV5qwFanoT/kS0qAV0c2a5M02gSTB6LWuVUzLFr6jaN4S9+5VtwpgyPrlA/
+BIu1eAM6lWFEhwp+OxoDUntGP5iV+18VFYIBBt6/Jzu5AHXMgfAUXEjgXjp0epDP
+exF0jkPLay26DVoJKsVsn2nx7b6fB11zV/ZrR/bWvXKDFKBgiGAEGBECACAWIQRF
+uzaUmKOH+O6eMJEJAIfJ+AdbgQUCYADmUgIbDAAKCRAJAIfJ+Adbgav6AJ46cuUi
+D5dmOHEjMKMgIHN5yEm66QCeOQKb9ZCirohcldmh/bXXm0DXapk=
+=NWDD
+-----END PGP PUBLIC KEY BLOCK-----"#;
+
 fn start_restd(db: String) -> AbortHandle {
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
     let _ = Abortable::new(
@@ -335,6 +361,8 @@ async fn test_restd() {
             ret.cert_info.primary.fingerprint,
             "B702 503F BB24 BDB1 6562  7078 6CC9 1D17 5464 3106".to_string()
         );
+    } else {
+        panic!("cert should be good");
     }
 
     // Alice, illegal "delisted" value (check/post may not
@@ -499,6 +527,33 @@ async fn test_restd() {
         .expect("failed to load carol");
     assert_eq!(carol.len(), 1);
     assert_eq!(carol[0].certificate.revocations.len(), 2);
+
+    // 6. test processing of cert with old/invalid cryptography.
+    // Expected output: ReturnBadJSON, with existing cert_info
+    let cert = Certificate {
+        cert: METHUSALEM_CERT.to_owned(),
+        delisted: None,
+        inactive: None,
+        email: vec!["methusalem@example.org".to_owned()],
+        name: Some("Methusalem".to_owned()),
+        revocations: vec![],
+    };
+
+    let res = c.check(&cert).await;
+
+    assert!(res.is_ok());
+    let res = res.unwrap();
+    assert_eq!(res.len(), 1);
+    let res = res.get(0).unwrap();
+
+    if let CertResultJSON::Bad(bad) = res {
+        assert_eq!(
+            bad.cert_info.as_ref().unwrap().primary.fingerprint,
+            "45BB 3694 98A3 87F8 EE9E  3091 0900 87C9 F807 5B81".to_string()
+        );
+    } else {
+        panic!("cert should be bad");
+    }
 
     // -- abort restd --
     abort_handle.abort();
