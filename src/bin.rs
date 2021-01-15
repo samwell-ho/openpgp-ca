@@ -170,28 +170,28 @@ fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
 
 fn print_certifications_status(ca: &OpenpgpCa) -> Result<()> {
     let mut count_ok = 0;
-    let mut count_all = 0;
 
-    for user in ca.users_get_all()? {
+    let users = ca.users_get_all()?;
+    for user in &users {
         for cert in ca.get_certs_by_user(&user)? {
             let (sig_from_ca, tsig_on_ca) =
                 ca.cert_check_certifications(&cert)?;
 
-            count_all += 1;
-
-            let name = ca.cert_get_name(&cert);
             let ok = if sig_from_ca {
                 true
             } else {
                 println!(
-                    "Missing certification by CA for user {:?} fingerprint {}.",
-                    user.name, cert.fingerprint
+                    "No certification from for any User ID of {}.",
+                    cert.fingerprint
                 );
                 false
             } && if tsig_on_ca {
                 true
             } else {
-                println!("CA Cert has not been tsigned by user {:?}", name);
+                println!(
+                    "CA Cert has not been tsigned by {}.",
+                    cert.fingerprint
+                );
                 false
             };
 
@@ -201,10 +201,12 @@ fn print_certifications_status(ca: &OpenpgpCa) -> Result<()> {
         }
     }
 
+    println!();
     println!(
         "Checked {} user keys, {} of them had good certifications in both \
         directions.",
-        count_all, count_ok
+        users.len(),
+        count_ok
     );
 
     Ok(())
@@ -244,8 +246,8 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
             let (sig_by_ca, tsig_on_ca) =
                 ca.cert_check_certifications(&cert)?;
 
-            println!("OpenPGP key for '{}'", name);
-            println!(" fingerprint {}", cert.fingerprint);
+            println!("OpenPGP key {}", cert.fingerprint);
+            println!(" for user '{}'", name);
 
             println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
             println!(" user cert has tsigned CA: {}", tsig_on_ca);
