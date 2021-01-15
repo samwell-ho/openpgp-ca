@@ -19,6 +19,7 @@ use sequoia_openpgp::packet::key;
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::Cert;
+use std::time::SystemTime;
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
 
@@ -58,6 +59,13 @@ pub struct Key {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiration_time: Option<DateTime<Utc>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// if this (sub-)key has an expiration_time, `expires_in_sec` shows in
+    /// how many seconds it will expire (e.g. "+1000" means "will expire in
+    /// 1000 seconds"), or if negative, how long ago it has expired (e.g.
+    /// "-1000" means "has expired 1000s ago)
+    pub expires_in_sec: Option<i64>,
 
     pub algo: String,
     pub bits: usize,
@@ -146,6 +154,20 @@ impl Key {
                 (None, None)
             };
 
+        let expires_in_sec = if let Some(exp) = expiration {
+            let now = SystemTime::now();
+
+            if exp > now {
+                // expiration is in the future
+                Some(exp.duration_since(now).unwrap().as_secs() as i64)
+            } else {
+                // expiration is in the past
+                Some(-(now.duration_since(exp).unwrap().as_secs() as i64))
+            }
+        } else {
+            None
+        };
+
         let fingerprint = ka.fingerprint().to_string();
 
         let creation = ka.creation_time();
@@ -180,6 +202,7 @@ impl Key {
             flags,
             creation_time: creation.into(),
             expiration_time: expiration.map(|time| time.into()),
+            expires_in_sec,
             algo,
             bits,
             revocations,
