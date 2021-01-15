@@ -486,7 +486,13 @@ fn test_ca_multiple_revocations() -> Result<()> {
 
     let alice_key = gnupg::export(&ctx, &"alice@example.org");
 
-    ca.cert_import_new(&alice_key, vec![], None, &[], None)?;
+    ca.cert_import_new(
+        &alice_key,
+        vec![],
+        None,
+        &["alice@example.org"],
+        None,
+    )?;
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
@@ -501,10 +507,11 @@ fn test_ca_multiple_revocations() -> Result<()> {
     // check data in CA
     let certs = ca.user_certs_get_all()?;
 
-    // check that name/email has been autodetected on CA import from the pubkey
+    // email has been explcitly set for CA import from the pubkey
     assert_eq!(certs.len(), 1);
     let alice = &certs[0];
 
+    // check that name has been autodetected on CA import from the pubkey
     let name = ca.cert_get_name(&alice)?;
     assert_eq!(name, "Alice".to_string());
 
