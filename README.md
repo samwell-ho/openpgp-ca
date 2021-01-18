@@ -151,7 +151,9 @@ https://openpgp-ca.gitlab.io/openpgp-ca/
 ## Support
 
 If you are interested in deploying OpenPGP CA in your organization, please
-contact <heiko@schaefer.name>. We can consult on the setup, help you with
+contact <heiko@schaefer.name> 
+(OpenPGP 68C8B3725276BEBB3EEA0E208ACFC41124CCB82E).
+We can consult on the setup, help you with
 the setup or even add features.
 
 For non-profit organizations reduced rates are available.  This is also a
