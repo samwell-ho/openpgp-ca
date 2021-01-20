@@ -43,10 +43,12 @@ pub fn cert_to_warn(cert: &Cert) -> Result<Option<Vec<Warning>>, CertError> {
     let now2y = now
         .clone()
         .checked_add(Duration::from_secs(60 * 60 * 24 * 365 * 2))
-        .ok_or(CertError::new(
-            CertStatus::InternalError,
-            "cert_to_warn: duration checked_add failed",
-        ))?;
+        .ok_or_else(|| {
+            CertError::new(
+                CertStatus::InternalError,
+                "cert_to_warn: duration checked_add failed",
+            )
+        })?;
 
     let policy_plus2y = StandardPolicy::at(now2y);
 
@@ -69,10 +71,12 @@ pub fn cert_to_warn(cert: &Cert) -> Result<Option<Vec<Warning>>, CertError> {
     let now3m = now
         .clone()
         .checked_add(Duration::from_secs(60 * 60 * 24 * 30 * 3))
-        .ok_or(CertError::new(
-            CertStatus::InternalError,
-            "cert_to_warn: duration checked_add failed",
-        ))?;
+        .ok_or_else(|| {
+            CertError::new(
+                CertStatus::InternalError,
+                "cert_to_warn: duration checked_add failed",
+            )
+        })?;
 
     let policy_plus3m = StandardPolicy::at(now3m);
 
