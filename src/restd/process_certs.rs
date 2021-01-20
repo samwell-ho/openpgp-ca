@@ -6,12 +6,14 @@
 // SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use core::time::Duration;
 use std::collections::HashSet;
 use std::ops::Deref;
+use std::time::SystemTime;
 
 use sequoia_openpgp::cert::ValidCert;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::types::RevocationStatus;
+use sequoia_openpgp::types::{HashAlgorithm, RevocationStatus};
 use sequoia_openpgp::Cert;
 
 use crate::ca::OpenpgpCa;
@@ -21,6 +23,78 @@ use crate::restd::json::*;
 use crate::restd::util::{is_email_in_domain, split_emails, user_id_filter};
 
 const STANDARD_POLICY: &StandardPolicy = &StandardPolicy::new();
+
+/// Warnings for this cert.
+///
+/// Warnings are currently generated for:
+/// - Standard Policy gives an error for 'now + 2 years'
+/// - Cert is not alive() in 'now + 3 months'
+///
+/// Assumption: the cert has been checked and found good by the
+/// StandardPolicy for `now`.
+pub fn cert_to_warn(cert: &Cert) -> Result<Option<Vec<Warning>>, CertError> {
+    let mut warns = Vec::new();
+    let now = SystemTime::now();
+
+    // Check if StandardPolicy is bad in 'now + 2 years', but good when
+    // allowing for SHA1.
+    let now2y = now
+        .clone()
+        .checked_add(Duration::from_secs(60 * 60 * 24 * 365 * 2))
+        .ok_or(CertError::new(
+            CertStatus::InternalError,
+            "cert_to_warn: duration checked_add failed",
+        ))?;
+
+    let policy_plus2y = StandardPolicy::at(now2y);
+
+    let valid2y = cert.with_policy(&policy_plus2y, Some(now2y));
+
+    let mut sp_plus_sha1 = StandardPolicy::at(now2y);
+    sp_plus_sha1.accept_hash(HashAlgorithm::SHA1);
+    let valid2y_sha1 = cert.with_policy(&sp_plus_sha1, now2y);
+
+    if valid2y.is_err() && valid2y_sha1.is_ok() {
+        warns.push(Warning::new(
+            WarnStatus::WeakCryptoSHA1,
+            "This certificate relies on SHA1 hashes, which are deprecated. It should be updated!",
+        ));
+    }
+
+    // Check if cert is alive() now, but will not be in 'now + 3 months'.
+    // If so: warn about imminent expiry.
+
+    let now3m = now
+        .clone()
+        .checked_add(Duration::from_secs(60 * 60 * 24 * 30 * 3))
+        .ok_or(CertError::new(
+            CertStatus::InternalError,
+            "cert_to_warn: duration checked_add failed",
+        ))?;
+
+    let policy_plus3m = StandardPolicy::at(now3m);
+
+    let valid_cert_now = cert.with_policy(STANDARD_POLICY, None);
+
+    let valid_cert_3m = cert.with_policy(&policy_plus3m, Some(now3m));
+
+    if valid_cert_now.is_ok()
+        && valid_cert_now.unwrap().alive().is_ok()
+        && valid_cert_3m.is_ok()
+        && valid_cert_3m.unwrap().alive().is_err()
+    {
+        warns.push(Warning::new(
+            WarnStatus::ExpiresSoon,
+            "Will expire in the next 90 days",
+        ));
+    }
+
+    if warns.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(warns))
+    }
+}
 
 pub fn cert_to_cert_info(cert: &Cert) -> Result<CertInfo, ReturnError> {
     CertInfo::from_cert(cert).map_err(|e| {
@@ -288,7 +362,7 @@ fn process_cert(
                 CertStatus::InternalError,
                 format!("process_cert: Couldn't re-armor cert {:?}", e),
             ),
-            Some(cert_info),
+            Some(cert_info.clone()),
         ))?;
 
     let action;
@@ -357,7 +431,7 @@ fn process_cert(
                         e
                     ),
                 );
-                ReturnBadJSON::new(error, cert_info)
+                ReturnBadJSON::new(error, cert_info.clone())
             })?;
         }
     } else {
@@ -397,9 +471,13 @@ fn process_cert(
         inactive: Some(inactive),
     };
 
+    let warn = cert_to_warn(&norm)
+        .map_err(|ce| ReturnBadJSON::new(ce, Some(cert_info.clone())))?;
+
     Ok(ReturnGoodJSON {
         certificate,
         cert_info: cert_info_norm,
+        warn,
         action,
         upload,
     })

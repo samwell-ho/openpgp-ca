@@ -16,7 +16,9 @@ use rocket_contrib::json::Json;
 use crate::ca::OpenpgpCa;
 use crate::models;
 use crate::restd::json::*;
-use crate::restd::process_certs::{cert_to_cert_info, process_certs};
+use crate::restd::process_certs::{
+    cert_to_cert_info, cert_to_warn, process_certs,
+};
 
 mod cli;
 mod process_certs;
@@ -121,12 +123,22 @@ fn certs_by_email(
                 })?;
 
             let cert_info = cert_to_cert_info(&cert)?;
+            let warn = cert_to_warn(&cert).map_err(|ce| {
+                ReturnError::new(
+                    ReturnStatus::InternalError,
+                    format!(
+                        "certs_by_email: error during cert_to_warn '{:?}'",
+                        ce
+                    ),
+                )
+            })?;
 
             let certificate = load_certificate_data(&ca, &c)?;
 
             res.push(ReturnGoodJSON {
                 certificate,
                 cert_info,
+                warn,
                 action: None,
                 upload: None,
             });
@@ -163,10 +175,20 @@ fn cert_by_fp(
                 })?;
 
             let cert_info = cert_to_cert_info(&cert)?;
+            let warn = cert_to_warn(&cert).map_err(|ce| {
+                ReturnError::new(
+                    ReturnStatus::InternalError,
+                    format!(
+                        "cert_by_fp: error during cert_to_warn '{:?}'",
+                        ce
+                    ),
+                )
+            })?;
 
             Ok(Json(Some(ReturnGoodJSON {
                 certificate,
                 cert_info,
+                warn,
                 action: None,
                 upload: None,
             })))

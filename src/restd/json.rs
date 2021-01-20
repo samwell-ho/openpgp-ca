@@ -42,7 +42,9 @@ pub struct ReturnGoodJSON {
     /// Factual information about the properties of an OpenPGP Cert
     pub cert_info: CertInfo,
 
-    /// +later: cert_lints (e.g. expiry warnings, deprecated crypto, ...)
+    /// e.g. expiry warnings, deprecated crypto,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warn: Option<Vec<Warning>>,
 
     /// action ("new" or "update")
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -245,11 +247,19 @@ impl CertError {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum CertStatus {
-    /// The cert failed a policy check, it cannot be used
-    /// (this probably means the key is using very old, broken crypto).
+    /// The cert failed a policy check, it cannot be used.
+    ///
+    /// This is a catchall status code - see the accompanying 'msg' for
+    /// details.
     ///
     /// This means that Sequoia's standard policy rejects this cert.
     BadCert,
+
+    /// The cert failed a policy check, it cannot be used.
+    ///
+    /// This status specifically signals that the key is using broken
+    /// cryptographic primitives.
+    BadCertKeyTooWeak,
 
     /// The OpenPGP key does not include a user_id that corresponds to an
     /// email address that was provided in "Certificate".
@@ -272,4 +282,28 @@ pub enum CertStatus {
     /// This should not happen - if it happens, it should probably be
     /// handled similar to HTTP 500, and investigated.
     InternalError,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Warning {
+    status: WarnStatus,
+    msg: String,
+}
+
+impl Warning {
+    pub fn new<S>(status: WarnStatus, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            status,
+            msg: msg.into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum WarnStatus {
+    ExpiresSoon,
+    WeakCryptoSHA1,
 }
