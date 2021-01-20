@@ -13,7 +13,9 @@ use std::time::SystemTime;
 
 use sequoia_openpgp::cert::ValidCert;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::types::{HashAlgorithm, RevocationStatus};
+use sequoia_openpgp::types::{
+    HashAlgorithm, PublicKeyAlgorithm, RevocationStatus,
+};
 use sequoia_openpgp::Cert;
 
 use crate::ca::OpenpgpCa;
@@ -326,7 +328,30 @@ fn process_cert(
     };
     let _ = cert; // drop previous version of the cert
 
-    // perform policy checks
+    // Detect weak algorithms, to give a more specific error status:
+    // RSA, DSA, Elgamal under 2048 bits return BadCertKeyTooWeak.
+    let pk_algo = cert.primary_key().pk_algo();
+    #[allow(deprecated)]
+    if pk_algo == PublicKeyAlgorithm::RSAEncryptSign
+        || pk_algo == PublicKeyAlgorithm::RSAEncrypt
+        || pk_algo == PublicKeyAlgorithm::RSASign
+        || pk_algo == PublicKeyAlgorithm::ElGamalEncryptSign
+        || pk_algo == PublicKeyAlgorithm::ElGamalEncrypt
+        || pk_algo == PublicKeyAlgorithm::DSA
+    {
+        // Note: Some implementations end up generating 2047 bits when a
+        // 2048 bit key is requested
+        if cert_info.primary.bits <= 2046 {
+            let ce = CertError::new(
+                CertStatus::BadCertKeyTooWeak,
+                "Cert uses a public key algorithm with a key of \
+                insufficient length",
+            );
+            return Err(ReturnBadJSON::new(ce, Some(cert_info.clone())));
+        }
+    }
+
+    // perform sequoia policy check
     let valid_cert = cert_policy_check(&merged)
         .map_err(|ce| ReturnBadJSON::new(ce, Some(cert_info.clone())))?;
     let _ = merged; // drop previous version of the cert
