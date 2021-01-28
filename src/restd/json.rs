@@ -287,7 +287,11 @@ pub enum CertStatus {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Warning {
     status: WarnStatus,
+
     msg: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
 }
 
 impl Warning {
@@ -298,6 +302,7 @@ impl Warning {
         Self {
             status,
             msg: msg.into(),
+            url: None,
         }
     }
 }
