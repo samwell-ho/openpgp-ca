@@ -1,4 +1,4 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
@@ -32,6 +32,7 @@
 
 use std::collections::HashMap;
 use std::env;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::SystemTime;
@@ -42,6 +43,9 @@ use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::packet::Signature;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
+use openpgp::serialize::stream::Armorer;
+use openpgp::serialize::stream::{Message, Signer};
+use openpgp::KeyHandle;
 use openpgp::{Cert, Fingerprint, KeyID, Packet};
 
 use crate::db::Db;
@@ -52,7 +56,6 @@ use diesel::prelude::*;
 
 use crate::models::Revocation;
 use anyhow::{Context, Result};
-use sequoia_openpgp::KeyHandle;
 use std::fs::File;
 use std::io::Read;
 
@@ -162,6 +165,24 @@ impl OpenpgpCa {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
             _ => panic!("get_ca_cert() failed"),
+        }
+    }
+
+    /// get the email of this CA
+    pub fn get_ca_email(&self) -> Result<String> {
+        let cert = self.ca_get_cert()?;
+        let uids: Vec<_> = cert.userids().collect();
+
+        if uids.len() != 1 {
+            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
+        }
+
+        let email = &uids[0].userid().email()?;
+
+        if let Some(email) = email {
+            Ok(email.clone())
+        } else {
+            Err(anyhow::anyhow!("ERROR: CA user_id has no email"))
         }
     }
 
@@ -1256,5 +1277,40 @@ impl OpenpgpCa {
         }
 
         Ok(res)
+    }
+
+    pub fn sign_detached(&self, text: &str) -> Result<String> {
+        let ca_cert = self.ca_get_cert()?;
+
+        let signing_keypair = ca_cert
+            .keys()
+            .secret()
+            .with_policy(&StandardPolicy::new(), None)
+            .supported()
+            .alive()
+            .revoked(false)
+            .for_signing()
+            .next()
+            .unwrap()
+            .key()
+            .clone()
+            .into_keypair()?;
+
+        let mut sink = vec![];
+        {
+            let message = Message::new(&mut sink);
+            let message = Armorer::new(message)
+                // Customize the `Armorer` here.
+                .build()?;
+
+            let mut signer =
+                Signer::new(message, signing_keypair).detached().build()?;
+
+            // Write the data directly to the `Signer`.
+            signer.write_all(text.as_bytes())?;
+            signer.finalize()?;
+        }
+
+        Ok(std::str::from_utf8(&sink)?.to_string())
     }
 }

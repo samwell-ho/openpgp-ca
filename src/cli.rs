@@ -1,4 +1,4 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
@@ -46,6 +46,11 @@ pub enum Command {
     Wkd {
         #[structopt(subcommand)]
         cmd: WkdCommand,
+    },
+    /// Keylist
+    Keylist {
+        #[structopt(subcommand)]
+        cmd: KeyListCommand,
     },
     //    /// Manage Directories
     //    Directory {
@@ -236,5 +241,28 @@ pub enum WkdCommand {
     Export {
         #[structopt(help = "Filesystem directory for WKD export")]
         path: PathBuf,
+    },
+}
+
+#[derive(StructOpt, Debug)]
+pub enum KeyListCommand {
+    /// Export KeyList
+    Export {
+        #[structopt(
+            short = "p",
+            long = "path",
+            help = "Filesystem directory for KeyList export"
+        )]
+        path: PathBuf,
+
+        #[structopt(short = "s", long = "sig-uri", help = "Sinature URI")]
+        signature_uri: String,
+
+        #[structopt(
+            short = "f",
+            long = "force",
+            help = "Overwrite keylist/sig files if they exist"
+        )]
+        force: bool,
     },
 }

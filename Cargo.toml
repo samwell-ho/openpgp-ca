@@ -1,9 +1,9 @@
-# SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+# SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 [package]
 name = "openpgp-ca"
-version = "0.9.2"
+version = "0.9.3"
 description = "OpenPGP CA is a tool for managing OpenPGP keys within organizations"
 authors = ["Heiko Schaefer <heiko@schaefer.name>"]
 license = "GPL-3.0-or-later"
@@ -47,6 +47,9 @@ sha2 = "0.9"
 
 futures = "0.3"
 futures-util = "0.3"
+
+openpgp-keylist = "0.2"
+#openpgp-keylist = { path="../openpgp-keylist" }
 
 sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v1.0.0" }
 sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "v1.0.0" }

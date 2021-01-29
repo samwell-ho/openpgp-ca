@@ -1,4 +1,4 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
@@ -6,6 +6,8 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::fs::{File, OpenOptions};
+use std::io::prelude::*;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -13,8 +15,12 @@ use chrono::offset::Utc;
 use chrono::DateTime;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_keylist::{Key, Keylist, Metadata};
 
 pub mod cli;
+
+// export filename of keylist
+const KEYLIST_FILE: &str = "keylist.json";
 
 fn main() -> Result<()> {
     use cli::*;
@@ -130,9 +136,117 @@ fn main() -> Result<()> {
                 ca.wkd_export(&db_ca.domainname, &path)?;
             }
         },
+
+        Command::Keylist { cmd } => match cmd {
+            KeyListCommand::Export {
+                path,
+                signature_uri,
+                force,
+            } => {
+                export_keylist(&ca, path, signature_uri, force)?;
+            }
+        },
     }
 
     Ok(())
+}
+
+/// `path`: filesystem path into which the exported keylist and signature files will be writter.
+/// `signature_uri`: the https address from which the signature file will be retrievable
+/// `force`: by default, this fn fails if the files exist; when force is true, overwrite.
+fn export_keylist(
+    oca: &OpenpgpCa,
+    path: PathBuf,
+    signature_uri: String,
+    force: bool,
+) -> Result<()> {
+    // filename of sigfile: last part of signature_uri
+    let pos = &signature_uri.rfind('/').unwrap() + 1; //FIXME
+    let sigfile_name = &signature_uri[pos..];
+
+    // Start populating new Keylist
+    let mut ukl = Keylist {
+        metadata: Metadata {
+            signature_uri: signature_uri.clone(),
+            keyserver: None,
+            comment: Some("Exported from OpenPGP CA".to_string()),
+        },
+        keys: vec![],
+    };
+
+    // .. add ca cert to Keylist ..
+    let (ca, cacert) = oca.ca_get()?.expect("failed to load CA");
+
+    ukl.keys.push(Key {
+        fingerprint: cacert.fingerprint,
+        name: Some(format!("OpenPGP CA at {}", ca.domainname)),
+        email: Some(oca.get_ca_email()?),
+        comment: None,
+        keyserver: None,
+    });
+
+    // .. add all "signed-by-ca" certs to the list.
+    for user in &oca.users_get_all()? {
+        for user_cert in oca.get_certs_by_user(&user)? {
+            // check if the cert has been certified by this ca (else skip)
+            // FIXME: certification should be processed per user id
+            let (sig_from_ca, _) =
+                oca.cert_check_certifications(&user_cert)?;
+            if !sig_from_ca {
+                continue;
+            }
+
+            // Create entries for each email that the CA
+            // FIXME: only export certified user ids
+            let emails = oca.emails_get(&user_cert)?;
+
+            if emails.is_empty() {
+                // Insert one entry with unset email
+                ukl.keys.push(Key {
+                    fingerprint: user_cert.fingerprint,
+                    name: user.name.clone(),
+                    email: None,
+                    comment: None,
+                    keyserver: None,
+                });
+            } else {
+                // Insert an entry for each email
+                for email in emails {
+                    ukl.keys.push(Key {
+                        fingerprint: user_cert.fingerprint.clone(),
+                        name: user.name.clone(),
+                        email: Some(email.addr),
+                        comment: None,
+                        keyserver: None,
+                    });
+                }
+            }
+        }
+    }
+
+    let signer = Box::new(|text: &str| oca.sign_detached(text));
+
+    // make a signed list object
+    let skl = ukl.sign(signer)?;
+
+    // Write keylist and signature to the filesystem
+    let mut keylist = path.clone();
+    keylist.push(KEYLIST_FILE);
+    open_file(keylist, force)?.write_all(&skl.keylist.as_bytes().to_vec())?;
+
+    let mut sigfile = path;
+    sigfile.push(sigfile_name);
+    open_file(sigfile, force)?.write_all(&skl.sig.as_bytes().to_vec())?;
+
+    Ok(())
+}
+
+fn open_file(name: PathBuf, overwrite: bool) -> std::io::Result<File> {
+    if overwrite {
+        File::create(name)
+    } else {
+        OpenOptions::new().write(true).create_new(true).open(name)
+    }
 }
 
 fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
