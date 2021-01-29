@@ -9,9 +9,9 @@ authors = ["Heiko Schaefer <heiko@schaefer.name>"]
 license = "GPL-3.0-or-later"
 categories = ["cryptography", "email"]
 keywords = ["OpenPGP", "Sequoia", "PGP"]
-homepage = "https://gitlab.com/openpgp-ca/openpgp-ca"
+homepage = "https://openpgp-ca.org"
 repository = "https://gitlab.com/openpgp-ca/openpgp-ca"
-documentation = "https://openpgp-ca.gitlab.io/openpgp-ca/"
+documentation = "https://openpgp-ca.gitlab.io/openpgp-ca"
 edition = "2018"
 
 [lib]
