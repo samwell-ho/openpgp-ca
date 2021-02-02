@@ -586,15 +586,15 @@ fn test_ca_signatures() -> Result<()> {
 
         match name.as_str() {
             "Alice" => {
-                assert!(sig_from_ca);
+                assert!(!sig_from_ca.is_empty());
                 assert!(!tsig_on_ca);
             }
             "Bob" => {
-                assert!(!sig_from_ca);
+                assert!(sig_from_ca.is_empty());
                 assert!(!tsig_on_ca);
             }
             "Carol" => {
-                assert!(sig_from_ca);
+                assert!(!sig_from_ca.is_empty());
                 assert!(tsig_on_ca);
             }
             _ => panic!(),
@@ -705,7 +705,7 @@ fn test_import_signed_cert() -> Result<()> {
     let name = ca.cert_get_name(&certs[0])?;
     match name.as_str() {
         "Alice" => {
-            assert!(sig_from_ca);
+            assert!(!sig_from_ca.is_empty());
             assert!(!tsig_on_ca);
         }
         _ => panic!(),

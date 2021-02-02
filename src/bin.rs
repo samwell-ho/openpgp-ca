@@ -188,34 +188,20 @@ fn export_keylist(
     // .. add all "signed-by-ca" certs to the list.
     for user in &oca.users_get_all()? {
         for user_cert in oca.get_certs_by_user(&user)? {
-            // check if the cert has been certified by this ca (else skip)
-            // FIXME: certification should be processed per user id
+            // check if any user id of the cert has been certified by this ca (else skip)
             let (sig_from_ca, _) =
                 oca.cert_check_certifications(&user_cert)?;
-            if !sig_from_ca {
+            if sig_from_ca.is_empty() {
                 continue;
             }
 
-            // Create entries for each email that the CA
-            // FIXME: only export certified user ids
-            let emails = oca.emails_get(&user_cert)?;
-
-            if emails.is_empty() {
-                // Insert one entry with unset email
-                ukl.keys.push(Key {
-                    fingerprint: user_cert.fingerprint,
-                    name: user.name.clone(),
-                    email: None,
-                    comment: None,
-                    keyserver: None,
-                });
-            } else {
-                // Insert an entry for each email
-                for email in emails {
+            // Create entries for each user id that the CA has certified
+            for u in sig_from_ca {
+                if let Ok(Some(email)) = u.email() {
                     ukl.keys.push(Key {
                         fingerprint: user_cert.fingerprint.clone(),
                         name: user.name.clone(),
-                        email: Some(email.addr),
+                        email: Some(email),
                         comment: None,
                         keyserver: None,
                     });
@@ -291,11 +277,11 @@ fn print_certifications_status(ca: &OpenpgpCa) -> Result<()> {
             let (sig_from_ca, tsig_on_ca) =
                 ca.cert_check_certifications(&cert)?;
 
-            let ok = if sig_from_ca {
+            let ok = if !sig_from_ca.is_empty() {
                 true
             } else {
                 println!(
-                    "No certification from for any User ID of {}.",
+                    "No CA certification on any User ID of {}.",
                     cert.fingerprint
                 );
                 false
@@ -363,7 +349,7 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
             println!("OpenPGP key {}", cert.fingerprint);
             println!(" for user '{}'", name);
 
-            println!(" user cert (or subkey) signed by CA: {}", sig_by_ca);
+            println!(" user cert signed by CA: {}", !sig_by_ca.is_empty());
             println!(" user cert has tsigned CA: {}", tsig_on_ca);
 
             ca.emails_get(&cert)?

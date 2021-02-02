@@ -56,6 +56,7 @@ use diesel::prelude::*;
 
 use crate::models::Revocation;
 use anyhow::{Context, Result};
+use sequoia_openpgp::packet::UserID;
 use std::fs::File;
 use std::io::Read;
 
@@ -605,7 +606,7 @@ impl OpenpgpCa {
     pub fn cert_check_certifications(
         &self,
         cert: &models::Cert,
-    ) -> Result<(bool, bool)> {
+    ) -> Result<(Vec<UserID>, bool)> {
         let sig_from_ca = self
             .cert_check_ca_sig(&cert)
             .context("Failed while checking CA sig")?;
@@ -618,15 +619,34 @@ impl OpenpgpCa {
     }
 
     /// Check if this Cert has been signed by the CA Key
-    pub fn cert_check_ca_sig(&self, cert: &models::Cert) -> Result<bool> {
-        let user_cert = Pgp::armored_to_cert(&cert.pub_cert)?;
-        let sigs = Self::get_third_party_sigs(&user_cert)?;
+    pub fn cert_check_ca_sig(
+        &self,
+        cert: &models::Cert,
+    ) -> Result<Vec<UserID>> {
+        let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
         let ca = self.ca_get_cert()?;
 
-        Ok(sigs
-            .iter()
-            .any(|s| s.issuer_fingerprints().any(|f| f == &ca.fingerprint())))
+        let mut res = Vec::new();
+        let policy = StandardPolicy::new();
+
+        for uid in c.userids() {
+            let signed_by_ca = uid
+                .clone()
+                .with_policy(&policy, None)?
+                .bundle()
+                .certifications()
+                .iter()
+                .any(|s| {
+                    s.issuer_fingerprints().any(|f| f == &ca.fingerprint())
+                });
+
+            if signed_by_ca {
+                res.push(uid.userid().clone());
+            }
+        }
+
+        Ok(res)
     }
 
     /// Check if this Cert has tsigned the CA Key
