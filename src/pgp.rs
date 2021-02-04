@@ -28,6 +28,9 @@ use std::time::SystemTime;
 use anyhow::{Context, Result};
 use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
 use sequoia_openpgp::cert::{CertParser, CipherSuite};
+use sequoia_openpgp::packet::signature::subpacket::{
+    Subpacket, SubpacketValue,
+};
 use sequoia_openpgp::parse::PacketParser;
 use sha2::Digest;
 
@@ -439,6 +442,27 @@ impl Pgp {
                         std::time::Duration::new(SECONDS_IN_DAY * days, 0),
                     )?;
                 }
+
+                // Include 'Signer's UserID' packet
+                // (https://tools.ietf.org/html/rfc4880#section-5.2.3.22)
+                // to make it easier to find the CA key via WKD
+                if let Some(uid) = ca_cert.userids().next() {
+                    // FIXME: wait until sequoia doesn't set this Subpacket
+                    // to critical by default (then replace the call below)
+
+                    // sb = sb.set_signers_user_id(uid.userid().value())?;
+
+                    // for now, manually set SignersUserID, with !critical
+                    sb.hashed_area_mut().replace(Subpacket::new(
+                        SubpacketValue::SignersUserID(
+                            uid.userid().value().as_ref().to_vec(),
+                        ),
+                        false,
+                    )?)?;
+                } else {
+                    panic!("no user id in ca cert. this should never happen.");
+                }
+
                 let sig = userid.bind(signer, user_cert, sb)?;
 
                 // collect all certifications
