@@ -15,6 +15,7 @@ use rocket_contrib::json::Json;
 
 use crate::ca::OpenpgpCa;
 use crate::models;
+use crate::restd::cert_info::CertInfo;
 use crate::restd::json::*;
 use crate::restd::process_certs::{
     cert_to_cert_info, cert_to_warn, process_certs,
@@ -333,6 +334,54 @@ fn poll_for_updates() -> String {
     unimplemented!()
 }
 
+/// Check for certs that will expire within "days" days.
+#[get("/certs/expire/<days>")]
+fn check_expiring(
+    days: u64,
+) -> Result<Json<Vec<CertInfo>>, BadRequest<Json<ReturnError>>> {
+    CA.with(|ca| {
+        let expired = ca.certs_expired(days).map_err(|e| {
+            ReturnError::new(
+                ReturnStatus::InternalError,
+                format!(
+                    "check_expiring: Error looking up expired certs '{:?}'",
+                    e
+                ),
+            )
+        })?;
+
+        let mut res = vec![];
+
+        for cert in expired.keys() {
+            let cert =
+                OpenpgpCa::armored_to_cert(&cert.pub_cert).map_err(|e| {
+                    ReturnError::new(
+                        ReturnStatus::InternalError,
+                        format!(
+                            "check_expiring: Error in armored_to_cert '{:?}'",
+                            e
+                        ),
+                    )
+                })?;
+
+            let ci = CertInfo::from_cert(&cert).map_err(|e| {
+                ReturnError::new(
+                    ReturnStatus::InternalError,
+                    format!(
+                        "check_expiring: Error getting cert_info for cert \
+                        '{:?}'",
+                        e
+                    ),
+                )
+            })?;
+
+            res.push(ci);
+        }
+
+        Ok(Json(res))
+    })
+}
+
 pub fn run(db: Option<String>) -> rocket::Rocket {
     DB.set(db).unwrap();
 
@@ -347,6 +396,7 @@ pub fn run(db: Option<String>) -> rocket::Rocket {
             delist_cert,
             refresh_certifications,
             poll_for_updates,
+            check_expiring
         ],
     )
 }

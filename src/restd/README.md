@@ -343,3 +343,15 @@ When this operation is appropriate, it can be performed as follows:
 ```
 curl --request DELETE http://localhost:8000/certs/<fingerprint>
 ```
+
+## Checking for certificates that will expire soon
+
+To check which certificates will expire in the next n days, the following 
+endpoint returns a list of CertInfo.
+
+Certs that are already expired or otherwise invalid at the time of the call 
+are not reported.
+
+```
+curl --request GET http://localhost:8000/certs/expire/<days>
+```
