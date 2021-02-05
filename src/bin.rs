@@ -9,6 +9,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::Result;
 use chrono::offset::Utc;
@@ -77,18 +78,8 @@ fn main() -> Result<()> {
                     None,
                 )?;
             }
-            UserCommand::Export { email } => {
-                let certs = match email {
-                    Some(email) => ca.certs_get(&email)?,
-                    None => ca.user_certs_get_all()?,
-                };
-
-                let mut c = Vec::new();
-                for cert in certs {
-                    c.push(OpenpgpCa::cert_to_cert(&cert)?);
-                }
-
-                println!("{}", OpenpgpCa::certs_to_armored(&c)?);
+            UserCommand::Export { email, path } => {
+                export_certs(&ca, email, path)?;
             }
             UserCommand::List => print_users(&ca)?,
             UserCommand::ShowRevocations { email } => {
@@ -151,9 +142,89 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// `path`: filesystem path into which the exported keylist and signature files will be writter.
-/// `signature_uri`: the https address from which the signature file will be retrievable
-/// `force`: by default, this fn fails if the files exist; when force is true, overwrite.
+fn export_certs(
+    oca: &OpenpgpCa,
+    email: Option<String>,
+    path: Option<String>,
+) -> Result<()> {
+    if let Some(path) = path {
+        // export to filesystem, individual files split by email
+
+        let emails = if let Some(email) = email {
+            vec![email]
+        } else {
+            oca.get_emails_all()?
+                .iter()
+                .map(|ce| ce.addr.clone())
+                .collect()
+        };
+
+        for email in &emails {
+            if let Ok(certs) = oca.certs_get(email) {
+                if !certs.is_empty() {
+                    let mut c: Vec<_> = vec![];
+                    for cert in certs {
+                        c.push(OpenpgpCa::armored_to_cert(&cert.pub_cert)?);
+                    }
+
+                    std::fs::write(
+                        path_append(&path, email)?,
+                        OpenpgpCa::certs_to_armored(&c)?,
+                    )?;
+                }
+            } else {
+                println!("ERROR loading certs for email '{}'", email)
+            };
+        }
+    } else {
+        // write to stdout
+        let certs = match email {
+            Some(email) => oca.certs_get(&email)?,
+            None => oca.user_certs_get_all()?,
+        };
+
+        let mut c = Vec::new();
+        for cert in certs {
+            c.push(OpenpgpCa::cert_to_cert(&cert)?);
+        }
+
+        println!("{}", OpenpgpCa::certs_to_armored(&c)?);
+    }
+
+    Ok(())
+}
+
+// Append a (potentially adversarial) `filename` to a (presumed trustworthy)
+// `path`.
+//
+// If `filename` contains suspicious chars, this fn returns an Err.
+fn path_append(path: &str, filename: &str) -> Result<PathBuf> {
+    // colon is a special char on windows (and illegal in emails)
+    if filename.chars().any(std::path::is_separator)
+        || filename.chars().any(|c| c == ':')
+    {
+        Err(anyhow::anyhow!(
+            "filename contains special character - maybe a path traversal \
+            attack? {}",
+            filename
+        ))
+    } else {
+        let mut pb = PathBuf::from_str(path)?;
+        pb.push(filename);
+        Ok(pb)
+    }
+}
+
+/// Export the contents of a CA in Keylist format.
+///
+/// `path`: filesystem path into which the exported keylist and signature
+/// files will be written.
+///
+/// `signature_uri`: the https address from which the signature file will
+/// be retrievable
+///
+/// `force`: by default, this fn fails if the files exist; when force is
+/// true, overwrite.
 fn export_keylist(
     oca: &OpenpgpCa,
     path: PathBuf,

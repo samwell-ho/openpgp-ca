@@ -157,6 +157,9 @@ pub enum UserCommand {
     Export {
         #[structopt(short = "e", long = "email", help = "Email address")]
         email: Option<String>,
+
+        #[structopt(short = "p", long = "path", help = "Output path")]
+        path: Option<String>,
     },
     /// List Users
     List,

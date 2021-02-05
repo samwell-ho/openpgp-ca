@@ -440,6 +440,12 @@ impl Db {
             .expect("could not load emails"))
     }
 
+    pub fn get_emails_all(&self) -> Result<Vec<CertEmail>> {
+        Ok(certs_emails::table
+            .load(&self.conn)
+            .expect("could not load emails"))
+    }
+
     pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {
         let inserted_count = diesel::insert_into(bridges::table)
             .values(&bridge)

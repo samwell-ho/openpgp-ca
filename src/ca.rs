@@ -983,6 +983,10 @@ impl OpenpgpCa {
         self.db.get_emails_by_cert(cert)
     }
 
+    pub fn get_emails_all(&self) -> Result<Vec<models::CertEmail>> {
+        self.db.get_emails_all()
+    }
+
     // -------- bridges
 
     /// Make regex for trust signature from domain-name
