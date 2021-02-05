@@ -182,9 +182,10 @@ pub enum UserCheckSubcommand {
         #[structopt(
             short = "d",
             long = "days",
-            help = "Check for keys that expire within 'days' days"
+            help = "Check for keys that expire within 'days' days",
+            default_value = "30"
         )]
-        days: Option<u64>,
+        days: u64,
     },
     /// Check certifications on CA key
     Certifications,

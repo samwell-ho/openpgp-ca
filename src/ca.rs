@@ -565,10 +565,13 @@ impl OpenpgpCa {
     }
 
     /// Which certs will be expired in 'days' days?
+    ///
+    /// If a cert is not "alive" now, it will not get returned as expiring.
+    /// (Otherwise old/abandoned certs would clutter the results)
     pub fn certs_expired(
         &self,
         days: u64,
-    ) -> Result<HashMap<models::Cert, (bool, Option<SystemTime>)>> {
+    ) -> Result<HashMap<models::Cert, Option<SystemTime>>> {
         let mut map = HashMap::new();
 
         let days = Duration::new(60 * 60 * 24 * days, 0);
@@ -579,14 +582,25 @@ impl OpenpgpCa {
 
         for cert in certs {
             let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+
+            // only consider (and thus potentially notify as "expiring") certs
+            // that are alive now
+            if c.with_policy(&StandardPolicy::new(), None)?
+                .alive()
+                .is_err()
+            {
+                continue;
+            }
+
             let exp = Pgp::get_expiry(&c)?;
             let alive = c
                 .with_policy(&StandardPolicy::new(), expiry_test)?
                 .alive()
                 .is_ok();
-            // cert.alive(&StandardPolicy::new(), expiry_test).is_ok();
 
-            map.insert(cert, (alive, exp));
+            if !alive {
+                map.insert(cert, exp);
+            }
         }
 
         Ok(map)

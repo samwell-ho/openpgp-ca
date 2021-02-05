@@ -47,8 +47,7 @@ fn main() -> Result<()> {
 
             UserCommand::Check { cmd } => match cmd {
                 UserCheckSubcommand::Expiry { days } => {
-                    // FIXME: set default in structopt?
-                    print_expiry_status(&ca, days.unwrap_or(0))?;
+                    print_expiry_status(&ca, days)?;
                 }
                 UserCheckSubcommand::Certifications => {
                     print_certifications_status(&ca)?;
@@ -386,9 +385,18 @@ fn print_certifications_status(ca: &OpenpgpCa) -> Result<()> {
 fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Result<()> {
     let expiries = ca.certs_expired(exp_days)?;
 
-    for (cert, (alive, expiry)) in expiries {
-        // let name = cert.name.clone().unwrap_or_else(|| "<no name>"
-        //     .to_string());
+    if expiries.is_empty() {
+        println!("No certificates will expire in the next {} days.", exp_days);
+    } else {
+        println!(
+            "The following {} certificates will expire in the next {} days.",
+            expiries.len(),
+            exp_days
+        );
+        println!();
+    }
+
+    for (cert, expiry) in expiries {
         let name = ca.cert_get_name(&cert)?;
         println!("name {}, fingerprint {}", name, cert.fingerprint);
 
@@ -397,10 +405,6 @@ fn print_expiry_status(ca: &OpenpgpCa, exp_days: u64) -> Result<()> {
             println!(" expires: {}", datetime.format("%d/%m/%Y"));
         } else {
             println!(" no expiration date is set for this user key");
-        }
-
-        if !alive {
-            println!(" user key EXPIRED/EXPIRING!");
         }
 
         println!();

@@ -191,14 +191,10 @@ fn test_update_cert_key() -> Result<()> {
 
     // check the same with ca.cert_expired()
     let exp1 = ca.certs_expired(365)?;
-    assert_eq!(exp1.len(), 1);
-    let (_, (alive, _)) = exp1.iter().next().unwrap();
-    assert!(alive);
+    assert_eq!(exp1.len(), 0);
 
     let exp3 = ca.certs_expired(3 * 365).unwrap();
     assert_eq!(exp3.len(), 1);
-    let (_, (alive, _)) = exp3.iter().next().unwrap();
-    assert!(!alive);
 
     // edit key with gpg, then import new version into CA
     gnupg::edit_expire(&ctx, "alice@example.org", "5y")?;
@@ -225,14 +221,10 @@ fn test_update_cert_key() -> Result<()> {
 
     // check the same with ca.cert_expired()
     let exp3 = ca.certs_expired(3 * 365)?;
-    assert_eq!(exp3.len(), 1);
-    let (_, (alive, _)) = exp3.iter().next().unwrap();
-    assert!(alive);
+    assert_eq!(exp3.len(), 0);
 
     let exp6 = ca.certs_expired(6 * 365)?;
     assert_eq!(exp6.len(), 1);
-    let (_, (alive, _)) = exp6.iter().next().unwrap();
-    assert!(!alive);
 
     Ok(())
 }

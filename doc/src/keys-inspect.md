@@ -102,30 +102,17 @@ Checked 2 user keys, 2 of them had good certifications in both directions.
 ```
 
 ### Checking expiry of user keys
- 
-To get an overview of the expiry of user keys:
- 
-`$ openpgp-ca -d example.oca user check expiry`
 
-```
-name Alice Adams, fingerprint F27CB2E92C3E01DA1C656FB21758251C75E25DDD
- no expiration date is set for this user key
-
-name Bob Baker, fingerprint 0EE935F56AC4381E007370E956A10EB1ABED2321
- expires: 12/08/2020
-```
-
-To check if any user keys will expire within a specified number of days:
+To check if any user keys will expire within a specified number of days 
+(if no number is specified, the default is 30 days):
  
 `$ openpgp-ca -d example.oca user check expiry --days 60`
 
 ```
-name Alice Adams, fingerprint F27CB2E92C3E01DA1C656FB21758251C75E25DDD
- no expiration date is set for this user key
+The following 1 certificates will expire in the next 60 days.
 
 name Bob Baker, fingerprint 0EE935F56AC4381E007370E956A10EB1ABED2321
  expires: 12/08/2020
- user cert EXPIRED/EXPIRING!
 ```
 
 This output shows us that Bob's key will have expired 60 days from now.
