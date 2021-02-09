@@ -155,7 +155,7 @@ fn export_certs(
             let ca_cert = oca.ca_get_cert()?;
 
             std::fs::write(
-                path_append(&path, &oca.get_ca_email()?)?,
+                path_append(&path, &format!("{}.asc", &oca.get_ca_email()?))?,
                 OpenpgpCa::certs_to_armored(&[ca_cert])?,
             )?;
         }
@@ -178,7 +178,7 @@ fn export_certs(
                     }
 
                     std::fs::write(
-                        path_append(&path, email)?,
+                        path_append(&path, &format!("{}.asc", email))?,
                         OpenpgpCa::certs_to_armored(&c)?,
                     )?;
                 }
