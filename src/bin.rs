@@ -143,13 +143,24 @@ fn main() -> Result<()> {
 
 fn export_certs(
     oca: &OpenpgpCa,
-    email: Option<String>,
+    email_filter: Option<String>,
     path: Option<String>,
 ) -> Result<()> {
     if let Some(path) = path {
         // export to filesystem, individual files split by email
 
-        let emails = if let Some(email) = email {
+        // export CA cert
+        if email_filter.is_none() {
+            // add CA cert to output
+            let ca_cert = oca.ca_get_cert()?;
+
+            std::fs::write(
+                path_append(&path, &oca.get_ca_email()?)?,
+                OpenpgpCa::certs_to_armored(&[ca_cert])?,
+            )?;
+        }
+
+        let emails = if let Some(email) = email_filter {
             vec![email]
         } else {
             oca.get_emails_all()?
@@ -177,7 +188,7 @@ fn export_certs(
         }
     } else {
         // write to stdout
-        let certs = match email {
+        let certs = match email_filter {
             Some(email) => oca.certs_get(&email)?,
             None => oca.user_certs_get_all()?,
         };
