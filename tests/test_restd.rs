@@ -519,7 +519,7 @@ async fn test_restd() {
         .expect("failed to persist carol update");
 
     assert_eq!(res.len(), 1);
-    assert!(matches!(res[0], CertResultJSON::Good{..}));
+    assert!(matches!(res[0], CertResultJSON::Good { .. }));
 
     let carol = c
         .get_by_email("carol@example.org".to_string())

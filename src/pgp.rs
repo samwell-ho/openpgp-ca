@@ -297,8 +297,7 @@ impl Pgp {
         user: &Cert,
         pass: Option<&str>,
     ) -> Result<Cert> {
-        let mut cert_keys = Self::get_cert_keys(&user, pass)
-            .context("filtered for unencrypted secret keys above")?;
+        let mut cert_keys = Self::get_cert_keys(&user, pass);
 
         assert!(!cert_keys.is_empty(), "Can't find usable user key");
 
@@ -340,7 +339,7 @@ impl Pgp {
 
         let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
 
-        let mut cert_keys = Self::get_cert_keys(&ca_cert, None)?;
+        let mut cert_keys = Self::get_cert_keys(&ca_cert, None);
 
         let mut packets: Vec<Packet> = Vec::new();
 
@@ -384,7 +383,7 @@ impl Pgp {
 
         // set_trust_signature, set_regular_expression(s), expiration
 
-        let mut cert_keys = Self::get_cert_keys(&ca_cert, None)?;
+        let mut cert_keys = Self::get_cert_keys(&ca_cert, None);
 
         // this CA should have exactly one key that can certify
         if cert_keys.len() != 1 {
@@ -421,8 +420,7 @@ impl Pgp {
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
     ) -> Result<Cert> {
-        let mut cert_keys = Self::get_cert_keys(&ca_cert, None)
-            .context("filtered for unencrypted secret keys above")?;
+        let mut cert_keys = Self::get_cert_keys(&ca_cert, None);
 
         let mut packets: Vec<Packet> = Vec::new();
 
@@ -521,10 +519,7 @@ impl Pgp {
     }
 
     /// get all valid, certification capable keys with secret key material
-    fn get_cert_keys(
-        cert: &Cert,
-        password: Option<&str>,
-    ) -> Result<Vec<KeyPair>> {
+    fn get_cert_keys(cert: &Cert, password: Option<&str>) -> Vec<KeyPair> {
         let keys = cert
             .keys()
             .with_policy(POLICY, None)
@@ -533,16 +528,15 @@ impl Pgp {
             .for_certification()
             .secret();
 
-        Ok(keys
-            .filter_map(|ka: ValidKeyAmalgamation<_, _, _>| {
-                let mut ka = ka.key().clone();
+        keys.filter_map(|ka: ValidKeyAmalgamation<_, _, _>| {
+            let mut ka = ka.key().clone();
 
-                if let Some(password) = password {
-                    ka = ka.decrypt_secret(&password.into()).ok()?
-                }
+            if let Some(password) = password {
+                ka = ka.decrypt_secret(&password.into()).ok()?
+            }
 
-                ka.into_keypair().ok()
-            })
-            .collect())
+            ka.into_keypair().ok()
+        })
+        .collect()
     }
 }

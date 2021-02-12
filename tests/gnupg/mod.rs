@@ -369,7 +369,7 @@ pub fn export_secret(ctx: &Ctx, search: &str) -> String {
 }
 
 pub fn list_keys(ctx: &Ctx) -> Result<HashMap<String, String>> {
-    let res = list_keys_raw(&ctx).unwrap();
+    let res = list_keys_raw(&ctx);
 
     // filter: keep only the "uid" lines
     let uids = res
@@ -385,7 +385,7 @@ pub fn list_keys(ctx: &Ctx) -> Result<HashMap<String, String>> {
         .collect())
 }
 
-fn list_keys_raw(ctx: &Ctx) -> Result<Vec<StringRecord>> {
+fn list_keys_raw(ctx: &Ctx) -> Vec<StringRecord> {
     let gpg = Command::new("gpg")
         .stdin(Stdio::piped())
         .arg("--homedir")
@@ -404,7 +404,7 @@ fn list_keys_raw(ctx: &Ctx) -> Result<Vec<StringRecord>> {
     let status = gpg.status;
     assert!(status.success());
 
-    Ok(rdr.records().map(|rec| rec.unwrap()).collect())
+    rdr.records().map(|rec| rec.unwrap()).collect()
 }
 
 pub fn edit_trust(ctx: &Ctx, user_id: &str, trust: u8) -> Result<()> {
