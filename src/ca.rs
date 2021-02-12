@@ -401,7 +401,7 @@ impl OpenpgpCa {
 
         if exists.is_some() {
             return Err(anyhow::anyhow!(
-                "A cert with this ingerprint already exists in the DB"
+                "A cert with this fingerprint already exists in the DB"
             ));
         }
 
