@@ -184,7 +184,9 @@ impl Pgp {
     }
 
     /// make a Vec of Cert from an ascii armored key(ring)
-    pub fn armored_keyring_to_certs(armored: &str) -> Result<Vec<Cert>> {
+    pub fn armored_keyring_to_certs<D: AsRef<[u8]> + Send + Sync>(
+        armored: &D,
+    ) -> Result<Vec<Cert>> {
         let ppr = PacketParser::from_bytes(armored)?;
 
         let mut res = vec![];

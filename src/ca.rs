@@ -708,7 +708,9 @@ impl OpenpgpCa {
     }
 
     /// Get a Vec of Cert from an ascii armored keyring
-    pub fn armored_keyring_to_certs(armored: &str) -> Result<Vec<Cert>> {
+    pub fn armored_keyring_to_certs<D: AsRef<[u8]> + Send + Sync>(
+        armored: &D,
+    ) -> Result<Vec<Cert>> {
         Pgp::armored_keyring_to_certs(armored)
     }
 
