@@ -542,7 +542,7 @@ fn unpack_certring(
                 for sig_kh in s.get_issuers() {
                     for (n, c) in certs.iter().enumerate() {
                         // check if c (or any of its subkeys) matches sig_issuers
-                        if c.keys().any(|k| k.key_handle() == sig_kh) {
+                        if c.keys().any(|k| k.key_handle().aliases(&sig_kh)) {
                             return Ok((certs, Some(n)));
                         }
                     }
