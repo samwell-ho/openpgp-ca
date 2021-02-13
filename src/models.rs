@@ -25,7 +25,7 @@ pub struct NewCa<'a> {
 pub struct Cacert {
     pub id: i32,
     pub fingerprint: String,
-    pub priv_cert: String,
+    pub priv_cert: String, // this field should be named priv_key
     // https://docs.diesel.rs/diesel/associations/index.html
     pub ca_id: i32,
 }
