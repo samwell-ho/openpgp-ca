@@ -161,7 +161,8 @@ impl OpenpgpCa {
 
     /// Get a sequoia `Cert` object for the CA from the database.
     ///
-    /// This is the "private" OpenPGP Cert of the CA.
+    /// This is the OpenPGP Cert of the CA (but doesn't contain the private
+    /// key material).
     pub fn ca_get_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
