@@ -32,7 +32,7 @@ communicating securely.
 
 There are several ways to use OpenPGP CA.  Here, we show one
 possible workflow.
-Please read [the book](https://openpgp-ca.gitlab.io/openpgp-ca/) for more
+Please read our [tutorials](https://openpgp-ca.org/tutorials/) for more 
 details.
 
 The first thing that you need to do is to create an OpenPGP CA instance
@@ -58,7 +58,7 @@ approach: users will either want to use their pre-existing OpenPGP keys, or
 generate new ones on their own machine.
 
 For more details about this workflow, see
-["importing user keys"](https://openpgp-ca.gitlab.io/openpgp-ca/keys-import.html)
+["importing user keys"](https://openpgp-ca.org/tutorials/keys-import/)
 in our documentation. 
 
 
@@ -141,11 +141,10 @@ using organizations sign each others CA key using a scoped trust signature.
 
 ## Documentation
 
-For more details and more workflows (including a workflow to create user keys
-on the user's machine, and then import those keys into OpenPGP CA) - see the
-documentation at:
-
-https://openpgp-ca.gitlab.io/openpgp-ca/
+For more [background information](https://openpgp-ca.org/background/) and 
+more [tutorials](https://openpgp-ca.org/tutorials/) on running an OpenPGP 
+CA instance, see our homepage at
+[https://openpgp-ca.org](https://openpgp-ca.org).
 
 
 ## Support
@@ -153,8 +152,7 @@ https://openpgp-ca.gitlab.io/openpgp-ca/
 If you are interested in deploying OpenPGP CA in your organization, please
 contact <heiko@schaefer.name> 
 (OpenPGP 68C8B3725276BEBB3EEA0E208ACFC41124CCB82E).
-We can consult on the setup, help you with
-the setup or even add features.
+We can consult, help you with your setup or even add features.
 
 For non-profit organizations reduced rates are available.  This is also a
 useful way for companies to support the project.
