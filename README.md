@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # OpenPGP CA
 
-OpenPGP CA (certificate authority) is a tool for managing OpenPGP 
+OpenPGP CA (certification authority) is a tool for managing OpenPGP 
 keys in groups or organizations.
 
 Imagine this:  Carol is the technical expert in her group.  The need for
@@ -19,7 +19,7 @@ worry about.
 
 This is where OpenPGP CA helps.  The members of Carol's group trust her.
 She is already their sysadmin.  So, it is sensible that Carol acts as a
-kind of certificate authority (CA) for her group.  This is exactly what
+certification authority (CA) for her group.  This is exactly what
 OpenPGP CA helps Carol do.  Using OpenPGP CA, only Carol has to verify
 fingerprints.  Then, her users just need to be taught to recognize whether
 a message has been authenticated, and how to make sure 
