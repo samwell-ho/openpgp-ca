@@ -793,7 +793,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
             .iter()
             .any(|kh| { matches!(kh, KeyHandle::Fingerprint(_)) }));
 
-        OpenpgpCa::sig_to_armored(&sig)
+        OpenpgpCa::revoc_to_armored(&sig)
             .context("couldn't armor revocation cert")?
     } else {
         panic!("Error handling Signature Packet");

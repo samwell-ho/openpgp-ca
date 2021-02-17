@@ -97,6 +97,10 @@ fn main() -> Result<()> {
                 let ca_key = ca.ca_get_pubkey_armored()?;
                 println!("{}", ca_key);
             }
+            CaCommand::Revocations { output } => {
+                ca.ca_generate_revocations(output)?;
+                println!("Wrote a set of revocations to the output file");
+            }
             CaCommand::ImportTsig { key_file } => {
                 let key = std::fs::read_to_string(key_file)?;
                 ca.ca_import_tsig(&key)?;

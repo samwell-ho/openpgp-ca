@@ -40,11 +40,14 @@ use std::time::SystemTime;
 use sequoia_openpgp as openpgp;
 
 use openpgp::cert::amalgamation::ValidateAmalgamation;
+use openpgp::cert::CertRevocationBuilder;
 use openpgp::packet::Signature;
+use openpgp::packet::UserID;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::Armorer;
 use openpgp::serialize::stream::{Message, Signer};
+use openpgp::types::ReasonForRevocation;
 use openpgp::KeyHandle;
 use openpgp::{Cert, Fingerprint, KeyID, Packet};
 
@@ -56,7 +59,7 @@ use diesel::prelude::*;
 
 use crate::models::Revocation;
 use anyhow::{Context, Result};
-use sequoia_openpgp::packet::UserID;
+use chrono::{DateTime, Utc};
 use std::fs::File;
 use std::io::Read;
 
@@ -161,13 +164,114 @@ impl OpenpgpCa {
 
     /// Get a sequoia `Cert` object for the CA from the database.
     ///
-    /// This is the OpenPGP Cert of the CA (but doesn't contain the private
-    /// key material).
+    /// This is the OpenPGP Cert of the CA.
     pub fn ca_get_cert(&self) -> Result<Cert> {
         match self.db.get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
             _ => panic!("get_ca_cert() failed"),
         }
+    }
+
+    /// Generate a set of revocation certificates for the CA key.
+    ///
+    /// This outputs a set of revocations with creation dates spaced
+    /// in 30 day increments, from now to 120x 30days in the future (around
+    /// 10 years). For each of those points in time, one hard and one soft
+    /// revocation certificate is generated.
+    ///
+    /// The output file is human readable, contains some informational
+    /// explanation, followed by the CA certificate and the list of
+    /// revocation certificates
+    pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
+        let ca = self.ca_get_cert()?;
+
+        let mut file = std::fs::File::create(output)?;
+
+        // write informational header
+        writeln!(
+            &mut file,
+            "This file contains revocation certificates for the OpenPGP CA \n\
+            instance '{}'.",
+            self.get_ca_email()?
+        )?;
+        writeln!(&mut file)?;
+
+        let msg = r#"These revocations can be used to invalidate the CA's key.
+This is useful e.g. if the (private) CA key gets compromised (i.e. available
+to a third party), or when the CA key becomes inaccessible to you.
+
+CAUTION: This file needs to be kept safe from third parties who could use 
+the revocations to adversarially invalidate your CA certificate!
+Keep in mind that an attacker can use these revocations to 
+perform a denial of service attack on your CA at the most inconvenient 
+moment. When a revocation certificate has been published for your CA, you 
+will need to start over with a fresh CA key.
+
+Please store this file appropriately, to avoid it becoming accessible to 
+adversaries."#;
+
+        writeln!(&mut file, "{}\n\n", msg)?;
+
+        writeln!(
+            &mut file,
+            "For reference, the certificate of your CA is\n\n{}",
+            Pgp::cert_to_armored(&ca)?
+        )?;
+        writeln!(&mut file)?;
+
+        let now = SystemTime::now();
+        let thirty_days = Duration::new(30 * 24 * 60 * 60, 0);
+
+        for i in 0..=120 {
+            let t = now + i * thirty_days;
+
+            let dt: DateTime<Utc> = t.into();
+            writeln!(
+                &mut file,
+                "** Revocations with creation time {} **\n",
+                dt.format("%Y-%m-%d")
+            )?;
+
+            let mut signer = ca
+                .primary_key()
+                .key()
+                .clone()
+                .parts_into_secret()?
+                .into_keypair()?;
+
+            let hard = CertRevocationBuilder::new()
+                .set_signature_creation_time(t)?
+                .set_reason_for_revocation(
+                    ReasonForRevocation::KeyCompromised,
+                    b"Certificate has been compromised",
+                )?
+                .build(&mut signer, &ca, None)?;
+
+            writeln!(
+                &mut file,
+                "Hard revocation, to signal key compromise:\n",
+            )?;
+            writeln!(&mut file, "{}\n", &Pgp::revoc_to_armored(&hard)?)?;
+
+            let soft = CertRevocationBuilder::new()
+                .set_signature_creation_time(t)?
+                .set_reason_for_revocation(
+                    ReasonForRevocation::KeyRetired,
+                    b"Certificate retired",
+                )?
+                .build(&mut signer, &ca, None)?;
+
+            writeln!(
+                &mut file,
+                "Soft revocation, to signal key is not in active use \
+                anymore:\n",
+            )?;
+            writeln!(&mut file, "{}\n", &Pgp::revoc_to_armored(&soft)?)?;
+
+            // writeln!(&mut file, "\n\n")?;
+        }
+
+        Ok(())
     }
 
     /// get the email of this CA
@@ -331,7 +435,7 @@ impl OpenpgpCa {
             Pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
-        let revoc = Pgp::sig_to_armored(&revoc)?;
+        let revoc = Pgp::revoc_to_armored(&revoc)?;
 
         self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
             let res = self.db.add_user(
@@ -841,7 +945,7 @@ impl OpenpgpCa {
             if Self::validate_revocation(&c, &mut revoc_cert)? {
                 if !self.check_for_equivalent_revocation(&revoc_cert, &cert)? {
                     // update sig in DB
-                    let armored = Pgp::sig_to_armored(&revoc_cert)
+                    let armored = Pgp::revoc_to_armored(&revoc_cert)
                         .context("couldn't armor revocation cert")?;
 
                     self.db.add_revocation(&armored, &cert)?;
@@ -985,9 +1089,9 @@ impl OpenpgpCa {
         })
     }
 
-    /// Get an armored representation of a Signature
-    pub fn sig_to_armored(sig: &Signature) -> Result<String> {
-        Pgp::sig_to_armored(sig)
+    /// Get an armored representation of a revocation certificate
+    pub fn revoc_to_armored(sig: &Signature) -> Result<String> {
+        Pgp::revoc_to_armored(sig)
     }
 
     // -------- emails
@@ -1149,7 +1253,7 @@ impl OpenpgpCa {
             // make sig to revoke bridge
             let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_cert)?;
 
-            let revoc_cert_arm = &Pgp::sig_to_armored(&rev_cert)?;
+            let revoc_cert_arm = &Pgp::revoc_to_armored(&rev_cert)?;
             println!("revoc cert:\n{}", revoc_cert_arm);
 
             // save updated key (with revocation) to DB

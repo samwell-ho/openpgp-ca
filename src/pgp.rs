@@ -218,14 +218,17 @@ impl Pgp {
         }
     }
 
-    /// make an ascii-armored representation of a Signature
-    pub fn sig_to_armored(sig: &Signature) -> Result<String> {
+    /// Make an ascii-armored representation of a revocation signature.
+    ///
+    /// This uses armor::Kind::PublicKey, because GnuPG doesn't seem to
+    /// accept revocations with the armor::Kind::Signature kind.
+    pub fn revoc_to_armored(sig: &Signature) -> Result<String> {
         let mut buf = vec![];
         {
             let rev = Packet::Signature(sig.clone());
 
             let mut writer =
-                armor::Writer::new(&mut buf, armor::Kind::Signature)?;
+                armor::Writer::new(&mut buf, armor::Kind::PublicKey)?;
             rev.serialize(&mut writer)?;
             writer.finalize()?;
         }

@@ -77,6 +77,12 @@ pub enum CaCommand {
     },
     /// Export CA public key
     Export,
+    /// Generate a set of revocations for the CA key
+    Revocations {
+        #[structopt(short = "o", long = "output", help = "File to export to")]
+        output: PathBuf,
+    },
+
     /// Import trust signature for CA Key
     ImportTsig {
         #[structopt(help = "File that contains the tsigned CA Key")]
