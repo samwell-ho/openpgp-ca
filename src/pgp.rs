@@ -222,13 +222,19 @@ impl Pgp {
     ///
     /// This uses armor::Kind::PublicKey, because GnuPG doesn't seem to
     /// accept revocations with the armor::Kind::Signature kind.
-    pub fn revoc_to_armored(sig: &Signature) -> Result<String> {
+    pub fn revoc_to_armored(
+        sig: &Signature,
+        headers: Option<Vec<(String, String)>>,
+    ) -> Result<String> {
         let mut buf = vec![];
         {
             let rev = Packet::Signature(sig.clone());
 
-            let mut writer =
-                armor::Writer::new(&mut buf, armor::Kind::PublicKey)?;
+            let mut writer = armor::Writer::with_headers(
+                &mut buf,
+                armor::Kind::PublicKey,
+                headers.unwrap_or_default(),
+            )?;
             rev.serialize(&mut writer)?;
             writer.finalize()?;
         }

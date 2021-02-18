@@ -214,30 +214,30 @@ adversaries."#;
 
         writeln!(
             &mut file,
-            "For reference, the certificate of your CA is\n\n{}",
+            "For reference, the certificate of your CA is\n\n{}\n",
             Pgp::cert_to_armored(&ca)?
         )?;
-        writeln!(&mut file)?;
+
+        writeln!(
+            &mut file,
+            "Revocation certificates (ordered by 'creation time') follow:\n"
+        )?;
 
         let now = SystemTime::now();
         let thirty_days = Duration::new(30 * 24 * 60 * 60, 0);
+
+        let mut signer = ca
+            .primary_key()
+            .key()
+            .clone()
+            .parts_into_secret()?
+            .into_keypair()?;
 
         for i in 0..=120 {
             let t = now + i * thirty_days;
 
             let dt: DateTime<Utc> = t.into();
-            writeln!(
-                &mut file,
-                "** Revocations with creation time {} **\n",
-                dt.format("%Y-%m-%d")
-            )?;
-
-            let mut signer = ca
-                .primary_key()
-                .key()
-                .clone()
-                .parts_into_secret()?
-                .into_keypair()?;
+            let date = dt.format("%Y-%m-%d");
 
             let hard = CertRevocationBuilder::new()
                 .set_signature_creation_time(t)?
@@ -247,11 +247,18 @@ adversaries."#;
                 )?
                 .build(&mut signer, &ca, None)?;
 
+            let header = vec![(
+                "Comment".to_string(),
+                format!(
+                    "Hard revocation (certificate compromised) ({})",
+                    date
+                ),
+            )];
             writeln!(
                 &mut file,
-                "Hard revocation, to signal key compromise:\n",
+                "{}\n",
+                &Pgp::revoc_to_armored(&hard, Some(header))?
             )?;
-            writeln!(&mut file, "{}\n", &Pgp::revoc_to_armored(&hard)?)?;
 
             let soft = CertRevocationBuilder::new()
                 .set_signature_creation_time(t)?
@@ -261,14 +268,15 @@ adversaries."#;
                 )?
                 .build(&mut signer, &ca, None)?;
 
+            let header = vec![(
+                "Comment".to_string(),
+                format!("Soft revocation (certificate retired) ({})", date),
+            )];
             writeln!(
                 &mut file,
-                "Soft revocation, to signal key is not in active use \
-                anymore:\n",
+                "{}\n",
+                &Pgp::revoc_to_armored(&soft, Some(header))?
             )?;
-            writeln!(&mut file, "{}\n", &Pgp::revoc_to_armored(&soft)?)?;
-
-            // writeln!(&mut file, "\n\n")?;
         }
 
         Ok(())
@@ -435,7 +443,7 @@ adversaries."#;
             Pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
         let pub_key = &Pgp::cert_to_armored(&certified)?;
-        let revoc = Pgp::revoc_to_armored(&revoc)?;
+        let revoc = Pgp::revoc_to_armored(&revoc, None)?;
 
         self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
             let res = self.db.add_user(
@@ -945,7 +953,7 @@ adversaries."#;
             if Self::validate_revocation(&c, &mut revoc_cert)? {
                 if !self.check_for_equivalent_revocation(&revoc_cert, &cert)? {
                     // update sig in DB
-                    let armored = Pgp::revoc_to_armored(&revoc_cert)
+                    let armored = Pgp::revoc_to_armored(&revoc_cert, None)
                         .context("couldn't armor revocation cert")?;
 
                     self.db.add_revocation(&armored, &cert)?;
@@ -1091,7 +1099,7 @@ adversaries."#;
 
     /// Get an armored representation of a revocation certificate
     pub fn revoc_to_armored(sig: &Signature) -> Result<String> {
-        Pgp::revoc_to_armored(sig)
+        Pgp::revoc_to_armored(sig, None)
     }
 
     // -------- emails
@@ -1253,7 +1261,7 @@ adversaries."#;
             // make sig to revoke bridge
             let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_cert)?;
 
-            let revoc_cert_arm = &Pgp::revoc_to_armored(&rev_cert)?;
+            let revoc_cert_arm = &Pgp::revoc_to_armored(&rev_cert, None)?;
             println!("revoc cert:\n{}", revoc_cert_arm);
 
             // save updated key (with revocation) to DB
