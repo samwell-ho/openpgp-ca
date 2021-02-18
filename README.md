@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
@@ -32,7 +32,7 @@ communicating securely.
 
 There are several ways to use OpenPGP CA.  Here, we show one
 possible workflow.
-Please read our [tutorials](https://openpgp-ca.org/tutorials/) for more 
+Please read our [documentation](https://openpgp-ca.org/doc/) for more 
 details.
 
 The first thing that you need to do is to create an OpenPGP CA instance
@@ -58,7 +58,7 @@ approach: users will either want to use their pre-existing OpenPGP keys, or
 generate new ones on their own machine.
 
 For more details about this workflow, see
-["importing user keys"](https://openpgp-ca.org/tutorials/keys-import/)
+["importing user keys"](https://openpgp-ca.org/doc/keys-import/)
 in our documentation. 
 
 
@@ -141,11 +141,10 @@ using organizations sign each others CA key using a scoped trust signature.
 
 ## Documentation
 
-For more [background information](https://openpgp-ca.org/background/) and 
-more [tutorials](https://openpgp-ca.org/tutorials/) on running an OpenPGP 
-CA instance, see our homepage at
-[https://openpgp-ca.org](https://openpgp-ca.org).
-
+You might want to start by reading some more
+[background information](https://openpgp-ca.org/background/)
+information about OpenPGP CA, and then read about
+[running an OpenPGP CA instance](https://openpgp-ca.org/doc/).
 
 ## Support
 
