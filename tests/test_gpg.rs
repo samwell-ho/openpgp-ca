@@ -339,3 +339,131 @@ fn test_bridge() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+/// Set up three CA instances, with scoped trust between a+b, and b+c:
+///
+/// alice@alpha.org ---tsign---> openpgp-ca@alpha.org
+///   ---tsign[scope=beta.org]---> openpgp-ca@beta.org
+///     ---tsign[scope=gamma.org]---> openpgp-ca@gamma.org
+///           ---sign--> carol@gamma.org
+///
+/// expected outcome: alice has "full" trust for openpgp-ca@alpha.org and openpgp-ca@beta.org,
+/// but no trust for openpgp-ca@gamma.org and carol@gamma.org
+fn test_multi_bridge() -> Result<()> {
+    let ctx = gnupg::make_context()?;
+
+    // don't delete home dir (for manual inspection)
+    // ctx.leak_tempdir();
+
+    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+
+    let db1 = format!("{}/ca1.sqlite", home_path);
+    let db2 = format!("{}/ca2.sqlite", home_path);
+    let db3 = format!("{}/ca3.sqlite", home_path);
+
+    let ca1 = OpenpgpCa::new(Some(&db1))?;
+    let ca2 = OpenpgpCa::new(Some(&db2))?;
+    let ca3 = OpenpgpCa::new(Some(&db3))?;
+
+    // ---- populate OpenPGP CA instances ----
+
+    ca1.ca_init("alpha.org", None)?;
+    ca1.user_new(Some(&"Alice"), &["alice@alpha.org"], None, false)?;
+
+    ca2.ca_init("beta.org", None)?;
+
+    ca3.ca_init("gamma.org", None)?;
+    ca3.user_new(Some(&"Carol"), &["carol@gamma.org"], None, false)?;
+
+    // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---
+    let ca1_file = format!("{}/ca1.pubkey", home_path);
+    let ca2_file = format!("{}/ca2.pubkey", home_path);
+    let ca3_file = format!("{}/ca3.pubkey", home_path);
+
+    let pub_ca1 = ca1.ca_get_pubkey_armored()?;
+    let pub_ca2 = ca2.ca_get_pubkey_armored()?;
+    let pub_ca3 = ca3.ca_get_pubkey_armored()?;
+
+    std::fs::write(&ca1_file, pub_ca1).expect("Unable to write file");
+    std::fs::write(&ca2_file, pub_ca2).expect("Unable to write file");
+    std::fs::write(&ca3_file, pub_ca3).expect("Unable to write file");
+
+    // ca1 certifies ca2
+    ca1.bridge_new(&PathBuf::from(&ca2_file), None, None)?;
+
+    // ca2 certifies ca3
+    ca2.bridge_new(&PathBuf::from(&ca3_file), None, None)?;
+
+    // ---- import all keys from OpenPGP CA into one GnuPG instance ----
+
+    // get Cert for ca1
+    let ca1_cert = ca1.ca_get_cert().expect("failed to get CA1 cert");
+
+    // get Cert for ca2 from ca1 bridge
+    // (this has the signed version of the ca2 pubkey)
+    let bridges1 = ca1.bridges_get()?;
+    assert_eq!(bridges1.len(), 1);
+    let ca2_cert = ca1.cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
+
+    // get Cert for ca3 from ca2 bridge
+    // (this has the tsig from ca3)
+    let bridges2 = ca2.bridges_get()?;
+    assert_eq!(bridges2.len(), 1);
+    let ca3_cert = ca2.cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
+
+    // import CA certs into GnuPG
+    gnupg::import(&ctx, OpenpgpCa::cert_to_armored(&ca1_cert)?.as_bytes());
+    gnupg::import(&ctx, ca2_cert.as_bytes());
+    gnupg::import(&ctx, ca3_cert.as_bytes());
+
+    // import CA1 users into GnuPG
+    let certs1 = ca1.user_certs_get_all()?;
+    assert_eq!(certs1.len(), 1);
+    certs1
+        .iter()
+        .for_each(|c| gnupg::import(&ctx, c.pub_cert.as_bytes()));
+
+    // import CA3 users into GnuPG
+    let certs3 = ca3.user_certs_get_all()?;
+    assert_eq!(certs3.len(), 1);
+    certs3
+        .iter()
+        .for_each(|c| gnupg::import(&ctx, c.pub_cert.as_bytes()));
+
+    // ---- set "ultimate" ownertrust for alice ----
+    gnupg::edit_trust(&ctx, "alice", 5)?;
+
+    // ---- read calculated "trust" per uid from GnuPG ----
+    let gpg_trust = gnupg::list_keys(&ctx)?;
+
+    assert_eq!(gpg_trust.len(), 5);
+
+    assert_eq!(
+        gpg_trust.get("Alice <alice@alpha.org>"),
+        Some(&"u".to_string()),
+        "alice@alpha.org"
+    );
+    assert_eq!(
+        gpg_trust.get("OpenPGP CA <openpgp-ca@alpha.org>"),
+        Some(&"f".to_string()),
+        "openpgp-ca@alpha.org"
+    );
+    assert_eq!(
+        gpg_trust.get("OpenPGP CA <openpgp-ca@beta.org>"),
+        Some(&"f".to_string()),
+        "openpgp-ca@beta.org"
+    );
+    assert_eq!(
+        gpg_trust.get("OpenPGP CA <openpgp-ca@gamma.org>"),
+        Some(&"-".to_string()),
+        "openpgp-ca@gamma.org"
+    );
+    assert_eq!(
+        gpg_trust.get("Carol <carol@gamma.org>"),
+        Some(&"-".to_string()),
+        "carol@gamma.org"
+    );
+
+    Ok(())
+}
