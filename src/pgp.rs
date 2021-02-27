@@ -301,31 +301,31 @@ impl Pgp {
     }
 
     /// user tsigns CA key
-    pub fn tsign_ca(
-        ca_cert: Cert,
-        user: &Cert,
+    pub fn tsign(
+        signee: Cert,
+        signer: &Cert,
         pass: Option<&str>,
     ) -> Result<Cert> {
-        let mut cert_keys = Self::get_cert_keys(&user, pass);
+        let mut cert_keys = Self::get_cert_keys(&signer, pass);
 
         assert!(!cert_keys.is_empty(), "Can't find usable user key");
 
         let mut sigs: Vec<Signature> = Vec::new();
 
         // create a TSIG for each UserID
-        for ca_uidb in ca_cert.userids() {
+        for ca_uidb in signee.userids() {
             for signer in &mut cert_keys {
                 let builder = signature::SignatureBuilder::new(
                     SignatureType::GenericCertification,
                 )
                 .set_trust_signature(255, 120)?;
 
-                let tsig = ca_uidb.userid().bind(signer, &ca_cert, builder)?;
+                let tsig = ca_uidb.userid().bind(signer, &signee, builder)?;
                 sigs.push(tsig);
             }
         }
 
-        let signed = ca_cert.insert_packets(sigs)?;
+        let signed = signee.insert_packets(sigs)?;
 
         Ok(signed)
     }

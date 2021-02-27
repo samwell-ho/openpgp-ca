@@ -436,7 +436,7 @@ adversaries."#;
         .context("sign_user failed")?;
 
         // user tsigns CA key
-        let tsigned_ca = Pgp::tsign_ca(ca_cert, &user_cert, pass.as_deref())
+        let tsigned_ca = Pgp::tsign(ca_cert, &user_cert, pass.as_deref())
             .context("failed: user tsigns CA")?;
 
         let tsigned_ca_armored =
@@ -1430,6 +1430,14 @@ adversaries."#;
         }
 
         Ok(res)
+    }
+
+    pub fn tsign(
+        signee: Cert,
+        signer: &Cert,
+        pass: Option<&str>,
+    ) -> Result<Cert> {
+        Pgp::tsign(signee, signer, pass)
     }
 
     pub fn sign_detached(&self, text: &str) -> Result<String> {
