@@ -60,6 +60,7 @@ use diesel::prelude::*;
 use crate::models::Revocation;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use sequoia_net::Policy;
 use std::fs::File;
 use std::io::Read;
 
@@ -1359,8 +1360,8 @@ adversaries."#;
         let mut merge = Pgp::armored_to_cert(&cert.pub_cert)?;
 
         // get key from hagrid
-        let c = sequoia_core::Context::new()?;
-        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
+        let mut hagrid =
+            sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
 
         let f = (cert.fingerprint).parse::<Fingerprint>()?;
         let c =

@@ -254,8 +254,8 @@ dependencies = [
 
 [[package]]
 name = "buffered-reader"
-version = "1.0.0"
-source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v1.0.0#8d50bc01335d98bef636bd4d07e5a6dde65ba858"
+version = "1.0.1"
+source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=openpgp/v1.1.0#1a2ac93e094721b6fb21c337a5f6bb350cfbef93"
 dependencies = [
  "bzip2",
  "flate2",
@@ -2560,7 +2560,7 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 [[package]]
 name = "sequoia-core"
 version = "0.22.0"
-source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v1.0.0#8d50bc01335d98bef636bd4d07e5a6dde65ba858"
+source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=openpgp/v1.1.0#1a2ac93e094721b6fb21c337a5f6bb350cfbef93"
 dependencies = [
  "anyhow",
  "dirs 2.0.2",
@@ -2570,8 +2570,8 @@ dependencies = [
 
 [[package]]
 name = "sequoia-net"
-version = "0.22.0"
-source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v1.0.0#8d50bc01335d98bef636bd4d07e5a6dde65ba858"
+version = "0.23.0"
+source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=openpgp/v1.1.0#1a2ac93e094721b6fb21c337a5f6bb350cfbef93"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -2581,7 +2581,6 @@ dependencies = [
  "libc",
  "native-tls",
  "percent-encoding",
- "sequoia-core",
  "sequoia-openpgp",
  "tempfile",
  "thiserror",
@@ -2591,8 +2590,8 @@ dependencies = [
 
 [[package]]
 name = "sequoia-openpgp"
-version = "1.0.0"
-source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=v1.0.0#8d50bc01335d98bef636bd4d07e5a6dde65ba858"
+version = "1.1.0"
+source = "git+https://gitlab.com/sequoia-pgp/sequoia.git?tag=openpgp/v1.1.0#1a2ac93e094721b6fb21c337a5f6bb350cfbef93"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -2611,6 +2610,7 @@ dependencies = [
  "memsec",
  "nettle",
  "regex",
+ "regex-syntax",
  "sha1collisiondetection",
  "thiserror",
  "unicode-normalization",

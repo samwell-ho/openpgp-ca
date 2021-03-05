@@ -168,7 +168,7 @@ impl Key {
             None
         };
 
-        let fingerprint = ka.fingerprint().to_string();
+        let fingerprint = ka.fingerprint().to_spaced_hex();
 
         let creation = ka.creation_time();
 

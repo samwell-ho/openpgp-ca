@@ -22,6 +22,7 @@ use openpgp::{Cert, Fingerprint, KeyID};
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
+use sequoia_net::Policy;
 
 pub mod gnupg;
 
@@ -408,16 +409,16 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     let j: Fingerprint = "CBCD8F030588653EEDD7E2659B7DD433F254904A".parse()?;
     let justus: Cert = rt.block_on(async move {
-        let c = sequoia_core::Context::new()?;
-        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
+        let mut hagrid =
+            sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
         hagrid.get(&KeyID::from(j)).await
     })?;
     let justus_key = OpenpgpCa::cert_to_armored(&justus)?;
 
     let n: Fingerprint = "8F17777118A33DDA9BA48E62AACB3243630052D9".parse()?;
     let neal: Cert = rt.block_on(async move {
-        let c = sequoia_core::Context::new()?;
-        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(&c)?;
+        let mut hagrid =
+            sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
         hagrid.get(&KeyID::from(n)).await
     })?;
     let neal_key = OpenpgpCa::cert_to_armored(&neal)?;
