@@ -42,7 +42,7 @@ cargo-clippy:
 
 pages:
   image: alpine:latest
-  stage: deploy
+  stage: test
   script:
     - echo 'pages'
   artifacts:
