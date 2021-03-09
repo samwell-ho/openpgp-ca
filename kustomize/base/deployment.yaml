@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openpgp-ca
+  labels:
+    app.kubernetes.io/name: openpgp-ca
+spec:
+  replicas: 1
+  strategy:
+    type: "Recreate"
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openpgp-ca
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openpgp-ca
+    spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      initContainers:
+        - name: init
+          image: registry.gitlab.com/openpgp-ca/openpgp-ca
+          command: ["/bin/sh"]
+          args:
+            - "-c"
+            - "/usr/local/bin/openpgp-ca ca init ${DOMAIN} || true"
+          volumeMounts:
+            - name: persistence
+              mountPath: /var/run/openpgp-ca/
+      volumes:
+        - name: persistence
+          persistentVolumeClaim:
+            claimName: openpgp-ca

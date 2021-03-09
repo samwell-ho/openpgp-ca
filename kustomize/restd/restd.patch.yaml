@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openpgp-ca
+spec:
+  template:
+    spec:
+      containers:
+        - name: restd
+          image: registry.gitlab.com/openpgp-ca/openpgp-ca/openpgp-ca-restd
+          securityContext:
+            runAsUser: 1000
+          livenessProbe:
+            initialDelaySeconds: 1
+            periodSeconds: 30
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            httpGet:
+              path: /ping
+              port: http
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: ROCKET_LOG_LEVEL
+              value: normal
+          volumeMounts:
+          - name: persistence
+            mountPath: /var/run/openpgp-ca/
