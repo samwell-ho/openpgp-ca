@@ -382,6 +382,20 @@ fn check_expiring(
     })
 }
 
+/// Ping, good for checking the service is alive
+#[get("/ping")]
+fn ping() -> Result<(), ()> {
+    Ok(())
+}
+
+/// Healthz, ensure the service can connect to it's depenencies and is ready
+/// to take traffic
+#[get("/healthz")]
+fn healthz() -> Result<(), ()> {
+    // TODO: Add check that service can connect to database.
+    Ok(())
+}
+
 pub fn run(db: Option<String>) -> rocket::Rocket {
     DB.set(db).unwrap();
 
@@ -396,7 +410,9 @@ pub fn run(db: Option<String>) -> rocket::Rocket {
             delist_cert,
             refresh_certifications,
             poll_for_updates,
-            check_expiring
+            check_expiring,
+            ping,
+            healthz,
         ],
     )
 }
