@@ -10,6 +10,7 @@
 //! This is an experimental API for use at FSFE.
 
 use once_cell::sync::OnceCell;
+use rocket::http::Status;
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
 
@@ -384,16 +385,21 @@ fn check_expiring(
 
 /// Ping, good for checking the service is alive
 #[get("/ping")]
-fn ping() -> Result<(), ()> {
-    Ok(())
+fn ping() -> Status {
+    Status::Ok
 }
 
-/// Healthz, ensure the service can connect to it's depenencies and is ready
-/// to take traffic
+/// Healthz, ensure the service can connect to its dependencies and is ready
+/// to take traffic.
+/// Tests for DB availability and that the CA has been initialized.
 #[get("/healthz")]
-fn healthz() -> Result<(), ()> {
-    // TODO: Add check that service can connect to database.
-    Ok(())
+fn healthz() -> Status {
+    if CA.with(|ca| ca.ca_get_cert()).is_err() {
+        // failed to load the CA Cert from the database
+        Status::InternalServerError
+    } else {
+        Status::Ok
+    }
 }
 
 pub fn run(db: Option<String>) -> rocket::Rocket {
