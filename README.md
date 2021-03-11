@@ -46,8 +46,9 @@ To run an OpenPGP CA instance for your organization, first, you need to
 install the openpgp-ca tool on your machine.
 
 Currently, you can either
-[build OpenPGP CA on your machine](https://openpgp-ca.org/doc/start/) or 
-run it as a [container image](https://openpgp-ca.org/doc/docker/).
+[build OpenPGP CA on your machine](https://openpgp-ca.org/doc/start/),
+run it as a [container image](https://openpgp-ca.org/doc/docker/) or 
+deploy it to a [kubernetes cluster](https://openpgp-ca.org/doc/kubernetes/).
 
 
 ## Initializing your CA
