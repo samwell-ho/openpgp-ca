@@ -19,6 +19,8 @@ use std::process::Stdio;
 use anyhow::{Context, Result};
 use csv::StringRecord;
 
+// FIXME: `LC_ALL=C` to make calls locale-independent
+
 pub fn make_context() -> Result<Ctx> {
     let ctx = Ctx::ephemeral().context(
         "SKIP: Failed to create GnuPG context. Is GnuPG installed?",
