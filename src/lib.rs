@@ -18,6 +18,7 @@ extern crate diesel_migrations;
 #[macro_use]
 extern crate rocket;
 
+mod bridge;
 pub mod ca;
 mod db;
 pub mod models;

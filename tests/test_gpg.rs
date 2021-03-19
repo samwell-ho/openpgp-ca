@@ -261,8 +261,8 @@ fn test_bridge() -> Result<()> {
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    ca1.bridge_new(&PathBuf::from(ca_other_file), None, None)?;
-    ca2.bridge_new(&PathBuf::from(ca_some_file), None, None)?;
+    ca1.add_bridge(None, &PathBuf::from(ca_other_file), None, true)?;
+    ca2.add_bridge(None, &PathBuf::from(ca_some_file), None, true)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
@@ -388,10 +388,10 @@ fn test_multi_bridge() -> Result<()> {
     std::fs::write(&ca3_file, pub_ca3).expect("Unable to write file");
 
     // ca1 certifies ca2
-    ca1.bridge_new(&PathBuf::from(&ca2_file), None, None)?;
+    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, true)?;
 
     // ca2 certifies ca3
-    ca2.bridge_new(&PathBuf::from(&ca3_file), None, None)?;
+    ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, true)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
@@ -507,7 +507,7 @@ fn test_scoping() -> Result<()> {
     std::fs::write(&ca2_file, pub_ca2).expect("Unable to write file");
 
     // ca1 certifies ca2
-    ca1.bridge_new(&PathBuf::from(&ca2_file), None, None)?;
+    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, true)?;
 
     // create unscoped trust signature from beta.org CA to other.org CA
     // ---- openpgp-ca@beta.org ---tsign---> openpgp-ca@other.org ----

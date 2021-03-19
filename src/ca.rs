@@ -36,7 +36,6 @@ use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::cert::CertRevocationBuilder;
 use openpgp::packet::Signature;
 use openpgp::packet::UserID;
-use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::Armorer;
 use openpgp::serialize::stream::{Message, Signer};
@@ -48,13 +47,14 @@ use sequoia_net::Policy;
 
 use openpgp_keylist::{Key, Keylist, Metadata};
 
+use crate::bridge;
 use crate::db::Db;
 use crate::models;
+use crate::models::Revocation;
 use crate::pgp::Pgp;
 
 use diesel::prelude::*;
 
-use crate::models::Revocation;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 
@@ -72,7 +72,7 @@ const KEYLIST_FILE: &str = "keylist.json";
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
 pub struct OpenpgpCa {
-    db: Db,
+    pub db: Db, // FIXME
 }
 
 impl OpenpgpCa {
@@ -1192,166 +1192,7 @@ adversaries."#;
         self.db.get_emails_all()
     }
 
-    // -------- bridges
-
-    /// Make regex for trust signature from domain-name
-    fn domain_to_regex(domain: &str) -> Result<String> {
-        // "other.org" => "<[^>]+[@.]other\\.org>$"
-        // FIXME: does this imply "subdomain allowed"?
-
-        // syntax check domain
-        if !publicsuffix::Domain::has_valid_syntax(domain) {
-            return Err(anyhow::anyhow!(
-                "Parameter is not a valid domainname"
-            ));
-        }
-
-        // transform domain to regex
-        let escaped_domain =
-            &domain.split('.').collect::<Vec<_>>().join("\\.");
-        Ok(format!("<[^>]+[@.]{}>$", escaped_domain))
-    }
-
-    /// Create a new Bridge (between this OpenPGP CA and a remote OpenPGP
-    /// CA instance)
-    ///
-    /// The result of this operation is a signed public key for the remote
-    /// CA. Once this signature is published and available to OpenPGP
-    /// CA users, the bridge is in effect.
-    ///
-    /// When `remote_email` or `remote_scope` are not set, they are derived
-    /// from the User ID in the key_file
-    pub fn bridge_new(
-        &self,
-        remote_key_file: &PathBuf,
-        remote_email: Option<&str>,
-        remote_scope: Option<&str>,
-    ) -> Result<(models::Bridge, Fingerprint)> {
-        let remote_ca_cert =
-            Cert::from_file(remote_key_file).context("Failed to read key")?;
-
-        let remote_uids: Vec<_> = remote_ca_cert.userids().collect();
-
-        // expect exactly one User ID in remote CA key (otherwise fail)
-        if remote_uids.len() != 1 {
-            return Err(anyhow::anyhow!(
-                "Expected exactly one User ID in remote CA Cert",
-            ));
-        }
-
-        let remote_uid = remote_uids[0].userid();
-
-        // derive an email and domain from the User ID in the remote cert
-        let (remote_cert_email, remote_cert_domain) = {
-            if let Some(remote_email) = remote_uid.email()? {
-                let split: Vec<_> = remote_email.split('@').collect();
-
-                // expect remote email address with localpart "openpgp-ca"
-                if split.len() != 2 || split[0] != "openpgp-ca" {
-                    return Err(anyhow::anyhow!(format!(
-                        "Unexpected remote email {}",
-                        remote_email
-                    )));
-                }
-
-                let domain = split[1];
-                (remote_email.to_owned(), domain.to_owned())
-            } else {
-                return Err(anyhow::anyhow!(
-                    "Couldn't get email from remote CA Cert"
-                ));
-            }
-        };
-
-        let scope = match remote_scope {
-            Some(scope) => {
-                // if scope and domain don't match, warn/error?
-                // (FIXME: error, unless --force parameter has been given?!)
-                if scope != remote_cert_domain {
-                    return Err(anyhow::anyhow!(
-                        "scope and domain don't match, currently unsupported"
-                    ));
-                }
-
-                scope
-            }
-            None => &remote_cert_domain,
-        };
-
-        let email = match remote_email {
-            None => remote_cert_email,
-            Some(email) => email.to_owned(),
-        };
-
-        let regex = Self::domain_to_regex(scope)?;
-
-        let regexes = vec![regex];
-
-        let bridged = Pgp::bridge_to_remote_ca(
-            self.ca_get_cert()?,
-            remote_ca_cert,
-            regexes,
-        )?;
-
-        // FIXME: transaction
-
-        // store new bridge in DB
-        let (ca_db, _) =
-            self.db.get_ca().context("Couldn't find CA")?.unwrap();
-
-        let cert: models::Cert = self.db.add_cert(
-            &Pgp::cert_to_armored(&bridged)?,
-            &bridged.fingerprint().to_hex(),
-            None,
-        )?;
-
-        let new_bridge = models::NewBridge {
-            email: &email,
-            scope,
-            cert_id: cert.id,
-            cas_id: ca_db.id,
-        };
-
-        Ok((self.db.insert_bridge(new_bridge)?, bridged.fingerprint()))
-    }
-
-    /// Create a revocation Certificate for a Bridge and apply it the our
-    /// copy of the remote CA's public key.
-    ///
-    /// Both the revoked remote public key and the revocation cert are
-    /// printed to stdout.
-    pub fn bridge_revoke(&self, email: &str) -> Result<()> {
-        let bridge = self.db.search_bridge(email)?;
-        if bridge.is_none() {
-            return Err(anyhow::anyhow!("bridge not found"));
-        }
-
-        let bridge = bridge.unwrap();
-
-        let (_, ca_cert) = self.db.get_ca()?.unwrap();
-        let ca_cert = Pgp::armored_to_cert(&ca_cert.priv_cert)?;
-
-        if let Some(mut db_cert) = self.db.get_cert_by_id(bridge.cert_id)? {
-            let bridge_pub = Pgp::armored_to_cert(&db_cert.pub_cert)?;
-
-            // make sig to revoke bridge
-            let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_cert)?;
-
-            let revoc_cert_arm = &Pgp::revoc_to_armored(&rev_cert, None)?;
-            println!("revoc cert:\n{}", revoc_cert_arm);
-
-            // save updated key (with revocation) to DB
-            let revoked_arm = Pgp::cert_to_armored(&cert)?;
-            println!("revoked remote key:\n{}", &revoked_arm);
-
-            db_cert.pub_cert = revoked_arm;
-            self.db.update_cert(&db_cert)?;
-
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("no cert found for bridge"))
-        }
-    }
+    // --------- bridges
 
     /// Get a list of Bridges
     pub fn bridges_get(&self) -> Result<Vec<models::Bridge>> {
@@ -1367,31 +1208,6 @@ adversaries."#;
         }
     }
 
-    pub fn list_bridges(&self) -> Result<()> {
-        self.bridges_get()?.iter().for_each(|bridge| {
-            println!(
-                "Bridge to '{}', (scope: '{}'",
-                bridge.email, bridge.scope
-            )
-        });
-        Ok(())
-    }
-
-    pub fn print_bridges(&self, email: Option<String>) -> Result<()> {
-        let bridges = if let Some(email) = email {
-            vec![self.bridges_search(&email)?]
-        } else {
-            self.bridges_get()?
-        };
-
-        for bridge in bridges {
-            let cert = self.cert_by_id(bridge.cert_id)?;
-            println!("{}", cert.unwrap().pub_cert);
-        }
-
-        Ok(())
-    }
-
     pub fn add_bridge(
         &self,
         email: Option<&str>,
@@ -1401,7 +1217,7 @@ adversaries."#;
     ) -> Result<()> {
         if commit {
             let (bridge, fingerprint) =
-                self.bridge_new(key_file, email, scope)?;
+                bridge::bridge_new(&self, key_file, email, scope)?;
 
             println!("Signed OpenPGP key for {} as bridge.\n", bridge.email);
             println!("The fingerprint of the remote CA key is");
@@ -1426,6 +1242,35 @@ adversaries."#;
             to commit the OpenPGP CA bridge to the database."
             );
         }
+        Ok(())
+    }
+
+    pub fn bridge_revoke(&self, email: &str) -> Result<()> {
+        bridge::bridge_revoke(self, email)
+    }
+
+    pub fn print_bridges(&self, email: Option<String>) -> Result<()> {
+        let bridges = if let Some(email) = email {
+            vec![self.bridges_search(&email)?]
+        } else {
+            self.bridges_get()?
+        };
+
+        for bridge in bridges {
+            let cert = self.cert_by_id(bridge.cert_id)?;
+            println!("{}", cert.unwrap().pub_cert);
+        }
+
+        Ok(())
+    }
+
+    pub fn list_bridges(&self) -> Result<()> {
+        self.bridges_get()?.iter().for_each(|bridge| {
+            println!(
+                "Bridge to '{}', (scope: '{}'",
+                bridge.email, bridge.scope
+            )
+        });
         Ok(())
     }
 
