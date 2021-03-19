@@ -20,6 +20,7 @@ extern crate rocket;
 
 mod bridge;
 pub mod ca;
+mod cas;
 mod db;
 mod export;
 pub mod models;
