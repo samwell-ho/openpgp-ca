@@ -30,28 +30,25 @@
 //! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false).unwrap();
 //! ```
 
-use sequoia_openpgp as openpgp;
-
-use openpgp::cert::amalgamation::ValidateAmalgamation;
-use openpgp::cert::CertRevocationBuilder;
-use openpgp::packet::Signature;
-use openpgp::packet::UserID;
-use openpgp::policy::StandardPolicy;
-use openpgp::serialize::stream::Armorer;
-use openpgp::serialize::stream::{Message, Signer};
-use openpgp::types::ReasonForRevocation;
-use openpgp::KeyHandle;
-use openpgp::{Cert, Fingerprint, KeyID, Packet};
-
-use sequoia_net::Policy;
-
 use openpgp_keylist::{Key, Keylist, Metadata};
 
 use crate::bridge;
 use crate::db::Db;
 use crate::models;
-use crate::models::Revocation;
 use crate::pgp::Pgp;
+use crate::revocation;
+
+use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
+use sequoia_openpgp::cert::CertRevocationBuilder;
+use sequoia_openpgp::packet::Signature;
+use sequoia_openpgp::packet::UserID;
+use sequoia_openpgp::policy::StandardPolicy;
+use sequoia_openpgp::serialize::stream::Armorer;
+use sequoia_openpgp::serialize::stream::{Message, Signer};
+use sequoia_openpgp::types::ReasonForRevocation;
+use sequoia_openpgp::{Cert, Fingerprint, KeyID, Packet};
+
+use sequoia_net::Policy;
 
 use diesel::prelude::*;
 
@@ -61,7 +58,8 @@ use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::env;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::Read;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
@@ -969,141 +967,6 @@ adversaries."#;
 
     // -------- revocations
 
-    /// Add a revocation certificate to the OpenPGP CA database (from a file).
-    pub fn revocation_add_from_file(&self, filename: &PathBuf) -> Result<()> {
-        let mut s = String::new();
-        File::open(filename)?.read_to_string(&mut s)?;
-        self.revocation_add(&s)
-    }
-
-    /// Check if the CA database has a variant of the revocation
-    /// certificate 'rev_cert' (according to Signature::normalized_eq()).
-    fn check_for_equivalent_revocation(
-        &self,
-        rev_cert: &Signature,
-        cert: &models::Cert,
-    ) -> Result<bool> {
-        for db_rev in self.db.get_revocations(cert)? {
-            let r = Pgp::armored_to_signature(&db_rev.revocation)
-                .context("Couldn't re-armor revocation cert from CA db")?;
-
-            if rev_cert.normalized_eq(&r) {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
-    /// Add a revocation certificate to the OpenPGP CA database.
-    ///
-    /// The matching cert is looked up by issuer Fingerprint, if
-    /// possible - or by exhaustive search otherwise.
-    ///
-    /// Verifies that applying the revocation cert can be validated by the
-    /// cert. Only if this is successful is the revocation stored.
-    pub fn revocation_add(&self, revoc_cert_str: &str) -> Result<()> {
-        // check if the exact same revocation already exists in db
-        if self.db.check_for_revocation(revoc_cert_str)? {
-            return Ok(()); // this revocation is already stored -> do nothing
-        }
-
-        let mut revoc_cert = Pgp::armored_to_signature(revoc_cert_str)
-            .context("Couldn't process revocation cert")?;
-
-        // find the matching cert for this revocation certificate
-        let mut cert = None;
-        // - search by fingerprint, if possible
-        if let Some(sig_fingerprint) = Pgp::get_revoc_issuer_fp(&revoc_cert) {
-            cert = self.db.get_cert(&sig_fingerprint.to_hex())?;
-        }
-        // - if match by fingerprint failed: test all certs
-        if cert.is_none() {
-            cert = self.search_revocable_cert_by_keyid(&mut revoc_cert)?;
-        }
-
-        if let Some(cert) = cert {
-            let c = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-            // verify that revocation certificate validates with cert
-            if Self::validate_revocation(&c, &mut revoc_cert)? {
-                if !self.check_for_equivalent_revocation(&revoc_cert, &cert)? {
-                    // update sig in DB
-                    let armored = Pgp::revoc_to_armored(&revoc_cert, None)
-                        .context("couldn't armor revocation cert")?;
-
-                    self.db.add_revocation(&armored, &cert)?;
-                }
-
-                Ok(())
-            } else {
-                let msg = format!(
-                    "revocation couldn't be matched to a cert: {:?}",
-                    revoc_cert
-                );
-
-                Err(anyhow::anyhow!(msg))
-            }
-        } else {
-            Err(anyhow::anyhow!("couldn't find cert for this fingerprint"))
-        }
-    }
-
-    /// verify that applying `revoc_cert` to `cert` yields a new validated
-    /// self revocation
-    fn validate_revocation(
-        cert: &Cert,
-        revoc_cert: &mut Signature,
-    ) -> Result<bool> {
-        let before = cert.primary_key().self_revocations().count();
-
-        let revoked = cert.to_owned().insert_packets(revoc_cert.to_owned())?;
-
-        let after = revoked.primary_key().self_revocations().count();
-
-        // expecting an additional self_revocation after merging revoc_cert
-        if before + 1 != after {
-            return Ok(false);
-        }
-
-        // does the self revocation verify?
-        let key = revoked.primary_key().key();
-        Ok(revoc_cert.verify_primary_key_revocation(key, key).is_ok())
-    }
-
-    /// Search all certs for the one that `revoc` can revoke.
-    ///
-    /// This assumes that the Signature has no issuer fingerprint.
-    /// So if the Signature also has no issuer KeyID, it fails to find a
-    /// cert.
-    fn search_revocable_cert_by_keyid(
-        &self,
-        mut revoc: &mut Signature,
-    ) -> Result<Option<models::Cert>> {
-        let revoc_keyhandles = revoc.get_issuers();
-        if revoc_keyhandles.is_empty() {
-            return Err(anyhow::anyhow!("Signature has no issuer KeyID"));
-        }
-
-        for cert in self.user_certs_get_all()? {
-            let c = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-            // require that keyid of cert and Signature issuer match
-            let c_keyid = c.keyid();
-
-            if !revoc_keyhandles.contains(&KeyHandle::KeyID(c_keyid)) {
-                // ignore certs with non-matching KeyID
-                continue;
-            }
-
-            // if KeyID matches, check if revocation validates
-            if Self::validate_revocation(&c, &mut revoc)? {
-                return Ok(Some(cert));
-            }
-        }
-        Ok(None)
-    }
-
     /// Get a list of all Revocations for a cert
     pub fn revocations_get(
         &self,
@@ -1112,21 +975,15 @@ adversaries."#;
         self.db.get_revocations(cert)
     }
 
-    /// Get reason and creation time for a Revocation
-    pub fn revocation_details(
-        &self,
-        revocation: &Revocation,
-    ) -> Result<(String, Option<SystemTime>)> {
-        let rev = Pgp::armored_to_signature(&revocation.revocation)?;
+    pub fn revocation_add(&self, revoc_cert_str: &str) -> Result<()> {
+        revocation::revocation_add(&self, revoc_cert_str)
+    }
 
-        let creation = rev.signature_creation_time();
-
-        if let Some((code, reason)) = rev.reason_for_revocation() {
-            let reason = String::from_utf8(reason.to_vec())?;
-            Ok((format!("{} ({})", code.to_string(), reason), creation))
-        } else {
-            Ok(("Revocation reason unknown".to_string(), creation))
-        }
+    /// Add a revocation certificate to the OpenPGP CA database (from a file).
+    pub fn revocation_add_from_file(&self, filename: &PathBuf) -> Result<()> {
+        let mut s = String::new();
+        File::open(filename)?.read_to_string(&mut s)?;
+        self.revocation_add(&s)
     }
 
     /// Get a Revocation by hash
@@ -1141,36 +998,24 @@ adversaries."#;
         }
     }
 
-    /// Apply a revocation.
-    ///
-    /// The revocation is merged into out copy of the OpenPGP Cert.
     pub fn revocation_apply(&self, revoc: models::Revocation) -> Result<()> {
-        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-            let cert = self.db.get_cert_by_id(revoc.cert_id)?;
+        revocation::revocation_apply(&self, revoc)
+    }
 
-            if let Some(mut cert) = cert {
-                let sig = Pgp::armored_to_signature(&revoc.revocation)?;
-                let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+    /// Get reason and creation time for a Revocation
+    pub fn revocation_details(
+        revocation: &models::Revocation,
+    ) -> Result<(String, Option<SystemTime>)> {
+        let rev = Pgp::armored_to_signature(&revocation.revocation)?;
 
-                let revocation: Packet = sig.into();
-                let revoked = c.insert_packets(vec![revocation])?;
+        let creation = rev.signature_creation_time();
 
-                cert.pub_cert = Pgp::cert_to_armored(&revoked)?;
-
-                let mut revoc = revoc.clone();
-                revoc.published = true;
-
-                self.db.update_cert(&cert).context("Couldn't update Cert")?;
-
-                self.db
-                    .update_revocation(&revoc)
-                    .context("Couldn't update Revocation")?;
-
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!("Couldn't find cert for apply_revocation"))
-            }
-        })
+        if let Some((code, reason)) = rev.reason_for_revocation() {
+            let reason = String::from_utf8(reason.to_vec())?;
+            Ok((format!("{} ({})", code.to_string(), reason), creation))
+        } else {
+            Ok(("Revocation reason unknown".to_string(), creation))
+        }
     }
 
     /// Get an armored representation of a revocation certificate

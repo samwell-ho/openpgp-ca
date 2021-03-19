@@ -150,7 +150,7 @@ fn print_revocations(ca: &OpenpgpCa, email: &str) -> Result<()> {
             );
             let revoc = ca.revocations_get(&cert)?;
             for r in revoc {
-                let (reason, time) = ca.revocation_details(&r)?;
+                let (reason, time) = OpenpgpCa::revocation_details(&r)?;
                 let time = if let Some(time) = time {
                     let datetime: DateTime<Utc> = time.into();
                     format!("{}", datetime.format("%d/%m/%Y"))

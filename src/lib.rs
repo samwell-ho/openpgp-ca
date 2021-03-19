@@ -23,6 +23,7 @@ pub mod ca;
 mod db;
 pub mod models;
 mod pgp;
+mod revocation;
 mod schema;
 
 pub mod restd;
