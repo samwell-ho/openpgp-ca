@@ -3,7 +3,7 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! OpenPGP CA as a library
@@ -1397,26 +1397,5 @@ fn open_file(name: PathBuf, overwrite: bool) -> std::io::Result<File> {
         File::create(name)
     } else {
         OpenOptions::new().write(true).create_new(true).open(name)
-    }
-}
-
-// Append a (potentially adversarial) `filename` to a (presumed trustworthy)
-// `path`.
-//
-// If `filename` contains suspicious chars, this fn returns an Err.
-fn path_append(path: &str, filename: &str) -> Result<PathBuf> {
-    // colon is a special char on windows (and illegal in emails)
-    if filename.chars().any(std::path::is_separator)
-        || filename.chars().any(|c| c == ':')
-    {
-        Err(anyhow::anyhow!(
-            "filename contains special character - maybe a path traversal \
-            attack? {}",
-            filename
-        ))
-    } else {
-        let mut pb = PathBuf::from_str(path)?;
-        pb.push(filename);
-        Ok(pb)
     }
 }

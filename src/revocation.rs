@@ -1,3 +1,11 @@
+// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+//
+// This file is part of OpenPGP CA
+// https://gitlab.com/openpgp-ca/openpgp-ca
+//
+// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::ca::OpenpgpCa;
 use crate::diesel::Connection;
 use crate::models;
