@@ -21,6 +21,7 @@ extern crate rocket;
 mod bridge;
 pub mod ca;
 mod db;
+mod export;
 pub mod models;
 mod pgp;
 mod revocation;

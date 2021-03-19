@@ -30,10 +30,9 @@
 //! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false).unwrap();
 //! ```
 
-use openpgp_keylist::{Key, Keylist, Metadata};
-
 use crate::bridge;
 use crate::db::Db;
+use crate::export;
 use crate::models;
 use crate::pgp::Pgp;
 use crate::revocation;
@@ -43,8 +42,6 @@ use sequoia_openpgp::cert::CertRevocationBuilder;
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::serialize::stream::Armorer;
-use sequoia_openpgp::serialize::stream::{Message, Signer};
 use sequoia_openpgp::types::ReasonForRevocation;
 use sequoia_openpgp::{Cert, Fingerprint, KeyID, Packet};
 
@@ -57,15 +54,11 @@ use chrono::{DateTime, Utc};
 
 use std::collections::HashMap;
 use std::env;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::time::{Duration, SystemTime};
-
-// export filename of keylist
-const KEYLIST_FILE: &str = "keylist.json";
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
@@ -895,76 +888,6 @@ adversaries."#;
         self.db.get_cert_by_id(cert_id)
     }
 
-    /// Export Certs from this CA into files, with filenames based on email
-    /// addresses of user ids.
-    pub fn export_certs_as_files(
-        &self,
-        email_filter: Option<String>,
-        path: Option<String>,
-    ) -> Result<()> {
-        if let Some(path) = path {
-            // export to filesystem, individual files split by email
-
-            // export CA cert
-            if email_filter.is_none() {
-                // add CA cert to output
-                let ca_cert = self.ca_get_cert()?;
-
-                std::fs::write(
-                    path_append(
-                        &path,
-                        &format!("{}.asc", &self.get_ca_email()?),
-                    )?,
-                    Self::certs_to_armored(&[ca_cert])?,
-                )?;
-            }
-
-            let emails = if let Some(email) = email_filter {
-                vec![email]
-            } else {
-                self.get_emails_all()?
-                    .iter()
-                    .map(|ce| ce.addr.clone())
-                    .collect()
-            };
-
-            for email in &emails {
-                if let Ok(certs) = self.certs_get(email) {
-                    if !certs.is_empty() {
-                        let mut c: Vec<_> = vec![];
-                        for cert in certs {
-                            c.push(OpenpgpCa::armored_to_cert(
-                                &cert.pub_cert,
-                            )?);
-                        }
-
-                        std::fs::write(
-                            path_append(&path, &format!("{}.asc", email))?,
-                            Self::certs_to_armored(&c)?,
-                        )?;
-                    }
-                } else {
-                    println!("ERROR loading certs for email '{}'", email)
-                };
-            }
-        } else {
-            // write to stdout
-            let certs = match email_filter {
-                Some(email) => self.certs_get(&email)?,
-                None => self.user_certs_get_all()?,
-            };
-
-            let mut c = Vec::new();
-            for cert in certs {
-                c.push(Self::cert_to_cert(&cert)?);
-            }
-
-            println!("{}", Self::certs_to_armored(&c)?);
-        }
-
-        Ok(())
-    }
-
     // -------- revocations
 
     /// Get a list of all Revocations for a cert
@@ -1119,116 +1042,27 @@ adversaries."#;
         Ok(())
     }
 
-    // --------- wkd
+    // -------- export
 
-    /// Export all user keys (that have a userid in `domain`) and the CA key
-    /// into a wkd directory structure
-    ///
-    /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
-    pub fn wkd_export(&self, domain: &str, path: &Path) -> Result<()> {
-        use sequoia_net::wkd;
-
-        let ca_cert = self.ca_get_cert()?;
-        wkd::insert(&path, domain, None, &ca_cert)?;
-
-        for cert in self.user_certs_get_all()? {
-            // don't export to WKD if the cert is marked "delisted"
-            if !cert.delisted {
-                let c = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-                if Self::cert_has_uid_in_domain(&c, domain)? {
-                    wkd::insert(&path, domain, None, &c)?;
-                }
-            }
-        }
-
-        Ok(())
+    pub fn export_certs_as_files(
+        &self,
+        email_filter: Option<String>,
+        path: Option<String>,
+    ) -> Result<()> {
+        export::export_certs_as_files(&self, email_filter, path)
     }
 
-    // --------- keylist
+    pub fn wkd_export(&self, domain: &str, path: &Path) -> Result<()> {
+        export::wkd_export(&self, domain, path)
+    }
 
-    /// Export the contents of a CA in Keylist format.
-    ///
-    /// `path`: filesystem path into which the exported keylist and signature
-    /// files will be written.
-    ///
-    /// `signature_uri`: the https address from which the signature file will
-    /// be retrievable
-    ///
-    /// `force`: by default, this fn fails if the files exist; when force is
-    /// true, overwrite.
     pub fn export_keylist(
         &self,
         path: PathBuf,
         signature_uri: String,
         force: bool,
     ) -> Result<()> {
-        // filename of sigfile: last part of signature_uri
-        let pos = &signature_uri.rfind('/').unwrap() + 1; //FIXME
-        let sigfile_name = &signature_uri[pos..];
-
-        // Start populating new Keylist
-        let mut ukl = Keylist {
-            metadata: Metadata {
-                signature_uri: signature_uri.clone(),
-                keyserver: None,
-                comment: Some("Exported from OpenPGP CA".to_string()),
-            },
-            keys: vec![],
-        };
-
-        // .. add ca cert to Keylist ..
-        let (ca, cacert) = self.ca_get()?.expect("failed to load CA");
-
-        ukl.keys.push(Key {
-            fingerprint: cacert.fingerprint,
-            name: Some(format!("OpenPGP CA at {}", ca.domainname)),
-            email: Some(self.get_ca_email()?),
-            comment: None,
-            keyserver: None,
-        });
-
-        // .. add all "signed-by-ca" certs to the list.
-        for user in &self.users_get_all()? {
-            for user_cert in self.get_certs_by_user(&user)? {
-                // check if any user id of the cert has been certified by this ca (else skip)
-                let (sig_from_ca, _) =
-                    self.cert_check_certifications(&user_cert)?;
-                if sig_from_ca.is_empty() {
-                    continue;
-                }
-
-                // Create entries for each user id that the CA has certified
-                for u in sig_from_ca {
-                    if let Ok(Some(email)) = u.email() {
-                        ukl.keys.push(Key {
-                            fingerprint: user_cert.fingerprint.clone(),
-                            name: user.name.clone(),
-                            email: Some(email),
-                            comment: None,
-                            keyserver: None,
-                        });
-                    }
-                }
-            }
-        }
-
-        let signer = Box::new(|text: &str| self.sign_detached(text));
-
-        // make a signed list object
-        let skl = ukl.sign(signer)?;
-
-        // Write keylist and signature to the filesystem
-        let mut keylist = path.clone();
-        keylist.push(KEYLIST_FILE);
-        open_file(keylist, force)?
-            .write_all(&skl.keylist.as_bytes().to_vec())?;
-
-        let mut sigfile = path;
-        sigfile.push(sigfile_name);
-        open_file(sigfile, force)?.write_all(&skl.sig.as_bytes().to_vec())?;
-
-        Ok(())
+        export::export_keylist(&self, path, signature_uri, force)
     }
 
     // -------- update keys from public key sources
@@ -1303,7 +1137,7 @@ adversaries."#;
     }
 
     /// Is any uid of this cert for an email address in "domain"?
-    fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Result<bool> {
+    pub fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Result<bool> {
         for uid in c.userids() {
             // is any uid in domain
             let email = uid.email()?;
@@ -1352,50 +1186,5 @@ adversaries."#;
         pass: Option<&str>,
     ) -> Result<Cert> {
         Pgp::tsign(signee, signer, pass)
-    }
-
-    pub fn sign_detached(&self, text: &str) -> Result<String> {
-        let ca_cert = self.ca_get_cert()?;
-
-        let signing_keypair = ca_cert
-            .keys()
-            .secret()
-            .with_policy(&StandardPolicy::new(), None)
-            .supported()
-            .alive()
-            .revoked(false)
-            .for_signing()
-            .next()
-            .unwrap()
-            .key()
-            .clone()
-            .into_keypair()?;
-
-        let mut sink = vec![];
-        {
-            let message = Message::new(&mut sink);
-            let message = Armorer::new(message)
-                // Customize the `Armorer` here.
-                .build()?;
-
-            let mut signer =
-                Signer::new(message, signing_keypair).detached().build()?;
-
-            // Write the data directly to the `Signer`.
-            signer.write_all(text.as_bytes())?;
-            signer.finalize()?;
-        }
-
-        Ok(std::str::from_utf8(&sink)?.to_string())
-    }
-}
-
-// ------- util
-
-fn open_file(name: PathBuf, overwrite: bool) -> std::io::Result<File> {
-    if overwrite {
-        File::create(name)
-    } else {
-        OpenOptions::new().write(true).create_new(true).open(name)
     }
 }
