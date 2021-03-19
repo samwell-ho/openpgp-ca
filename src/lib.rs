@@ -23,6 +23,7 @@ pub mod ca;
 mod cas;
 mod db;
 mod export;
+mod import;
 pub mod models;
 mod pgp;
 mod revocation;

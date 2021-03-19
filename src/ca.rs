@@ -34,6 +34,7 @@ use crate::bridge;
 use crate::cas;
 use crate::db::Db;
 use crate::export;
+use crate::import;
 use crate::models;
 use crate::pgp::Pgp;
 use crate::revocation;
@@ -42,9 +43,7 @@ use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::{Cert, Fingerprint, KeyID};
-
-use sequoia_net::Policy;
+use sequoia_openpgp::Cert;
 
 use diesel::prelude::*;
 
@@ -830,62 +829,12 @@ impl OpenpgpCa {
 
     // -------- update keys from public key sources
 
-    /// Pull a key from WKD and merge any updates into our local version of
-    /// this key
     pub fn update_from_wkd(&self, cert: &models::Cert) -> Result<()> {
-        use sequoia_net::wkd;
-
-        use tokio::runtime::Runtime;
-        let mut rt = Runtime::new()?;
-
-        let emails = self.emails_get(&cert)?;
-
-        let mut merge = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-        for email in emails {
-            let certs =
-                rt.block_on(async move { wkd::get(&email.addr).await });
-
-            for c in certs? {
-                if c.fingerprint().to_hex() == cert.fingerprint {
-                    merge = merge.merge_public(c)?;
-                }
-            }
-        }
-
-        let mut updated = cert.clone();
-        updated.pub_cert = Pgp::cert_to_armored(&merge)?;
-
-        self.db.update_cert(&updated)?;
-
-        Ok(())
+        import::update_from_wkd(&self, cert)
     }
 
-    /// Pull a key from hagrid and merge any updates into our local version of
-    /// this key
     pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<()> {
-        use tokio::runtime::Runtime;
-        let mut rt = Runtime::new()?;
-
-        let mut merge = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-        // get key from hagrid
-        let mut hagrid =
-            sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
-
-        let f = (cert.fingerprint).parse::<Fingerprint>()?;
-        let c =
-            rt.block_on(async move { hagrid.get(&KeyID::from(f)).await })?;
-
-        // update in DB
-        merge = merge.merge_public(c)?;
-
-        let mut updated = cert.clone();
-        updated.pub_cert = Pgp::cert_to_armored(&merge)?;
-
-        self.db.update_cert(&updated)?;
-
-        Ok(())
+        import::update_from_hagrid(&self, cert)
     }
 
     // -------- helper functions
