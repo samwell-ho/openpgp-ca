@@ -32,6 +32,7 @@
 
 use crate::bridge;
 use crate::cas;
+use crate::cert;
 use crate::db::Db;
 use crate::export;
 use crate::import;
@@ -45,8 +46,6 @@ use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::Cert;
 
-use diesel::prelude::*;
-
 use anyhow::{Context, Result};
 
 use std::collections::HashMap;
@@ -54,7 +53,7 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
@@ -160,17 +159,57 @@ impl OpenpgpCa {
     }
     // -------- users / certs
 
-    /// Create a new OpenPGP CA User.
-    ///
-    /// The CA Cert is automatically trust-signed with this new user
-    /// Cert and the user Cert is signed by the CA. This is the
-    /// "Centralized key creation workflow"
-    ///
-    /// This generates a new OpenPGP Cert for the new User.
-    /// The private Cert material is printed to stdout and NOT stored
-    /// in OpenPGP CA.
-    ///
-    /// The public Cert is stored in the OpenPGP CA database.
+    /// Get a list of all User Certs
+    //
+    // FIXME: remove this method ->
+    // it's probably always better to explicitly iterate over user,
+    // then certs(user)
+    pub fn user_certs_get_all(&self) -> Result<Vec<models::Cert>> {
+        let users = self.db.get_users_sort_by_name()?;
+        let mut user_certs = Vec::new();
+        for user in users {
+            user_certs.append(&mut self.db.get_cert_by_user(&user)?);
+        }
+        Ok(user_certs)
+    }
+
+    pub fn certs_expired(
+        &self,
+        days: u64,
+    ) -> Result<HashMap<models::Cert, Option<SystemTime>>> {
+        cert::certs_expired(self, days)
+    }
+
+    pub fn cert_check_certifications(
+        &self,
+        cert: &models::Cert,
+    ) -> Result<(Vec<UserID>, bool)> {
+        cert::cert_check_certifications(self, cert)
+    }
+
+    pub fn cert_check_ca_sig(
+        &self,
+        cert: &models::Cert,
+    ) -> Result<Vec<UserID>> {
+        cert::cert_check_ca_sig(self, cert)
+    }
+
+    pub fn cert_check_tsig_on_ca(&self, cert: &models::Cert) -> Result<bool> {
+        cert::cert_check_tsig_on_ca(self, cert)
+    }
+
+    pub fn certs_refresh_ca_certifications(
+        &self,
+        threshold_days: u64,
+        validity_days: u64,
+    ) -> Result<()> {
+        cert::certs_refresh_ca_certifications(
+            self,
+            threshold_days,
+            validity_days,
+        )
+    }
+
     pub fn user_new(
         &self,
         name: Option<&str>,
@@ -178,81 +217,9 @@ impl OpenpgpCa {
         duration_days: Option<u64>,
         password: bool,
     ) -> Result<models::User> {
-        let ca_cert = self.ca_get_cert()?;
-
-        // make user cert (signed by CA)
-        let (user_cert, revoc, pass) =
-            Pgp::make_user_cert(emails, name, password)
-                .context("make_user failed")?;
-
-        // sign user key with CA key
-        let certified = Pgp::sign_user_emails(
-            &ca_cert,
-            &user_cert,
-            Some(emails),
-            duration_days,
-        )
-        .context("sign_user failed")?;
-
-        // user tsigns CA key
-        let tsigned_ca = Pgp::tsign(ca_cert, &user_cert, pass.as_deref())
-            .context("failed: user tsigns CA")?;
-
-        let tsigned_ca_armored =
-            Pgp::cert_to_armored_private_key(&tsigned_ca)?;
-
-        let pub_key = &Pgp::cert_to_armored(&certified)?;
-        let revoc = Pgp::revoc_to_armored(&revoc, None)?;
-
-        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-            let res = self.db.add_user(
-                name,
-                (pub_key, &user_cert.fingerprint().to_hex()),
-                emails,
-                &[revoc],
-                Some(&tsigned_ca_armored),
-            );
-
-            if res.is_err() {
-                eprint!("{:?}", res);
-                return Err(anyhow::anyhow!("Couldn't insert user"));
-            }
-
-            // the private key needs to be handed over to the user, print for now
-            println!(
-                "new user key for {}:\n{}",
-                name.unwrap_or(""),
-                &Pgp::cert_to_armored_private_key(&certified)?
-            );
-            if let Some(pass) = pass {
-                println!("Password for this key: '{}'.\n", pass);
-            } else {
-                println!("No password set for this key.\n");
-            }
-            // --
-
-            Ok(res?)
-        })
+        cert::user_new(&self, name, emails, duration_days, password)
     }
 
-    /// Update a User in the database
-    pub fn user_update(&self, user: &models::User) -> Result<()> {
-        self.db.update_user(user)
-    }
-
-    /// Import an existing OpenPGP public Cert a new OpenPGP CA user.
-    ///
-    /// The `key` is expected as an armored public key.
-    ///
-    /// userids that correspond to `emails` will be signed by the CA.
-    ///
-    /// A symbolic `name` and a list of `emails` for this User can
-    /// optionally be supplied. If those are not set, emails are taken from
-    /// the list of userids in the public key. Also, if the
-    /// key has exactly one userid, the symbolic name is taken from that
-    /// userid.
-    ///
-    /// Optionally a revocation certificate can be supplied.
     pub fn cert_import_new(
         &self,
         key: &str,
@@ -261,93 +228,23 @@ impl OpenpgpCa {
         emails: &[&str],
         duration_days: Option<u64>,
     ) -> Result<()> {
-        let c = Pgp::armored_to_cert(key)
-            .context("cert_import_new: couldn't process key")?;
-
-        let fingerprint = &c.fingerprint().to_hex();
-
-        let exists = self.db.get_cert(fingerprint).context(
-            "cert_import_new: error while checking for \
-            existing cert with the same fingerprint",
-        )?;
-
-        if exists.is_some() {
-            return Err(anyhow::anyhow!(
-                "A cert with this fingerprint already exists in the DB"
-            ));
-        }
-
-        // sign user key with CA key
-        let ca_cert = self.ca_get_cert()?;
-
-        // sign only the User IDs that have been specified
-        let certified =
-            Pgp::sign_user_emails(&ca_cert, &c, Some(emails), duration_days)
-                .context("sign_user_emails failed")?;
-
-        // use name from User IDs, if no name was passed
-        let name = match name {
-            Some(name) => Some(name.to_owned()),
-            None => {
-                let userids: Vec<_> = c.userids().collect();
-                if userids.len() == 1 {
-                    let userid = &userids[0];
-                    userid.userid().name()?
-                } else {
-                    None
-                }
-            }
-        };
-
-        let pub_key = &Pgp::cert_to_armored(&certified)
-            .context("cert_import_new: couldn't re-armor key")?;
-
-        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-            let res = self.db.add_user(
-                name.as_deref(),
-                (pub_key, fingerprint),
-                &emails,
-                &revoc_certs,
-                None,
-            );
-
-            if res.is_err() {
-                eprint!("{:?}", res);
-                return Err(anyhow::anyhow!("Couldn't insert user"));
-            }
-
-            Ok(())
-        })
+        cert::cert_import_new(
+            self,
+            key,
+            revoc_certs,
+            name,
+            emails,
+            duration_days,
+        )
     }
 
-    /// Update key for existing database Cert
     pub fn cert_import_update(&self, key: &str) -> Result<()> {
-        let cert_new = Pgp::armored_to_cert(key)
-            .context("cert_import_new: couldn't process key")?;
+        cert::cert_import_update(self, key)
+    }
 
-        let fingerprint = &cert_new.fingerprint().to_hex();
-
-        let exists = self.db.get_cert(fingerprint).context(
-            "cert_import_update: error while checking for \
-            existing cert with the same fingerprint",
-        )?;
-
-        if let Some(mut cert) = exists {
-            // merge existing and new public key
-            let cert_old = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-            let updated = cert_old.merge_public(cert_new)?;
-            let armored = Pgp::cert_to_armored(&updated)?;
-
-            cert.pub_cert = armored;
-            self.db.update_cert(&cert)?;
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "No cert with this fingerprint exists in the DB, cannot \
-                update"
-            ))
-        }
+    /// Update a User in the database
+    pub fn user_update(&self, user: &models::User) -> Result<()> {
+        self.db.update_user(user)
     }
 
     /// Update a Cert in the database
@@ -355,202 +252,39 @@ impl OpenpgpCa {
         self.db.update_cert(cert)
     }
 
-    /// Check all Certs for certifications from the CA.
+    /// Get Cert by fingerprint.
     ///
-    /// If a certification expires in less than `threshold_days`, and it is
-    /// not marked as 'inactive', make a new certification that is good for
-    /// `validity_days`, and update the Cert.
-    pub fn certs_refresh_ca_certifications(
+    /// If 'fingerprint' contains spaces, they will be
+    /// filtered out.
+    pub fn cert_get_by_fingerprint(
         &self,
-        threshold_days: u64,
-        validity_days: u64,
-    ) -> Result<()> {
-        self.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-            let ca_cert = self.ca_get_cert()?;
-            let ca_fp = ca_cert.fingerprint();
-
-            let threshold_secs = threshold_days * 24 * 60 * 60;
-            let threshold_time =
-                SystemTime::now() + Duration::new(threshold_secs, 0);
-
-            for cert in self
-                .db
-                .get_certs()?
-                .iter()
-                // ignore "inactive" Certs
-                .filter(|c| !c.inactive)
-            {
-                let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
-                let mut uids_to_recert = Vec::new();
-
-                for uid in c.userids() {
-                    let ca_certifications: Vec<_> = uid
-                        .certifications()
-                        .filter(|c| {
-                            c.issuer_fingerprints().any(|fp| *fp == ca_fp)
-                        })
-                        .collect();
-
-                    let sig_valid_past_threshold = |c: &&Signature| {
-                        let expiration = c.signature_expiration_time();
-                        expiration.is_none()
-                            || (expiration.unwrap() > threshold_time)
-                    };
-
-                    // a new certification is created if certifications by the
-                    // CA exist, but none of the existing certifications are
-                    // valid for longer than `threshold_days`
-                    if !ca_certifications.is_empty()
-                        && !ca_certifications
-                            .iter()
-                            .any(sig_valid_past_threshold)
-                    {
-                        // make a new certification for this uid
-                        uids_to_recert.push(uid.userid());
-                    }
-                }
-                if !uids_to_recert.is_empty() {
-                    // make new certifications for "uids_to_update"
-                    let recertified = Pgp::sign_user_ids(
-                        &ca_cert,
-                        &c,
-                        &uids_to_recert[..],
-                        Some(validity_days),
-                    )?;
-
-                    // update cert in db
-                    let mut cert_update = cert.clone();
-                    cert_update.pub_cert =
-                        OpenpgpCa::cert_to_armored(&recertified)?;
-                    self.cert_update(&cert_update)?;
-                }
-            }
-
-            Ok(())
-        })
+        fingerprint: &str,
+    ) -> Result<Option<models::Cert>> {
+        let norm = OpenpgpCa::normalize_fp(fingerprint);
+        self.db.get_cert(&norm)
     }
 
-    /// Get the SystemTime for when the specified Cert will expire
-    pub fn cert_expiration(cert: &models::Cert) -> Result<Option<SystemTime>> {
-        let cert = Pgp::armored_to_cert(&cert.pub_cert)?;
-        Ok(Pgp::get_expiry(&cert)?)
+    /// Get a Cert by id
+    pub fn cert_by_id(&self, cert_id: i32) -> Result<Option<models::Cert>> {
+        self.db.get_cert_by_id(cert_id)
     }
 
-    /// Which certs will be expired in 'days' days?
-    ///
-    /// If a cert is not "alive" now, it will not get returned as expiring.
-    /// (Otherwise old/abandoned certs would clutter the results)
-    pub fn certs_expired(
+    /// Get a list of all Certs for one User
+    pub fn get_certs_by_user(
         &self,
-        days: u64,
-    ) -> Result<HashMap<models::Cert, Option<SystemTime>>> {
-        let mut map = HashMap::new();
-
-        let days = Duration::new(60 * 60 * 24 * days, 0);
-        let expiry_test = SystemTime::now().checked_add(days).unwrap();
-
-        let certs =
-            self.user_certs_get_all().context("couldn't load certs")?;
-
-        for cert in certs {
-            let c = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-            // only consider (and thus potentially notify as "expiring") certs
-            // that are alive now
-            if c.with_policy(&StandardPolicy::new(), None)?
-                .alive()
-                .is_err()
-            {
-                continue;
-            }
-
-            let exp = Pgp::get_expiry(&c)?;
-            let alive = c
-                .with_policy(&StandardPolicy::new(), expiry_test)?
-                .alive()
-                .is_ok();
-
-            if !alive {
-                map.insert(cert, exp);
-            }
-        }
-
-        Ok(map)
+        user: &models::User,
+    ) -> Result<Vec<models::Cert>> {
+        self.db.get_cert_by_user(&user)
     }
 
-    /// Check if a cert is "possibly revoked"
-    pub fn cert_possibly_revoked(cert: &models::Cert) -> Result<bool> {
-        let cert = Pgp::armored_to_cert(&cert.pub_cert)?;
-        Ok(Pgp::is_possibly_revoked(&cert))
+    /// Get a list of all Users, ordered by name
+    pub fn users_get_all(&self) -> Result<Vec<models::User>> {
+        self.db.get_users_sort_by_name()
     }
 
-    /// For each Cert, check if:
-    /// - the Cert has been signed by the CA, and
-    /// - the CA key has a trust-signature from the Cert
-    ///
-    /// Returns a map 'cert -> (sig_from_ca, tsig_on_ca)'
-    pub fn cert_check_certifications(
-        &self,
-        cert: &models::Cert,
-    ) -> Result<(Vec<UserID>, bool)> {
-        let sig_from_ca = self
-            .cert_check_ca_sig(&cert)
-            .context("Failed while checking CA sig")?;
-
-        let tsig_on_ca = self
-            .cert_check_tsig_on_ca(&cert)
-            .context("Failed while checking tsig on CA")?;
-
-        Ok((sig_from_ca, tsig_on_ca))
-    }
-
-    /// Check if this Cert has been signed by the CA Key
-    pub fn cert_check_ca_sig(
-        &self,
-        cert: &models::Cert,
-    ) -> Result<Vec<UserID>> {
-        let c = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-        let ca = self.ca_get_cert()?;
-
-        let mut res = Vec::new();
-        let policy = StandardPolicy::new();
-
-        for uid in c.userids() {
-            let signed_by_ca = uid
-                .clone()
-                .with_policy(&policy, None)?
-                .bundle()
-                .certifications()
-                .iter()
-                .any(|s| {
-                    s.issuer_fingerprints().any(|f| f == &ca.fingerprint())
-                });
-
-            if signed_by_ca {
-                res.push(uid.userid().clone());
-            }
-        }
-
-        Ok(res)
-    }
-
-    /// Check if this Cert has tsigned the CA Key
-    pub fn cert_check_tsig_on_ca(&self, cert: &models::Cert) -> Result<bool> {
-        let ca = self.ca_get_cert()?;
-        let tsigs = Self::get_trust_sigs(&ca)?;
-
-        let user_cert = Pgp::armored_to_cert(&cert.pub_cert)?;
-
-        Ok(tsigs.iter().any(|t| {
-            t.issuer_fingerprints()
-                .any(|fp| fp == &user_cert.fingerprint())
-        }))
-    }
-
-    /// Get sequoia Cert representation of a database Cert
-    pub fn cert_to_cert(cert: &models::Cert) -> Result<Cert> {
-        Pgp::armored_to_cert(&cert.pub_cert)
+    /// Get a list of the Certs that are associated with `email`
+    pub fn certs_get(&self, email: &str) -> Result<Vec<models::Cert>> {
+        self.db.get_certs_by_email(email)
     }
 
     /// Get database User(s) for database Cert
@@ -559,6 +293,11 @@ impl OpenpgpCa {
         cert: &models::Cert,
     ) -> Result<Option<models::User>> {
         self.db.get_user_by_cert(cert)
+    }
+
+    /// Filter spaces so that pretty-printed fingerprint strings can be used
+    fn normalize_fp(fp: &str) -> String {
+        fp.chars().filter(|&c| c != ' ').collect()
     }
 
     /// Get a user name that is associated with this Cert.
@@ -573,6 +312,20 @@ impl OpenpgpCa {
             Ok("<no name>".to_string())
         }
     }
+
+    /// Check if a cert is "possibly revoked"
+    pub fn cert_possibly_revoked(cert: &models::Cert) -> Result<bool> {
+        let cert = Pgp::armored_to_cert(&cert.pub_cert)?;
+        Ok(Pgp::is_possibly_revoked(&cert))
+    }
+
+    /// Get the SystemTime for when the specified Cert will expire
+    pub fn cert_expiration(cert: &models::Cert) -> Result<Option<SystemTime>> {
+        let cert = Pgp::armored_to_cert(&cert.pub_cert)?;
+        Ok(Pgp::get_expiry(&cert)?)
+    }
+
+    // --
 
     /// Get the Cert representation of an armored key
     pub fn armored_to_cert(armored: &str) -> Result<Cert> {
@@ -596,58 +349,9 @@ impl OpenpgpCa {
         Pgp::certs_to_armored(certs)
     }
 
-    /// Get a list of all User Certs
-    //
-    // FIXME: remove this method ->
-    // it's probably always better to explicitly iterate over user,
-    // then certs(user)
-    pub fn user_certs_get_all(&self) -> Result<Vec<models::Cert>> {
-        let users = self.db.get_users_sort_by_name()?;
-        let mut user_certs = Vec::new();
-        for user in users {
-            user_certs.append(&mut self.db.get_cert_by_user(&user)?);
-        }
-        Ok(user_certs)
-    }
-
-    /// Get a list of all Certs for one User
-    pub fn get_certs_by_user(
-        &self,
-        user: &models::User,
-    ) -> Result<Vec<models::Cert>> {
-        self.db.get_cert_by_user(&user)
-    }
-
-    /// Get a list of all Users, ordered by name
-    pub fn users_get_all(&self) -> Result<Vec<models::User>> {
-        self.db.get_users_sort_by_name()
-    }
-
-    /// Get a list of the Certs that are associated with `email`
-    pub fn certs_get(&self, email: &str) -> Result<Vec<models::Cert>> {
-        self.db.get_certs_by_email(email)
-    }
-
-    /// Filter spaces so that pretty-printed fingerprint strings can be used
-    fn normalize_fp(fp: &str) -> String {
-        fp.chars().filter(|&c| c != ' ').collect()
-    }
-
-    /// Get Cert by fingerprint.
-    ///
-    /// If 'fingerprint' contains spaces, they will be
-    /// filtered out.
-    pub fn cert_get_by_fingerprint(
-        &self,
-        fingerprint: &str,
-    ) -> Result<Option<models::Cert>> {
-        let norm = OpenpgpCa::normalize_fp(fingerprint);
-        self.db.get_cert(&norm)
-    }
-
-    /// Get a Cert by id
-    pub fn cert_by_id(&self, cert_id: i32) -> Result<Option<models::Cert>> {
-        self.db.get_cert_by_id(cert_id)
+    /// Get sequoia Cert representation of a database Cert
+    pub fn cert_to_cert(cert: &models::Cert) -> Result<Cert> {
+        Pgp::armored_to_cert(&cert.pub_cert)
     }
 
     // -------- revocations
@@ -849,7 +553,10 @@ impl OpenpgpCa {
     }
 
     /// Is any uid of this cert for an email address in "domain"?
-    pub fn cert_has_uid_in_domain(c: &Cert, domain: &str) -> Result<bool> {
+    pub(crate) fn cert_has_uid_in_domain(
+        c: &Cert,
+        domain: &str,
+    ) -> Result<bool> {
         for uid in c.userids() {
             // is any uid in domain
             let email = uid.email()?;
@@ -878,7 +585,7 @@ impl OpenpgpCa {
     }
 
     /// Get all trust sigs on User IDs in this Cert
-    pub fn get_trust_sigs(c: &Cert) -> Result<Vec<Signature>> {
+    pub(crate) fn get_trust_sigs(c: &Cert) -> Result<Vec<Signature>> {
         Ok(Self::get_third_party_sigs(c)?
             .iter()
             .filter(|s| s.trust_signature().is_some())
