@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::schema::*;
+use crate::db::schema::*;
 
 #[derive(Queryable, Debug, Clone, AsChangeset, Identifiable)]
 pub struct Ca {

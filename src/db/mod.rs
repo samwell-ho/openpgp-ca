@@ -6,19 +6,22 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use anyhow::{Context, Result};
 use diesel::prelude::*;
 
-use anyhow::{Context, Result};
-
-use crate::models::*;
 use crate::pgp::Pgp;
-use crate::schema::*;
 
-pub struct Db {
+pub mod models;
+mod schema;
+
+use models::*;
+use schema::*;
+
+pub struct OcaDb {
     conn: SqliteConnection,
 }
 
-impl Db {
+impl OcaDb {
     pub fn new(db_url: &str) -> Result<Self> {
         let conn = SqliteConnection::establish(&db_url)
             .context(format!("Error connecting to {}", db_url))?;
@@ -28,7 +31,7 @@ impl Db {
             .execute(&conn)
             .context("Couldn't set 'PRAGMA foreign_keys=1;'")?;
 
-        Ok(Db { conn })
+        Ok(OcaDb { conn })
     }
 
     pub fn get_conn(&self) -> &SqliteConnection {

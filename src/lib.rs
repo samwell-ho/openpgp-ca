@@ -25,9 +25,7 @@ mod cert;
 mod db;
 mod export;
 mod import;
-pub mod models;
 pub mod pgp;
 mod revocation;
-mod schema;
 
 pub mod restd;

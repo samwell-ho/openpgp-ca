@@ -10,7 +10,7 @@ use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
 
-use crate::models;
+use crate::db::models;
 use crate::restd::cert_info::CertInfo;
 
 /// A container for return-data about one Cert.

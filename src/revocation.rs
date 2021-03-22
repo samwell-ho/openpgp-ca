@@ -7,8 +7,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::OpenpgpCa;
+use crate::db::models;
 use crate::diesel::Connection;
-use crate::models;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::packet::Signature;

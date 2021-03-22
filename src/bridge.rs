@@ -13,7 +13,7 @@ use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::{Cert, Fingerprint};
 
 use crate::ca::OpenpgpCa;
-use crate::models;
+use crate::db::models;
 use crate::pgp::Pgp;
 
 /// Create a new Bridge (between this OpenPGP CA and a remote OpenPGP

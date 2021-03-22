@@ -33,10 +33,10 @@
 use crate::bridge;
 use crate::cas;
 use crate::cert;
-use crate::db::Db;
+use crate::db::models;
+use crate::db::OcaDb;
 use crate::export;
 use crate::import;
-use crate::models;
 use crate::pgp::Pgp;
 use crate::revocation;
 
@@ -56,7 +56,7 @@ use std::time::SystemTime;
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
 pub struct OpenpgpCa {
-    db: Db,
+    db: OcaDb,
 }
 
 impl OpenpgpCa {
@@ -83,7 +83,7 @@ impl OpenpgpCa {
         };
 
         if let Some(db_url) = db_url {
-            let db = Db::new(&db_url)?;
+            let db = OcaDb::new(&db_url)?;
             db.diesel_migrations_run();
 
             Ok(OpenpgpCa { db })
@@ -92,7 +92,7 @@ impl OpenpgpCa {
         }
     }
 
-    pub fn db(&self) -> &Db {
+    pub fn db(&self) -> &OcaDb {
         &self.db
     }
 

@@ -15,7 +15,7 @@ use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
 
 use crate::ca::OpenpgpCa;
-use crate::models;
+use crate::db::models;
 use crate::pgp::Pgp;
 use crate::restd::cert_info::CertInfo;
 use crate::restd::json::*;
