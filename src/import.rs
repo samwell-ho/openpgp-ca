@@ -40,7 +40,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     let mut updated = cert.clone();
     updated.pub_cert = Pgp::cert_to_armored(&merge)?;
 
-    oca.db.update_cert(&updated)?;
+    oca.db().update_cert(&updated)?;
 
     Ok(())
 }
@@ -66,7 +66,7 @@ pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     let mut updated = cert.clone();
     updated.pub_cert = Pgp::cert_to_armored(&merge)?;
 
-    oca.db.update_cert(&updated)?;
+    oca.db().update_cert(&updated)?;
 
     Ok(())
 }

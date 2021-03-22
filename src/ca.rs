@@ -56,7 +56,7 @@ use std::time::SystemTime;
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
 pub struct OpenpgpCa {
-    pub db: Db, // FIXME
+    db: Db,
 }
 
 impl OpenpgpCa {
@@ -90,6 +90,10 @@ impl OpenpgpCa {
         } else {
             Err(anyhow::anyhow!("ERROR: no database configuration found"))
         }
+    }
+
+    pub fn db(&self) -> &Db {
+        &self.db
     }
 
     // -------- CAs
@@ -238,11 +242,6 @@ impl OpenpgpCa {
 
     pub fn cert_import_update(&self, key: &str) -> Result<()> {
         cert::cert_import_update(self, key)
-    }
-
-    /// Update a User in the database
-    pub fn user_update(&self, user: &models::User) -> Result<()> {
-        self.db.update_user(user)
     }
 
     /// Update a Cert in the database
@@ -462,14 +461,6 @@ impl OpenpgpCa {
 
     // -------- export
 
-    pub fn export_certs_as_files(
-        &self,
-        email_filter: Option<String>,
-        path: Option<String>,
-    ) -> Result<()> {
-        export::export_certs_as_files(&self, email_filter, path)
-    }
-
     pub fn wkd_export(&self, domain: &str, path: &Path) -> Result<()> {
         export::wkd_export(&self, domain, path)
     }
@@ -481,6 +472,14 @@ impl OpenpgpCa {
         force: bool,
     ) -> Result<()> {
         export::export_keylist(&self, path, signature_uri, force)
+    }
+
+    pub fn export_certs_as_files(
+        &self,
+        email_filter: Option<String>,
+        path: Option<String>,
+    ) -> Result<()> {
+        export::export_certs_as_files(&self, email_filter, path)
     }
 
     // -------- update keys from public key sources

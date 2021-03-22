@@ -24,7 +24,7 @@ fn check_for_equivalent_revocation(
     rev_cert: &Signature,
     cert: &models::Cert,
 ) -> Result<bool> {
-    for db_rev in oca.db.get_revocations(cert)? {
+    for db_rev in oca.db().get_revocations(cert)? {
         let r = Pgp::armored_to_signature(&db_rev.revocation)
             .context("Couldn't re-armor revocation cert from CA db")?;
 
@@ -45,7 +45,7 @@ fn check_for_equivalent_revocation(
 /// cert. Only if this is successful is the revocation stored.
 pub fn revocation_add(oca: &OpenpgpCa, revoc_cert_str: &str) -> Result<()> {
     // check if the exact same revocation already exists in db
-    if oca.db.check_for_revocation(revoc_cert_str)? {
+    if oca.db().check_for_revocation(revoc_cert_str)? {
         return Ok(()); // this revocation is already stored -> do nothing
     }
 
@@ -56,7 +56,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revoc_cert_str: &str) -> Result<()> {
     let mut cert = None;
     // - search by fingerprint, if possible
     if let Some(sig_fingerprint) = Pgp::get_revoc_issuer_fp(&revoc_cert) {
-        cert = oca.db.get_cert(&sig_fingerprint.to_hex())?;
+        cert = oca.db().get_cert(&sig_fingerprint.to_hex())?;
     }
     // - if match by fingerprint failed: test all certs
     if cert.is_none() {
@@ -73,7 +73,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revoc_cert_str: &str) -> Result<()> {
                 let armored = Pgp::revoc_to_armored(&revoc_cert, None)
                     .context("couldn't armor revocation cert")?;
 
-                oca.db.add_revocation(&armored, &cert)?;
+                oca.db().add_revocation(&armored, &cert)?;
             }
 
             Ok(())
@@ -152,8 +152,8 @@ pub fn revocation_apply(
     oca: &OpenpgpCa,
     revoc: models::Revocation,
 ) -> Result<()> {
-    oca.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-        let cert = oca.db.get_cert_by_id(revoc.cert_id)?;
+    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+        let cert = oca.db().get_cert_by_id(revoc.cert_id)?;
 
         if let Some(mut cert) = cert {
             let sig = Pgp::armored_to_signature(&revoc.revocation)?;
@@ -167,9 +167,11 @@ pub fn revocation_apply(
             let mut revoc = revoc.clone();
             revoc.published = true;
 
-            oca.db.update_cert(&cert).context("Couldn't update Cert")?;
+            oca.db()
+                .update_cert(&cert)
+                .context("Couldn't update Cert")?;
 
-            oca.db
+            oca.db()
                 .update_revocation(&revoc)
                 .context("Couldn't update Revocation")?;
 

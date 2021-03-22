@@ -63,8 +63,8 @@ pub fn user_new(
     let pub_key = &Pgp::cert_to_armored(&certified)?;
     let revoc = Pgp::revoc_to_armored(&revoc, None)?;
 
-    oca.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-        let res = oca.db.add_user(
+    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+        let res = oca.db().add_user(
             name,
             (pub_key, &user_cert.fingerprint().to_hex()),
             emails,
@@ -120,7 +120,7 @@ pub fn cert_import_new(
 
     let fingerprint = &c.fingerprint().to_hex();
 
-    let exists = oca.db.get_cert(fingerprint).context(
+    let exists = oca.db().get_cert(fingerprint).context(
         "cert_import_new: error while checking for \
             existing cert with the same fingerprint",
     )?;
@@ -156,8 +156,8 @@ pub fn cert_import_new(
     let pub_key = &Pgp::cert_to_armored(&certified)
         .context("cert_import_new: couldn't re-armor key")?;
 
-    oca.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-        let res = oca.db.add_user(
+    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+        let res = oca.db().add_user(
             name.as_deref(),
             (pub_key, fingerprint),
             &emails,
@@ -181,7 +181,7 @@ pub fn cert_import_update(oca: &OpenpgpCa, key: &str) -> Result<()> {
 
     let fingerprint = &cert_new.fingerprint().to_hex();
 
-    let exists = oca.db.get_cert(fingerprint).context(
+    let exists = oca.db().get_cert(fingerprint).context(
         "cert_import_update: error while checking for \
             existing cert with the same fingerprint",
     )?;
@@ -194,7 +194,7 @@ pub fn cert_import_update(oca: &OpenpgpCa, key: &str) -> Result<()> {
         let armored = Pgp::cert_to_armored(&updated)?;
 
         cert.pub_cert = armored;
-        oca.db.update_cert(&cert)?;
+        oca.db().update_cert(&cert)?;
         Ok(())
     } else {
         Err(anyhow::anyhow!(
@@ -214,7 +214,7 @@ pub fn certs_refresh_ca_certifications(
     threshold_days: u64,
     validity_days: u64,
 ) -> Result<()> {
-    oca.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
+    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
         let ca_cert = oca.ca_get_cert()?;
         let ca_fp = ca_cert.fingerprint();
 
@@ -223,7 +223,7 @@ pub fn certs_refresh_ca_certifications(
             SystemTime::now() + Duration::new(threshold_secs, 0);
 
         for cert in oca
-            .db
+            .db()
             .get_certs()?
             .iter()
             // ignore "inactive" Certs

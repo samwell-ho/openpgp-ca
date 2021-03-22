@@ -36,7 +36,7 @@ pub fn ca_init(
     domainname: &str,
     name: Option<&str>,
 ) -> Result<()> {
-    if oca.db.get_ca()?.is_some() {
+    if oca.db().get_ca()?.is_some() {
         return Err(anyhow::anyhow!("ERROR: CA has already been created",));
     }
 
@@ -54,8 +54,8 @@ pub fn ca_init(
 
     let ca_key = &Pgp::cert_to_armored_private_key(&cert)?;
 
-    oca.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
-        oca.db.insert_ca(
+    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+        oca.db().insert_ca(
             models::NewCa { domainname },
             ca_key,
             &cert.fingerprint().to_hex(),
@@ -69,7 +69,7 @@ pub fn ca_init(
 ///
 /// This is the OpenPGP Cert of the CA.
 pub fn ca_get_cert(oca: &OpenpgpCa) -> Result<Cert> {
-    match oca.db.get_ca()? {
+    match oca.db().get_ca()? {
         Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
         _ => panic!("get_ca_cert() failed"),
     }
@@ -244,7 +244,7 @@ pub fn ca_get_pubkey_armored(oca: &OpenpgpCa) -> Result<String> {
 /// any trust-signatures on it and merges those into "our" local copy of
 /// the CA key.
 pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
-    oca.db.get_conn().transaction::<_, anyhow::Error, _>(|| {
+    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
         let ca_cert = oca.ca_get_cert().unwrap();
 
         let cert_import = Pgp::armored_to_cert(cert)?;
@@ -269,7 +269,7 @@ pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
 
         // update in DB
         let (_, mut ca_cert) = oca
-            .db
+            .db()
             .get_ca()
             .context("failed to load CA from database")?
             .unwrap();
@@ -277,7 +277,7 @@ pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
         ca_cert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
             .context("failed to armor CA Cert")?;
 
-        oca.db
+        oca.db()
             .update_cacert(&ca_cert)
             .context("Update of CA Cert in DB failed")?;
 
