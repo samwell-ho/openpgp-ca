@@ -42,7 +42,7 @@ pub fn export_certs_as_files(
 
             std::fs::write(
                 path_append(&path, &format!("{}.asc", &oca.get_ca_email()?))?,
-                OpenpgpCa::certs_to_armored(&[ca_cert])?,
+                Pgp::certs_to_armored(&[ca_cert])?,
             )?;
         }
 
@@ -60,12 +60,12 @@ pub fn export_certs_as_files(
                 if !certs.is_empty() {
                     let mut c: Vec<_> = vec![];
                     for cert in certs {
-                        c.push(OpenpgpCa::armored_to_cert(&cert.pub_cert)?);
+                        c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
                     }
 
                     std::fs::write(
                         path_append(&path, &format!("{}.asc", email))?,
-                        OpenpgpCa::certs_to_armored(&c)?,
+                        Pgp::certs_to_armored(&c)?,
                     )?;
                 }
             } else {
@@ -84,7 +84,7 @@ pub fn export_certs_as_files(
             c.push(OpenpgpCa::cert_to_cert(&cert)?);
         }
 
-        println!("{}", OpenpgpCa::certs_to_armored(&c)?);
+        println!("{}", Pgp::certs_to_armored(&c)?);
     }
 
     Ok(())

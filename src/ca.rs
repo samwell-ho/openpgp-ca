@@ -321,32 +321,8 @@ impl OpenpgpCa {
 
     /// Get the SystemTime for when the specified Cert will expire
     pub fn cert_expiration(cert: &models::Cert) -> Result<Option<SystemTime>> {
-        let cert = Pgp::armored_to_cert(&cert.pub_cert)?;
+        let cert = Self::cert_to_cert(&cert)?;
         Ok(Pgp::get_expiry(&cert)?)
-    }
-
-    // --
-
-    /// Get the Cert representation of an armored key
-    pub fn armored_to_cert(armored: &str) -> Result<Cert> {
-        Pgp::armored_to_cert(armored)
-    }
-
-    /// Get a Vec of Cert from an ascii armored keyring
-    pub fn armored_keyring_to_certs<D: AsRef<[u8]> + Send + Sync>(
-        armored: &D,
-    ) -> Result<Vec<Cert>> {
-        Pgp::armored_keyring_to_certs(armored)
-    }
-
-    /// Get the armored "public key" representation of a Cert
-    pub fn cert_to_armored(cert: &Cert) -> Result<String> {
-        Pgp::cert_to_armored(cert)
-    }
-
-    /// Get the armored "keyring" representation of a List of public-key Certs
-    pub fn certs_to_armored(certs: &[Cert]) -> Result<String> {
-        Pgp::certs_to_armored(certs)
     }
 
     /// Get sequoia Cert representation of a database Cert

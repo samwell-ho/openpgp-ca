@@ -22,6 +22,7 @@ use openpgp::{Cert, Fingerprint, KeyID};
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::pgp::Pgp;
 use sequoia_net::Policy;
 
 pub mod gnupg;
@@ -102,7 +103,7 @@ fn test_expiring_certification() -> Result<()> {
 
     let cert = &certs[0];
 
-    let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
+    let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
     // alice should have one user id
     assert_eq!(c.userids().len(), 1);
@@ -413,7 +414,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
             sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
         hagrid.get(&KeyID::from(j)).await
     })?;
-    let justus_key = OpenpgpCa::cert_to_armored(&justus)?;
+    let justus_key = Pgp::cert_to_armored(&justus)?;
 
     let n: Fingerprint = "8F17777118A33DDA9BA48E62AACB3243630052D9".parse()?;
     let neal: Cert = rt.block_on(async move {
@@ -421,7 +422,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
             sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
         hagrid.get(&KeyID::from(n)).await
     })?;
-    let neal_key = OpenpgpCa::cert_to_armored(&neal)?;
+    let neal_key = Pgp::cert_to_armored(&neal)?;
 
     // -- import keys into CA
 
@@ -909,7 +910,7 @@ fn test_refresh() -> Result<()> {
     let certs = ca.user_certs_get_all()?;
     for cert in certs {
         let u = ca.cert_get_users(&cert)?.unwrap();
-        let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
+        let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
         // get all certifications from the CA
         assert_eq!(c.userids().len(), 1);

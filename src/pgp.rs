@@ -52,7 +52,7 @@ impl Pgp {
     }
 
     /// make a private CA key
-    pub fn make_ca_cert(
+    pub(crate) fn make_ca_cert(
         domainname: &str,
         name: Option<&str>,
     ) -> Result<(Cert, Signature)> {
@@ -104,7 +104,7 @@ impl Pgp {
     }
 
     /// Makes a user Cert with "emails" as UIDs.
-    pub fn make_user_cert(
+    pub(crate) fn make_user_cert(
         emails: &[&str],
         name: Option<&str>,
         password: bool,

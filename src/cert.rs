@@ -229,7 +229,7 @@ pub fn certs_refresh_ca_certifications(
             // ignore "inactive" Certs
             .filter(|c| !c.inactive)
         {
-            let c = OpenpgpCa::armored_to_cert(&cert.pub_cert)?;
+            let c = Pgp::armored_to_cert(&cert.pub_cert)?;
             let mut uids_to_recert = Vec::new();
 
             for uid in c.userids() {
@@ -265,8 +265,7 @@ pub fn certs_refresh_ca_certifications(
 
                 // update cert in db
                 let mut cert_update = cert.clone();
-                cert_update.pub_cert =
-                    OpenpgpCa::cert_to_armored(&recertified)?;
+                cert_update.pub_cert = Pgp::cert_to_armored(&recertified)?;
                 oca.cert_update(&cert_update)?;
             }
         }

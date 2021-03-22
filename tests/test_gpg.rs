@@ -10,6 +10,7 @@ use openpgp::serialize::Serialize;
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::pgp::Pgp;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -526,9 +527,9 @@ fn test_scoping() -> Result<()> {
     let ca2_cert = ca1.cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
 
     // import CA certs into GnuPG
-    gnupg::import(&ctx, OpenpgpCa::cert_to_armored(&ca1_cert)?.as_bytes());
+    gnupg::import(&ctx, Pgp::cert_to_armored(&ca1_cert)?.as_bytes());
     gnupg::import(&ctx, ca2_cert.as_bytes());
-    gnupg::import(&ctx, OpenpgpCa::cert_to_armored(&tsigned_ca3)?.as_bytes());
+    gnupg::import(&ctx, Pgp::cert_to_armored(&tsigned_ca3)?.as_bytes());
 
     // import CA1 users into GnuPG
     let certs1 = ca1.user_certs_get_all()?;

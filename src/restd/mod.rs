@@ -16,6 +16,7 @@ use rocket_contrib::json::Json;
 
 use crate::ca::OpenpgpCa;
 use crate::models;
+use crate::pgp::Pgp;
 use crate::restd::cert_info::CertInfo;
 use crate::restd::json::*;
 use crate::restd::process_certs::{
@@ -112,17 +113,16 @@ fn certs_by_email(
         })?;
 
         for c in certs {
-            let cert =
-                OpenpgpCa::armored_to_cert(&c.pub_cert).map_err(|e| {
-                    ReturnError::new(
-                        ReturnStatus::InternalError,
-                        format!(
-                            "certs_by_email: error during armored_to_cert \
+            let cert = Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
+                ReturnError::new(
+                    ReturnStatus::InternalError,
+                    format!(
+                        "certs_by_email: error during armored_to_cert \
                             '{:?}'",
-                            e
-                        ),
-                    )
-                })?;
+                        e
+                    ),
+                )
+            })?;
 
             let cert_info = cert_to_cert_info(&cert)?;
             let warn = cert_to_warn(&cert).map_err(|ce| {
@@ -165,16 +165,15 @@ fn cert_by_fp(
         if let Some(c) = c {
             let certificate = load_certificate_data(&ca, &c)?;
 
-            let cert =
-                OpenpgpCa::armored_to_cert(&c.pub_cert).map_err(|e| {
-                    ReturnError::new(
-                        ReturnStatus::InternalError,
-                        format!(
-                            "cert_by_fp: error during armored_to_cert '{:?}'",
-                            e
-                        ),
-                    )
-                })?;
+            let cert = Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
+                ReturnError::new(
+                    ReturnStatus::InternalError,
+                    format!(
+                        "cert_by_fp: error during armored_to_cert '{:?}'",
+                        e
+                    ),
+                )
+            })?;
 
             let cert_info = cert_to_cert_info(&cert)?;
             let warn = cert_to_warn(&cert).map_err(|ce| {
@@ -354,16 +353,15 @@ fn check_expiring(
         let mut res = vec![];
 
         for cert in expired.keys() {
-            let cert =
-                OpenpgpCa::armored_to_cert(&cert.pub_cert).map_err(|e| {
-                    ReturnError::new(
-                        ReturnStatus::InternalError,
-                        format!(
-                            "check_expiring: Error in armored_to_cert '{:?}'",
-                            e
-                        ),
-                    )
-                })?;
+            let cert = Pgp::armored_to_cert(&cert.pub_cert).map_err(|e| {
+                ReturnError::new(
+                    ReturnStatus::InternalError,
+                    format!(
+                        "check_expiring: Error in armored_to_cert '{:?}'",
+                        e
+                    ),
+                )
+            })?;
 
             let ci = CertInfo::from_cert(&cert).map_err(|e| {
                 ReturnError::new(

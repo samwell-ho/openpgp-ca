@@ -20,6 +20,7 @@ use sequoia_openpgp::types::{
 use sequoia_openpgp::{Cert, Message, Packet};
 
 use crate::ca::OpenpgpCa;
+use crate::pgp::Pgp;
 use crate::restd;
 use crate::restd::cert_info::CertInfo;
 use crate::restd::json::*;
@@ -224,7 +225,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
     }
 
     // reject unreasonably big certificates
-    if let Ok(armored) = OpenpgpCa::cert_to_armored(cert) {
+    if let Ok(armored) = Pgp::cert_to_armored(cert) {
         let len = armored.len();
         if len > restd::CERT_SIZE_LIMIT {
             return Err(ReturnBadJSON::new(
@@ -309,7 +310,7 @@ fn process_cert(
         None => cert.clone(),
         Some(ref c) => {
             let db_cert =
-                OpenpgpCa::armored_to_cert(&c.pub_cert).map_err(|e| {
+                Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
                     let error = CertError::new(
                         CertStatus::InternalError,
                         format!(
@@ -389,7 +390,7 @@ fn process_cert(
         })
         .map_err(|ce| ReturnBadJSON::new(ce, None))?;
 
-    let armored = OpenpgpCa::cert_to_armored(&norm).map_err(|e|
+    let armored = Pgp::cert_to_armored(&norm).map_err(|e|
         // this should probably never happen?
         ReturnBadJSON::new(
             CertError::new(
@@ -532,7 +533,7 @@ fn unpack_certring(
         // 1) a signed message that contains a certring (?)
         if let Some(l) = msg.body() {
             // we expect the literal to contain an armored keyring
-            let certs = OpenpgpCa::armored_keyring_to_certs(&l.body())?;
+            let certs = Pgp::armored_keyring_to_certs(&l.body())?;
 
             if let Some(Packet::Signature(s)) = msg
                 .descendants()
@@ -555,7 +556,7 @@ fn unpack_certring(
         Err(anyhow::anyhow!("No Literal found in Message").into())
     } else {
         // 2) a plain keyring (unsigned)
-        Ok((OpenpgpCa::armored_keyring_to_certs(&certring)?, None))
+        Ok((Pgp::armored_keyring_to_certs(&certring)?, None))
     }
 }
 

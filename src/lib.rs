@@ -26,7 +26,7 @@ mod db;
 mod export;
 mod import;
 pub mod models;
-mod pgp;
+pub mod pgp;
 mod revocation;
 mod schema;
 
