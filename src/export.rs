@@ -81,7 +81,7 @@ pub fn export_certs_as_files(
 
         let mut c = Vec::new();
         for cert in certs {
-            c.push(OpenpgpCa::cert_to_cert(&cert)?);
+            c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
         }
 
         println!("{}", Pgp::certs_to_armored(&c)?);
@@ -136,7 +136,7 @@ pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
         if !cert.delisted {
             let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
-            if OpenpgpCa::cert_has_uid_in_domain(&c, domain)? {
+            if Pgp::cert_has_uid_in_domain(&c, domain)? {
                 wkd::insert(&path, domain, None, &c)?;
             }
         }

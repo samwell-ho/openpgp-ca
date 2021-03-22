@@ -186,7 +186,7 @@ fn test_update_cert_key() -> Result<()> {
     let alice = &certs[0];
 
     // check that expiry is ~2y
-    let cert = OpenpgpCa::cert_to_cert(alice)?;
+    let cert = Pgp::armored_to_cert(&alice.pub_cert)?;
 
     cert.with_policy(&policy, in_one_year)?.alive()?;
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_err());
@@ -216,7 +216,7 @@ fn test_update_cert_key() -> Result<()> {
     assert_eq!(certs.len(), 1);
 
     // check that expiry is not ~2y but ~5y
-    let cert = OpenpgpCa::cert_to_cert(&certs[0])?;
+    let cert = Pgp::armored_to_cert(&certs[0].pub_cert)?;
 
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_ok());
     assert!(!cert.with_policy(&policy, in_six_years)?.alive().is_ok());
@@ -675,7 +675,7 @@ fn test_import_signed_cert() -> Result<()> {
     assert_eq!(certs.len(), 1);
 
     let alice = &certs[0];
-    let cert = OpenpgpCa::cert_to_cert(&alice)?;
+    let cert = Pgp::armored_to_cert(&alice.pub_cert)?;
 
     assert_eq!(cert.userids().len(), 1);
 

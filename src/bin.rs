@@ -12,6 +12,7 @@ use chrono::offset::Utc;
 use chrono::DateTime;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::pgp::Pgp;
 
 pub mod cli;
 
@@ -258,11 +259,13 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
             println!(" user cert signed by CA: {}", !sig_by_ca.is_empty());
             println!(" user cert has tsigned CA: {}", tsig_on_ca);
 
+            let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+
             ca.emails_get(&cert)?
                 .iter()
                 .for_each(|email| println!(" - email {}", email.addr));
 
-            if let Some(exp) = OpenpgpCa::cert_expiration(&cert)? {
+            if let Some(exp) = Pgp::get_expiry(&c)? {
                 let datetime: DateTime<Utc> = exp.into();
                 println!(" expires: {}", datetime.format("%d/%m/%Y"));
             } else {
@@ -272,7 +275,7 @@ fn print_users(ca: &OpenpgpCa) -> Result<()> {
             let revs = ca.revocations_get(&cert)?;
             println!(" {} revocation certificate(s) available", revs.len());
 
-            if OpenpgpCa::cert_possibly_revoked(&cert)? {
+            if Pgp::is_possibly_revoked(&c) {
                 println!(" this user key has (possibly) been REVOKED");
             }
             println!();

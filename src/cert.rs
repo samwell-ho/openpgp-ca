@@ -370,7 +370,7 @@ pub fn cert_check_tsig_on_ca(
     cert: &models::Cert,
 ) -> Result<bool> {
     let ca = oca.ca_get_cert()?;
-    let tsigs = OpenpgpCa::get_trust_sigs(&ca)?;
+    let tsigs = Pgp::get_trust_sigs(&ca)?;
 
     let user_cert = Pgp::armored_to_cert(&cert.pub_cert)?;
 

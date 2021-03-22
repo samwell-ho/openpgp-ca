@@ -513,7 +513,7 @@ fn test_scoping() -> Result<()> {
     // create unscoped trust signature from beta.org CA to other.org CA
     // ---- openpgp-ca@beta.org ---tsign---> openpgp-ca@other.org ----
     let tsigned_ca3 =
-        OpenpgpCa::tsign(ca3.ca_get_cert()?, &ca2.ca_get_cert()?, None)?;
+        Pgp::tsign(ca3.ca_get_cert()?, &ca2.ca_get_cert()?, None)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 

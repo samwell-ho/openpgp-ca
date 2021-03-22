@@ -257,7 +257,7 @@ pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
         }
 
         // get the tsig(s) from import
-        let tsigs = OpenpgpCa::get_trust_sigs(&cert_import)?;
+        let tsigs = Pgp::get_trust_sigs(&cert_import)?;
 
         // add tsig(s) to our "own" version of the CA key
         let mut packets: Vec<Packet> = Vec::new();

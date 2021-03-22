@@ -6,21 +6,21 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use sequoia_openpgp as openpgp;
-
-use openpgp::armor;
-use openpgp::cert;
-use openpgp::cert::amalgamation::{ValidAmalgamation, ValidateAmalgamation};
-use openpgp::crypto::KeyPair;
-use openpgp::packet::{signature, Signature, UserID};
-use openpgp::parse::Parse;
-use openpgp::policy::StandardPolicy;
-use openpgp::serialize::Serialize;
-use openpgp::serialize::SerializeInto;
-use openpgp::types::{
+use sequoia_openpgp::armor;
+use sequoia_openpgp::cert;
+use sequoia_openpgp::cert::amalgamation::{
+    ValidAmalgamation, ValidateAmalgamation,
+};
+use sequoia_openpgp::crypto::KeyPair;
+use sequoia_openpgp::packet::{signature, Signature, UserID};
+use sequoia_openpgp::parse::Parse;
+use sequoia_openpgp::policy::StandardPolicy;
+use sequoia_openpgp::serialize::Serialize;
+use sequoia_openpgp::serialize::SerializeInto;
+use sequoia_openpgp::types::{
     KeyFlags, ReasonForRevocation, RevocationStatus, SignatureType,
 };
-use openpgp::{Cert, Fingerprint, KeyHandle, Packet};
+use sequoia_openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
 use std::convert::identity;
 use std::time::SystemTime;
@@ -205,7 +205,7 @@ impl Pgp {
 
     /// make a Signature from an ascii armored signature
     pub fn armored_to_signature(armored: &str) -> Result<Signature> {
-        let p = openpgp::Packet::from_bytes(armored)
+        let p = Packet::from_bytes(armored)
             .context("Input could not be parsed")?;
 
         if let Packet::Signature(s) = p {
@@ -249,6 +249,11 @@ impl Pgp {
     pub fn is_possibly_revoked(cert: &Cert) -> bool {
         RevocationStatus::NotAsFarAsWeKnow
             != cert.revocation_status(POLICY, None)
+    }
+
+    /// Filter spaces so that pretty-printed fingerprint strings can be used
+    pub(crate) fn normalize_fp(fp: &str) -> String {
+        fp.chars().filter(|&c| c != ' ').collect()
     }
 
     pub fn get_revoc_issuer_fp(revoc_cert: &Signature) -> Option<Fingerprint> {
@@ -533,5 +538,63 @@ impl Pgp {
             ka.into_keypair().ok()
         })
         .collect()
+    }
+
+    // -------- helper functions
+
+    pub fn print_cert_info(armored: &str) -> Result<()> {
+        let c = Pgp::armored_to_cert(&armored)?;
+        for uid in c.userids() {
+            println!("User ID: {}", uid.userid());
+        }
+        println!("Fingerprint '{}'", c);
+        Ok(())
+    }
+
+    /// Is any uid of this cert for an email address in "domain"?
+    pub(crate) fn cert_has_uid_in_domain(
+        c: &Cert,
+        domain: &str,
+    ) -> Result<bool> {
+        for uid in c.userids() {
+            // is any uid in domain
+            let email = uid.email()?;
+            if let Some(email) = email {
+                let split: Vec<_> = email.split('@').collect();
+
+                if split.len() != 2 {
+                    return Err(anyhow::anyhow!("unexpected email format"));
+                }
+
+                if split[1] == domain {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Get all trust sigs on User IDs in this Cert
+    pub(crate) fn get_trust_sigs(c: &Cert) -> Result<Vec<Signature>> {
+        Ok(Self::get_third_party_sigs(c)?
+            .iter()
+            .filter(|s| s.trust_signature().is_some())
+            .cloned()
+            .collect())
+    }
+
+    /// Get all third party sigs on User IDs in this Cert
+    fn get_third_party_sigs(c: &Cert) -> Result<Vec<Signature>> {
+        let mut res = Vec::new();
+        let policy = StandardPolicy::new();
+
+        for uid in c.userids() {
+            let sigs =
+                uid.with_policy(&policy, None)?.bundle().certifications();
+            sigs.iter().for_each(|s| res.push(s.clone()));
+        }
+
+        Ok(res)
     }
 }
