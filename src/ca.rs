@@ -45,6 +45,8 @@ use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::Cert;
 
 use anyhow::{Context, Result};
+use chrono::offset::Utc;
+use chrono::DateTime;
 
 use std::collections::HashMap;
 use std::env;
@@ -305,6 +307,128 @@ impl OpenpgpCa {
         }
     }
 
+    pub fn print_certifications_status(&self) -> Result<()> {
+        let mut count_ok = 0;
+
+        let users = self.users_get_all()?;
+        for user in &users {
+            for cert in self.get_certs_by_user(&user)? {
+                let (sig_from_ca, tsig_on_ca) =
+                    self.cert_check_certifications(&cert)?;
+
+                let ok = if !sig_from_ca.is_empty() {
+                    true
+                } else {
+                    println!(
+                        "No CA certification on any User ID of {}.",
+                        cert.fingerprint
+                    );
+                    false
+                } && if tsig_on_ca {
+                    true
+                } else {
+                    println!(
+                        "CA Cert has not been tsigned by {}.",
+                        cert.fingerprint
+                    );
+                    false
+                };
+
+                if ok {
+                    count_ok += 1;
+                }
+            }
+        }
+
+        println!();
+        println!(
+            "Checked {} user keys, {} of them had good certifications in both \
+        directions.",
+            users.len(),
+            count_ok
+        );
+
+        Ok(())
+    }
+
+    pub fn print_expiry_status(&self, exp_days: u64) -> Result<()> {
+        let expiries = self.certs_expired(exp_days)?;
+
+        if expiries.is_empty() {
+            println!(
+                "No certificates will expire in the next {} days.",
+                exp_days
+            );
+        } else {
+            println!(
+                "The following {} certificates will expire in the next {} days.",
+                expiries.len(),
+                exp_days
+            );
+            println!();
+        }
+
+        for (cert, expiry) in expiries {
+            let name = self.cert_get_name(&cert)?;
+            println!("name {}, fingerprint {}", name, cert.fingerprint);
+
+            if let Some(exp) = expiry {
+                let datetime: DateTime<Utc> = exp.into();
+                println!(" expires: {}", datetime.format("%d/%m/%Y"));
+            } else {
+                println!(" no expiration date is set for this user key");
+            }
+
+            println!();
+        }
+
+        Ok(())
+    }
+
+    pub fn print_users(&self) -> Result<()> {
+        for user in self.users_get_all()? {
+            let name =
+                user.name.clone().unwrap_or_else(|| "<no name>".to_owned());
+
+            for cert in self.get_certs_by_user(&user)? {
+                let (sig_by_ca, tsig_on_ca) =
+                    self.cert_check_certifications(&cert)?;
+
+                println!("OpenPGP key {}", cert.fingerprint);
+                println!(" for user '{}'", name);
+
+                println!(" user cert signed by CA: {}", !sig_by_ca.is_empty());
+                println!(" user cert has tsigned CA: {}", tsig_on_ca);
+
+                let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+
+                self.emails_get(&cert)?
+                    .iter()
+                    .for_each(|email| println!(" - email {}", email.addr));
+
+                if let Some(exp) = Pgp::get_expiry(&c)? {
+                    let datetime: DateTime<Utc> = exp.into();
+                    println!(" expires: {}", datetime.format("%d/%m/%Y"));
+                } else {
+                    println!(" no expiration date is set for this user key");
+                }
+
+                let revs = self.revocations_get(&cert)?;
+                println!(
+                    " {} revocation certificate(s) available",
+                    revs.len()
+                );
+
+                if Pgp::is_possibly_revoked(&c) {
+                    println!(" this user key has (possibly) been REVOKED");
+                }
+                println!();
+            }
+        }
+
+        Ok(())
+    }
+
     // -------- revocations
 
     /// Get a list of all Revocations for a cert
@@ -361,6 +485,42 @@ impl OpenpgpCa {
     /// Get an armored representation of a revocation certificate
     pub fn revoc_to_armored(sig: &Signature) -> Result<String> {
         Pgp::revoc_to_armored(sig, None)
+    }
+
+    pub fn print_revocations(&self, email: &str) -> Result<()> {
+        let certs = self.certs_get(email)?;
+        if certs.is_empty() {
+            println!("No OpenPGP keys found");
+        } else {
+            for cert in certs {
+                let name = self.cert_get_name(&cert)?;
+
+                println!(
+                    "Revocations for OpenPGP key {}, user \"{}\"",
+                    cert.fingerprint, name
+                );
+                let revoc = self.revocations_get(&cert)?;
+                for r in revoc {
+                    let (reason, time) = Self::revocation_details(&r)?;
+                    let time = if let Some(time) = time {
+                        let datetime: DateTime<Utc> = time.into();
+                        format!("{}", datetime.format("%d/%m/%Y"))
+                    } else {
+                        "".to_string()
+                    };
+                    println!(
+                        " - revocation id {}: {} ({})",
+                        r.hash, reason, time
+                    );
+                    if r.published {
+                        println!("   this revocation has been APPLIED");
+                    }
+
+                    println!();
+                }
+            }
+        }
+        Ok(())
     }
 
     // -------- emails
