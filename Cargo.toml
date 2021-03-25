@@ -51,8 +51,8 @@ futures-util = "0.3"
 openpgp-keylist = "0.2"
 #openpgp-keylist = { path="../openpgp-keylist" }
 
-sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "openpgp/v1.1.0" }
-sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", tag = "openpgp/v1.1.0" }
+sequoia-openpgp = "1.1"
+sequoia-net = "0.23"
 
 #sequoia-openpgp = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "e9439f7c4b902265d3f599c224e5e5ac9798014e" }
 #sequoia-net = { git = "https://gitlab.com/sequoia-pgp/sequoia.git", rev = "e9439f7c4b902265d3f599c224e5e5ac9798014e" }
