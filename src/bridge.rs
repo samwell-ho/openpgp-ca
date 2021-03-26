@@ -115,11 +115,6 @@ pub fn bridge_new(
     Ok((oca.db().insert_bridge(new_bridge)?, bridged.fingerprint()))
 }
 
-/// Create a revocation Certificate for a Bridge and apply it the our
-/// copy of the remote CA's public key.
-///
-/// Both the revoked remote public key and the revocation cert are
-/// printed to stdout.
 pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
     let bridge = oca.db().search_bridge(email)?;
     if bridge.is_none() {

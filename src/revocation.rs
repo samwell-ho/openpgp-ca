@@ -36,13 +36,6 @@ fn check_for_equivalent_revocation(
     Ok(false)
 }
 
-/// Add a revocation certificate to the OpenPGP CA database.
-///
-/// The matching cert is looked up by issuer Fingerprint, if
-/// possible - or by exhaustive search otherwise.
-///
-/// Verifies that applying the revocation cert can be validated by the
-/// cert. Only if this is successful is the revocation stored.
 pub fn revocation_add(oca: &OpenpgpCa, revoc_cert_str: &str) -> Result<()> {
     // check if the exact same revocation already exists in db
     if oca.db().check_for_revocation(revoc_cert_str)? {
@@ -145,9 +138,6 @@ fn search_revocable_cert_by_keyid(
     Ok(None)
 }
 
-/// Apply a revocation.
-///
-/// The revocation is merged into out copy of the OpenPGP Cert.
 pub fn revocation_apply(
     oca: &OpenpgpCa,
     revoc: models::Revocation,

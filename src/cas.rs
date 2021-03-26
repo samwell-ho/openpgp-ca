@@ -22,15 +22,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-/// Initialize OpenPGP CA Admin database entry.
-///
-/// This generates a new OpenPGP Key for the Admin role and stores the
-/// private Key in the OpenPGP CA database.
-///
-/// `domainname` is the domain that this CA Admin is in charge of,
-/// `name` is a descriptive name for the CA Admin
-///
-/// Only one CA Admin can be configured per database.
 pub fn ca_init(
     oca: &OpenpgpCa,
     domainname: &str,
@@ -65,9 +56,6 @@ pub fn ca_init(
     })
 }
 
-/// Get a sequoia `Cert` object for the CA from the database.
-///
-/// This is the OpenPGP Cert of the CA.
 pub fn ca_get_cert(oca: &OpenpgpCa) -> Result<Cert> {
     match oca.db().get_ca()? {
         Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
@@ -75,16 +63,6 @@ pub fn ca_get_cert(oca: &OpenpgpCa) -> Result<Cert> {
     }
 }
 
-/// Generate a set of revocation certificates for the CA key.
-///
-/// This outputs a set of revocations with creation dates spaced
-/// in 30 day increments, from now to 120x 30days in the future (around
-/// 10 years). For each of those points in time, one hard and one soft
-/// revocation certificate is generated.
-///
-/// The output file is human readable, contains some informational
-/// explanation, followed by the CA certificate and the list of
-/// revocation certificates
 pub fn ca_generate_revocations(
     oca: &OpenpgpCa,
     output: PathBuf,
@@ -185,7 +163,6 @@ adversaries."#;
     Ok(())
 }
 
-/// get the email of this CA
 pub fn get_ca_email(oca: &OpenpgpCa) -> Result<String> {
     let cert = oca.ca_get_cert()?;
     let uids: Vec<_> = cert.userids().collect();
@@ -203,7 +180,6 @@ pub fn get_ca_email(oca: &OpenpgpCa) -> Result<String> {
     }
 }
 
-/// get the domainname of this CA
 pub fn get_ca_domain(oca: &OpenpgpCa) -> Result<String> {
     let cert = oca.ca_get_cert()?;
     let uids: Vec<_> = cert.userids().collect();
@@ -229,7 +205,6 @@ pub fn get_ca_domain(oca: &OpenpgpCa) -> Result<String> {
     }
 }
 
-/// Returns the public key of the CA as an armored String
 pub fn ca_get_pubkey_armored(oca: &OpenpgpCa) -> Result<String> {
     let cert = oca.ca_get_cert()?;
     let ca_pub = Pgp::cert_to_armored(&cert)
@@ -238,11 +213,6 @@ pub fn ca_get_pubkey_armored(oca: &OpenpgpCa) -> Result<String> {
     Ok(ca_pub)
 }
 
-/// Add trust-signature(s) from CA users to the CA's Cert.
-///
-/// This receives an armored version of the CA's public key, finds
-/// any trust-signatures on it and merges those into "our" local copy of
-/// the CA key.
 pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
     oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
         let ca_cert = oca.ca_get_cert().unwrap();

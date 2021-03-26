@@ -100,14 +100,38 @@ impl OpenpgpCa {
 
     // -------- CAs
 
+    /// Initialize OpenPGP CA Admin database entry.
+    ///
+    /// This generates a new OpenPGP Key for the Admin role and stores the
+    /// private Key in the OpenPGP CA database.
+    ///
+    /// `domainname` is the domain that this CA Admin is in charge of,
+    /// `name` is a descriptive name for the CA Admin
+    ///
+    /// Only one CA Admin can be configured per database.
     pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
         cas::ca_init(&self, domainname, name)
     }
 
+    /// Generate a set of revocation certificates for the CA key.
+    ///
+    /// This outputs a set of revocations with creation dates spaced
+    /// in 30 day increments, from now to 120x 30days in the future (around
+    /// 10 years). For each of those points in time, one hard and one soft
+    /// revocation certificate is generated.
+    ///
+    /// The output file is human readable, contains some informational
+    /// explanation, followed by the CA certificate and the list of
+    /// revocation certificates
     pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
         cas::ca_generate_revocations(&self, output)
     }
 
+    /// Add trust-signature(s) from CA users to the CA's Cert.
+    ///
+    /// This receives an armored version of the CA's public key, finds
+    /// any trust-signatures on it and merges those into "our" local copy of
+    /// the CA key.
     pub fn ca_import_tsig(&self, cert: &str) -> Result<()> {
         cas::ca_import_tsig(&self, cert)
     }
@@ -134,14 +158,17 @@ impl OpenpgpCa {
         cas::ca_get_cert(&self)
     }
 
+    /// Get the domainname for this CA
     pub fn get_ca_domain(&self) -> Result<String> {
         cas::get_ca_domain(&self)
     }
 
+    /// Get the email of this CA
     pub fn get_ca_email(&self) -> Result<String> {
         cas::get_ca_email(&self)
     }
 
+    /// Returns the public key of the CA as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
         cas::ca_get_pubkey_armored(&self)
     }
@@ -177,6 +204,10 @@ impl OpenpgpCa {
         Ok(user_certs)
     }
 
+    /// Which certs will be expired in 'days' days?
+    ///
+    /// If a cert is not "alive" now, it will not get returned as expiring.
+    /// (Otherwise old/abandoned certs would clutter the results)
     pub fn certs_expired(
         &self,
         days: u64,
@@ -184,6 +215,11 @@ impl OpenpgpCa {
         cert::certs_expired(self, days)
     }
 
+    /// For each Cert, check if:
+    /// - the Cert has been signed by the CA, and
+    /// - the CA key has a trust-signature from the Cert
+    ///
+    /// Returns a map 'cert -> (sig_from_ca, tsig_on_ca)'
     pub fn cert_check_certifications(
         &self,
         cert: &models::Cert,
@@ -191,6 +227,7 @@ impl OpenpgpCa {
         cert::cert_check_certifications(self, cert)
     }
 
+    /// Check if this Cert has been signed by the CA Key
     pub fn cert_check_ca_sig(
         &self,
         cert: &models::Cert,
@@ -198,10 +235,16 @@ impl OpenpgpCa {
         cert::cert_check_ca_sig(self, cert)
     }
 
+    /// Check if this Cert has tsigned the CA Key
     pub fn cert_check_tsig_on_ca(&self, cert: &models::Cert) -> Result<bool> {
         cert::cert_check_tsig_on_ca(self, cert)
     }
 
+    /// Check all Certs for certifications from the CA.
+    ///
+    /// If a certification expires in less than `threshold_days`, and it is
+    /// not marked as 'inactive', make a new certification that is good for
+    /// `validity_days`, and update the Cert.
     pub fn certs_refresh_ca_certifications(
         &self,
         threshold_days: u64,
@@ -214,6 +257,17 @@ impl OpenpgpCa {
         )
     }
 
+    /// Create a new OpenPGP CA User.
+    ///
+    /// The CA Cert is automatically trust-signed with this new user
+    /// Cert and the user Cert is signed by the CA. This is the
+    /// "Centralized key creation workflow"
+    ///
+    /// This generates a new OpenPGP Cert for the new User.
+    /// The private Cert material is printed to stdout and NOT stored
+    /// in OpenPGP CA.
+    ///
+    /// The public Cert is stored in the OpenPGP CA database.
     pub fn user_new(
         &self,
         name: Option<&str>,
@@ -224,6 +278,19 @@ impl OpenpgpCa {
         cert::user_new(&self, name, emails, duration_days, password)
     }
 
+    /// Import an existing OpenPGP public Cert a new OpenPGP CA user.
+    ///
+    /// The `key` is expected as an armored public key.
+    ///
+    /// userids that correspond to `emails` will be signed by the CA.
+    ///
+    /// A symbolic `name` and a list of `emails` for this User can
+    /// optionally be supplied. If those are not set, emails are taken from
+    /// the list of userids in the public key. Also, if the
+    /// key has exactly one userid, the symbolic name is taken from that
+    /// userid.
+    ///
+    /// Optionally a revocation certificate can be supplied.
     pub fn cert_import_new(
         &self,
         key: &str,
@@ -242,6 +309,7 @@ impl OpenpgpCa {
         )
     }
 
+    /// Update key for existing database Cert
     pub fn cert_import_update(&self, key: &str) -> Result<()> {
         cert::cert_import_update(self, key)
     }
@@ -439,6 +507,13 @@ impl OpenpgpCa {
         self.db.get_revocations(cert)
     }
 
+    /// Add a revocation certificate to the OpenPGP CA database.
+    ///
+    /// The matching cert is looked up by issuer Fingerprint, if
+    /// possible - or by exhaustive search otherwise.
+    ///
+    /// Verifies that applying the revocation cert can be validated by the
+    /// cert. Only if this is successful is the revocation stored.
     pub fn revocation_add(&self, revoc_cert_str: &str) -> Result<()> {
         revocation::revocation_add(&self, revoc_cert_str)
     }
@@ -462,6 +537,9 @@ impl OpenpgpCa {
         }
     }
 
+    /// Apply a revocation.
+    ///
+    /// The revocation is merged into out copy of the OpenPGP Cert.
     pub fn revocation_apply(&self, revoc: models::Revocation) -> Result<()> {
         revocation::revocation_apply(&self, revoc)
     }
@@ -533,6 +611,7 @@ impl OpenpgpCa {
         self.db.get_emails_by_cert(cert)
     }
 
+    /// Get all Emails
     pub fn get_emails_all(&self) -> Result<Vec<models::CertEmail>> {
         self.db.get_emails_all()
     }
@@ -590,6 +669,11 @@ impl OpenpgpCa {
         Ok(())
     }
 
+    /// Create a revocation Certificate for a Bridge and apply it the our
+    /// copy of the remote CA's public key.
+    ///
+    /// Both the revoked remote public key and the revocation cert are
+    /// printed to stdout.
     pub fn bridge_revoke(&self, email: &str) -> Result<()> {
         bridge::bridge_revoke(self, email)
     }
@@ -621,10 +705,24 @@ impl OpenpgpCa {
 
     // -------- export
 
+    /// Export all user keys (that have a userid in `domain`) and the CA key
+    /// into a wkd directory structure
+    ///
+    /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
     pub fn wkd_export(&self, domain: &str, path: &Path) -> Result<()> {
         export::wkd_export(&self, domain, path)
     }
 
+    /// Export the contents of a CA in Keylist format.
+    ///
+    /// `path`: filesystem path into which the exported keylist and signature
+    /// files will be written.
+    ///
+    /// `signature_uri`: the https address from which the signature file will
+    /// be retrievable
+    ///
+    /// `force`: by default, this fn fails if the files exist; when force is
+    /// true, overwrite.
     pub fn export_keylist(
         &self,
         path: PathBuf,
@@ -634,6 +732,8 @@ impl OpenpgpCa {
         export::export_keylist(&self, path, signature_uri, force)
     }
 
+    /// Export Certs from this CA into files, with filenames based on email
+    /// addresses of user ids.
     pub fn export_certs_as_files(
         &self,
         email_filter: Option<String>,
@@ -644,10 +744,14 @@ impl OpenpgpCa {
 
     // -------- update keys from public key sources
 
+    /// Pull a key from WKD and merge any updates into our local version of
+    /// this key
     pub fn update_from_wkd(&self, cert: &models::Cert) -> Result<()> {
         import::update_from_wkd(&self, cert)
     }
 
+    /// Pull a key from hagrid and merge any updates into our local version of
+    /// this key
     pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<()> {
         import::update_from_hagrid(&self, cert)
     }

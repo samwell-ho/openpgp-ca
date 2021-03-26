@@ -15,8 +15,6 @@ use sequoia_openpgp::{Fingerprint, KeyID};
 
 use anyhow::Result;
 
-/// Pull a key from WKD and merge any updates into our local version of
-/// this key
 pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     use sequoia_net::wkd;
 
@@ -45,8 +43,6 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     Ok(())
 }
 
-/// Pull a key from hagrid and merge any updates into our local version of
-/// this key
 pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     use tokio::runtime::Runtime;
     let mut rt = Runtime::new()?;

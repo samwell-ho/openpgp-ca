@@ -25,8 +25,6 @@ use std::str::FromStr;
 // export filename of keylist
 const KEYLIST_FILE: &str = "keylist.json";
 
-/// Export Certs from this CA into files, with filenames based on email
-/// addresses of user ids.
 pub fn export_certs_as_files(
     oca: &OpenpgpCa,
     email_filter: Option<String>,
@@ -121,10 +119,6 @@ fn path_append(path: &str, filename: &str) -> Result<PathBuf> {
 
 // --------- wkd
 
-/// Export all user keys (that have a userid in `domain`) and the CA key
-/// into a wkd directory structure
-///
-/// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
 pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
     use sequoia_net::wkd;
 
@@ -147,16 +141,6 @@ pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
 
 // --------- keylist
 
-/// Export the contents of a CA in Keylist format.
-///
-/// `path`: filesystem path into which the exported keylist and signature
-/// files will be written.
-///
-/// `signature_uri`: the https address from which the signature file will
-/// be retrievable
-///
-/// `force`: by default, this fn fails if the files exist; when force is
-/// true, overwrite.
 pub fn export_keylist(
     oca: &OpenpgpCa,
     path: PathBuf,

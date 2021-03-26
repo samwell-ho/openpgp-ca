@@ -21,17 +21,6 @@ use diesel::prelude::*;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
-/// Create a new OpenPGP CA User.
-///
-/// The CA Cert is automatically trust-signed with this new user
-/// Cert and the user Cert is signed by the CA. This is the
-/// "Centralized key creation workflow"
-///
-/// This generates a new OpenPGP Cert for the new User.
-/// The private Cert material is printed to stdout and NOT stored
-/// in OpenPGP CA.
-///
-/// The public Cert is stored in the OpenPGP CA database.
 pub fn user_new(
     oca: &OpenpgpCa,
     name: Option<&str>,
@@ -94,19 +83,6 @@ pub fn user_new(
     })
 }
 
-/// Import an existing OpenPGP public Cert a new OpenPGP CA user.
-///
-/// The `key` is expected as an armored public key.
-///
-/// userids that correspond to `emails` will be signed by the CA.
-///
-/// A symbolic `name` and a list of `emails` for this User can
-/// optionally be supplied. If those are not set, emails are taken from
-/// the list of userids in the public key. Also, if the
-/// key has exactly one userid, the symbolic name is taken from that
-/// userid.
-///
-/// Optionally a revocation certificate can be supplied.
 pub fn cert_import_new(
     oca: &OpenpgpCa,
     key: &str,
@@ -174,7 +150,6 @@ pub fn cert_import_new(
     })
 }
 
-/// Update key for existing database Cert
 pub fn cert_import_update(oca: &OpenpgpCa, key: &str) -> Result<()> {
     let cert_new = Pgp::armored_to_cert(key)
         .context("cert_import_new: couldn't process key")?;
@@ -204,11 +179,6 @@ pub fn cert_import_update(oca: &OpenpgpCa, key: &str) -> Result<()> {
     }
 }
 
-/// Check all Certs for certifications from the CA.
-///
-/// If a certification expires in less than `threshold_days`, and it is
-/// not marked as 'inactive', make a new certification that is good for
-/// `validity_days`, and update the Cert.
 pub fn certs_refresh_ca_certifications(
     oca: &OpenpgpCa,
     threshold_days: u64,
@@ -274,10 +244,6 @@ pub fn certs_refresh_ca_certifications(
     })
 }
 
-/// Which certs will be expired in 'days' days?
-///
-/// If a cert is not "alive" now, it will not get returned as expiring.
-/// (Otherwise old/abandoned certs would clutter the results)
 pub fn certs_expired(
     oca: &OpenpgpCa,
     days: u64,
@@ -315,11 +281,6 @@ pub fn certs_expired(
     Ok(map)
 }
 
-/// For each Cert, check if:
-/// - the Cert has been signed by the CA, and
-/// - the CA key has a trust-signature from the Cert
-///
-/// Returns a map 'cert -> (sig_from_ca, tsig_on_ca)'
 pub fn cert_check_certifications(
     oca: &OpenpgpCa,
     cert: &models::Cert,
@@ -335,7 +296,6 @@ pub fn cert_check_certifications(
     Ok((sig_from_ca, tsig_on_ca))
 }
 
-/// Check if this Cert has been signed by the CA Key
 pub fn cert_check_ca_sig(
     oca: &OpenpgpCa,
     cert: &models::Cert,
@@ -364,7 +324,6 @@ pub fn cert_check_ca_sig(
     Ok(res)
 }
 
-/// Check if this Cert has tsigned the CA Key
 pub fn cert_check_tsig_on_ca(
     oca: &OpenpgpCa,
     cert: &models::Cert,
