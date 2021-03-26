@@ -12,7 +12,7 @@
 use reqwest::{Response, StatusCode};
 
 use crate::restd::json::{
-    CertResultJSON, Certificate, ReturnError, ReturnGoodJSON,
+    CertResultJson, Certificate, ReturnError, ReturnGoodJson,
 };
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
@@ -31,7 +31,7 @@ impl Client {
 
     async fn map_result(
         resp: Result<Response, reqwest::Error>,
-    ) -> Result<Option<ReturnGoodJSON>, ReturnError> {
+    ) -> Result<Option<ReturnGoodJson>, ReturnError> {
         match resp {
             Ok(o) => match o.status() {
                 StatusCode::OK => {
@@ -39,7 +39,7 @@ impl Client {
                         Ok(None)
                     } else {
                         let resp =
-                            o.json::<Option<ReturnGoodJSON>>().await.unwrap();
+                            o.json::<Option<ReturnGoodJson>>().await.unwrap();
 
                         Ok(resp)
                     }
@@ -59,14 +59,14 @@ impl Client {
 
     async fn map_result_keyring(
         resp: Result<Response, reqwest::Error>,
-    ) -> Result<Vec<CertResultJSON>, ReturnError> {
+    ) -> Result<Vec<CertResultJson>, ReturnError> {
         match resp {
             Ok(o) => match o.status() {
                 StatusCode::OK => {
                     if o.content_length() == Some(0) {
                         Ok(vec![])
                     } else {
-                        Ok(o.json::<Vec<CertResultJSON>>()
+                        Ok(o.json::<Vec<CertResultJson>>()
                             .await
                             .expect("Ok Status, but JSON mapping failed"))
                     }
@@ -84,11 +84,11 @@ impl Client {
 
     async fn map_result_vec(
         resp: Result<Response, reqwest::Error>,
-    ) -> Result<Vec<ReturnGoodJSON>, ReturnError> {
+    ) -> Result<Vec<ReturnGoodJson>, ReturnError> {
         match resp {
             Ok(o) => match o.status() {
                 StatusCode::OK => {
-                    Ok(o.json::<Vec<ReturnGoodJSON>>().await.unwrap())
+                    Ok(o.json::<Vec<ReturnGoodJson>>().await.unwrap())
                 }
                 StatusCode::BAD_REQUEST => {
                     Err(o.json::<ReturnError>().await.unwrap())
@@ -104,7 +104,7 @@ impl Client {
     pub async fn check(
         &self,
         cert: &Certificate,
-    ) -> Result<Vec<CertResultJSON>, ReturnError> {
+    ) -> Result<Vec<CertResultJson>, ReturnError> {
         let cert_json = serde_json::to_string(&cert).unwrap();
 
         let resp = self
@@ -120,7 +120,7 @@ impl Client {
     pub async fn persist(
         &self,
         cert: &Certificate,
-    ) -> Result<Vec<CertResultJSON>, ReturnError> {
+    ) -> Result<Vec<CertResultJson>, ReturnError> {
         let cert_json = serde_json::to_string(&cert).unwrap();
 
         let mut header_map = HeaderMap::new();
@@ -143,7 +143,7 @@ impl Client {
     pub async fn get_by_email(
         &self,
         email: String,
-    ) -> Result<Vec<ReturnGoodJSON>, ReturnError> {
+    ) -> Result<Vec<ReturnGoodJson>, ReturnError> {
         let resp = self
             .client
             .get(&format!("{}certs/by_email/{}", &self.uri, email))
@@ -156,7 +156,7 @@ impl Client {
     pub async fn get_by_fp(
         &self,
         fp: String,
-    ) -> Result<Option<ReturnGoodJSON>, ReturnError> {
+    ) -> Result<Option<ReturnGoodJson>, ReturnError> {
         let resp = self
             .client
             .get(&format!("{}certs/by_fp/{}", &self.uri, fp))
@@ -169,7 +169,7 @@ impl Client {
     pub async fn deactivate(
         &self,
         fp: String,
-    ) -> Result<Option<ReturnGoodJSON>, ReturnError> {
+    ) -> Result<Option<ReturnGoodJson>, ReturnError> {
         let resp = self
             .client
             .post(&format!("{}certs/deactivate/{}", &self.uri, fp))
@@ -182,7 +182,7 @@ impl Client {
     pub async fn delist(
         &self,
         fp: String,
-    ) -> Result<Option<ReturnGoodJSON>, ReturnError> {
+    ) -> Result<Option<ReturnGoodJson>, ReturnError> {
         let resp = self
             .client
             .delete(&format!("{}certs/{}", &self.uri, fp))

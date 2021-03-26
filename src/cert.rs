@@ -90,7 +90,7 @@ pub fn user_new(
         }
         // --
 
-        Ok(res?)
+        res
     })
 }
 

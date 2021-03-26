@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Context, Result};
-use std::path::PathBuf;
+use std::path::Path;
 
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::{Cert, Fingerprint};
@@ -27,7 +27,7 @@ use crate::pgp::Pgp;
 /// from the User ID in the key_file
 pub fn bridge_new(
     oca: &OpenpgpCa,
-    remote_key_file: &PathBuf,
+    remote_key_file: &Path,
     remote_email: Option<&str>,
     remote_scope: Option<&str>,
 ) -> Result<(models::Bridge, Fingerprint)> {

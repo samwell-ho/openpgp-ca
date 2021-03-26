@@ -26,14 +26,14 @@ const POLICY: &StandardPolicy = &StandardPolicy::new();
 /// Human-readable, factual information about an OpenPGP certificate
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CertInfo {
-    pub user_ids: Vec<UserID>,
+    pub user_ids: Vec<UserId>,
 
     pub primary: Key,
     pub subkeys: Vec<Key>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UserID {
+pub struct UserId {
     pub email: Option<String>,
     pub name: Option<String>,
 
@@ -86,10 +86,10 @@ pub struct Revocation {
 
 impl CertInfo {
     pub fn from_cert(cert: &Cert) -> Result<CertInfo, anyhow::Error> {
-        let mut user_ids: Vec<UserID> = vec![];
+        let mut user_ids: Vec<UserId> = vec![];
 
         for userid in cert.userids() {
-            let uid = UserID::from_component_amalgamation(&userid)?;
+            let uid = UserId::from_component_amalgamation(&userid)?;
 
             user_ids.push(uid)
         }
@@ -112,7 +112,7 @@ impl CertInfo {
     }
 }
 
-impl UserID {
+impl UserId {
     fn from_component_amalgamation(
         uid: &ComponentAmalgamation<sequoia_openpgp::packet::UserID>,
     ) -> Result<Self, anyhow::Error> {
@@ -134,7 +134,7 @@ impl UserID {
             Some(revocations)
         };
 
-        Ok(UserID {
+        Ok(UserId {
             email,
             name,
             raw,

@@ -222,10 +222,10 @@ impl OcaDb {
     }
 
     pub fn get_users_sort_by_name(&self) -> Result<Vec<User>> {
-        Ok(users::table
+        users::table
             .order((users::name, users::id))
             .load::<User>(&self.conn)
-            .context("Error loading users")?)
+            .context("Error loading users")
     }
 
     pub fn get_user_by_cert(&self, cert: &Cert) -> Result<Option<User>> {
@@ -495,9 +495,9 @@ impl OcaDb {
     }
 
     pub fn list_bridges(&self) -> Result<Vec<Bridge>> {
-        Ok(bridges::table
+        bridges::table
             .load::<Bridge>(&self.conn)
-            .context("Error loading bridges")?)
+            .context("Error loading bridges")
     }
 
     pub fn diesel_migrations_run(&self) {

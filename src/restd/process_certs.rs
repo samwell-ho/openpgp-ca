@@ -200,9 +200,9 @@ fn validate_and_strip_user_ids(
     }
 }
 
-fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
+fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
     let ci = CertInfo::from_cert(cert).map_err(|e| {
-        ReturnBadJSON::new(
+        ReturnBadJson::new(
             CertError::new(
                 CertStatus::InternalError,
                 format!["check_cert: CertInfo::from_cert() failed {:?}", e],
@@ -213,7 +213,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
 
     // private keys are illegal
     if cert.is_tsk() {
-        return Err(ReturnBadJSON::new(
+        return Err(ReturnBadJson::new(
             CertError::new(
                 CertStatus::PrivateKey,
                 String::from(
@@ -228,7 +228,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
     if let Ok(armored) = Pgp::cert_to_armored(cert) {
         let len = armored.len();
         if len > restd::CERT_SIZE_LIMIT {
-            return Err(ReturnBadJSON::new(
+            return Err(ReturnBadJson::new(
                 CertError::new(
                     CertStatus::CertSizeLimit,
                     format!(
@@ -240,7 +240,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJSON> {
             ));
         }
     } else {
-        return Err(ReturnBadJSON::new(
+        return Err(ReturnBadJson::new(
             CertError::new(
                 CertStatus::InternalError,
                 "check_cert: Failed to re-armor cert",
@@ -261,7 +261,7 @@ fn process_cert(
     certificate: &Certificate,
     ca: &OpenpgpCa,
     persist: bool,
-) -> Result<ReturnGoodJSON, ReturnBadJSON> {
+) -> Result<ReturnGoodJson, ReturnBadJson> {
     let cert_info = check_cert(&cert)?;
 
     // check if a cert with this fingerprint exists already in db
@@ -276,7 +276,7 @@ fn process_cert(
                 e
             ),
         );
-        ReturnBadJSON::new(ce, Some(cert_info.clone()))
+        ReturnBadJson::new(ce, Some(cert_info.clone()))
     })?;
 
     // will this cert be processed as an update to an existing version of it?
@@ -301,7 +301,7 @@ fn process_cert(
                     certificate
                 ),
             );
-            return Err(ReturnBadJSON::new(ce, Some(cert_info.clone())));
+            return Err(ReturnBadJson::new(ce, Some(cert_info.clone())));
         }
     }
 
@@ -319,7 +319,7 @@ fn process_cert(
                         ),
                     );
 
-                    ReturnBadJSON::new(error, Some(cert_info.clone()))
+                    ReturnBadJson::new(error, Some(cert_info.clone()))
                 })?;
 
             db_cert.merge_public(cert.clone()).map_err(|e| {
@@ -332,7 +332,7 @@ fn process_cert(
                     ),
                 );
 
-                ReturnBadJSON::new(error, Some(cert_info.clone()))
+                ReturnBadJson::new(error, Some(cert_info.clone()))
             })?
         }
     };
@@ -357,13 +357,13 @@ fn process_cert(
                 "Cert uses a public key algorithm with a key of \
                 insufficient length",
             );
-            return Err(ReturnBadJSON::new(ce, Some(cert_info.clone())));
+            return Err(ReturnBadJson::new(ce, Some(cert_info.clone())));
         }
     }
 
     // perform sequoia policy check
     let valid_cert = cert_policy_check(&merged)
-        .map_err(|ce| ReturnBadJSON::new(ce, Some(cert_info.clone())))?;
+        .map_err(|ce| ReturnBadJson::new(ce, Some(cert_info.clone())))?;
     let _ = merged; // drop previous version of the cert
 
     // check if the cert is revoked
@@ -376,7 +376,7 @@ fn process_cert(
         &my_domain,
         &certificate.email,
     )
-    .map_err(|e| ReturnBadJSON::new(e, Some(cert_info.clone())))?;
+    .map_err(|e| ReturnBadJson::new(e, Some(cert_info.clone())))?;
 
     let cert_info_norm = CertInfo::from_cert(&norm)
         .map_err(|e| {
@@ -388,11 +388,11 @@ fn process_cert(
                 ),
             )
         })
-        .map_err(|ce| ReturnBadJSON::new(ce, None))?;
+        .map_err(|ce| ReturnBadJson::new(ce, None))?;
 
     let armored = Pgp::cert_to_armored(&norm).map_err(|e|
         // this should probably never happen?
-        ReturnBadJSON::new(
+        ReturnBadJson::new(
             CertError::new(
                 CertStatus::InternalError,
                 format!("process_cert: Couldn't re-armor cert {:?}", e),
@@ -424,7 +424,7 @@ fn process_cert(
                     ),
                 );
 
-                ReturnBadJSON::new(error, cert_info.clone())
+                ReturnBadJson::new(error, cert_info.clone())
             })?;
 
             for rev in &certificate.revocations {
@@ -437,7 +437,7 @@ fn process_cert(
                             e
                         ),
                     );
-                    ReturnBadJSON::new(ce, cert_info.clone())
+                    ReturnBadJson::new(ce, cert_info.clone())
                 })?;
             }
         } else {
@@ -466,7 +466,7 @@ fn process_cert(
                         e
                     ),
                 );
-                ReturnBadJSON::new(error, cert_info.clone())
+                ReturnBadJson::new(error, cert_info.clone())
             })?;
         }
     } else {
@@ -505,9 +505,9 @@ fn process_cert(
     };
 
     let warn = cert_to_warn(&norm)
-        .map_err(|ce| ReturnBadJSON::new(ce, Some(cert_info.clone())))?;
+        .map_err(|ce| ReturnBadJson::new(ce, Some(cert_info.clone())))?;
 
-    Ok(ReturnGoodJSON {
+    Ok(ReturnGoodJson {
         certificate,
         cert_info: cert_info_norm,
         warn,
@@ -564,7 +564,7 @@ pub fn process_certs(
     ca: &OpenpgpCa,
     certificate: &Certificate,
     persist: bool,
-) -> Result<Vec<CertResultJSON>, ReturnError> {
+) -> Result<Vec<CertResultJson>, ReturnError> {
     let (certs, signer) = unpack_certring(&certificate.cert).map_err(|e| {
         ReturnError::new(
             ReturnStatus::BadKeyring,

@@ -444,7 +444,7 @@ impl OpenpgpCa {
     }
 
     /// Add a revocation certificate to the OpenPGP CA database (from a file).
-    pub fn revocation_add_from_file(&self, filename: &PathBuf) -> Result<()> {
+    pub fn revocation_add_from_file(&self, filename: &Path) -> Result<()> {
         let mut s = String::new();
         File::open(filename)?.read_to_string(&mut s)?;
         self.revocation_add(&s)
@@ -556,7 +556,7 @@ impl OpenpgpCa {
     pub fn add_bridge(
         &self,
         email: Option<&str>,
-        key_file: &PathBuf,
+        key_file: &Path,
         scope: Option<&str>,
         commit: bool,
     ) -> Result<()> {

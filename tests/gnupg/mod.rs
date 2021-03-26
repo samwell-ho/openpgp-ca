@@ -152,7 +152,7 @@ impl Ctx {
             gpgconf.arg(argument);
         }
         let output = gpgconf.output().map_err(|e| -> anyhow::Error {
-            GnupgError::GPGConf(e.to_string()).into()
+            GnupgError::GgpConf(e.to_string()).into()
         })?;
 
         if output.status.success() {
@@ -169,7 +169,7 @@ impl Ctx {
                     .collect::<Vec<_>>();
 
                 if fields.len() != nfields {
-                    return Err(GnupgError::GPGConf(format!(
+                    return Err(GnupgError::GgpConf(format!(
                         "Malformed response, expected {} fields, \
                          on line: {:?}",
                         nfields, line
@@ -181,7 +181,7 @@ impl Ctx {
             }
             Ok(result)
         } else {
-            Err(GnupgError::GPGConf(
+            Err(GnupgError::GgpConf(
                 String::from_utf8_lossy(&output.stderr).into_owned(),
             )
             .into())
@@ -197,7 +197,7 @@ impl Ctx {
             .get(component.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                GnupgError::GPGConf(format!(
+                GnupgError::GgpConf(format!(
                     "No such component {:?}",
                     component.as_ref()
                 ))
@@ -214,7 +214,7 @@ impl Ctx {
             .get(directory.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                GnupgError::GPGConf(format!(
+                GnupgError::GgpConf(format!(
                     "No such directory {:?}",
                     directory.as_ref()
                 ))
@@ -231,7 +231,7 @@ impl Ctx {
             .get(socket.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                GnupgError::GPGConf(format!(
+                GnupgError::GgpConf(format!(
                     "No such socket {:?}",
                     socket.as_ref()
                 ))
@@ -287,7 +287,7 @@ impl std::error::Error for GnupgError {}
 impl fmt::Display for GnupgError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GnupgError::GPGConf(s) => write!(f, "gpgconf: {}", s),
+            GnupgError::GgpConf(s) => write!(f, "gpgconf: {}", s),
             GnupgError::OperationFailed(s) => {
                 write!(f, "Operation failed: {}", s)
             }
@@ -302,7 +302,7 @@ impl fmt::Display for GnupgError {
 /// Errors used in this module.
 pub enum GnupgError {
     /// Errors related to `gpgconf`.
-    GPGConf(String),
+    GgpConf(String),
 
     /// The remote operation failed.
     OperationFailed(String),

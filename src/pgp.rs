@@ -471,7 +471,7 @@ impl Pgp {
         }
 
         // insert all new certifications into user_cert
-        Ok(user_cert.clone().insert_packets(packets)?)
+        user_cert.clone().insert_packets(packets)
     }
 
     /// ca_cert certifies either all or a specified subset of userids of

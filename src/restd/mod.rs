@@ -98,7 +98,7 @@ fn load_certificate_data(
 #[get("/certs/by_email/<email>")]
 fn certs_by_email(
     email: String,
-) -> Result<Json<Vec<ReturnGoodJSON>>, BadRequest<Json<ReturnError>>> {
+) -> Result<Json<Vec<ReturnGoodJson>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let mut res = Vec::new();
 
@@ -137,7 +137,7 @@ fn certs_by_email(
 
             let certificate = load_certificate_data(&ca, &c)?;
 
-            res.push(ReturnGoodJSON {
+            res.push(ReturnGoodJson {
                 certificate,
                 cert_info,
                 warn,
@@ -153,7 +153,7 @@ fn certs_by_email(
 #[get("/certs/by_fp/<fp>")]
 fn cert_by_fp(
     fp: String,
-) -> Result<Json<Option<ReturnGoodJSON>>, BadRequest<Json<ReturnError>>> {
+) -> Result<Json<Option<ReturnGoodJson>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let c = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::new(
@@ -186,7 +186,7 @@ fn cert_by_fp(
                 )
             })?;
 
-            Ok(Json(Some(ReturnGoodJSON {
+            Ok(Json(Some(ReturnGoodJson {
                 certificate,
                 cert_info,
                 warn,
@@ -205,7 +205,7 @@ fn cert_by_fp(
 #[get("/certs/check", data = "<certificate>", format = "json")]
 fn check_certs(
     certificate: Json<Certificate>,
-) -> Result<Json<Vec<CertResultJSON>>, BadRequest<Json<ReturnError>>> {
+) -> Result<Json<Vec<CertResultJson>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         Ok(Json(process_certs(&ca, &certificate.into_inner(), false)?))
     })
@@ -223,7 +223,7 @@ fn check_certs(
 #[post("/certs", data = "<certificate>", format = "json")]
 fn post_certs(
     certificate: Json<Certificate>,
-) -> Result<Json<Vec<CertResultJSON>>, BadRequest<Json<ReturnError>>> {
+) -> Result<Json<Vec<CertResultJson>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         Ok(Json(process_certs(&ca, &certificate.into_inner(), true)?))
     })

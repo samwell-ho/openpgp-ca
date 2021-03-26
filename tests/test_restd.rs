@@ -10,7 +10,7 @@ use openpgp_ca_lib::ca::OpenpgpCa;
 use openpgp_ca_lib::restd;
 use openpgp_ca_lib::restd::client::Client;
 use openpgp_ca_lib::restd::json::{
-    Action, CertResultJSON, CertStatus, Certificate,
+    Action, CertResultJson, CertStatus, Certificate,
 };
 
 use rocket::futures::prelude::future::{AbortHandle, Abortable};
@@ -262,7 +262,7 @@ async fn test_restd() {
     assert_eq!(ret.len(), 1);
     let ret = ret.get(0).unwrap();
 
-    let alice_fp = if let CertResultJSON::Good(ret) = ret {
+    let alice_fp = if let CertResultJson::Good(ret) = ret {
         assert_eq!(ret.action, Some(Action::New));
         assert_eq!(
             &ret.cert_info.primary.fingerprint,
@@ -291,7 +291,7 @@ async fn test_restd() {
     assert_eq!(res.len(), 1);
     let res = res.get(0).unwrap();
 
-    if let CertResultJSON::Bad(res) = res {
+    if let CertResultJson::Bad(res) = res {
         assert_eq!(res.error[0].status, CertStatus::CertMissingLocalUserId);
     } else {
         panic!("error");
@@ -318,7 +318,7 @@ async fn test_restd() {
     assert_eq!(res.len(), 1);
     let res = res.get(0).unwrap();
 
-    if let CertResultJSON::Bad(res) = res {
+    if let CertResultJson::Bad(res) = res {
         assert_eq!(res.error[0].status, CertStatus::PrivateKey);
     } else {
         panic!("error");
@@ -340,7 +340,7 @@ async fn test_restd() {
     let ret = res.unwrap();
     assert_eq!(ret.len(), 1);
     let ret = ret.get(0).unwrap();
-    if let CertResultJSON::Good(ret) = ret {
+    if let CertResultJson::Good(ret) = ret {
         assert_eq!(ret.action, Some(Action::New));
         assert_eq!(
             ret.cert_info.primary.fingerprint,
@@ -355,7 +355,7 @@ async fn test_restd() {
     assert_eq!(ret.len(), 1);
     let ret = ret.get(0).unwrap();
 
-    if let CertResultJSON::Good(ret) = ret {
+    if let CertResultJson::Good(ret) = ret {
         assert_eq!(ret.action, Some(Action::Update));
         assert_eq!(
             ret.cert_info.primary.fingerprint,
@@ -381,7 +381,7 @@ async fn test_restd() {
     let ret = res.unwrap();
     assert_eq!(ret.len(), 1);
     let ret = ret.get(0).unwrap();
-    if let CertResultJSON::Bad(bad) = ret {
+    if let CertResultJson::Bad(bad) = ret {
         assert_eq!(bad.error.len(), 1);
         assert_eq!(bad.error[0].status, CertStatus::InternalError);
         assert!(bad.error[0].msg.starts_with("process_cert: changing delisted and inactive is not currently allowed via this call Certificate"));
@@ -519,7 +519,7 @@ async fn test_restd() {
         .expect("failed to persist carol update");
 
     assert_eq!(res.len(), 1);
-    assert!(matches!(res[0], CertResultJSON::Good { .. }));
+    assert!(matches!(res[0], CertResultJson::Good { .. }));
 
     let carol = c
         .get_by_email("carol@example.org".to_string())
@@ -546,7 +546,7 @@ async fn test_restd() {
     assert_eq!(res.len(), 1);
     let res = res.get(0).unwrap();
 
-    if let CertResultJSON::Bad(bad) = res {
+    if let CertResultJson::Bad(bad) = res {
         assert_eq!(
             bad.cert_info.as_ref().unwrap().primary.fingerprint,
             "45BB 3694 98A3 87F8 EE9E  3091 0900 87C9 F807 5B81".to_string()

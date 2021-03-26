@@ -19,23 +19,23 @@ use crate::restd::cert_info::CertInfo;
 /// One if the Cert can be processed, and another if Cert cannot be processed.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum CertResultJSON {
-    Good(ReturnGoodJSON),
-    Bad(ReturnBadJSON),
+pub enum CertResultJson {
+    Good(ReturnGoodJson),
+    Bad(ReturnBadJson),
 }
 
-impl From<Result<ReturnGoodJSON, ReturnBadJSON>> for CertResultJSON {
-    fn from(res: Result<ReturnGoodJSON, ReturnBadJSON>) -> Self {
+impl From<Result<ReturnGoodJson, ReturnBadJson>> for CertResultJson {
+    fn from(res: Result<ReturnGoodJson, ReturnBadJson>) -> Self {
         match res {
-            Ok(rgj) => CertResultJSON::Good(rgj),
-            Err(rbj) => CertResultJSON::Bad(rbj),
+            Ok(rgj) => CertResultJson::Good(rgj),
+            Err(rbj) => CertResultJson::Bad(rbj),
         }
     }
 }
 
 /// A container for information about a "good" Cert.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ReturnGoodJSON {
+pub struct ReturnGoodJson {
     /// OpenPGP CA representation of a Cert (armored cert + metadata)
     pub certificate: Certificate,
 
@@ -91,13 +91,13 @@ pub enum Upload {
 
 /// A container for information about a "bad" Cert.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ReturnBadJSON {
+pub struct ReturnBadJson {
     pub error: Vec<CertError>, // FIXME: read/write access methods?
     pub cert_info: Option<CertInfo>,
     upload: Upload,
 }
 
-impl ReturnBadJSON {
+impl ReturnBadJson {
     pub fn new(error: CertError, cert_info: Option<CertInfo>) -> Self {
         Self {
             error: vec![error],
@@ -238,9 +238,9 @@ impl CertError {
         status: CertStatus,
         msg: String,
         ci: Option<CertInfo>,
-    ) -> BadRequest<Json<ReturnBadJSON>> {
+    ) -> BadRequest<Json<ReturnBadJson>> {
         let re = CertError::new(status, msg);
-        let rbj = ReturnBadJSON::new(re, ci);
+        let rbj = ReturnBadJson::new(re, ci);
         BadRequest(Some(Json(rbj)))
     }
 }
@@ -310,5 +310,8 @@ impl Warning {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WarnStatus {
     ExpiresSoon,
+
+    // The capitalization of this constant is part of the external API
+    #[allow(clippy::upper_case_acronyms)]
     WeakCryptoSHA1,
 }
