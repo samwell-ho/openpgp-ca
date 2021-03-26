@@ -22,6 +22,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
+// Operations that require CA private key material
+
 pub fn ca_init(
     oca: &OpenpgpCa,
     domainname: &str,
@@ -54,13 +56,6 @@ pub fn ca_init(
 
         Ok(())
     })
-}
-
-pub fn ca_get_cert(oca: &OpenpgpCa) -> Result<Cert> {
-    match oca.db().get_ca()? {
-        Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
-        _ => panic!("get_ca_cert() failed"),
-    }
 }
 
 pub fn ca_generate_revocations(
@@ -163,56 +158,6 @@ adversaries."#;
     Ok(())
 }
 
-pub fn get_ca_email(oca: &OpenpgpCa) -> Result<String> {
-    let cert = oca.ca_get_cert()?;
-    let uids: Vec<_> = cert.userids().collect();
-
-    if uids.len() != 1 {
-        return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
-    }
-
-    let email = &uids[0].userid().email()?;
-
-    if let Some(email) = email {
-        Ok(email.clone())
-    } else {
-        Err(anyhow::anyhow!("ERROR: CA user_id has no email"))
-    }
-}
-
-pub fn get_ca_domain(oca: &OpenpgpCa) -> Result<String> {
-    let cert = oca.ca_get_cert()?;
-    let uids: Vec<_> = cert.userids().collect();
-
-    if uids.len() != 1 {
-        return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
-    }
-
-    let email = &uids[0].userid().email()?;
-
-    if let Some(email) = email {
-        let split: Vec<_> = email.split('@').collect();
-
-        if split.len() == 2 {
-            Ok(split[1].to_owned())
-        } else {
-            Err(anyhow::anyhow!(
-                "ERROR: Error while splitting domain from CA user_id "
-            ))
-        }
-    } else {
-        Err(anyhow::anyhow!("ERROR: CA user_id has no email"))
-    }
-}
-
-pub fn ca_get_pubkey_armored(oca: &OpenpgpCa) -> Result<String> {
-    let cert = oca.ca_get_cert()?;
-    let ca_pub = Pgp::cert_to_armored(&cert)
-        .context("failed to transform CA key to armored pubkey")?;
-
-    Ok(ca_pub)
-}
-
 pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
     oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
         let ca_cert = oca.ca_get_cert().unwrap();
@@ -253,4 +198,11 @@ pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
 
         Ok(())
     })
+}
+
+pub fn ca_get_cert(oca: &OpenpgpCa) -> Result<Cert> {
+    match oca.db().get_ca()? {
+        Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
+        _ => panic!("get_ca_cert() failed"),
+    }
 }

@@ -31,7 +31,8 @@
 //! ```
 
 use crate::bridge;
-use crate::cas;
+use crate::ca_public;
+use crate::ca_secret;
 use crate::cert;
 use crate::db::models;
 use crate::db::OcaDb;
@@ -110,7 +111,7 @@ impl OpenpgpCa {
     ///
     /// Only one CA Admin can be configured per database.
     pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
-        cas::ca_init(&self, domainname, name)
+        ca_secret::ca_init(&self, domainname, name)
     }
 
     /// Generate a set of revocation certificates for the CA key.
@@ -124,7 +125,7 @@ impl OpenpgpCa {
     /// explanation, followed by the CA certificate and the list of
     /// revocation certificates
     pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
-        cas::ca_generate_revocations(&self, output)
+        ca_secret::ca_generate_revocations(&self, output)
     }
 
     /// Add trust-signature(s) from CA users to the CA's Cert.
@@ -133,7 +134,7 @@ impl OpenpgpCa {
     /// any trust-signatures on it and merges those into "our" local copy of
     /// the CA key.
     pub fn ca_import_tsig(&self, cert: &str) -> Result<()> {
-        cas::ca_import_tsig(&self, cert)
+        ca_secret::ca_import_tsig(&self, cert)
     }
 
     /// Get the Ca and Cacert objects from the database
@@ -155,22 +156,22 @@ impl OpenpgpCa {
     ///
     /// This is the OpenPGP Cert of the CA.
     pub fn ca_get_cert(&self) -> Result<Cert> {
-        cas::ca_get_cert(&self)
+        ca_secret::ca_get_cert(&self)
     }
 
     /// Get the domainname for this CA
     pub fn get_ca_domain(&self) -> Result<String> {
-        cas::get_ca_domain(&self)
+        ca_public::get_ca_domain(&self)
     }
 
     /// Get the email of this CA
     pub fn get_ca_email(&self) -> Result<String> {
-        cas::get_ca_email(&self)
+        ca_public::get_ca_email(&self)
     }
 
     /// Returns the public key of the CA as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
-        cas::ca_get_pubkey_armored(&self)
+        ca_public::ca_get_pubkey_armored(&self)
     }
 
     /// Print information about the Ca to stdout.
