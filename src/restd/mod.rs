@@ -392,7 +392,7 @@ fn ping() -> Status {
 /// Tests for DB availability and that the CA has been initialized.
 #[get("/healthz")]
 fn healthz() -> Status {
-    if CA.with(|ca| ca.ca_get_cert()).is_err() {
+    if CA.with(|ca| ca.ca_get_cert_pub()).is_err() {
         // failed to load the CA Cert from the database
         Status::InternalServerError
     } else {

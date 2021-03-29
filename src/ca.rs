@@ -139,9 +139,22 @@ impl OpenpgpCa {
 
     /// Get a sequoia `Cert` object for the CA from the database.
     ///
+    /// This returns a stripped version of the CA Cert, without private key
+    /// material.
+    ///
     /// This is the OpenPGP Cert of the CA.
-    pub fn ca_get_cert(&self) -> Result<Cert> {
-        ca_secret::ca_get_cert(&self)
+    pub fn ca_get_cert_pub(&self) -> Result<Cert> {
+        ca_public::ca_get_cert_pub(&self)
+    }
+
+    /// Get a sequoia `Cert` object for the CA from the database.
+    ///
+    /// This returns a full version of the CA Cert, including private key
+    /// material.
+    ///
+    /// This is the OpenPGP Cert of the CA.
+    pub fn ca_get_cert_priv(&self) -> Result<Cert> {
+        ca_secret::ca_get_cert_priv(&self)
     }
 
     /// Get the domainname for this CA

@@ -36,7 +36,7 @@ pub fn export_certs_as_files(
         // export CA cert
         if email_filter.is_none() {
             // add CA cert to output
-            let ca_cert = oca.ca_get_cert()?;
+            let ca_cert = oca.ca_get_cert_pub()?;
 
             std::fs::write(
                 path_append(&path, &format!("{}.asc", &oca.get_ca_email()?))?,
@@ -122,7 +122,7 @@ fn path_append(path: &str, filename: &str) -> Result<PathBuf> {
 pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
     use sequoia_net::wkd;
 
-    let ca_cert = oca.ca_get_cert()?;
+    let ca_cert = oca.ca_get_cert_pub()?;
     wkd::insert(&path, domain, None, &ca_cert)?;
 
     for cert in oca.user_certs_get_all()? {
@@ -162,7 +162,7 @@ pub fn export_keylist(
     };
 
     // .. add ca cert to Keylist ..
-    let fingerprint = oca.ca_get_cert()?.fingerprint().to_hex();
+    let fingerprint = oca.ca_get_cert_pub()?.fingerprint().to_hex();
 
     ukl.keys.push(Key {
         fingerprint,
@@ -215,7 +215,7 @@ pub fn export_keylist(
 }
 
 fn sign_detached(oca: &OpenpgpCa, text: &str) -> Result<String> {
-    let ca_cert = oca.ca_get_cert()?;
+    let ca_cert = oca.ca_get_cert_priv()?;
 
     let signing_keypair = ca_cert
         .keys()

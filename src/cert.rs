@@ -28,7 +28,7 @@ pub fn user_new(
     duration_days: Option<u64>,
     password: bool,
 ) -> Result<models::User> {
-    let ca_cert = oca.ca_get_cert()?;
+    let ca_cert = oca.ca_get_cert_priv()?;
 
     // make user cert (signed by CA)
     let (user_cert, revoc, pass) = Pgp::make_user_cert(emails, name, password)
@@ -108,7 +108,7 @@ pub fn cert_import_new(
     }
 
     // sign user key with CA key
-    let ca_cert = oca.ca_get_cert()?;
+    let ca_cert = oca.ca_get_cert_priv()?;
 
     // sign only the User IDs that have been specified
     let certified =
@@ -185,7 +185,7 @@ pub fn certs_refresh_ca_certifications(
     validity_days: u64,
 ) -> Result<()> {
     oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
-        let ca_cert = oca.ca_get_cert()?;
+        let ca_cert = oca.ca_get_cert_priv()?;
         let ca_fp = ca_cert.fingerprint();
 
         let threshold_secs = threshold_days * 24 * 60 * 60;
@@ -302,7 +302,7 @@ pub fn cert_check_ca_sig(
 ) -> Result<Vec<UserID>> {
     let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
-    let ca = oca.ca_get_cert()?;
+    let ca = oca.ca_get_cert_priv()?;
 
     let mut res = Vec::new();
     let policy = StandardPolicy::new();
@@ -328,7 +328,7 @@ pub fn cert_check_tsig_on_ca(
     oca: &OpenpgpCa,
     cert: &models::Cert,
 ) -> Result<bool> {
-    let ca = oca.ca_get_cert()?;
+    let ca = oca.ca_get_cert_priv()?;
     let tsigs = Pgp::get_trust_sigs(&ca)?;
 
     let user_cert = Pgp::armored_to_cert(&cert.pub_cert)?;

@@ -7,12 +7,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::OpenpgpCa;
+use crate::ca_secret;
 use crate::pgp::Pgp;
+
+use sequoia_openpgp::Cert;
 
 use anyhow::{Context, Result};
 
 pub fn get_ca_email(oca: &OpenpgpCa) -> Result<String> {
-    let cert = oca.ca_get_cert()?;
+    let cert = ca_get_cert_pub(oca)?;
     let uids: Vec<_> = cert.userids().collect();
 
     if uids.len() != 1 {
@@ -29,7 +32,7 @@ pub fn get_ca_email(oca: &OpenpgpCa) -> Result<String> {
 }
 
 pub fn get_ca_domain(oca: &OpenpgpCa) -> Result<String> {
-    let cert = oca.ca_get_cert()?;
+    let cert = ca_get_cert_pub(oca)?;
     let uids: Vec<_> = cert.userids().collect();
 
     if uids.len() != 1 {
@@ -54,9 +57,13 @@ pub fn get_ca_domain(oca: &OpenpgpCa) -> Result<String> {
 }
 
 pub fn ca_get_pubkey_armored(oca: &OpenpgpCa) -> Result<String> {
-    let cert = oca.ca_get_cert()?;
+    let cert = oca.ca_get_cert_pub()?;
     let ca_pub = Pgp::cert_to_armored(&cert)
         .context("failed to transform CA key to armored pubkey")?;
 
     Ok(ca_pub)
+}
+
+pub fn ca_get_cert_pub(oca: &OpenpgpCa) -> Result<Cert> {
+    Ok(ca_secret::ca_get_cert_priv(oca)?.strip_secret_key_material())
 }

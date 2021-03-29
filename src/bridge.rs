@@ -91,8 +91,11 @@ pub fn bridge_new(
 
     let regexes = vec![regex];
 
-    let bridged =
-        Pgp::bridge_to_remote_ca(oca.ca_get_cert()?, remote_ca_cert, regexes)?;
+    let bridged = Pgp::bridge_to_remote_ca(
+        oca.ca_get_cert_priv()?,
+        remote_ca_cert,
+        regexes,
+    )?;
 
     // FIXME: transaction
 

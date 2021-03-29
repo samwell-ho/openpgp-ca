@@ -44,7 +44,7 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     // ---- import keys from OpenPGP CA into GnuPG ----
 
     // get Cert for CA
-    let ca_cert = ca.ca_get_cert()?;
+    let ca_cert = ca.ca_get_cert_priv()?;
 
     // import CA key into GnuPG
     let mut buf = Vec::new();
@@ -124,7 +124,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     gnupg::import(&ctx_bob, ca_key.as_bytes());
 
     // get Cert for CA
-    let ca_cert = ca.ca_get_cert()?;
+    let ca_cert = ca.ca_get_cert_priv()?;
 
     let ca_keyid = format!("{:X}", ca_cert.keyid());
 
@@ -513,12 +513,12 @@ fn test_scoping() -> Result<()> {
     // create unscoped trust signature from beta.org CA to other.org CA
     // ---- openpgp-ca@beta.org ---tsign---> openpgp-ca@other.org ----
     let tsigned_ca3 =
-        Pgp::tsign(ca3.ca_get_cert()?, &ca2.ca_get_cert()?, None)?;
+        Pgp::tsign(ca3.ca_get_cert_priv()?, &ca2.ca_get_cert_priv()?, None)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
     // get Cert for ca1
-    let ca1_cert = ca1.ca_get_cert().expect("failed to get CA1 cert");
+    let ca1_cert = ca1.ca_get_cert_priv().expect("failed to get CA1 cert");
 
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)

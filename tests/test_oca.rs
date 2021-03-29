@@ -59,7 +59,7 @@ fn test_ca() -> Result<()> {
     assert_eq!(revocs.len(), 1);
 
     // check that the custom name has ended up in the CA Cert
-    let ca_cert = ca.ca_get_cert().unwrap();
+    let ca_cert = ca.ca_get_cert_pub().unwrap();
     let uid = ca_cert.userids().find(|c| {
         c.clone()
             .with_policy(&StandardPolicy::new(), None)
@@ -91,7 +91,7 @@ fn test_expiring_certification() -> Result<()> {
     // make new CA key
     ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
 
-    let ca_cert = ca.ca_get_cert()?;
+    let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
 
     // make CA user
@@ -651,7 +651,7 @@ fn test_import_signed_cert() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // import CA key into GnuPG
-    let ca_cert = ca.ca_get_cert()?;
+    let ca_cert = ca.ca_get_cert_priv()?;
     let mut buf = Vec::new();
     ca_cert.as_tsk().serialize(&mut buf)?;
     gnupg::import(&ctx, &buf);
@@ -888,7 +888,7 @@ fn test_refresh() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
     ca.ca_init("example.org", None)?;
 
-    let ca_cert = ca.ca_get_cert()?;
+    let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
 
     // make CA user

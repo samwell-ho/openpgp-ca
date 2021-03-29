@@ -62,7 +62,7 @@ pub fn ca_generate_revocations(
     oca: &OpenpgpCa,
     output: PathBuf,
 ) -> Result<()> {
-    let ca = oca.ca_get_cert()?;
+    let ca = oca.ca_get_cert_priv()?;
 
     let mut file = std::fs::File::create(output)?;
 
@@ -160,7 +160,7 @@ adversaries."#;
 
 pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
     oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
-        let ca_cert = oca.ca_get_cert().unwrap();
+        let ca_cert = oca.ca_get_cert_priv()?;
 
         let cert_import = Pgp::armored_to_cert(cert)?;
 
@@ -200,7 +200,7 @@ pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
     })
 }
 
-pub fn ca_get_cert(oca: &OpenpgpCa) -> Result<Cert> {
+pub(crate) fn ca_get_cert_priv(oca: &OpenpgpCa) -> Result<Cert> {
     match oca.db().get_ca()? {
         Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
         _ => panic!("get_ca_cert() failed"),
