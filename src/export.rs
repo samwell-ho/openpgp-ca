@@ -162,11 +162,11 @@ pub fn export_keylist(
     };
 
     // .. add ca cert to Keylist ..
-    let (ca, cacert) = oca.ca_get()?.expect("failed to load CA");
+    let fingerprint = oca.ca_get_cert()?.fingerprint().to_hex();
 
     ukl.keys.push(Key {
-        fingerprint: cacert.fingerprint,
-        name: Some(format!("OpenPGP CA at {}", ca.domainname)),
+        fingerprint,
+        name: Some(format!("OpenPGP CA at {}", oca.get_ca_domain()?)),
         email: Some(oca.get_ca_email()?),
         comment: None,
         keyserver: None,

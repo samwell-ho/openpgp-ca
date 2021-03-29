@@ -137,21 +137,6 @@ impl OpenpgpCa {
         ca_secret::ca_import_tsig(&self, cert)
     }
 
-    /// Get the Ca and Cacert objects from the database
-    ///
-    /// The Ca object is permanent and shouldn't change after initial
-    /// creation.
-    ///
-    /// The Cacert contains the Key material for the CA.
-    /// When the CA Cert gets updated (e.g. it gets signed by a CA user), the
-    /// Cert in the database will be updated.
-    ///
-    /// If a new Cert gets created for the CA, a new Cacert row is
-    /// inserted into the database.
-    pub fn ca_get(&self) -> Result<Option<(models::Ca, models::Cacert)>> {
-        self.db.get_ca()
-    }
-
     /// Get a sequoia `Cert` object for the CA from the database.
     ///
     /// This is the OpenPGP Cert of the CA.

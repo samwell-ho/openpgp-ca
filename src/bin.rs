@@ -114,8 +114,7 @@ fn main() -> Result<()> {
         },
         Command::Wkd { cmd } => match cmd {
             WkdCommand::Export { path } => {
-                let (db_ca, _) = ca.ca_get()?.unwrap();
-                ca.wkd_export(&db_ca.domainname, &path)?;
+                ca.wkd_export(&ca.get_ca_domain()?, &path)?;
             }
         },
 
