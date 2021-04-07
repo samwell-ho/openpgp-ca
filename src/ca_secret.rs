@@ -16,7 +16,6 @@ use sequoia_openpgp::{Cert, Packet};
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use diesel::prelude::*;
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -47,14 +46,12 @@ pub fn ca_init(
 
     let ca_key = &Pgp::cert_to_armored_private_key(&cert)?;
 
-    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+    oca.db().transaction(|| {
         oca.db().insert_ca(
             models::NewCa { domainname },
             ca_key,
             &cert.fingerprint().to_hex(),
-        )?;
-
-        Ok(())
+        )
     })
 }
 
@@ -159,7 +156,7 @@ adversaries."#;
 }
 
 pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
-    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+    oca.db().transaction(|| {
         let ca_cert = oca.ca_get_cert_priv()?;
 
         let cert_import = Pgp::armored_to_cert(cert)?;
@@ -194,9 +191,7 @@ pub fn ca_import_tsig(oca: &OpenpgpCa, cert: &str) -> Result<()> {
 
         oca.db()
             .update_cacert(&ca_cert)
-            .context("Update of CA Cert in DB failed")?;
-
-        Ok(())
+            .context("Update of CA Cert in DB failed")
     })
 }
 

@@ -8,7 +8,6 @@
 
 use crate::ca::OpenpgpCa;
 use crate::db::models;
-use crate::diesel::Connection;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::packet::Signature;
@@ -142,7 +141,7 @@ pub fn revocation_apply(
     oca: &OpenpgpCa,
     revoc: models::Revocation,
 ) -> Result<()> {
-    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+    oca.db().transaction(|| {
         let cert = oca.db().get_cert_by_id(revoc.cert_id)?;
 
         if let Some(mut cert) = cert {

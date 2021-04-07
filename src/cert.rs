@@ -16,7 +16,6 @@ use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::policy::StandardPolicy;
 
 use anyhow::{Context, Result};
-use diesel::prelude::*;
 
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -52,7 +51,7 @@ pub fn user_new(
     let pub_key = &Pgp::cert_to_armored(&certified)?;
     let revoc = Pgp::revoc_to_armored(&revoc, None)?;
 
-    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+    oca.db().transaction(|| {
         let res = oca.db().add_user(
             name,
             (pub_key, &user_cert.fingerprint().to_hex()),
@@ -132,7 +131,7 @@ pub fn cert_import_new(
     let pub_key = &Pgp::cert_to_armored(&certified)
         .context("cert_import_new: couldn't re-armor key")?;
 
-    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+    oca.db().transaction(|| {
         let res = oca.db().add_user(
             name.as_deref(),
             (pub_key, fingerprint),
@@ -184,7 +183,7 @@ pub fn certs_refresh_ca_certifications(
     threshold_days: u64,
     validity_days: u64,
 ) -> Result<()> {
-    oca.db().get_conn().transaction::<_, anyhow::Error, _>(|| {
+    oca.db().transaction(|| {
         let ca_cert = oca.ca_get_cert_priv()?;
         let ca_fp = ca_cert.fingerprint();
 

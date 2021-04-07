@@ -1,13 +1,14 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Context, Result};
 use diesel::prelude::*;
+use diesel::result::Error;
 
 use crate::pgp::Pgp;
 
@@ -34,8 +35,12 @@ impl OcaDb {
         Ok(OcaDb { conn })
     }
 
-    pub fn get_conn(&self) -> &SqliteConnection {
-        &self.conn
+    pub fn transaction<T, E, F>(&self, f: F) -> Result<T, E>
+    where
+        F: FnOnce() -> Result<T, E>,
+        E: From<Error>,
+    {
+        self.conn.transaction(f)
     }
 
     // --- building block functions ---
