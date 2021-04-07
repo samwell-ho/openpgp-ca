@@ -68,31 +68,21 @@ impl OpenpgpCa {
     /// The SQLite backend filename can be configured:
     /// - explicitly via the db_url parameter,
     /// - the environment variable OPENPGP_CA_DB, or
-    /// - the .env DATABASE_URL
     pub fn new(db_url: Option<&str>) -> Result<Self> {
-        let db_url = if let Some(s) = db_url {
-            Some(s.to_owned())
+        let db_url = if let Some(url) = db_url {
+            url.to_owned()
         } else if let Ok(database) = env::var("OPENPGP_CA_DB") {
-            Some(database)
+            database
         } else {
-            // load config from .env
-            dotenv::dotenv().ok();
-
-            // diesel naming convention for .env
-            let env_db = env::var("DATABASE_URL");
-
-            // if unset (or bad), return None
-            env_db.ok()
+            return Err(anyhow::anyhow!(
+                "ERROR: no database configuration found"
+            ));
         };
 
-        if let Some(db_url) = db_url {
-            let db = OcaDb::new(&db_url)?;
-            db.diesel_migrations_run();
+        let db = OcaDb::new(&db_url)?;
+        db.diesel_migrations_run();
 
-            Ok(OpenpgpCa { db })
-        } else {
-            Err(anyhow::anyhow!("ERROR: no database configuration found"))
-        }
+        Ok(OpenpgpCa { db })
     }
 
     pub fn db(&self) -> &OcaDb {
