@@ -301,7 +301,7 @@ pub fn cert_check_ca_sig(
 ) -> Result<Vec<UserID>> {
     let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
-    let ca = oca.ca_get_cert_priv()?;
+    let ca = oca.ca_get_cert_pub()?;
 
     let mut res = Vec::new();
     let policy = StandardPolicy::new();
@@ -327,7 +327,7 @@ pub fn cert_check_tsig_on_ca(
     oca: &OpenpgpCa,
     cert: &models::Cert,
 ) -> Result<bool> {
-    let ca = oca.ca_get_cert_priv()?;
+    let ca = oca.ca_get_cert_pub()?;
     let tsigs = Pgp::get_trust_sigs(&ca)?;
 
     let user_cert = Pgp::armored_to_cert(&cert.pub_cert)?;
