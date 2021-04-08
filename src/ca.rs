@@ -31,8 +31,8 @@
 //! ```
 
 use crate::bridge;
-use crate::ca_public;
-use crate::ca_secret;
+use crate::ca_public::CaPub;
+use crate::ca_secret::CaSec;
 use crate::cert;
 use crate::db::models;
 use crate::db::OcaDb;
@@ -56,10 +56,27 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+/// a DB backend for a CA instance
+pub(crate) struct DbCa {
+    db: OcaDb,
+}
+
+impl DbCa {
+    pub fn new(db: OcaDb) -> Self {
+        Self { db }
+    }
+
+    pub fn db(&self) -> &OcaDb {
+        &self.db
+    }
+}
+
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
 pub struct OpenpgpCa {
     db: OcaDb,
+    ca_public: Box<dyn CaPub>,
+    ca_secret: Box<dyn CaSec>,
 }
 
 impl OpenpgpCa {
@@ -82,7 +99,13 @@ impl OpenpgpCa {
         let db = OcaDb::new(&db_url)?;
         db.diesel_migrations_run();
 
-        Ok(OpenpgpCa { db })
+        Ok(OpenpgpCa {
+            db,
+
+            // FIXME: only one db object should exist
+            ca_secret: Box::new(DbCa::new(OcaDb::new(&db_url)?)),
+            ca_public: Box::new(DbCa::new(OcaDb::new(&db_url)?)),
+        })
     }
 
     pub fn db(&self) -> &OcaDb {
@@ -101,7 +124,7 @@ impl OpenpgpCa {
     ///
     /// Only one CA Admin can be configured per database.
     pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
-        ca_secret::ca_init(&self, domainname, name)
+        self.ca_secret.ca_init(domainname, name)
     }
 
     /// Generate a set of revocation certificates for the CA key.
@@ -115,7 +138,7 @@ impl OpenpgpCa {
     /// explanation, followed by the CA certificate and the list of
     /// revocation certificates
     pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
-        ca_secret::ca_generate_revocations(&self, output)
+        self.ca_secret.ca_generate_revocations(&self, output)
     }
 
     /// Add trust-signature(s) from CA users to the CA's Cert.
@@ -124,7 +147,7 @@ impl OpenpgpCa {
     /// any trust-signatures on it and merges those into "our" local copy of
     /// the CA key.
     pub fn ca_import_tsig(&self, cert: &str) -> Result<()> {
-        ca_secret::ca_import_tsig(&self, cert)
+        self.ca_secret.ca_import_tsig(cert)
     }
 
     /// Get a sequoia `Cert` object for the CA from the database.
@@ -134,7 +157,7 @@ impl OpenpgpCa {
     ///
     /// This is the OpenPGP Cert of the CA.
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
-        ca_public::ca_get_cert_pub(&self)
+        self.ca_public.ca_get_cert_pub(&self)
     }
 
     /// Get a sequoia `Cert` object for the CA from the database.
@@ -144,22 +167,22 @@ impl OpenpgpCa {
     ///
     /// This is the OpenPGP Cert of the CA.
     pub fn ca_get_cert_priv(&self) -> Result<Cert> {
-        ca_secret::ca_get_cert_priv(&self)
+        self.ca_secret.ca_get_cert_priv()
     }
 
     /// Get the domainname for this CA
     pub fn get_ca_domain(&self) -> Result<String> {
-        ca_public::get_ca_domain(&self)
+        self.ca_public.get_ca_domain(&self)
     }
 
     /// Get the email of this CA
     pub fn get_ca_email(&self) -> Result<String> {
-        ca_public::get_ca_email(&self)
+        self.ca_public.get_ca_email(&self)
     }
 
     /// Returns the public key of the CA as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
-        ca_public::ca_get_pubkey_armored(&self)
+        self.ca_public.ca_get_pubkey_armored(&self)
     }
 
     /// Print information about the Ca to stdout.
