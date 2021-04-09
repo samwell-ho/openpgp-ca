@@ -54,15 +54,16 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::SystemTime;
 
 /// a DB backend for a CA instance
 pub(crate) struct DbCa {
-    db: OcaDb,
+    db: Rc<OcaDb>,
 }
 
 impl DbCa {
-    pub fn new(db: OcaDb) -> Self {
+    pub fn new(db: Rc<OcaDb>) -> Self {
         Self { db }
     }
 
@@ -74,9 +75,10 @@ impl DbCa {
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
 pub struct OpenpgpCa {
-    db: OcaDb,
-    ca_public: Box<dyn CaPub>,
-    ca_secret: Box<dyn CaSec>,
+    db: Rc<OcaDb>,
+
+    ca_public: Rc<dyn CaPub>,
+    ca_secret: Rc<dyn CaSec>,
 }
 
 impl OpenpgpCa {
@@ -96,15 +98,16 @@ impl OpenpgpCa {
             ));
         };
 
-        let db = OcaDb::new(&db_url)?;
+        let db = Rc::new(OcaDb::new(&db_url)?);
         db.diesel_migrations_run();
+
+        let dbca = Rc::new(DbCa::new(db.clone()));
 
         Ok(OpenpgpCa {
             db,
 
-            // FIXME: only one db object should exist
-            ca_secret: Box::new(DbCa::new(OcaDb::new(&db_url)?)),
-            ca_public: Box::new(DbCa::new(OcaDb::new(&db_url)?)),
+            ca_secret: dbca.clone(),
+            ca_public: dbca,
         })
     }
 
