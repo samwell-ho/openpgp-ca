@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ca::{DbCa, OpenpgpCa};
+use crate::ca::DbCa;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::Cert;
@@ -15,15 +15,15 @@ use anyhow::{Context, Result};
 
 /// abstraction of operations that only need public CA key material
 pub trait CaPub {
-    fn get_ca_email(&self, oca: &OpenpgpCa) -> Result<String>;
-    fn get_ca_domain(&self, oca: &OpenpgpCa) -> Result<String>;
-    fn ca_get_pubkey_armored(&self, oca: &OpenpgpCa) -> Result<String>;
-    fn ca_get_cert_pub(&self, oca: &OpenpgpCa) -> Result<Cert>;
+    fn get_ca_email(&self) -> Result<String>;
+    fn get_ca_domain(&self) -> Result<String>;
+    fn ca_get_pubkey_armored(&self) -> Result<String>;
+    fn ca_get_cert_pub(&self) -> Result<Cert>;
 }
 
 impl CaPub for DbCa {
-    fn get_ca_email(&self, oca: &OpenpgpCa) -> Result<String> {
-        let cert = self.ca_get_cert_pub(oca)?;
+    fn get_ca_email(&self) -> Result<String> {
+        let cert = self.ca_get_cert_pub()?;
         let uids: Vec<_> = cert.userids().collect();
 
         if uids.len() != 1 {
@@ -39,8 +39,8 @@ impl CaPub for DbCa {
         }
     }
 
-    fn get_ca_domain(&self, oca: &OpenpgpCa) -> Result<String> {
-        let cert = self.ca_get_cert_pub(oca)?;
+    fn get_ca_domain(&self) -> Result<String> {
+        let cert = self.ca_get_cert_pub()?;
         let uids: Vec<_> = cert.userids().collect();
 
         if uids.len() != 1 {
@@ -64,15 +64,20 @@ impl CaPub for DbCa {
         }
     }
 
-    fn ca_get_pubkey_armored(&self, oca: &OpenpgpCa) -> Result<String> {
-        let cert = self.ca_get_cert_pub(oca)?;
+    fn ca_get_pubkey_armored(&self) -> Result<String> {
+        let cert = self.ca_get_cert_pub()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
             .context("failed to transform CA key to armored pubkey")?;
 
         Ok(ca_pub)
     }
 
-    fn ca_get_cert_pub(&self, oca: &OpenpgpCa) -> Result<Cert> {
-        Ok(oca.ca_get_cert_priv()?.strip_secret_key_material())
+    fn ca_get_cert_pub(&self) -> Result<Cert> {
+        if let Some((_, cacert)) = self.db().get_ca()? {
+            let cert = Pgp::armored_to_cert(&cacert.priv_cert)?;
+            Ok(cert.strip_secret_key_material())
+        } else {
+            panic!("get_ca_cert() failed") // FIXME: Result
+        }
     }
 }

@@ -160,7 +160,7 @@ impl OpenpgpCa {
     ///
     /// This is the OpenPGP Cert of the CA.
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
-        self.ca_public.ca_get_cert_pub(&self)
+        self.ca_public.ca_get_cert_pub()
     }
 
     /// Get a sequoia `Cert` object for the CA from the database.
@@ -175,17 +175,17 @@ impl OpenpgpCa {
 
     /// Get the domainname for this CA
     pub fn get_ca_domain(&self) -> Result<String> {
-        self.ca_public.get_ca_domain(&self)
+        self.ca_public.get_ca_domain()
     }
 
     /// Get the email of this CA
     pub fn get_ca_email(&self) -> Result<String> {
-        self.ca_public.get_ca_email(&self)
+        self.ca_public.get_ca_email()
     }
 
     /// Returns the public key of the CA as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
-        self.ca_public.ca_get_pubkey_armored(&self)
+        self.ca_public.ca_get_pubkey_armored()
     }
 
     /// Print information about the Ca to stdout.
