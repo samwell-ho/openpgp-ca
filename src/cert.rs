@@ -27,20 +27,16 @@ pub fn user_new(
     duration_days: Option<u64>,
     password: bool,
 ) -> Result<models::User> {
-    let ca_cert = oca.ca_get_cert_priv()?;
+    let ca_cert = oca.ca_get_cert_pub()?;
 
     // make user cert (signed by CA)
     let (user_cert, revoc, pass) = Pgp::make_user_cert(emails, name, password)
         .context("make_user failed")?;
 
     // sign user key with CA key
-    let certified = Pgp::sign_user_emails(
-        &ca_cert,
-        &user_cert,
-        Some(emails),
-        duration_days,
-    )
-    .context("sign_user failed")?;
+    let certified = oca
+        .sign_user_emails(&user_cert, Some(emails), duration_days)
+        .context("sign_user failed")?;
 
     // user tsigns CA key
     let tsigned_ca = Pgp::tsign(ca_cert, &user_cert, pass.as_deref())
@@ -106,13 +102,10 @@ pub fn cert_import_new(
         ));
     }
 
-    // sign user key with CA key
-    let ca_cert = oca.ca_get_cert_priv()?;
-
-    // sign only the User IDs that have been specified
-    let certified =
-        Pgp::sign_user_emails(&ca_cert, &c, Some(emails), duration_days)
-            .context("sign_user_emails failed")?;
+    // sign user key with CA key (only the User IDs that have been specified)
+    let certified = oca
+        .sign_user_emails(&c, Some(emails), duration_days)
+        .context("sign_user_emails failed")?;
 
     // use name from User IDs, if no name was passed
     let name = match name {
@@ -184,8 +177,7 @@ pub fn certs_refresh_ca_certifications(
     validity_days: u64,
 ) -> Result<()> {
     oca.db().transaction(|| {
-        let ca_cert = oca.ca_get_cert_priv()?;
-        let ca_fp = ca_cert.fingerprint();
+        let ca_fp = oca.ca_get_cert_pub()?.fingerprint();
 
         let threshold_secs = threshold_days * 24 * 60 * 60;
         let threshold_time =
@@ -225,8 +217,7 @@ pub fn certs_refresh_ca_certifications(
             }
             if !uids_to_recert.is_empty() {
                 // make new certifications for "uids_to_update"
-                let recertified = Pgp::sign_user_ids(
-                    &ca_cert,
+                let recertified = oca.sign_user_ids(
                     &c,
                     &uids_to_recert[..],
                     Some(validity_days),

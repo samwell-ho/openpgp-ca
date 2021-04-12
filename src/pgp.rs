@@ -8,11 +8,14 @@
 
 use sequoia_openpgp::armor;
 use sequoia_openpgp::cert;
+use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
 use sequoia_openpgp::cert::amalgamation::{
     ValidAmalgamation, ValidateAmalgamation,
 };
+use sequoia_openpgp::cert::{CertParser, CipherSuite};
 use sequoia_openpgp::crypto::KeyPair;
 use sequoia_openpgp::packet::{signature, Signature, UserID};
+use sequoia_openpgp::parse::PacketParser;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::serialize::Serialize;
@@ -26,9 +29,6 @@ use std::convert::identity;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
-use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
-use sequoia_openpgp::cert::{CertParser, CipherSuite};
-use sequoia_openpgp::parse::PacketParser;
 use sha2::Digest;
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
@@ -332,52 +332,6 @@ impl Pgp {
         Ok(signed)
     }
 
-    /// add trust signature to the public key of a remote CA
-    pub fn bridge_to_remote_ca(
-        ca_cert: Cert,
-        remote_ca_cert: Cert,
-        scope_regexes: Vec<String>,
-    ) -> Result<Cert> {
-        // FIXME: do we want to support a tsig without any scope regex?
-        // -> or force users to explicitly set a catchall regex, then.
-
-        // there should be exactly one userid in the remote CA Cert
-        if remote_ca_cert.userids().len() != 1 {
-            return Err(anyhow::anyhow!(
-                "expect remote CA cert to have exactly one user_id",
-            ));
-        }
-
-        let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
-
-        let mut cert_keys = Self::get_cert_keys(&ca_cert, None);
-
-        let mut packets: Vec<Packet> = Vec::new();
-
-        // create one tsig for each signer
-        for signer in &mut cert_keys {
-            let mut builder = signature::SignatureBuilder::new(
-                SignatureType::GenericCertification,
-            )
-            .set_trust_signature(255, 120)?;
-
-            // add all regexes
-            for regex in &scope_regexes {
-                builder = builder.add_regular_expression(regex.as_bytes())?;
-            }
-
-            let tsig = userid.bind(signer, &remote_ca_cert, builder)?;
-
-            packets.push(tsig.into());
-        }
-
-        // FIXME: expiration?
-
-        let signed = remote_ca_cert.insert_packets(packets)?;
-
-        Ok(signed)
-    }
-
     // FIXME: justus thinks this might not be supported by implementations
     pub fn bridge_revoke(
         remote_ca_cert: &Cert,
@@ -421,105 +375,11 @@ impl Pgp {
         Ok((revocation_sig, revoked))
     }
 
-    /// ca_cert certifies a specified list of userids of user_cert.
-    ///
-    /// This fn does not perform any checks as a precondition for adding new
-    /// certifications.
-    pub fn sign_user_ids(
-        ca_cert: &Cert,
-        user_cert: &Cert,
-        uids_certify: &[&UserID],
-        duration_days: Option<u64>,
-    ) -> Result<Cert> {
-        let mut cert_keys = Self::get_cert_keys(&ca_cert, None);
-
-        let mut packets: Vec<Packet> = Vec::new();
-
-        for userid in user_cert
-            .userids()
-            // sign only userids that are in "uids_certify"
-            .filter(|u| uids_certify.contains(&u.userid()))
-            .map(|u| u.userid())
-        {
-            for signer in &mut cert_keys {
-                // make certification
-                let mut sb = signature::SignatureBuilder::new(
-                    SignatureType::GenericCertification,
-                );
-                if let Some(days) = duration_days {
-                    // the signature should be good for "days" days from now
-                    const SECONDS_IN_DAY: u64 = 60 * 60 * 24;
-                    sb = sb.set_signature_validity_period(
-                        std::time::Duration::new(SECONDS_IN_DAY * days, 0),
-                    )?;
-                }
-
-                // Include 'Signer's UserID' packet
-                // (https://tools.ietf.org/html/rfc4880#section-5.2.3.22)
-                // to make it easier to find the CA key via WKD
-                if let Some(uid) = ca_cert.userids().next() {
-                    sb = sb.set_signers_user_id(uid.userid().value())?;
-                } else {
-                    panic!("no user id in ca cert. this should never happen.");
-                }
-
-                let sig = userid.bind(signer, user_cert, sb)?;
-
-                // collect all certifications
-                packets.push(sig.into());
-            }
-        }
-
-        // insert all new certifications into user_cert
-        user_cert.clone().insert_packets(packets)
-    }
-
-    /// ca_cert certifies either all or a specified subset of userids of
-    /// user_cert
-    pub fn sign_user_emails(
-        ca_cert: &Cert,
-        user_cert: &Cert,
-        emails_filter: Option<&[&str]>,
-        duration_days: Option<u64>,
-    ) -> Result<Cert> {
-        let fp_ca = ca_cert.fingerprint();
-
-        let mut uids = Vec::new();
-
-        for uid in user_cert.userids() {
-            // check if this uid already has a valid signature by ca_cert.
-            // if yes, don't add another one.
-            if !uid
-                .clone()
-                .with_policy(POLICY, None)?
-                .certifications()
-                .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
-            {
-                let userid = uid.userid();
-                let uid_addr = userid
-                    .email_normalized()?
-                    .expect("email normalization failed");
-
-                // certify this userid if we
-                // a) have no filter-list, or
-                // b) if the userid is specified in the filter-list
-                if emails_filter.is_none()
-                    || emails_filter.unwrap().contains(&uid_addr.as_str())
-                {
-                    uids.push(userid);
-                }
-            }
-        }
-
-        // FIXME: complain about emails that have been specified but
-        // haven't been found in the userids?
-        //            panic!("Email {} not found in the key", );
-
-        Self::sign_user_ids(ca_cert, user_cert, &uids, duration_days)
-    }
-
     /// get all valid, certification capable keys with secret key material
-    fn get_cert_keys(cert: &Cert, password: Option<&str>) -> Vec<KeyPair> {
+    pub(crate) fn get_cert_keys(
+        cert: &Cert,
+        password: Option<&str>,
+    ) -> Vec<KeyPair> {
         let keys = cert
             .keys()
             .with_policy(POLICY, None)

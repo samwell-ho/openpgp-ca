@@ -11,10 +11,6 @@ use crate::pgp::Pgp;
 
 use openpgp_keylist::{Key, Keylist, Metadata};
 
-use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::serialize::stream::Armorer;
-use sequoia_openpgp::serialize::stream::{Message, Signer};
-
 use anyhow::Result;
 
 use std::fs::{File, OpenOptions};
@@ -197,7 +193,7 @@ pub fn export_keylist(
         }
     }
 
-    let signer = Box::new(|text: &str| sign_detached(&oca, text));
+    let signer = Box::new(|text: &str| oca.sign_detached(text));
 
     // make a signed list object
     let skl = ukl.sign(signer)?;
@@ -212,39 +208,4 @@ pub fn export_keylist(
     open_file(sigfile, force)?.write_all(&skl.sig.as_bytes().to_vec())?;
 
     Ok(())
-}
-
-fn sign_detached(oca: &OpenpgpCa, text: &str) -> Result<String> {
-    let ca_cert = oca.ca_get_cert_priv()?;
-
-    let signing_keypair = ca_cert
-        .keys()
-        .secret()
-        .with_policy(&StandardPolicy::new(), None)
-        .supported()
-        .alive()
-        .revoked(false)
-        .for_signing()
-        .next()
-        .unwrap()
-        .key()
-        .clone()
-        .into_keypair()?;
-
-    let mut sink = vec![];
-    {
-        let message = Message::new(&mut sink);
-        let message = Armorer::new(message)
-            // Customize the `Armorer` here.
-            .build()?;
-
-        let mut signer =
-            Signer::new(message, signing_keypair).detached().build()?;
-
-        // Write the data directly to the `Signer`.
-        signer.write_all(text.as_bytes())?;
-        signer.finalize()?;
-    }
-
-    Ok(std::str::from_utf8(&sink)?.to_string())
 }

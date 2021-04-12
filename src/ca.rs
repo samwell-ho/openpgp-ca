@@ -41,8 +41,7 @@ use crate::import;
 use crate::pgp::Pgp;
 use crate::revocation;
 
-use sequoia_openpgp::packet::Signature;
-use sequoia_openpgp::packet::UserID;
+use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
 
 use anyhow::{Context, Result};
@@ -69,6 +68,13 @@ impl DbCa {
 
     pub fn db(&self) -> &OcaDb {
         &self.db
+    }
+
+    pub(crate) fn ca_get_cert_priv(&self) -> Result<Cert> {
+        match self.db().get_ca()? {
+            Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
+            _ => panic!("get_ca_cert() failed"),
+        }
     }
 }
 
@@ -153,6 +159,34 @@ impl OpenpgpCa {
         self.ca_secret.ca_import_tsig(cert)
     }
 
+    /// Generate a detached signature with the CA key, for 'text'
+    pub(crate) fn sign_detached(&self, text: &str) -> Result<String> {
+        self.ca_secret.sign_detached(text)
+    }
+
+    pub(crate) fn sign_user_emails(
+        &self,
+        user_cert: &Cert,
+        emails_filter: Option<&[&str]>,
+        duration_days: Option<u64>,
+    ) -> Result<Cert> {
+        self.ca_secret.sign_user_emails(
+            user_cert,
+            emails_filter,
+            duration_days,
+        )
+    }
+
+    pub(crate) fn sign_user_ids(
+        &self,
+        user_cert: &Cert,
+        uids_certify: &[&UserID],
+        duration_days: Option<u64>,
+    ) -> Result<Cert> {
+        self.ca_secret
+            .sign_user_ids(user_cert, uids_certify, duration_days)
+    }
+
     /// Get a sequoia `Cert` object for the CA from the database.
     ///
     /// This returns a stripped version of the CA Cert, without private key
@@ -169,8 +203,11 @@ impl OpenpgpCa {
     /// material.
     ///
     /// This is the OpenPGP Cert of the CA.
+    ///
+    /// CAUTION: this should only by used in tests. getting private key
+    /// material is not possible with some secret key backends!
     pub fn ca_get_cert_priv(&self) -> Result<Cert> {
-        self.ca_secret.ca_get_cert_priv()
+        self.ca_secret.ca_get_priv_key()
     }
 
     /// Get the domainname for this CA
@@ -716,6 +753,14 @@ impl OpenpgpCa {
             )
         });
         Ok(())
+    }
+
+    pub(crate) fn bridge_to_remote_ca(
+        &self,
+        remote_ca_cert: Cert,
+        regexes: Vec<String>,
+    ) -> Result<Cert> {
+        self.ca_secret.bridge_to_remote_ca(remote_ca_cert, regexes)
     }
 
     // -------- export
