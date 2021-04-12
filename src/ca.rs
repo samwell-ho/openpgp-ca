@@ -27,7 +27,7 @@
 //! // create a new user, with all signatures
 //! // (the private key is printed to stdout and needs to be manually
 //! // processed from there)
-//! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false).unwrap();
+//! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false).unwrap();
 //! ```
 
 use crate::bridge;
@@ -326,8 +326,16 @@ impl OpenpgpCa {
         emails: &[&str],
         duration_days: Option<u64>,
         password: bool,
+        output_format_minimal: bool,
     ) -> Result<models::User> {
-        cert::user_new(&self, name, emails, duration_days, password)
+        cert::user_new(
+            &self,
+            name,
+            emails,
+            duration_days,
+            password,
+            output_format_minimal,
+        )
     }
 
     /// Import an existing OpenPGP public Cert a new OpenPGP CA user.

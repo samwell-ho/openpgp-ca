@@ -112,6 +112,13 @@ pub enum UserCommand {
             help = "Descriptive User Name"
         )]
         name: Option<String>,
+
+        #[structopt(
+            short = "m",
+            long = "minimal",
+            help = "Minimal output (for consumption by tools such as 'pass')"
+        )]
+        minimal: bool,
     },
 
     /// Add Revocation Certificate

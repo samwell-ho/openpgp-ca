@@ -26,6 +26,7 @@ pub fn user_new(
     emails: &[&str],
     duration_days: Option<u64>,
     password: bool,
+    output_format_minimal: bool,
 ) -> Result<models::User> {
     let ca_cert = oca.ca_get_cert_pub()?;
 
@@ -61,16 +62,21 @@ pub fn user_new(
             return Err(anyhow::anyhow!("Couldn't insert user"));
         }
 
-        // the private key needs to be handed over to the user, print for now
-        println!(
-            "new user key for {}:\n{}",
-            name.unwrap_or(""),
-            &Pgp::cert_to_armored_private_key(&certified)?
-        );
-        if let Some(pass) = pass {
-            println!("Password for this key: '{}'.\n", pass);
+        let armored = Pgp::cert_to_armored_private_key(&certified)?;
+
+        // the private key needs to be handed over to the user -> print it
+        if output_format_minimal {
+            if let Some(pass) = pass {
+                println!("{}", pass);
+            }
+            println!("{}", armored);
         } else {
-            println!("No password set for this key.\n");
+            println!("new user key for {}:\n{}", name.unwrap_or(""), armored);
+            if let Some(pass) = pass {
+                println!("Password for this key: '{}'.\n", pass);
+            } else {
+                println!("No password set for this key.\n");
+            }
         }
         // --
 

@@ -44,7 +44,7 @@ fn test_ca() -> Result<()> {
     ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -95,7 +95,13 @@ fn test_expiring_certification() -> Result<()> {
     let ca_fp = ca_cert.fingerprint();
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], Some(365), false)?;
+    ca.user_new(
+        Some(&"Alice"),
+        &["alice@example.org"],
+        Some(365),
+        false,
+        false,
+    )?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -308,10 +314,10 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     assert!(ca.ca_init("example.org", None).is_ok());
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
 
     // make another CA user with the same email address
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -344,14 +350,15 @@ fn test_ca_export_wkd() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     ca.ca_init("example.org", None)?;
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
     ca.user_new(
         Some(&"Bob"),
         &["bob@example.org", "bob@other.org"],
         None,
         false,
+        false,
     )?;
-    ca.user_new(Some(&"Carol"), &["carol@other.org"], None, false)?;
+    ca.user_new(Some(&"Carol"), &["carol@other.org"], None, false, false)?;
 
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
@@ -566,7 +573,7 @@ fn test_ca_signatures() -> Result<()> {
 
     // create carol, CA will sign carol's key.
     // also, CA key gets a tsig by carol
-    ca.user_new(Some(&"Carol"), &["carol@example.org"], None, false)?;
+    ca.user_new(Some(&"Carol"), &["carol@example.org"], None, false, false)?;
 
     for user in ca.users_get_all()? {
         let certs = ca.get_certs_by_user(&user)?;
@@ -613,7 +620,7 @@ fn test_apply_revocation() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -731,7 +738,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // create Alice
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
 
     // gpg: make key for Bob
     gnupg::create_user(&ctx, "Bob <bob@example.org>");
@@ -859,7 +866,7 @@ fn test_create_user_with_pw() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true, false)?;
 
     let certs = ca.user_certs_get_all()?;
     assert_eq!(certs.len(), 1);
@@ -892,10 +899,16 @@ fn test_refresh() -> Result<()> {
     let ca_fp = ca_cert.fingerprint();
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], Some(10), true)?;
-    ca.user_new(Some(&"Bob"), &["bob@example.org"], Some(365), true)?;
-    ca.user_new(Some(&"Carol"), &["carol@example.org"], None, true)?;
-    ca.user_new(Some(&"Dave"), &["dave@example.org"], Some(10), true)?;
+    ca.user_new(
+        Some(&"Alice"),
+        &["alice@example.org"],
+        Some(10),
+        true,
+        false,
+    )?;
+    ca.user_new(Some(&"Bob"), &["bob@example.org"], Some(365), true, false)?;
+    ca.user_new(Some(&"Carol"), &["carol@example.org"], None, true, false)?;
+    ca.user_new(Some(&"Dave"), &["dave@example.org"], Some(10), true, false)?;
 
     // set dave to "inactive"
     let cert = ca.certs_get("dave@example.org")?;
@@ -970,8 +983,8 @@ fn test_wkd_delist() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA users
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true)?;
-    ca.user_new(Some(&"Bob"), &["bob@example.org"], None, true)?;
+    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true, false)?;
+    ca.user_new(Some(&"Bob"), &["bob@example.org"], None, true, false)?;
 
     // set bob to "delisted"
     let cert = ca.certs_get("bob@example.org")?;

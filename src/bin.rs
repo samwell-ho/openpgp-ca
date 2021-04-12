@@ -22,13 +22,17 @@ fn main() -> Result<()> {
 
     match cli.cmd {
         Command::User { cmd } => match cmd {
-            UserCommand::Add { email, name } => {
+            UserCommand::Add {
+                email,
+                name,
+                minimal,
+            } => {
                 // TODO: key-profile?
 
                 let email: Vec<&str> =
                     email.iter().map(String::as_str).collect();
 
-                ca.user_new(name.as_deref(), &email[..], None, true)?;
+                ca.user_new(name.as_deref(), &email[..], None, true, minimal)?;
             }
             UserCommand::AddRevocation { revocation_file } => {
                 ca.revocation_add_from_file(&revocation_file)?
