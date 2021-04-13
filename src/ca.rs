@@ -770,7 +770,7 @@ impl OpenpgpCa {
     /// into a wkd directory structure
     ///
     /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
-    pub fn wkd_export(&self, domain: &str, path: &Path) -> Result<()> {
+    pub fn export_wkd(&self, domain: &str, path: &Path) -> Result<()> {
         export::wkd_export(&self, domain, path)
     }
 

@@ -363,7 +363,7 @@ fn test_ca_export_wkd() -> Result<()> {
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
-    ca.wkd_export("example.org", &wkd_path)?;
+    ca.export_wkd("example.org", &wkd_path)?;
 
     // expect 3 exported keys (carol should not be in the export)
     let test_path = wkd_path.join(".well-known/openpgpkey/example.org/hu/");
@@ -459,7 +459,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
-    ca.wkd_export("sequoia-pgp.org", &wkd_path)?;
+    ca.export_wkd("sequoia-pgp.org", &wkd_path)?;
 
     Ok(())
 }
@@ -997,7 +997,7 @@ fn test_wkd_delist() -> Result<()> {
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
-    ca.wkd_export("example.org", &wkd_path)?;
+    ca.export_wkd("example.org", &wkd_path)?;
 
     // expect 3 exported keys (carol should not be in the export)
     let test_path = wkd_path.join(".well-known/openpgpkey/example.org/hu/");
