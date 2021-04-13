@@ -107,7 +107,7 @@ impl CaSec for DbCa {
         oca: &OpenpgpCa,
         output: PathBuf,
     ) -> Result<()> {
-        let ca = self.ca_get_cert_priv()?;
+        let ca = self.ca_get_priv_key()?;
 
         let mut file = std::fs::File::create(output)?;
 
@@ -208,7 +208,7 @@ adversaries."#;
 
     fn ca_import_tsig(&self, cert: &str) -> Result<()> {
         self.db().transaction(|| {
-            let ca_cert = self.ca_get_cert_priv()?;
+            let ca_cert = self.ca_get_priv_key()?;
 
             let cert_import = Pgp::armored_to_cert(cert)?;
 
@@ -252,7 +252,7 @@ adversaries."#;
         remote_ca_cert: Cert,
         scope_regexes: Vec<String>,
     ) -> Result<Cert> {
-        let ca_cert = self.ca_get_cert_priv()?;
+        let ca_cert = self.ca_get_priv_key()?;
 
         // FIXME: do we want to support a tsig without any scope regex?
         // -> or force users to explicitly set a catchall regex, then.
@@ -294,7 +294,7 @@ adversaries."#;
     }
 
     fn sign_detached(&self, text: &str) -> Result<String> {
-        let ca_cert = self.ca_get_cert_priv()?;
+        let ca_cert = self.ca_get_priv_key()?;
 
         let signing_keypair = ca_cert
             .keys()
@@ -336,7 +336,7 @@ adversaries."#;
         emails_filter: Option<&[&str]>,
         duration_days: Option<u64>,
     ) -> Result<Cert> {
-        let fp_ca = self.ca_get_cert_priv()?.fingerprint();
+        let fp_ca = self.ca_get_priv_key()?.fingerprint();
 
         let mut uids = Vec::new();
 
@@ -382,7 +382,7 @@ adversaries."#;
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
     ) -> Result<Cert> {
-        let ca_cert = self.ca_get_cert_priv()?;
+        let ca_cert = self.ca_get_priv_key()?;
 
         let mut cert_keys = Pgp::get_cert_keys(&ca_cert, None);
 

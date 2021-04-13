@@ -69,13 +69,6 @@ impl DbCa {
     pub fn db(&self) -> &OcaDb {
         &self.db
     }
-
-    pub(crate) fn ca_get_cert_priv(&self) -> Result<Cert> {
-        match self.db().get_ca()? {
-            Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
-            _ => panic!("get_ca_cert() failed"),
-        }
-    }
 }
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
