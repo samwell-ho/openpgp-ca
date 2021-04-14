@@ -77,7 +77,7 @@ impl CaPub for DbCa {
             let cert = Pgp::armored_to_cert(&cacert.priv_cert)?;
             Ok(cert.strip_secret_key_material())
         } else {
-            panic!("get_ca_cert() failed") // FIXME: Result
+            Err(anyhow::anyhow!("ERROR: ca_get_cert_pub() failed"))
         }
     }
 }

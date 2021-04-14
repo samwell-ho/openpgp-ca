@@ -365,10 +365,6 @@ adversaries."#;
             }
         }
 
-        // FIXME: complain about emails that have been specified but
-        // haven't been found in the userids?
-        //            panic!("Email {} not found in the key", );
-
         self.sign_user_ids(user_cert, &uids, duration_days)
     }
 
@@ -413,7 +409,10 @@ adversaries."#;
                 if let Some(uid) = ca_cert.userids().next() {
                     sb = sb.set_signers_user_id(uid.userid().value())?;
                 } else {
-                    panic!("no user id in ca cert. this should never happen.");
+                    return Err(anyhow::anyhow!(
+                        "ERROR: No User ID in CA cert. \
+                        This should never happen."
+                    ));
                 }
 
                 let sig = userid.bind(signer, user_cert, sb)?;
@@ -430,7 +429,7 @@ adversaries."#;
     fn ca_get_priv_key(&self) -> Result<Cert> {
         match self.db().get_ca()? {
             Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
-            _ => panic!("get_ca_cert() failed"),
+            None => Err(anyhow::anyhow!("ERROR: ca_get_priv_key() failed.")),
         }
     }
 }

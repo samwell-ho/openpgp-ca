@@ -47,7 +47,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revoc_cert_str: &str) -> Result<()> {
     // find the matching cert for this revocation certificate
     let mut cert = None;
     // - search by fingerprint, if possible
-    if let Some(sig_fingerprint) = Pgp::get_revoc_issuer_fp(&revoc_cert) {
+    if let Some(sig_fingerprint) = Pgp::get_revoc_issuer_fp(&revoc_cert)? {
         cert = oca.db().get_cert(&sig_fingerprint.to_hex())?;
     }
     // - if match by fingerprint failed: test all certs
