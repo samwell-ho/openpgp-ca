@@ -1,9 +1,9 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use sequoia_openpgp::armor;
@@ -20,9 +20,7 @@ use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::serialize::Serialize;
 use sequoia_openpgp::serialize::SerializeInto;
-use sequoia_openpgp::types::{
-    KeyFlags, ReasonForRevocation, RevocationStatus, SignatureType,
-};
+use sequoia_openpgp::types::{KeyFlags, RevocationStatus, SignatureType};
 use sequoia_openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
 use std::convert::identity;
@@ -334,49 +332,6 @@ impl Pgp {
         let signed = signee.insert_packets(sigs)?;
 
         Ok(signed)
-    }
-
-    // FIXME: justus thinks this might not be supported by implementations
-    pub fn bridge_revoke(
-        remote_ca_cert: &Cert,
-        ca_cert: &Cert,
-    ) -> Result<(Signature, Cert)> {
-        // there should be exactly one userid in the remote CA Cert
-        if remote_ca_cert.userids().len() != 1 {
-            return Err(anyhow::anyhow!(
-                "expect remote CA cert to have exactly one user_id",
-            ));
-        }
-
-        let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
-
-        // set_trust_signature, set_regular_expression(s), expiration
-
-        let mut cert_keys = Self::get_cert_keys(&ca_cert, None);
-
-        // this CA should have exactly one key that can certify
-        if cert_keys.len() != 1 {
-            return Err(anyhow::anyhow!(
-                "this CA should have exactly one key that can certify",
-            ));
-        }
-
-        let signer = &mut cert_keys[0];
-
-        let mut packets: Vec<Packet> = Vec::new();
-
-        let revocation_sig = cert::UserIDRevocationBuilder::new()
-            .set_reason_for_revocation(
-                ReasonForRevocation::Unspecified,
-                b"removing OpenPGP CA bridge",
-            )?
-            .build(signer, &remote_ca_cert, &userid, None)?;
-
-        packets.push(revocation_sig.clone().into());
-
-        let revoked = remote_ca_cert.clone().insert_packets(packets)?;
-
-        Ok((revocation_sig, revoked))
     }
 
     /// get all valid, certification capable keys with secret key material

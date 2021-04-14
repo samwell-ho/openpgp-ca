@@ -93,8 +93,6 @@ pub fn bridge_new(
 
     let bridged = oca.bridge_to_remote_ca(remote_ca_cert, regexes)?;
 
-    // FIXME: transaction
-
     // store new bridge in DB
     let (ca_db, _) = oca.db().get_ca().context("Couldn't find CA")?.unwrap();
 
@@ -115,35 +113,29 @@ pub fn bridge_new(
 }
 
 pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
-    let bridge = oca.db().search_bridge(email)?;
-    if bridge.is_none() {
-        return Err(anyhow::anyhow!("bridge not found"));
-    }
+    if let Some(bridge) = oca.db().search_bridge(email)? {
+        if let Some(mut db_cert) = oca.db().get_cert_by_id(bridge.cert_id)? {
+            let bridge_pub = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
-    let bridge = bridge.unwrap();
+            // make sig to revoke bridge
+            let (rev_cert, cert) = oca.secret().bridge_revoke(&bridge_pub)?;
 
-    let (_, ca_cert) = oca.db().get_ca()?.unwrap();
-    let ca_cert = Pgp::armored_to_cert(&ca_cert.priv_cert)?;
+            let revoc_cert_arm = &Pgp::revoc_to_armored(&rev_cert, None)?;
+            println!("revoc cert:\n{}", revoc_cert_arm);
 
-    if let Some(mut db_cert) = oca.db().get_cert_by_id(bridge.cert_id)? {
-        let bridge_pub = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+            // save updated key (with revocation) to DB
+            let revoked_arm = Pgp::cert_to_armored(&cert)?;
+            println!("revoked remote key:\n{}", &revoked_arm);
 
-        // make sig to revoke bridge
-        let (rev_cert, cert) = Pgp::bridge_revoke(&bridge_pub, &ca_cert)?;
+            db_cert.pub_cert = revoked_arm;
+            oca.db().update_cert(&db_cert)?;
 
-        let revoc_cert_arm = &Pgp::revoc_to_armored(&rev_cert, None)?;
-        println!("revoc cert:\n{}", revoc_cert_arm);
-
-        // save updated key (with revocation) to DB
-        let revoked_arm = Pgp::cert_to_armored(&cert)?;
-        println!("revoked remote key:\n{}", &revoked_arm);
-
-        db_cert.pub_cert = revoked_arm;
-        oca.db().update_cert(&db_cert)?;
-
-        Ok(())
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("no cert found for bridge"))
+        }
     } else {
-        Err(anyhow::anyhow!("no cert found for bridge"))
+        Err(anyhow::anyhow!("bridge not found"))
     }
 }
 

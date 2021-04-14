@@ -10,9 +10,10 @@ use crate::ca::{DbCa, OpenpgpCa};
 use crate::db::models;
 use crate::pgp::Pgp;
 
+use sequoia_openpgp::cert;
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::cert::CertRevocationBuilder;
-use sequoia_openpgp::packet::{signature, UserID};
+use sequoia_openpgp::packet::{signature, Signature, UserID};
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::serialize::stream::Armorer;
 use sequoia_openpgp::serialize::stream::{Message, Signer};
@@ -62,6 +63,11 @@ pub trait CaSec {
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
     ) -> Result<Cert>;
+
+    fn bridge_revoke(
+        &self,
+        remote_ca_cert: &Cert,
+    ) -> Result<(Signature, Cert)>;
 
     /// CAUTION: getting the private key is not possible for OpenPGP cards,
     /// this fn should only be used for tests.
@@ -424,6 +430,50 @@ adversaries."#;
 
         // insert all new certifications into user_cert
         user_cert.clone().insert_packets(packets)
+    }
+
+    // FIXME: justus thinks this might not be supported by implementations
+    fn bridge_revoke(
+        &self,
+        remote_ca_cert: &Cert,
+    ) -> Result<(Signature, Cert)> {
+        // there should be exactly one userid in the remote CA Cert
+        if remote_ca_cert.userids().len() != 1 {
+            return Err(anyhow::anyhow!(
+                "expect remote CA cert to have exactly one user_id",
+            ));
+        }
+
+        let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
+
+        let ca_cert = self.ca_get_priv_key()?;
+
+        // set_trust_signature, set_regular_expression(s), expiration
+        let mut cert_keys = Pgp::get_cert_keys(&ca_cert, None);
+
+        // this CA should have exactly one key that can certify
+        if cert_keys.len() != 1 {
+            return Err(anyhow::anyhow!(
+                "this CA should have exactly one key that can certify",
+            ));
+        }
+
+        let signer = &mut cert_keys[0];
+
+        let mut packets: Vec<Packet> = Vec::new();
+
+        let revocation_sig = cert::UserIDRevocationBuilder::new()
+            .set_reason_for_revocation(
+                ReasonForRevocation::Unspecified,
+                b"removing OpenPGP CA bridge",
+            )?
+            .build(signer, &remote_ca_cert, &userid, None)?;
+
+        packets.push(revocation_sig.clone().into());
+
+        let revoked = remote_ca_cert.clone().insert_packets(packets)?;
+
+        Ok((revocation_sig, revoked))
     }
 
     fn ca_get_priv_key(&self) -> Result<Cert> {

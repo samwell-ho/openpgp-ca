@@ -114,6 +114,10 @@ impl OpenpgpCa {
         &self.db
     }
 
+    pub fn secret(&self) -> &Rc<dyn CaSec> {
+        &self.ca_secret
+    }
+
     // -------- CAs
 
     /// Initialize OpenPGP CA Admin database entry.
@@ -693,12 +697,19 @@ impl OpenpgpCa {
         commit: bool,
     ) -> Result<()> {
         if commit {
-            let (bridge, fingerprint) =
-                bridge::bridge_new(&self, key_file, email, scope)?;
+            self.db.transaction::<_, anyhow::Error, _>(|| {
+                let (bridge, fingerprint) =
+                    bridge::bridge_new(&self, key_file, email, scope)?;
 
-            println!("Signed OpenPGP key for {} as bridge.\n", bridge.email);
-            println!("The fingerprint of the remote CA key is");
-            println!("{}\n", fingerprint);
+                println!(
+                    "Signed OpenPGP key for {} as bridge.\n",
+                    bridge.email
+                );
+                println!("The fingerprint of the remote CA key is");
+                println!("{}\n", fingerprint);
+
+                Ok(())
+            })?;
         } else {
             println!("Bridge creation DRY RUN.");
             println!();
