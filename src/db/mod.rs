@@ -367,10 +367,10 @@ impl OcaDb {
             .filter(certs_emails::addr.eq(email))
             .select(certs_emails::cert_id);
 
-        Ok(certs::table
+        certs::table
             .filter(certs::id.eq_any(cert_ids))
             .load::<Cert>(&self.conn)
-            .expect("could not load certs"))
+            .context("could not load certs")
     }
 
     /// All Certs that belong to `user`, ordered by certs::id
@@ -442,16 +442,16 @@ impl OcaDb {
     }
 
     pub fn get_emails_by_cert(&self, cert: &Cert) -> Result<Vec<CertEmail>> {
-        Ok(certs_emails::table
+        certs_emails::table
             .filter(certs_emails::cert_id.eq(cert.id))
             .load(&self.conn)
-            .expect("could not load emails"))
+            .context("could not load emails")
     }
 
     pub fn get_emails_all(&self) -> Result<Vec<CertEmail>> {
-        Ok(certs_emails::table
+        certs_emails::table
             .load(&self.conn)
-            .expect("could not load emails"))
+            .context("could not load emails")
     }
 
     pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {
