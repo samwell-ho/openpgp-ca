@@ -87,14 +87,14 @@ pub fn user_new(
 
 pub fn cert_import_new(
     oca: &OpenpgpCa,
-    key: &str,
+    user_cert: &str,
     revoc_certs: Vec<String>,
     name: Option<&str>,
     emails: &[&str],
     duration_days: Option<u64>,
 ) -> Result<()> {
-    let c = Pgp::armored_to_cert(key)
-        .context("cert_import_new: couldn't process key")?;
+    let c = Pgp::armored_to_cert(user_cert)
+        .context("cert_import_new: couldn't process user cert")?;
 
     let fingerprint = &c.fingerprint().to_hex();
 
