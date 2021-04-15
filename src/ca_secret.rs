@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ca::{DbCa, OpenpgpCa};
+use crate::ca::DbCa;
 use crate::db::models;
 use crate::pgp::Pgp;
 
@@ -32,14 +32,36 @@ const POLICY: &StandardPolicy = &StandardPolicy::new();
 
 /// abstraction of operations that need private key material
 pub trait CaSec {
+    /// Initialize OpenPGP CA Admin database entry.
+    ///
+    /// This generates a new OpenPGP Key for the Admin role and stores the
+    /// private Key in the OpenPGP CA database.
+    ///
+    /// `domainname` is the domain that this CA Admin is in charge of,
+    /// `name` is a descriptive name for the CA Admin
+    ///
+    /// Only one CA Admin can be configured per database.
     fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()>;
 
-    fn ca_generate_revocations(
-        &self,
-        oca: &OpenpgpCa,
-        output: PathBuf,
-    ) -> Result<()>;
+    /// Generate a set of revocation certificates for the CA key.
+    ///
+    /// This outputs a set of revocations with creation dates spaced
+    /// in 30 day increments, from now to 120x 30days in the future (around
+    /// 10 years). For each of those points in time, one hard and one soft
+    /// revocation certificate is generated.
+    ///
+    /// The output file is human readable, contains some informational
+    /// explanation, followed by the CA certificate and the list of
+    /// revocation certificates
+    fn ca_generate_revocations(&self, output: PathBuf) -> Result<()>;
 
+    /// Add trust-signature(s) from CA users to the CA's Cert.
+    ///
+    /// This receives an armored version of the CA's public key, finds
+    /// any trust-signatures on it and merges those into "our" local copy of
+    /// the CA key.
+    ///
+    /// FIXME: should this be in ca_public?
     fn ca_import_tsig(&self, cert: &str) -> Result<()>;
 
     fn bridge_to_remote_ca(
@@ -48,6 +70,7 @@ pub trait CaSec {
         scope_regexes: Vec<String>,
     ) -> Result<Cert>;
 
+    /// Generate a detached signature with the CA key, for 'text'
     fn sign_detached(&self, text: &str) -> Result<String>;
 
     fn sign_user_emails(
@@ -69,6 +92,13 @@ pub trait CaSec {
         remote_ca_cert: &Cert,
     ) -> Result<(Signature, Cert)>;
 
+    /// Get a sequoia `Cert` object for the CA from the database.
+    ///
+    /// This returns a full version of the CA Cert, including private key
+    /// material.
+    ///
+    /// This is the OpenPGP Cert of the CA.
+    ///
     /// CAUTION: getting the private key is not possible for OpenPGP cards,
     /// this fn should only be used for tests.
     fn ca_get_priv_key(&self) -> Result<Cert>;
@@ -108,11 +138,7 @@ impl CaSec for DbCa {
         })
     }
 
-    fn ca_generate_revocations(
-        &self,
-        oca: &OpenpgpCa,
-        output: PathBuf,
-    ) -> Result<()> {
+    fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
         let ca = self.ca_get_priv_key()?;
 
         let mut file = std::fs::File::create(output)?;
@@ -122,7 +148,7 @@ impl CaSec for DbCa {
             &mut file,
             "This file contains revocation certificates for the OpenPGP CA \n\
             instance '{}'.",
-            oca.get_ca_email()?
+            self.ca_email()?
         )?;
         writeln!(&mut file)?;
 

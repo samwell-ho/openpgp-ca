@@ -69,6 +69,10 @@ impl DbCa {
     pub fn db(&self) -> &OcaDb {
         &self.db
     }
+
+    pub fn ca_email(&self) -> Result<String> {
+        self.get_ca_email()
+    }
 }
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
@@ -120,70 +124,6 @@ impl OpenpgpCa {
 
     // -------- CAs
 
-    /// Initialize OpenPGP CA Admin database entry.
-    ///
-    /// This generates a new OpenPGP Key for the Admin role and stores the
-    /// private Key in the OpenPGP CA database.
-    ///
-    /// `domainname` is the domain that this CA Admin is in charge of,
-    /// `name` is a descriptive name for the CA Admin
-    ///
-    /// Only one CA Admin can be configured per database.
-    pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
-        self.ca_secret.ca_init(domainname, name)
-    }
-
-    /// Generate a set of revocation certificates for the CA key.
-    ///
-    /// This outputs a set of revocations with creation dates spaced
-    /// in 30 day increments, from now to 120x 30days in the future (around
-    /// 10 years). For each of those points in time, one hard and one soft
-    /// revocation certificate is generated.
-    ///
-    /// The output file is human readable, contains some informational
-    /// explanation, followed by the CA certificate and the list of
-    /// revocation certificates
-    pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
-        self.ca_secret.ca_generate_revocations(&self, output)
-    }
-
-    /// Add trust-signature(s) from CA users to the CA's Cert.
-    ///
-    /// This receives an armored version of the CA's public key, finds
-    /// any trust-signatures on it and merges those into "our" local copy of
-    /// the CA key.
-    pub fn ca_import_tsig(&self, cert: &str) -> Result<()> {
-        self.ca_secret.ca_import_tsig(cert)
-    }
-
-    /// Generate a detached signature with the CA key, for 'text'
-    pub(crate) fn sign_detached(&self, text: &str) -> Result<String> {
-        self.ca_secret.sign_detached(text)
-    }
-
-    pub(crate) fn sign_user_emails(
-        &self,
-        user_cert: &Cert,
-        emails_filter: Option<&[&str]>,
-        duration_days: Option<u64>,
-    ) -> Result<Cert> {
-        self.ca_secret.sign_user_emails(
-            user_cert,
-            emails_filter,
-            duration_days,
-        )
-    }
-
-    pub(crate) fn sign_user_ids(
-        &self,
-        user_cert: &Cert,
-        uids_certify: &[&UserID],
-        duration_days: Option<u64>,
-    ) -> Result<Cert> {
-        self.ca_secret
-            .sign_user_ids(user_cert, uids_certify, duration_days)
-    }
-
     /// Get a sequoia `Cert` object for the CA from the database.
     ///
     /// This returns a stripped version of the CA Cert, without private key
@@ -192,19 +132,6 @@ impl OpenpgpCa {
     /// This is the OpenPGP Cert of the CA.
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
         self.ca_public.ca_get_cert_pub()
-    }
-
-    /// Get a sequoia `Cert` object for the CA from the database.
-    ///
-    /// This returns a full version of the CA Cert, including private key
-    /// material.
-    ///
-    /// This is the OpenPGP Cert of the CA.
-    ///
-    /// CAUTION: this should only by used in tests. getting private key
-    /// material is not possible with some secret key backends!
-    pub fn ca_get_cert_priv(&self) -> Result<Cert> {
-        self.ca_secret.ca_get_priv_key()
     }
 
     /// Get the domainname for this CA
@@ -765,14 +692,6 @@ impl OpenpgpCa {
             )
         });
         Ok(())
-    }
-
-    pub(crate) fn bridge_to_remote_ca(
-        &self,
-        remote_ca_cert: Cert,
-        regexes: Vec<String>,
-    ) -> Result<Cert> {
-        self.ca_secret.bridge_to_remote_ca(remote_ca_cert, regexes)
     }
 
     // -------- export

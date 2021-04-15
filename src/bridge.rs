@@ -91,7 +91,7 @@ pub fn bridge_new(
 
     let regexes = vec![regex];
 
-    let bridged = oca.bridge_to_remote_ca(remote_ca_cert, regexes)?;
+    let bridged = oca.secret().bridge_to_remote_ca(remote_ca_cert, regexes)?;
 
     // store new bridge in DB
     let (ca_db, _) = oca.db().get_ca().context("Couldn't find CA")?.unwrap();

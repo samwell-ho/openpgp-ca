@@ -36,6 +36,7 @@ pub fn user_new(
 
     // sign user key with CA key
     let certified = oca
+        .secret()
         .sign_user_emails(&user_cert, Some(emails), duration_days)
         .context("sign_user failed")?;
 
@@ -110,6 +111,7 @@ pub fn cert_import_new(
 
     // sign user key with CA key (only the User IDs that have been specified)
     let certified = oca
+        .secret()
         .sign_user_emails(&c, Some(emails), duration_days)
         .context("sign_user_emails failed")?;
 
@@ -223,7 +225,7 @@ pub fn certs_refresh_ca_certifications(
             }
             if !uids_to_recert.is_empty() {
                 // make new certifications for "uids_to_update"
-                let recertified = oca.sign_user_ids(
+                let recertified = oca.secret().sign_user_ids(
                     &c,
                     &uids_to_recert[..],
                     Some(validity_days),

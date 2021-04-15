@@ -41,7 +41,8 @@ fn test_ca() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
+    ca.secret()
+        .ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     // make CA user
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
@@ -89,7 +90,8 @@ fn test_expiring_certification() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
+    ca.secret()
+        .ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
@@ -169,7 +171,7 @@ fn test_update_cert_key() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // import key as new user
     gnupg::create_user(&ctx, "alice@example.org");
@@ -249,7 +251,7 @@ fn test_ca_import() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // import key as new user
     gnupg::create_user(&ctx, "alice@example.org");
@@ -311,7 +313,7 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    assert!(ca.ca_init("example.org", None).is_ok());
+    assert!(ca.secret().ca_init("example.org", None).is_ok());
 
     // make CA user
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
@@ -349,7 +351,7 @@ fn test_ca_export_wkd() -> Result<()> {
 
     let ca = OpenpgpCa::new(Some(&db))?;
 
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
     ca.user_new(
         Some(&"Bob"),
@@ -437,7 +439,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     let ca = OpenpgpCa::new(Some(&db))?;
 
-    ca.ca_init("sequoia-pgp.org", None)?;
+    ca.secret().ca_init("sequoia-pgp.org", None)?;
 
     ca.cert_import_new(
         &justus_key,
@@ -480,7 +482,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // gpg: make key for Alice
     gnupg::create_user(&ctx, "Alice <alice@example.org>");
@@ -547,7 +549,7 @@ fn test_ca_signatures() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // create/import alice, CA signs alice's key
     gnupg::create_user(&ctx, "alice@example.org");
@@ -617,7 +619,7 @@ fn test_apply_revocation() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // make CA user
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
@@ -655,10 +657,10 @@ fn test_import_signed_cert() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // import CA key into GnuPG
-    let ca_cert = ca.ca_get_cert_priv()?;
+    let ca_cert = ca.secret().ca_get_priv_key()?;
     let mut buf = Vec::new();
     ca_cert.as_tsk().serialize(&mut buf)?;
     gnupg::import(&ctx, &buf);
@@ -735,7 +737,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // create Alice
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
@@ -863,7 +865,7 @@ fn test_create_user_with_pw() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // make CA user
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true, false)?;
@@ -893,7 +895,7 @@ fn test_refresh() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
@@ -980,7 +982,7 @@ fn test_wkd_delist() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
-    ca.ca_init("example.org", None)?;
+    ca.secret().ca_init("example.org", None)?;
 
     // make CA users
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true, false)?;
