@@ -22,7 +22,7 @@
 //! let openpgp_ca = OpenpgpCa::new(Some(db_filename)).expect("Failed to set up CA");
 //!
 //! // initialize the CA Admin (with domainname and a symbolic name)
-//! openpgp_ca.ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
+//! openpgp_ca.secret().ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
 //!
 //! // create a new user, with all signatures
 //! // (the private key is printed to stdout and needs to be manually
