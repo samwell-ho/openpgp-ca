@@ -311,7 +311,7 @@ impl OpenpgpCa {
         &self,
         fingerprint: &str,
     ) -> Result<Option<models::Cert>> {
-        let norm = Pgp::normalize_fp(fingerprint);
+        let norm = Pgp::normalize_fp(fingerprint)?;
         self.db.get_cert(&norm)
     }
 

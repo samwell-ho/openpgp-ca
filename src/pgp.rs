@@ -15,11 +15,9 @@ use sequoia_openpgp::cert::amalgamation::{
 use sequoia_openpgp::cert::{CertParser, CipherSuite};
 use sequoia_openpgp::crypto::KeyPair;
 use sequoia_openpgp::packet::{signature, Signature, UserID};
-use sequoia_openpgp::parse::PacketParser;
-use sequoia_openpgp::parse::Parse;
+use sequoia_openpgp::parse::{PacketParser, Parse};
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::serialize::Serialize;
-use sequoia_openpgp::serialize::SerializeInto;
+use sequoia_openpgp::serialize::{Serialize, SerializeInto};
 use sequoia_openpgp::types::{KeyFlags, RevocationStatus, SignatureType};
 use sequoia_openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
@@ -43,9 +41,10 @@ impl Pgp {
     }
 
     fn user_id(email: &str, name: Option<&str>) -> UserID {
-        match name {
-            Some(name) => UserID::from(format!("{} <{}>", name, email)),
-            None => UserID::from(format!("<{}>", email)),
+        if let Some(name) = name {
+            UserID::from(format!("{} <{}>", name, email))
+        } else {
+            UserID::from(format!("<{}>", email))
         }
     }
 
@@ -129,7 +128,7 @@ impl Pgp {
         }
 
         for email in emails {
-            builder = builder.add_userid(Self::user_id(&email, name));
+            builder = builder.add_userid(Self::user_id(email, name));
         }
 
         let (cert, sig) = builder.generate()?;
@@ -192,8 +191,7 @@ impl Pgp {
         Ok(res)
     }
 
-    /// make one Cert from an ascii armored key.
-    /// throws an error if more than one Cert is in the armored data.
+    /// Returns the first Cert found in 'armored'.
     pub fn armored_to_cert(armored: &str) -> Result<Cert> {
         let cert =
             Cert::from_bytes(armored).context("Cert::from_bytes failed")?;
@@ -243,15 +241,16 @@ impl Pgp {
         Ok(primary.key_expiration_time())
     }
 
-    /// is (possibly) revoked
+    /// Is cert (possibly) revoked?
     pub fn is_possibly_revoked(cert: &Cert) -> bool {
         RevocationStatus::NotAsFarAsWeKnow
             != cert.revocation_status(POLICY, None)
     }
 
-    /// Filter spaces so that pretty-printed fingerprint strings can be used
-    pub(crate) fn normalize_fp(fp: &str) -> String {
-        fp.chars().filter(|&c| c != ' ').collect()
+    /// Normalize pretty-printed fingerprint strings (with spaces etc)
+    /// into a format with no spaces and uppercase characters
+    pub(crate) fn normalize_fp(fp: &str) -> Result<String> {
+        Ok(Fingerprint::from_hex(fp)?.to_hex())
     }
 
     pub fn get_revoc_issuer_fp(
