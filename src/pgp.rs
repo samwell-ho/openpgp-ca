@@ -256,8 +256,8 @@ impl Pgp {
     pub fn get_revoc_issuer_fp(
         revoc_cert: &Signature,
     ) -> Result<Option<Fingerprint>> {
-        let keyhandles = revoc_cert.get_issuers();
-        let sig_fingerprints: Vec<_> = keyhandles
+        let issuers = revoc_cert.get_issuers();
+        let sig_fingerprints: Vec<&Fingerprint> = issuers
             .iter()
             .map(|keyhandle| {
                 if let KeyHandle::Fingerprint(fp) = keyhandle {
@@ -273,7 +273,7 @@ impl Pgp {
             0 => Ok(None),
             1 => Ok(Some(sig_fingerprints[0].clone())),
             _ => Err(anyhow::anyhow!(
-                "ERROR: expected 0 or 1 issuer fingerprint in revocation"
+                "ERROR: expected 0 or 1 issuer fingerprints in revocation"
             )),
         }
     }
