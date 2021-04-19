@@ -282,7 +282,7 @@ impl Pgp {
     /// (represented as 16 character hex strings).
     ///
     /// These hashes can be used to refer to specific revocations.
-    pub fn revocation_to_hash(revoc: &str) -> Result<String> {
+    pub(crate) fn revocation_to_hash(revoc: &str) -> Result<String> {
         let sig = Pgp::armored_to_signature(revoc)?;
 
         let p: Packet = sig.into();
@@ -303,7 +303,7 @@ impl Pgp {
         Ok(hex)
     }
 
-    /// user tsigns CA key
+    /// User tsigns CA key. All User IDs of signee get certified.
     pub fn tsign(
         signee: Cert,
         signer: &Cert,
@@ -311,7 +311,11 @@ impl Pgp {
     ) -> Result<Cert> {
         let mut cert_keys = Self::get_cert_keys(&signer, pass);
 
-        assert!(!cert_keys.is_empty(), "Can't find usable user key");
+        if cert_keys.is_empty() {
+            return Err(anyhow::anyhow!(
+                "tsign(): signer has no valid, certification capable subkey"
+            ));
+        }
 
         let mut sigs: Vec<Signature> = Vec::new();
 
