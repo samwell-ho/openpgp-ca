@@ -97,6 +97,9 @@ pub fn export_certs_as_files(
     Ok(())
 }
 
+/// Open a file for writing. If 'overwrite' is false and the file already
+/// exists, an Error is returned. When 'overwrite' is false, an existing
+/// file will get truncated.
 fn open_file(name: PathBuf, overwrite: bool) -> std::io::Result<File> {
     if overwrite {
         File::create(name)
@@ -105,10 +108,10 @@ fn open_file(name: PathBuf, overwrite: bool) -> std::io::Result<File> {
     }
 }
 
-// Append a (potentially adversarial) `filename` to a (presumed trustworthy)
-// `path`.
-//
-// If `filename` contains suspicious chars, this fn returns an Err.
+/// Append a (potentially adversarial) `filename` to a (presumed trustworthy)
+/// `path`.
+///
+/// If `filename` contains suspicious chars, this fn returns an Err.
 fn path_append(path: &str, filename: &str) -> Result<PathBuf> {
     // colon is a special char on windows (and illegal in emails)
     if filename.chars().any(std::path::is_separator)
