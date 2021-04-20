@@ -728,9 +728,13 @@ impl OpenpgpCa {
     pub fn export_certs_as_files(
         &self,
         email_filter: Option<String>,
-        path: Option<String>,
+        path: &str,
     ) -> Result<()> {
         export::export_certs_as_files(&self, email_filter, path)
+    }
+
+    pub fn print_certring(&self, email_filter: Option<String>) -> Result<()> {
+        export::print_certring(&self, email_filter)
     }
 
     // -------- Update certs from public sources

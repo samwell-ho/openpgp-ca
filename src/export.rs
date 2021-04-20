@@ -21,64 +21,72 @@ use std::str::FromStr;
 // export filename of keylist
 const KEYLIST_FILE: &str = "keylist.json";
 
+/// Write all Certs to stdout as one armored certring (or a subset of certs,
+/// filtered by User ID via email)
+pub fn print_certring(
+    oca: &OpenpgpCa,
+    email_filter: Option<String>,
+) -> Result<()> {
+    // FIXME: add CA cert if no filter
+
+    let certs = match email_filter {
+        Some(email) => oca.certs_get(&email)?,
+        None => oca.user_certs_get_all()?,
+    };
+
+    let mut c = Vec::new();
+    for cert in certs {
+        c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
+    }
+
+    println!("{}", Pgp::certs_to_armored(&c)?);
+
+    Ok(())
+}
+
+/// Export Certs to filesystem, as individual files split and named by email.
+/// (Optionally: filter by User ID via list of emails)
 pub fn export_certs_as_files(
     oca: &OpenpgpCa,
     email_filter: Option<String>,
-    path: Option<String>,
+    path: &str,
 ) -> Result<()> {
-    if let Some(path) = path {
-        // export to filesystem, individual files split by email
+    // export CA cert
+    if email_filter.is_none() {
+        // add CA cert to output
+        let ca_cert = oca.ca_get_cert_pub()?;
 
-        // export CA cert
-        if email_filter.is_none() {
-            // add CA cert to output
-            let ca_cert = oca.ca_get_cert_pub()?;
+        std::fs::write(
+            path_append(path, &format!("{}.asc", &oca.get_ca_email()?))?,
+            Pgp::certs_to_armored(&[ca_cert])?,
+        )?;
+    }
 
-            std::fs::write(
-                path_append(&path, &format!("{}.asc", &oca.get_ca_email()?))?,
-                Pgp::certs_to_armored(&[ca_cert])?,
-            )?;
-        }
-
-        let emails = if let Some(email) = email_filter {
-            vec![email]
-        } else {
-            oca.get_emails_all()?
-                .iter()
-                .map(|ce| ce.addr.clone())
-                .collect()
-        };
-
-        for email in &emails {
-            if let Ok(certs) = oca.certs_get(email) {
-                if !certs.is_empty() {
-                    let mut c: Vec<_> = vec![];
-                    for cert in certs {
-                        c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
-                    }
-
-                    std::fs::write(
-                        path_append(&path, &format!("{}.asc", email))?,
-                        Pgp::certs_to_armored(&c)?,
-                    )?;
-                }
-            } else {
-                println!("ERROR loading certs for email '{}'", email)
-            };
-        }
+    let emails = if let Some(email) = email_filter {
+        vec![email]
     } else {
-        // write to stdout
-        let certs = match email_filter {
-            Some(email) => oca.certs_get(&email)?,
-            None => oca.user_certs_get_all()?,
+        oca.get_emails_all()?
+            .iter()
+            .map(|ce| ce.addr.clone())
+            .collect()
+    };
+
+    for email in &emails {
+        if let Ok(certs) = oca.certs_get(email) {
+            if !certs.is_empty() {
+                let mut c: Vec<_> = vec![];
+                for cert in certs {
+                    c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
+                }
+
+                std::fs::write(
+                    path_append(path, &format!("{}.asc", email))?,
+                    Pgp::certs_to_armored(&c)?,
+                )?;
+            }
+        } else {
+            println!("ERROR loading certs for email '{}'", email)
         };
-
-        let mut c = Vec::new();
-        for cert in certs {
-            c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
-        }
-
-        println!("{}", Pgp::certs_to_armored(&c)?);
     }
 
     Ok(())

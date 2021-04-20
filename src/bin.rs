@@ -71,7 +71,11 @@ fn main() -> Result<()> {
                 )?;
             }
             UserCommand::Export { email, path } => {
-                ca.export_certs_as_files(email, path)?;
+                if let Some(path) = path {
+                    ca.export_certs_as_files(email, &path)?;
+                } else {
+                    ca.print_certring(email)?;
+                }
             }
             UserCommand::List => OpenpgpCa::print_users(&ca)?,
             UserCommand::ShowRevocations { email } => {
