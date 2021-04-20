@@ -27,14 +27,19 @@ pub fn print_certring(
     oca: &OpenpgpCa,
     email_filter: Option<String>,
 ) -> Result<()> {
-    // FIXME: add CA cert if no filter
-
-    let certs = match email_filter {
-        Some(email) => oca.certs_get(&email)?,
+    // Load all user-certs (optionally filtered by email)
+    let certs = match &email_filter {
+        Some(email) => oca.certs_get(email)?,
         None => oca.user_certs_get_all()?,
     };
 
     let mut c = Vec::new();
+
+    // add CA cert if no filter has been set
+    if email_filter.is_none() {
+        c.push(oca.ca_get_cert_pub()?);
+    }
+
     for cert in certs {
         c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
     }
