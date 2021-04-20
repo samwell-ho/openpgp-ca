@@ -733,16 +733,17 @@ impl OpenpgpCa {
         export::export_certs_as_files(&self, email_filter, path)
     }
 
-    // -------- update keys from public key sources
+    // -------- Update certs from public sources
 
-    /// Pull a key from WKD and merge any updates into our local version of
-    /// this key
+    /// Pull updates for a cert from WKD and merge them into our local
+    /// storage for this cert.
     pub fn update_from_wkd(&self, cert: &models::Cert) -> Result<()> {
         import::update_from_wkd(&self, cert)
     }
 
-    /// Pull a key from hagrid and merge any updates into our local version of
-    /// this key
+    /// Pull updates for a cert from the hagrid keyserver
+    /// (https://keys.openpgp.org/) and merge any updates into our local
+    /// storage for this cert.
     pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<()> {
         import::update_from_hagrid(&self, cert)
     }
