@@ -70,12 +70,10 @@ pub fn revocation_add(oca: &OpenpgpCa, revoc_cert_str: &str) -> Result<()> {
 
             Ok(())
         } else {
-            let msg = format!(
+            Err(anyhow::anyhow!(format!(
                 "revocation couldn't be matched to a cert: {:?}",
                 revoc_cert
-            );
-
-            Err(anyhow::anyhow!(msg))
+            )))
         }
     } else {
         Err(anyhow::anyhow!("couldn't find cert for this fingerprint"))
