@@ -251,7 +251,7 @@ impl OpenpgpCa {
         duration_days: Option<u64>,
         password: bool,
         output_format_minimal: bool,
-    ) -> Result<models::User> {
+    ) -> Result<()> {
         cert::user_new(
             &self,
             name,
