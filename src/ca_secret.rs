@@ -30,7 +30,7 @@ use std::time::{Duration, SystemTime};
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
 
-/// abstraction of operations that need private key material
+/// Abstraction of operations that need private key material
 pub trait CaSec {
     /// Initialize OpenPGP CA Admin database entry.
     ///
@@ -73,7 +73,7 @@ pub trait CaSec {
     /// Generate a detached signature with the CA key, for 'text'
     fn sign_detached(&self, text: &str) -> Result<String>;
 
-    fn sign_user_emails(
+    fn sign_cert_emails(
         &self,
         user_cert: &Cert,
         emails_filter: Option<&[&str]>,
@@ -104,7 +104,8 @@ pub trait CaSec {
     fn ca_get_priv_key(&self) -> Result<Cert>;
 }
 
-/// Operations that require CA private key material
+/// Implementation of CaSec based on a DbCa backend that contains the
+/// private key material for the CA.
 impl CaSec for DbCa {
     fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
         if self.db().get_ca()?.is_some() {
@@ -115,9 +116,10 @@ impl CaSec for DbCa {
 
         // domainname syntax check
         if !publicsuffix::Domain::has_valid_syntax(domainname) {
-            return Err(anyhow::anyhow!(
-                "Parameter is not a valid domainname",
-            ));
+            return Err(anyhow::anyhow!(format!(
+                "not a valid domainname: '{}'",
+                domainname
+            )));
         }
 
         let name = match name {
@@ -244,14 +246,14 @@ adversaries."#;
 
             let cert_import = Pgp::armored_to_cert(cert)?;
 
-            // make sure the keys have the same Fingerprint
+            // The imported cert must have the same Fingerprint as the CA cert
             if ca_cert.fingerprint() != cert_import.fingerprint() {
                 return Err(anyhow::anyhow!(
                     "The imported cert has an unexpected Fingerprint",
                 ));
             }
 
-            // get the tsig(s) from import
+            // Get the third party tsig(s) from the imported cert
             let tsigs = Pgp::get_trust_sigs(&cert_import)?;
 
             // add tsig(s) to our "own" version of the CA key
@@ -263,25 +265,25 @@ adversaries."#;
                 .context("merging tsigs into CA Key failed")?;
 
             // update in DB
-            let (_, mut ca_cert) = self
+            let (_, mut cacert) = self
                 .db()
                 .get_ca()
                 .context("failed to load CA from database")?
                 .unwrap();
 
-            ca_cert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
+            cacert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
                 .context("failed to armor CA Cert")?;
 
             self.db()
-                .update_cacert(&ca_cert)
+                .update_cacert(&cacert)
                 .context("Update of CA Cert in DB failed")
         })
     }
 
-    /// add trust signature to the public key of a remote CA
+    /// Add trust signature to the cert of a remote CA
     fn bridge_to_remote_ca(
         &self,
-        remote_ca_cert: Cert,
+        remote_ca: Cert,
         scope_regexes: Vec<String>,
     ) -> Result<Cert> {
         let ca_cert = self.ca_get_priv_key()?;
@@ -290,20 +292,20 @@ adversaries."#;
         // -> or force users to explicitly set a catchall regex, then.
 
         // there should be exactly one userid in the remote CA Cert
-        if remote_ca_cert.userids().len() != 1 {
+        if remote_ca.userids().len() != 1 {
             return Err(anyhow::anyhow!(
                 "expect remote CA cert to have exactly one user_id",
             ));
         }
 
-        let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
+        let userid = remote_ca.userids().next().unwrap().userid().clone();
 
-        let mut cert_keys = Pgp::get_cert_keys(&ca_cert, None);
+        let mut ca_keys = Pgp::get_cert_keys(&ca_cert, None);
 
         let mut packets: Vec<Packet> = Vec::new();
 
         // create one tsig for each signer
-        for signer in &mut cert_keys {
+        for signer in &mut ca_keys {
             let mut builder =
                 SignatureBuilder::new(SignatureType::GenericCertification)
                     .set_trust_signature(255, 120)?;
@@ -313,14 +315,14 @@ adversaries."#;
                 builder = builder.add_regular_expression(regex.as_bytes())?;
             }
 
-            let tsig = userid.bind(signer, &remote_ca_cert, builder)?;
+            let tsig = userid.bind(signer, &remote_ca, builder)?;
 
             packets.push(tsig.into());
         }
 
         // FIXME: expiration?
 
-        let signed = remote_ca_cert.insert_packets(packets)?;
+        let signed = remote_ca.insert_packets(packets)?;
 
         Ok(signed)
     }
@@ -345,9 +347,7 @@ adversaries."#;
         let mut sink = vec![];
         {
             let message = Message::new(&mut sink);
-            let message = Armorer::new(message)
-                // Customize the `Armorer` here.
-                .build()?;
+            let message = Armorer::new(message).build()?;
 
             let mut signer =
                 Signer::new(message, signing_keypair).detached().build()?;
@@ -360,11 +360,13 @@ adversaries."#;
         Ok(std::str::from_utf8(&sink)?.to_string())
     }
 
-    /// ca_cert certifies either all or a specified subset of userids of
-    /// user_cert
-    fn sign_user_emails(
+    /// CA certifies either all or a subset of User IDs of cert.
+    ///
+    /// 'emails_filter' (if not None) specifies the subset of User IDs to
+    /// certify.
+    fn sign_cert_emails(
         &self,
-        user_cert: &Cert,
+        cert: &Cert,
         emails_filter: Option<&[&str]>,
         duration_days: Option<u64>,
     ) -> Result<Cert> {
@@ -372,7 +374,7 @@ adversaries."#;
 
         let mut uids = Vec::new();
 
-        for uid in user_cert.userids() {
+        for uid in cert.userids() {
             // check if this uid already has a valid signature by ca_cert.
             // if yes, don't add another one.
             if !uid
@@ -397,32 +399,33 @@ adversaries."#;
             }
         }
 
-        self.sign_user_ids(user_cert, &uids, duration_days)
+        self.sign_user_ids(cert, &uids, duration_days)
     }
 
-    /// ca_cert certifies a specified list of userids of user_cert.
+    /// CA certifies a specified list of User IDs of a cert.
     ///
     /// This fn does not perform any checks as a precondition for adding new
     /// certifications.
     fn sign_user_ids(
         &self,
-        user_cert: &Cert,
+        cert: &Cert,
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
     ) -> Result<Cert> {
         let ca_cert = self.ca_get_priv_key()?;
 
-        let mut cert_keys = Pgp::get_cert_keys(&ca_cert, None);
+        let mut ca_keys = Pgp::get_cert_keys(&ca_cert, None);
 
         let mut packets: Vec<Packet> = Vec::new();
 
-        for userid in user_cert
+        let userids = cert
             .userids()
             // sign only userids that are in "uids_certify"
             .filter(|u| uids_certify.contains(&u.userid()))
-            .map(|u| u.userid())
-        {
-            for signer in &mut cert_keys {
+            .map(|u| u.userid());
+
+        for userid in userids {
+            for signer in &mut ca_keys {
                 // make certification
                 let mut sb = signature::SignatureBuilder::new(
                     SignatureType::GenericCertification,
@@ -447,15 +450,15 @@ adversaries."#;
                     ));
                 }
 
-                let sig = userid.bind(signer, user_cert, sb)?;
+                let sig = userid.bind(signer, cert, sb)?;
 
                 // collect all certifications
                 packets.push(sig.into());
             }
         }
 
-        // insert all new certifications into user_cert
-        user_cert.clone().insert_packets(packets)
+        // insert all new certifications into cert
+        cert.clone().insert_packets(packets)
     }
 
     // FIXME: justus thinks this might not be supported by implementations
@@ -463,14 +466,14 @@ adversaries."#;
         &self,
         remote_ca_cert: &Cert,
     ) -> Result<(Signature, Cert)> {
-        // there should be exactly one userid in the remote CA Cert
+        // There should be exactly one userid in the remote CA cert
         if remote_ca_cert.userids().len() != 1 {
             return Err(anyhow::anyhow!(
                 "expect remote CA cert to have exactly one user_id",
             ));
         }
 
-        let userid = remote_ca_cert.userids().next().unwrap().userid().clone();
+        let remote_uid = remote_ca_cert.userids().next().unwrap().userid();
 
         let ca_cert = self.ca_get_priv_key()?;
 
@@ -486,18 +489,16 @@ adversaries."#;
 
         let signer = &mut cert_keys[0];
 
-        let mut packets: Vec<Packet> = Vec::new();
-
         let revocation_sig = cert::UserIDRevocationBuilder::new()
             .set_reason_for_revocation(
                 ReasonForRevocation::Unspecified,
                 b"removing OpenPGP CA bridge",
             )?
-            .build(signer, &remote_ca_cert, &userid, None)?;
+            .build(signer, &remote_ca_cert, remote_uid, None)?;
 
-        packets.push(revocation_sig.clone().into());
-
-        let revoked = remote_ca_cert.clone().insert_packets(packets)?;
+        let revoked = remote_ca_cert
+            .clone()
+            .insert_packets(Packet::from(revocation_sig.clone()))?;
 
         Ok((revocation_sig, revoked))
     }

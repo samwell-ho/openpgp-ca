@@ -36,7 +36,7 @@ pub fn user_new(
     // CA certifies user cert
     let user_certified = oca
         .secret()
-        .sign_user_emails(&user_key, Some(emails), duration_days)
+        .sign_cert_emails(&user_key, Some(emails), duration_days)
         .context("sign_user_emails failed")?;
 
     // User tsigns CA cert
@@ -107,7 +107,7 @@ pub fn cert_import_new(
     // Sign user cert with CA key (only the User IDs that have been specified)
     let certified = oca
         .secret()
-        .sign_user_emails(&user_cert, Some(emails), duration_days)
+        .sign_cert_emails(&user_cert, Some(emails), duration_days)
         .context("sign_user_emails failed")?;
 
     // use name from User IDs, if no name was passed
