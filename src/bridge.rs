@@ -27,12 +27,12 @@ use crate::pgp::Pgp;
 /// from the User ID in the key_file
 pub fn bridge_new(
     oca: &OpenpgpCa,
-    remote_key_file: &Path,
+    remote_cert_file: &Path,
     remote_email: Option<&str>,
     remote_scope: Option<&str>,
 ) -> Result<(models::Bridge, Fingerprint)> {
     let remote_ca_cert =
-        Cert::from_file(remote_key_file).context("Failed to read key")?;
+        Cert::from_file(remote_cert_file).context("Failed to read key")?;
 
     let remote_uids: Vec<_> = remote_ca_cert.userids().collect();
 
@@ -67,6 +67,14 @@ pub fn bridge_new(
         }
     };
 
+    // Email to store in the oca-database for this bridge
+    let email = match remote_email {
+        None => remote_cert_email,
+        Some(email) => email.to_owned(),
+    };
+
+    // Scope for the bridge (limit which user ids the trust signature is
+    // valid for, by domainname)
     let scope = match remote_scope {
         Some(scope) => {
             // if scope and domain don't match, warn/error?
@@ -82,21 +90,17 @@ pub fn bridge_new(
         None => &remote_cert_domain,
     };
 
-    let email = match remote_email {
-        None => remote_cert_email,
-        Some(email) => email.to_owned(),
-    };
-
     let regex = domain_to_regex(scope)?;
 
-    let regexes = vec![regex];
-
-    let bridged = oca.secret().bridge_to_remote_ca(remote_ca_cert, regexes)?;
+    // Make trust signature on the remote CA cert, to set up the bridge
+    let bridged = oca
+        .secret()
+        .bridge_to_remote_ca(remote_ca_cert, vec![regex])?;
 
     // store new bridge in DB
-    let (ca_db, _) = oca.db().get_ca().context("Couldn't find CA")?.unwrap();
+    let (ca_db, _) = oca.db().get_ca()?.unwrap();
 
-    let cert: models::Cert = oca.db().add_cert(
+    let db_cert = oca.db().add_cert(
         &Pgp::cert_to_armored(&bridged)?,
         &bridged.fingerprint().to_hex(),
         None,
@@ -105,7 +109,7 @@ pub fn bridge_new(
     let new_bridge = models::NewBridge {
         email: &email,
         scope,
-        cert_id: cert.id,
+        cert_id: db_cert.id,
         cas_id: ca_db.id,
     };
 
@@ -115,22 +119,23 @@ pub fn bridge_new(
 pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
     if let Some(bridge) = oca.db().search_bridge(email)? {
         if let Some(mut db_cert) = oca.db().get_cert_by_id(bridge.cert_id)? {
-            let bridge_pub = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+            let bridge_cert = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
-            // make sig to revoke bridge
-            let (rev_cert, cert) = oca.secret().bridge_revoke(&bridge_pub)?;
+            // Generate revocation for the bridge
+            let (revocation, revoked) =
+                oca.secret().bridge_revoke(&bridge_cert)?;
 
-            let revoc_cert_arm = &Pgp::revoc_to_armored(&rev_cert, None)?;
-            println!("revoc cert:\n{}", revoc_cert_arm);
+            // Print the revocation in case the user wants to publish it
+            // using external mechanisms.
+            println!(
+                "Revocation for the bridge to {}:\n{}",
+                email,
+                Pgp::revoc_to_armored(&revocation, None)?
+            );
 
-            // save updated key (with revocation) to DB
-            let revoked_arm = Pgp::cert_to_armored(&cert)?;
-            println!("revoked remote key:\n{}", &revoked_arm);
-
-            db_cert.pub_cert = revoked_arm;
-            oca.db().update_cert(&db_cert)?;
-
-            Ok(())
+            // Save updated cert (including the revocation) to DB
+            db_cert.pub_cert = Pgp::cert_to_armored(&revoked)?;
+            oca.db().update_cert(&db_cert)
         } else {
             Err(anyhow::anyhow!("no cert found for bridge"))
         }
@@ -139,17 +144,17 @@ pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
     }
 }
 
-/// Make regex for trust signature from domain-name
+/// Make regex for trust signature from domain-name.
+///
+/// ("other.org" => "<[^>]+[@.]other\\.org>$")
 fn domain_to_regex(domain: &str) -> Result<String> {
-    // "other.org" => "<[^>]+[@.]other\\.org>$"
-    // FIXME: does this imply "subdomain allowed"?
+    if publicsuffix::Domain::has_valid_syntax(domain) {
+        // if valid syntax: transform domain to regex
+        let escaped_domain =
+            &domain.split('.').collect::<Vec<_>>().join("\\.");
 
-    // syntax check domain
-    if !publicsuffix::Domain::has_valid_syntax(domain) {
-        return Err(anyhow::anyhow!("Parameter is not a valid domainname"));
+        Ok(format!("<[^>]+[@.]{}>$", escaped_domain))
+    } else {
+        Err(anyhow::anyhow!("Parameter is not a valid domainname"))
     }
-
-    // transform domain to regex
-    let escaped_domain = &domain.split('.').collect::<Vec<_>>().join("\\.");
-    Ok(format!("<[^>]+[@.]{}>$", escaped_domain))
 }
