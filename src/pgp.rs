@@ -131,8 +131,8 @@ impl Pgp {
             builder = builder.add_userid(Self::user_id(email, name));
         }
 
-        let (cert, sig) = builder.generate()?;
-        Ok((cert, sig, pass))
+        let (cert, revoc) = builder.generate()?;
+        Ok((cert, revoc, pass))
     }
 
     /// make a "public key" ascii-armored representation of a Cert
