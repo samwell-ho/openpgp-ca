@@ -228,6 +228,12 @@ pub fn certs_refresh_ca_certifications(
     })
 }
 
+/// Return a list of Certs that are alive now, but will not be alive
+/// anymore a number of 'days' in the future.
+///
+/// The purpose is to have a list of Certs whose users can be notified that
+/// their Certs will expire soon, in case they want to extend the
+/// expiration date.
 pub fn certs_expired(
     oca: &OpenpgpCa,
     days: u64,
@@ -242,21 +248,13 @@ pub fn certs_expired(
     for db_cert in certs {
         let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
-        // only consider (and thus potentially notify as "expiring") certs
-        // that are alive now
-        if c.with_policy(&StandardPolicy::new(), None)?
-            .alive()
-            .is_err()
+        let p = StandardPolicy::new();
+
+        // Notify only certs that are alive now, but not alive at
+        // 'expiry_test'.
+        if c.with_policy(&p, None)?.alive().is_ok()
+            && c.with_policy(&p, expiry_test)?.alive().is_err()
         {
-            continue;
-        }
-
-        let alive = c
-            .with_policy(&StandardPolicy::new(), expiry_test)?
-            .alive()
-            .is_ok();
-
-        if !alive {
             res.insert(db_cert, Pgp::get_expiry(&c)?);
         }
     }
