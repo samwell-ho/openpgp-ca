@@ -73,6 +73,17 @@ impl DbCa {
     pub fn ca_email(&self) -> Result<String> {
         self.get_ca_email()
     }
+
+    pub(crate) fn ca_userid(&self) -> Result<UserID> {
+        let cert = self.ca_get_cert_pub()?;
+        let uids: Vec<_> = cert.userids().collect();
+
+        if uids.len() != 1 {
+            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
+        }
+
+        Ok(uids[0].userid().clone())
+    }
 }
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library

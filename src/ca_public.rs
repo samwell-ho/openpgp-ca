@@ -23,14 +23,7 @@ pub trait CaPub {
 
 impl CaPub for DbCa {
     fn get_ca_email(&self) -> Result<String> {
-        let cert = self.ca_get_cert_pub()?;
-        let uids: Vec<_> = cert.userids().collect();
-
-        if uids.len() != 1 {
-            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
-        }
-
-        let email = &uids[0].userid().email()?;
+        let email = self.ca_userid()?.email()?;
 
         if let Some(email) = email {
             Ok(email.clone())
@@ -40,27 +33,15 @@ impl CaPub for DbCa {
     }
 
     fn get_ca_domain(&self) -> Result<String> {
-        let cert = self.ca_get_cert_pub()?;
-        let uids: Vec<_> = cert.userids().collect();
+        let email = self.get_ca_email()?;
+        let email_split: Vec<_> = email.split('@').collect();
 
-        if uids.len() != 1 {
-            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
-        }
-
-        let email = &uids[0].userid().email()?;
-
-        if let Some(email) = email {
-            let split: Vec<_> = email.split('@').collect();
-
-            if split.len() == 2 {
-                Ok(split[1].to_owned())
-            } else {
-                Err(anyhow::anyhow!(
-                    "ERROR: Error while splitting domain from CA user_id "
-                ))
-            }
+        if email_split.len() == 2 {
+            Ok(email_split[1].to_owned())
         } else {
-            Err(anyhow::anyhow!("ERROR: CA user_id has no email"))
+            Err(anyhow::anyhow!(
+                "ERROR: Error while splitting domain from CA email"
+            ))
         }
     }
 
