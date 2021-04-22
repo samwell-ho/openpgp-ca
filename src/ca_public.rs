@@ -26,7 +26,7 @@ impl CaPub for DbCa {
         let email = self.ca_userid()?.email()?;
 
         if let Some(email) = email {
-            Ok(email.clone())
+            Ok(email)
         } else {
             Err(anyhow::anyhow!("ERROR: CA user_id has no email"))
         }
