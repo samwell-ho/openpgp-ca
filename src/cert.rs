@@ -220,7 +220,7 @@ pub fn certs_refresh_ca_certifications(
                 // update cert in db
                 let mut cert_update = db_cert.clone();
                 cert_update.pub_cert = Pgp::cert_to_armored(&recertified)?;
-                oca.cert_update(&cert_update)?;
+                oca.db().update_cert(&cert_update)?;
             }
         }
 

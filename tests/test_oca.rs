@@ -917,7 +917,7 @@ fn test_refresh() -> Result<()> {
     assert_eq!(cert.len(), 1);
     let mut dave = cert[0].clone();
     dave.inactive = true;
-    ca.cert_update(&dave)?;
+    ca.db().update_cert(&dave)?;
 
     // refresh all CA certifications that are valid for less than 30 days
     ca.certs_refresh_ca_certifications(30, 365)?;
@@ -993,7 +993,7 @@ fn test_wkd_delist() -> Result<()> {
     assert_eq!(cert.len(), 1);
     let mut bob = cert[0].clone();
     bob.delisted = true;
-    ca.cert_update(&bob)?;
+    ca.db().update_cert(&bob)?;
 
     // export to WKD
     let wkd_dir = home_path + "/wkd/";

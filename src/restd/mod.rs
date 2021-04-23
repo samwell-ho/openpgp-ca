@@ -251,7 +251,7 @@ fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
         if let Some(mut cert) = cert {
             cert.inactive = true;
 
-            Ok(ca.cert_update(&cert).map_err(|e| {
+            Ok(ca.db().update_cert(&cert).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!("deactivate_cert: Error updating Cert '{:?}'", e),
@@ -289,7 +289,7 @@ fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
         if let Some(mut cert) = cert {
             cert.delisted = true;
 
-            ca.cert_update(&cert).map_err(|e| {
+            ca.db().update_cert(&cert).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!("delist_cert: Error updating Cert '{:?}'", e),

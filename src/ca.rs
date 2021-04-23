@@ -309,11 +309,6 @@ impl OpenpgpCa {
         cert::cert_import_update(self, key)
     }
 
-    /// Update a Cert in the database
-    pub fn cert_update(&self, cert: &models::Cert) -> Result<()> {
-        self.db.update_cert(cert)
-    }
-
     /// Get Cert by fingerprint.
     ///
     /// If 'fingerprint' contains spaces, they will be
