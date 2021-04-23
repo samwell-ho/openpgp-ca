@@ -29,7 +29,7 @@ pub fn print_certring(
 ) -> Result<()> {
     // Load all user-certs (optionally filtered by email)
     let certs = match &email_filter {
-        Some(email) => oca.certs_get(email)?,
+        Some(email) => oca.certs_by_email(email)?,
         None => oca.user_certs_get_all()?,
     };
 
@@ -77,7 +77,7 @@ pub fn export_certs_as_files(
     };
 
     for email in &emails {
-        if let Ok(certs) = oca.certs_get(email) {
+        if let Ok(certs) = oca.certs_by_email(email) {
             if !certs.is_empty() {
                 let mut c: Vec<_> = vec![];
                 for cert in certs {

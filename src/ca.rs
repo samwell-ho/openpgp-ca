@@ -333,7 +333,7 @@ impl OpenpgpCa {
     }
 
     /// Get a list of the Certs that are associated with `email`
-    pub fn certs_get(&self, email: &str) -> Result<Vec<models::Cert>> {
+    pub fn certs_by_email(&self, email: &str) -> Result<Vec<models::Cert>> {
         self.db.get_certs_by_email(email)
     }
 
@@ -549,7 +549,7 @@ impl OpenpgpCa {
     }
 
     pub fn print_revocations(&self, email: &str) -> Result<()> {
-        let certs = self.certs_get(email)?;
+        let certs = self.certs_by_email(email)?;
         if certs.is_empty() {
             println!("No OpenPGP keys found");
         } else {

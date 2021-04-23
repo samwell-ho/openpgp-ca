@@ -102,7 +102,7 @@ fn certs_by_email(
     CA.with(|ca| {
         let mut res = Vec::new();
 
-        let certs = ca.certs_get(&email).map_err(|e| {
+        let certs = ca.certs_by_email(&email).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
                 format!(

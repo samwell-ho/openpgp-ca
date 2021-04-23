@@ -211,7 +211,7 @@ fn test_update_cert_key() -> Result<()> {
     let alice2_key = gnupg::export(&ctx, &"alice@example.org");
 
     // get cert for alice
-    let certs = ca.certs_get("alice@example.org")?;
+    let certs = ca.certs_by_email("alice@example.org")?;
     assert_eq!(certs.len(), 1);
     let _alice = &certs[0];
 
@@ -680,7 +680,7 @@ fn test_import_signed_cert() -> Result<()> {
     )?;
 
     // get alice cert back from CA
-    let certs = ca.certs_get("alice@example.org")?;
+    let certs = ca.certs_by_email("alice@example.org")?;
     assert_eq!(certs.len(), 1);
 
     let alice = &certs[0];
@@ -913,7 +913,7 @@ fn test_refresh() -> Result<()> {
     ca.user_new(Some(&"Dave"), &["dave@example.org"], Some(10), true, false)?;
 
     // set dave to "inactive"
-    let cert = ca.certs_get("dave@example.org")?;
+    let cert = ca.certs_by_email("dave@example.org")?;
     assert_eq!(cert.len(), 1);
     let mut dave = cert[0].clone();
     dave.inactive = true;
@@ -989,7 +989,7 @@ fn test_wkd_delist() -> Result<()> {
     ca.user_new(Some(&"Bob"), &["bob@example.org"], None, true, false)?;
 
     // set bob to "delisted"
-    let cert = ca.certs_get("bob@example.org")?;
+    let cert = ca.certs_by_email("bob@example.org")?;
     assert_eq!(cert.len(), 1);
     let mut bob = cert[0].clone();
     bob.delisted = true;

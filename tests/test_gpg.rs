@@ -172,7 +172,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
 
     // export bob, CA-key from CA
     let ca_key = ca.ca_get_pubkey_armored()?;
-    let certs = ca.certs_get(&"bob@example.org")?;
+    let certs = ca.certs_by_email(&"bob@example.org")?;
     let bob = certs.first().unwrap();
 
     // import bob+CA key into alice's GnuPG context
