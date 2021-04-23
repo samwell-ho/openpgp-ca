@@ -64,12 +64,6 @@ pub trait CaSec {
     /// FIXME: should this be in ca_public?
     fn ca_import_tsig(&self, cert: &str) -> Result<()>;
 
-    fn bridge_to_remote_ca(
-        &self,
-        remote_ca_cert: Cert,
-        scope_regexes: Vec<String>,
-    ) -> Result<Cert>;
-
     /// Generate a detached signature with the CA key, for 'text'
     fn sign_detached(&self, text: &str) -> Result<String>;
 
@@ -85,6 +79,12 @@ pub trait CaSec {
         user_cert: &Cert,
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
+    ) -> Result<Cert>;
+
+    fn bridge_to_remote_ca(
+        &self,
+        remote_ca_cert: Cert,
+        scope_regexes: Vec<String>,
     ) -> Result<Cert>;
 
     fn bridge_revoke(
@@ -279,53 +279,6 @@ adversaries."#;
         })
     }
 
-    /// Add trust signature to the cert of a remote CA
-    fn bridge_to_remote_ca(
-        &self,
-        remote_ca: Cert,
-        scope_regexes: Vec<String>,
-    ) -> Result<Cert> {
-        let ca_cert = self.ca_get_priv_key()?;
-
-        // FIXME: do we want to support a tsig without any scope regex?
-        // -> or force users to explicitly set a catchall regex, then.
-
-        // there should be exactly one userid in the remote CA Cert
-        if remote_ca.userids().len() != 1 {
-            return Err(anyhow::anyhow!(
-                "expect remote CA cert to have exactly one user_id",
-            ));
-        }
-
-        let userid = remote_ca.userids().next().unwrap().userid().clone();
-
-        let mut ca_keys = Pgp::get_cert_keys(&ca_cert, None);
-
-        let mut packets: Vec<Packet> = Vec::new();
-
-        // create one tsig for each signer
-        for signer in &mut ca_keys {
-            let mut builder =
-                SignatureBuilder::new(SignatureType::GenericCertification)
-                    .set_trust_signature(255, 120)?;
-
-            // add all regexes
-            for regex in &scope_regexes {
-                builder = builder.add_regular_expression(regex.as_bytes())?;
-            }
-
-            let tsig = userid.bind(signer, &remote_ca, builder)?;
-
-            packets.push(tsig.into());
-        }
-
-        // FIXME: expiration?
-
-        let signed = remote_ca.insert_packets(packets)?;
-
-        Ok(signed)
-    }
-
     fn sign_detached(&self, text: &str) -> Result<String> {
         let ca_cert = self.ca_get_priv_key()?;
 
@@ -460,46 +413,95 @@ adversaries."#;
         cert.clone().insert_packets(packets)
     }
 
-    // FIXME: justus thinks this might not be supported by implementations
-    fn bridge_revoke(
+    /// Add trust signature to the cert of a remote CA.
+    ///
+    /// If `scope_regexes` is empty, no regex scoping is added to the trust
+    /// signature.
+    fn bridge_to_remote_ca(
         &self,
-        remote_ca_cert: &Cert,
-    ) -> Result<(Signature, Cert)> {
-        // There should be exactly one userid in the remote CA cert
-        if remote_ca_cert.userids().len() != 1 {
-            return Err(anyhow::anyhow!(
-                "expect remote CA cert to have exactly one user_id",
-            ));
-        }
-
-        let remote_uid = remote_ca_cert.userids().next().unwrap().userid();
-
+        remote_ca: Cert,
+        scope_regexes: Vec<String>,
+    ) -> Result<Cert> {
         let ca_cert = self.ca_get_priv_key()?;
 
-        // set_trust_signature, set_regular_expression(s), expiration
-        let mut cert_keys = Pgp::get_cert_keys(&ca_cert, None);
+        // there should be exactly one userid in the remote CA Cert
+        let uids: Vec<_> = remote_ca.userids().collect();
 
-        // this CA should have exactly one key that can certify
-        if cert_keys.len() != 1 {
-            return Err(anyhow::anyhow!(
-                "this CA should have exactly one key that can certify",
-            ));
+        if uids.len() == 1 {
+            let userid = uids[0].userid();
+
+            let mut ca_keys = Pgp::get_cert_keys(&ca_cert, None);
+
+            let mut packets: Vec<Packet> = Vec::new();
+
+            // create one tsig for each signer
+            for signer in &mut ca_keys {
+                let mut builder =
+                    SignatureBuilder::new(SignatureType::GenericCertification)
+                        .set_trust_signature(255, 120)?;
+
+                // add all regexes
+                for regex in &scope_regexes {
+                    builder =
+                        builder.add_regular_expression(regex.as_bytes())?;
+                }
+
+                let tsig = userid.bind(signer, &remote_ca, builder)?;
+
+                packets.push(tsig.into());
+            }
+
+            // FIXME: expiration?
+
+            let signed = remote_ca.insert_packets(packets)?;
+
+            Ok(signed)
+        } else {
+            Err(anyhow::anyhow!(
+                "Remote CA cert doesn't have exactly one User ID"
+            ))
         }
+    }
 
-        let signer = &mut cert_keys[0];
+    // FIXME: justus thinks this might not be supported by implementations
+    fn bridge_revoke(&self, remote_ca: &Cert) -> Result<(Signature, Cert)> {
+        // there should be exactly one userid in the remote CA Cert
+        let uids: Vec<_> = remote_ca.userids().collect();
 
-        let revocation_sig = cert::UserIDRevocationBuilder::new()
-            .set_reason_for_revocation(
-                ReasonForRevocation::Unspecified,
-                b"removing OpenPGP CA bridge",
-            )?
-            .build(signer, &remote_ca_cert, remote_uid, None)?;
+        if uids.len() == 1 {
+            let remote_uid = uids[0].userid();
 
-        let revoked = remote_ca_cert
-            .clone()
-            .insert_packets(Packet::from(revocation_sig.clone()))?;
+            let ca_cert = self.ca_get_priv_key()?;
 
-        Ok((revocation_sig, revoked))
+            // set_trust_signature, set_regular_expression(s), expiration
+            let mut cert_keys = Pgp::get_cert_keys(&ca_cert, None);
+
+            // this CA should have exactly one key that can certify
+            if cert_keys.len() != 1 {
+                return Err(anyhow::anyhow!(
+                    "this CA should have exactly one key that can certify",
+                ));
+            }
+
+            let signer = &mut cert_keys[0];
+
+            let revocation_sig = cert::UserIDRevocationBuilder::new()
+                .set_reason_for_revocation(
+                    ReasonForRevocation::Unspecified,
+                    b"removing OpenPGP CA bridge",
+                )?
+                .build(signer, &remote_ca, remote_uid, None)?;
+
+            let revoked = remote_ca
+                .clone()
+                .insert_packets(Packet::from(revocation_sig.clone()))?;
+
+            Ok((revocation_sig, revoked))
+        } else {
+            Err(anyhow::anyhow!(
+                "expect remote CA cert to have exactly one user_id",
+            ))
+        }
     }
 
     fn ca_get_priv_key(&self) -> Result<Cert> {
