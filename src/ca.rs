@@ -99,8 +99,8 @@ impl OpenpgpCa {
     /// Instantiate a new OpenpgpCa object.
     ///
     /// The SQLite backend filename can be configured:
-    /// - explicitly via the db_url parameter,
-    /// - the environment variable OPENPGP_CA_DB, or
+    /// - explicitly via the db_url parameter, or
+    /// - the environment variable OPENPGP_CA_DB.
     pub fn new(db_url: Option<&str>) -> Result<Self> {
         let db_url = if let Some(url) = db_url {
             url.to_owned()
@@ -129,18 +129,15 @@ impl OpenpgpCa {
         &self.db
     }
 
+    // -------- CA
+
+    /// Get the CaSec implementation to run operations that need CA
+    /// private key material.
     pub fn secret(&self) -> &Rc<dyn CaSec> {
         &self.ca_secret
     }
 
-    // -------- CAs
-
-    /// Get a sequoia `Cert` object for the CA from the database.
-    ///
-    /// This returns a stripped version of the CA Cert, without private key
-    /// material.
-    ///
-    /// This is the OpenPGP Cert of the CA.
+    /// Get the Cert of the CA (without private key material).
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
         self.ca_public.ca_get_cert_pub()
     }
@@ -175,13 +172,10 @@ impl OpenpgpCa {
         println!("{}", ca_cert.priv_cert);
         Ok(())
     }
+
     // -------- users / certs
 
     /// Get a list of all User Certs
-    //
-    // FIXME: remove this method ->
-    // it's probably always better to explicitly iterate over user,
-    // then certs(user)
     pub fn user_certs_get_all(&self) -> Result<Vec<models::Cert>> {
         let users = self.db.get_users_sort_by_name()?;
         let mut user_certs = Vec::new();
@@ -193,8 +187,8 @@ impl OpenpgpCa {
 
     /// Which certs will be expired in 'days' days?
     ///
-    /// If a cert is not "alive" now, it will not get returned as expiring.
-    /// (Otherwise old/abandoned certs would clutter the results)
+    /// If a cert is not "alive" now, it will not get returned as expiring
+    /// (otherwise old/abandoned certs would clutter the results)
     pub fn certs_expired(
         &self,
         days: u64,
@@ -245,16 +239,14 @@ impl OpenpgpCa {
     }
 
     /// Create a new OpenPGP CA User.
+    /// ("Centralized key creation workflow")
     ///
-    /// The CA Cert is automatically trust-signed with this new user
-    /// Cert and the user Cert is signed by the CA. This is the
-    /// "Centralized key creation workflow"
+    /// This generates a fresh OpenPGP key for the new User.
+    /// The private key is printed to stdout and NOT stored in OpenPGP CA.
+    /// The Cert (public key material) is stored in the OpenPGP CA database.
     ///
-    /// This generates a new OpenPGP Cert for the new User.
-    /// The private Cert material is printed to stdout and NOT stored
-    /// in OpenPGP CA.
-    ///
-    /// The public Cert is stored in the OpenPGP CA database.
+    /// The CA Cert is trust-signed by this new user key and the user
+    /// Cert is certified by the CA.
     pub fn user_new(
         &self,
         name: Option<&str>,
@@ -273,22 +265,22 @@ impl OpenpgpCa {
         )
     }
 
-    /// Import an existing OpenPGP public Cert a new OpenPGP CA user.
+    /// Import an existing OpenPGP Cert (public key) as a new OpenPGP CA user.
     ///
-    /// The `key` is expected as an armored public key.
+    /// The `cert` parameter accepts the user's armored public key.
     ///
-    /// userids that correspond to `emails` will be signed by the CA.
+    /// User IDs that correspond to `emails` will be signed by the CA.
     ///
     /// A symbolic `name` and a list of `emails` for this User can
     /// optionally be supplied. If those are not set, emails are taken from
-    /// the list of userids in the public key. Also, if the
-    /// key has exactly one userid, the symbolic name is taken from that
-    /// userid.
+    /// the list of User IDs in the public key. If the key has exactly one
+    /// User ID, the symbolic name is taken from that User ID.
     ///
-    /// Optionally a revocation certificate can be supplied.
+    /// Optionally, revocation certificates can be supplied for storage in
+    /// OpenPGP CA.
     pub fn cert_import_new(
         &self,
-        key: &str,
+        cert: &str,
         revoc_certs: Vec<String>,
         name: Option<&str>,
         emails: &[&str],
@@ -296,7 +288,7 @@ impl OpenpgpCa {
     ) -> Result<()> {
         cert::cert_import_new(
             self,
-            key,
+            cert,
             revoc_certs,
             name,
             emails,
@@ -304,9 +296,10 @@ impl OpenpgpCa {
         )
     }
 
-    /// Update key for existing database Cert
-    pub fn cert_import_update(&self, key: &str) -> Result<()> {
-        cert::cert_import_update(self, key)
+    /// Update existing Cert in database (e.g. if the user has extended
+    /// the expiry date)
+    pub fn cert_import_update(&self, cert: &str) -> Result<()> {
+        cert::cert_import_update(self, cert)
     }
 
     /// Get Cert by fingerprint.
@@ -352,7 +345,7 @@ impl OpenpgpCa {
         self.db.get_user_by_cert(cert)
     }
 
-    /// Get a user name that is associated with this Cert.
+    /// Get the user name that is associated with this Cert.
     ///
     /// The name is only for display purposes, it is set to "<no name>" if
     /// no name can be found, or to "<multiple users>" if the Cert is
@@ -711,6 +704,8 @@ impl OpenpgpCa {
     }
 
     /// Export the contents of a CA in Keylist format.
+    ///
+    /// https://code.firstlook.media/keylist-rfc-explainer
     ///
     /// `path`: filesystem path into which the exported keylist and signature
     /// files will be written.
