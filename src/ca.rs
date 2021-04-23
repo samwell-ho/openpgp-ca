@@ -165,8 +165,7 @@ impl OpenpgpCa {
         let (ca, ca_cert) = self
             .db
             .get_ca()
-            .context("failed to load CA from database")?
-            .unwrap();
+            .context("failed to load CA from database")?;
         println!("\nOpenPGP CA for Domain: {}", ca.domainname);
         println!();
         println!("{}", ca_cert.priv_cert);

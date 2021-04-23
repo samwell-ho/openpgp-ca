@@ -98,7 +98,7 @@ pub fn bridge_new(
         .bridge_to_remote_ca(remote_ca_cert, vec![regex])?;
 
     // store new bridge in DB
-    let (ca_db, _) = oca.db().get_ca()?.unwrap();
+    let (ca_db, _) = oca.db().get_ca()?;
 
     let db_cert = oca.db().add_cert(
         &Pgp::cert_to_armored(&bridged)?,

@@ -108,10 +108,10 @@ pub trait CaSec {
 /// private key material for the CA.
 impl CaSec for DbCa {
     fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
-        if self.db().get_ca()?.is_some() {
-            return Err(
-                anyhow::anyhow!("ERROR: CA has already been created",),
-            );
+        if self.db().check_ca_initialized()? {
+            return Err(anyhow::anyhow!(
+                "ERROR: CA has already been initialized",
+            ));
         }
 
         // domainname syntax check
@@ -268,8 +268,7 @@ adversaries."#;
             let (_, mut cacert) = self
                 .db()
                 .get_ca()
-                .context("failed to load CA from database")?
-                .unwrap();
+                .context("failed to load CA from database")?;
 
             cacert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
                 .context("failed to armor CA Cert")?;
@@ -504,9 +503,8 @@ adversaries."#;
     }
 
     fn ca_get_priv_key(&self) -> Result<Cert> {
-        match self.db().get_ca()? {
-            Some((_, cert)) => Ok(Pgp::armored_to_cert(&cert.priv_cert)?),
-            None => Err(anyhow::anyhow!("ERROR: ca_get_priv_key() failed.")),
-        }
+        let (_, cert) = self.db().get_ca()?;
+
+        Pgp::armored_to_cert(&cert.priv_cert)
     }
 }

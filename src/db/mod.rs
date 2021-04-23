@@ -155,13 +155,21 @@ impl OcaDb {
 
     // --- public ---
 
-    pub fn get_ca(&self) -> Result<Option<(Ca, Cacert)>> {
+    pub fn check_ca_initialized(&self) -> Result<bool> {
+        let cas = cas::table
+            .load::<Ca>(&self.conn)
+            .context("Error loading CAs")?;
+
+        Ok(cas.len() == 1)
+    }
+
+    pub fn get_ca(&self) -> Result<(Ca, Cacert)> {
         let cas = cas::table
             .load::<Ca>(&self.conn)
             .context("Error loading CAs")?;
 
         match cas.len() {
-            0 => Ok(None),
+            0 => Err(anyhow::anyhow!("CA is not initialized")),
             1 => {
                 let ca = cas[0].clone();
 
@@ -171,8 +179,8 @@ impl OcaDb {
                     .context("Error loading CA Certs")?;
 
                 match ca_certs.len() {
-                    0 => Ok(None),
-                    1 => Ok(Some((ca, ca_certs[0].to_owned()))),
+                    0 => Err(anyhow::anyhow!("No CA cert found")),
+                    1 => Ok((ca, ca_certs[0].to_owned())),
                     _ => {
                         // FIXME: which cert(s) should be returned?
                         // -> there can be more than one "active" cert,
@@ -260,8 +268,7 @@ impl OcaDb {
         revocation_certs: &[String],
         ca_cert_tsigned: Option<&str>,
     ) -> Result<User> {
-        let (ca, mut cacert_db) =
-            self.get_ca().context("Couldn't find CA")?.unwrap();
+        let (ca, mut cacert_db) = self.get_ca().context("Couldn't find CA")?;
 
         // merge new trust signature into local CA cert (if applicable)
         if let Some(ca_cert_tsigned) = ca_cert_tsigned {

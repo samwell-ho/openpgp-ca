@@ -54,11 +54,9 @@ impl CaPub for DbCa {
     }
 
     fn ca_get_cert_pub(&self) -> Result<Cert> {
-        if let Some((_, cacert)) = self.db().get_ca()? {
-            let cert = Pgp::armored_to_cert(&cacert.priv_cert)?;
-            Ok(cert.strip_secret_key_material())
-        } else {
-            Err(anyhow::anyhow!("ERROR: ca_get_cert_pub() failed"))
-        }
+        let (_, cacert) = self.db().get_ca()?;
+
+        let cert = Pgp::armored_to_cert(&cacert.priv_cert)?;
+        Ok(cert.strip_secret_key_material())
     }
 }
