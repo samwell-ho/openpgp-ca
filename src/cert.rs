@@ -194,9 +194,11 @@ pub fn certs_refresh_ca_certifications(
                     .collect();
 
                 let sig_valid_past_threshold = |c: &&Signature| {
-                    let expiration = c.signature_expiration_time();
-                    expiration.is_none()
-                        || (expiration.unwrap() > threshold_time)
+                    if let Some(expiration) = c.signature_expiration_time() {
+                        expiration > threshold_time
+                    } else {
+                        true // signature has no expiration time
+                    }
                 };
 
                 // a new certification is created if certifications by the
