@@ -207,7 +207,8 @@ impl OpenpgpCa {
         cert::cert_check_certifications(self, cert)
     }
 
-    /// Check if this Cert has been signed by the CA Key
+    /// Check if this Cert has been certified by the CA Key, returns all
+    /// certified User IDs
     pub fn cert_check_ca_sig(
         &self,
         cert: &models::Cert,
