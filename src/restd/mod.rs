@@ -267,15 +267,18 @@ fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
     })
 }
 
-/// Remove a cert from the OpenPGP CA database, by fingerprint.
+/// Mark a cert as "delisted" in the OpenPGP CA database.
 /// As a result, the cert will not be exported to WKD anymore.
 ///
-/// Note: the CA certification will not get renewed in this case, so it will
-/// expire.
+/// Note: existing CA certifications will still get renewed for delisted
+/// certs, but as the cert is not published via WKD, third parties might not
+/// learn about refreshed certifications.
 ///
 /// CAUTION:
 /// This method is probably rarely appropriate. In most cases, it's better
-/// to "deactivate" a cert.
+/// to "deactivate" a cert (in almost all cases, it is best to continually
+/// serve the latest version of a cert to third parties, so they can learn
+/// about e.g. revocations on the cert)
 #[delete("/certs/<fp>")]
 fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
@@ -307,7 +310,7 @@ fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
     })
 }
 
-/// Refresh CA certifications on all user certs
+/// Refresh CA certifications on all user certs.
 ///
 /// For certifications which are going to expire soon:
 /// Make a new certification, unless the user cert is marked as "deactivated".
