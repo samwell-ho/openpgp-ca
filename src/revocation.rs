@@ -137,7 +137,7 @@ fn search_revocable_cert_by_keyid(
 
 pub fn revocation_apply(
     oca: &OpenpgpCa,
-    revoc: models::Revocation,
+    mut revoc: models::Revocation,
 ) -> Result<()> {
     if let Some(mut cert) = oca.db().get_cert_by_id(revoc.cert_id)? {
         let sig = Pgp::armored_to_signature(&revoc.revocation)?;
@@ -148,7 +148,6 @@ pub fn revocation_apply(
 
         cert.pub_cert = Pgp::cert_to_armored(&revoked)?;
 
-        let mut revoc = revoc.clone();
         revoc.published = true;
 
         oca.db()
