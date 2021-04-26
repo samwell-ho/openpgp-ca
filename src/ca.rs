@@ -528,7 +528,8 @@ impl OpenpgpCa {
     ///
     /// The revocation is merged into out copy of the OpenPGP Cert.
     pub fn revocation_apply(&self, revoc: models::Revocation) -> Result<()> {
-        revocation::revocation_apply(&self, revoc)
+        self.db()
+            .transaction(|| revocation::revocation_apply(&self, revoc))
     }
 
     /// Get reason and creation time for a Revocation

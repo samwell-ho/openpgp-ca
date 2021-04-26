@@ -139,32 +139,28 @@ pub fn revocation_apply(
     oca: &OpenpgpCa,
     revoc: models::Revocation,
 ) -> Result<()> {
-    oca.db().transaction(|| {
-        let cert = oca.db().get_cert_by_id(revoc.cert_id)?;
+    if let Some(mut cert) = oca.db().get_cert_by_id(revoc.cert_id)? {
+        let sig = Pgp::armored_to_signature(&revoc.revocation)?;
+        let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
-        if let Some(mut cert) = cert {
-            let sig = Pgp::armored_to_signature(&revoc.revocation)?;
-            let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+        let revocation: Packet = sig.into();
+        let revoked = c.insert_packets(vec![revocation])?;
 
-            let revocation: Packet = sig.into();
-            let revoked = c.insert_packets(vec![revocation])?;
+        cert.pub_cert = Pgp::cert_to_armored(&revoked)?;
 
-            cert.pub_cert = Pgp::cert_to_armored(&revoked)?;
+        let mut revoc = revoc.clone();
+        revoc.published = true;
 
-            let mut revoc = revoc.clone();
-            revoc.published = true;
+        oca.db()
+            .update_cert(&cert)
+            .context("Couldn't update Cert")?;
 
-            oca.db()
-                .update_cert(&cert)
-                .context("Couldn't update Cert")?;
+        oca.db()
+            .update_revocation(&revoc)
+            .context("Couldn't update Revocation")?;
 
-            oca.db()
-                .update_revocation(&revoc)
-                .context("Couldn't update Revocation")?;
-
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Couldn't find cert for apply_revocation"))
-        }
-    })
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Couldn't find cert for apply_revocation"))
+    }
 }
