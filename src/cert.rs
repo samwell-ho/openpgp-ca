@@ -170,64 +170,61 @@ pub fn certs_refresh_ca_certifications(
     threshold_days: u64,
     validity_days: u64,
 ) -> Result<()> {
-    oca.db().transaction(|| {
-        let ca_fp = oca.ca_get_cert_pub()?.fingerprint();
+    let ca_fp = oca.ca_get_cert_pub()?.fingerprint();
 
-        let threshold_secs = threshold_days * 24 * 60 * 60;
-        let threshold_time =
-            SystemTime::now() + Duration::new(threshold_secs, 0);
+    let threshold_secs = threshold_days * 24 * 60 * 60;
+    let threshold_time = SystemTime::now() + Duration::new(threshold_secs, 0);
 
-        for db_cert in oca
-            .db()
-            .get_certs()?
-            .iter()
-            // ignore "inactive" Certs
-            .filter(|c| !c.inactive)
-        {
-            let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
-            let mut uids_to_recert = Vec::new();
+    for db_cert in oca
+        .db()
+        .get_certs()?
+        .iter()
+        // ignore "inactive" Certs
+        .filter(|c| !c.inactive)
+    {
+        let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+        let mut uids_to_recert = Vec::new();
 
-            for uid in c.userids() {
-                let ca_certifications: Vec<_> = uid
-                    .certifications()
-                    .filter(|c| c.issuer_fingerprints().any(|fp| *fp == ca_fp))
-                    .collect();
+        for uid in c.userids() {
+            let ca_certifications: Vec<_> = uid
+                .certifications()
+                .filter(|c| c.issuer_fingerprints().any(|fp| *fp == ca_fp))
+                .collect();
 
-                let sig_valid_past_threshold = |c: &&Signature| {
-                    if let Some(expiration) = c.signature_expiration_time() {
-                        expiration > threshold_time
-                    } else {
-                        true // signature has no expiration time
-                    }
-                };
-
-                // a new certification is created if certifications by the
-                // CA exist, but none of the existing certifications are
-                // valid for longer than `threshold_days`
-                if !ca_certifications.is_empty()
-                    && !ca_certifications.iter().any(sig_valid_past_threshold)
-                {
-                    // make a new certification for this uid
-                    uids_to_recert.push(uid.userid());
+            let sig_valid_past_threshold = |c: &&Signature| {
+                if let Some(expiration) = c.signature_expiration_time() {
+                    expiration > threshold_time
+                } else {
+                    true // signature has no expiration time
                 }
-            }
-            if !uids_to_recert.is_empty() {
-                // make new certifications for "uids_to_update"
-                let recertified = oca.secret().sign_user_ids(
-                    &c,
-                    &uids_to_recert[..],
-                    Some(validity_days),
-                )?;
+            };
 
-                // update cert in db
-                let mut cert_update = db_cert.clone();
-                cert_update.pub_cert = Pgp::cert_to_armored(&recertified)?;
-                oca.db().update_cert(&cert_update)?;
+            // a new certification is created if certifications by the
+            // CA exist, but none of the existing certifications are
+            // valid for longer than `threshold_days`
+            if !ca_certifications.is_empty()
+                && !ca_certifications.iter().any(sig_valid_past_threshold)
+            {
+                // make a new certification for this uid
+                uids_to_recert.push(uid.userid());
             }
         }
+        if !uids_to_recert.is_empty() {
+            // make new certifications for "uids_to_update"
+            let recertified = oca.secret().sign_user_ids(
+                &c,
+                &uids_to_recert[..],
+                Some(validity_days),
+            )?;
 
-        Ok(())
-    })
+            // update cert in db
+            let mut cert_update = db_cert.clone();
+            cert_update.pub_cert = Pgp::cert_to_armored(&recertified)?;
+            oca.db().update_cert(&cert_update)?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Return a list of Certs that are alive now, but will not be alive

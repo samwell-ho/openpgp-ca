@@ -231,11 +231,13 @@ impl OpenpgpCa {
         threshold_days: u64,
         validity_days: u64,
     ) -> Result<()> {
-        cert::certs_refresh_ca_certifications(
-            self,
-            threshold_days,
-            validity_days,
-        )
+        self.db().transaction(|| {
+            cert::certs_refresh_ca_certifications(
+                self,
+                threshold_days,
+                validity_days,
+            )
+        })
     }
 
     /// Create a new OpenPGP CA User.
@@ -255,14 +257,16 @@ impl OpenpgpCa {
         password: bool,
         output_format_minimal: bool,
     ) -> Result<()> {
-        cert::user_new(
-            &self,
-            name,
-            emails,
-            duration_days,
-            password,
-            output_format_minimal,
-        )
+        self.db().transaction(|| {
+            cert::user_new(
+                &self,
+                name,
+                emails,
+                duration_days,
+                password,
+                output_format_minimal,
+            )
+        })
     }
 
     /// Import an existing OpenPGP Cert (public key) as a new OpenPGP CA user.
@@ -676,8 +680,11 @@ impl OpenpgpCa {
         };
 
         for bridge in bridges {
-            let cert = self.cert_by_id(bridge.cert_id)?;
-            println!("{}", cert.unwrap().pub_cert);
+            println!("Bridge to '{}'", bridge.email);
+            if let Some(cert) = self.cert_by_id(bridge.cert_id)? {
+                println!("{}", cert.pub_cert);
+            }
+            println!();
         }
 
         Ok(())
