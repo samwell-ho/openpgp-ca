@@ -324,14 +324,14 @@ impl OcaDb {
         fingerprint: &str,
         user_id: Option<i32>,
     ) -> Result<Cert> {
-        let newcert = NewCert {
+        let cert = NewCert {
             pub_cert,
             fingerprint,
             delisted: false,
             inactive: false,
             user_id,
         };
-        self.insert_cert(newcert)
+        self.insert_cert(cert)
     }
 
     pub fn update_cert(&self, cert: &Cert) -> Result<()> {
@@ -349,11 +349,7 @@ impl OcaDb {
             .load::<Cert>(&self.conn)
             .context("Error loading Cert by id")?;
 
-        if let Some(cert) = db.get(0) {
-            Ok(Some(cert.clone()))
-        } else {
-            Ok(None)
-        }
+        Ok(db.get(0).cloned())
     }
 
     pub fn get_cert(&self, fingerprint: &str) -> Result<Option<Cert>> {
@@ -432,11 +428,7 @@ impl OcaDb {
             "unexpected duplicate hash in revocations table"
         );
 
-        if let Some(revocation) = db.get(0) {
-            Ok(Some(revocation.clone()))
-        } else {
-            Ok(None)
-        }
+        Ok(db.get(0).cloned())
     }
 
     pub fn update_revocation(&self, revocation: &Revocation) -> Result<()> {
