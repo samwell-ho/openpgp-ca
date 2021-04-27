@@ -7,15 +7,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::Result;
-
-use openpgp_ca_lib::ca::OpenpgpCa;
+use structopt::StructOpt;
 
 pub mod cli;
 
-fn main() -> Result<()> {
-    use cli::*;
-    use structopt::StructOpt;
+use cli::*;
+use openpgp_ca_lib::ca::OpenpgpCa;
 
+fn main() -> Result<()> {
     let cli = Cli::from_args();
 
     let ca = OpenpgpCa::new(cli.database.as_deref())?;
@@ -29,10 +28,16 @@ fn main() -> Result<()> {
             } => {
                 // TODO: key-profile?
 
-                let email: Vec<&str> =
+                let emails: Vec<_> =
                     email.iter().map(String::as_str).collect();
 
-                ca.user_new(name.as_deref(), &email[..], None, true, minimal)?;
+                ca.user_new(
+                    name.as_deref(),
+                    &emails[..],
+                    None,
+                    true,
+                    minimal,
+                )?;
             }
             UserCommand::AddRevocation { revocation_file } => {
                 ca.revocation_add_from_file(&revocation_file)?
@@ -47,26 +52,27 @@ fn main() -> Result<()> {
                 }
             },
             UserCommand::Import {
-                key_file,
+                cert_file,
                 name,
                 email,
                 revocation_file,
             } => {
-                let key = std::fs::read_to_string(key_file)?;
-                let mut revoc_certs: Vec<String> = Vec::new();
-                for filename in revocation_file {
-                    let rev = std::fs::read_to_string(filename)?;
+                let cert = std::fs::read_to_string(cert_file)?;
+
+                let mut revoc_certs = Vec::new();
+                for path in revocation_file {
+                    let rev = std::fs::read_to_string(path)?;
                     revoc_certs.push(rev);
                 }
 
-                let email: Vec<&str> =
+                let emails: Vec<_> =
                     email.iter().map(String::as_str).collect();
 
                 ca.cert_import_new(
-                    &key,
+                    &cert,
                     revoc_certs,
                     name.as_deref(),
-                    &email[..],
+                    &emails,
                     None,
                 )?;
             }
@@ -91,16 +97,15 @@ fn main() -> Result<()> {
                 ca.secret().ca_init(&domain, name.as_deref())?;
             }
             CaCommand::Export => {
-                let ca_key = ca.ca_get_pubkey_armored()?;
-                println!("{}", ca_key);
+                println!("{}", ca.ca_get_pubkey_armored()?);
             }
             CaCommand::Revocations { output } => {
                 ca.secret().ca_generate_revocations(output)?;
                 println!("Wrote a set of revocations to the output file");
             }
-            CaCommand::ImportTsig { key_file } => {
-                let key = std::fs::read_to_string(key_file)?;
-                ca.secret().ca_import_tsig(&key)?;
+            CaCommand::ImportTsig { cert_file } => {
+                let cert = std::fs::read_to_string(cert_file)?;
+                ca.secret().ca_import_tsig(&cert)?;
             }
             CaCommand::Show => ca.ca_show()?,
         },

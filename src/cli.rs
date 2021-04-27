@@ -86,7 +86,7 @@ pub enum CaCommand {
     /// Import trust signature for CA Key
     ImportTsig {
         #[structopt(help = "File that contains the tsigned CA Key")]
-        key_file: PathBuf,
+        cert_file: PathBuf,
     },
     /// Show CA
     Show,
@@ -148,7 +148,7 @@ pub enum UserCommand {
             long = "key-file",
             help = "File that contains the User's Public Key"
         )]
-        key_file: PathBuf,
+        cert_file: PathBuf,
 
         #[structopt(
             short = "n",
