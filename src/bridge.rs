@@ -81,7 +81,7 @@ pub fn bridge_new(
             // (FIXME: error, unless --force parameter has been given?!)
             if scope != remote_cert_domain {
                 return Err(anyhow::anyhow!(
-                    "scope and domain don't match, currently unsupported"
+                    "Scope and domain don't match, currently unsupported"
                 ));
             }
 
@@ -98,14 +98,13 @@ pub fn bridge_new(
         .bridge_to_remote_ca(remote_ca_cert, vec![regex])?;
 
     // store new bridge in DB
-    let (ca_db, _) = oca.db().get_ca()?;
-
     let db_cert = oca.db().add_cert(
         &Pgp::cert_to_armored(&bridged)?,
         &bridged.fingerprint().to_hex(),
         None,
     )?;
 
+    let (ca_db, _) = oca.db().get_ca()?;
     let new_bridge = models::NewBridge {
         email: &email,
         scope,
@@ -137,14 +136,14 @@ pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
             db_cert.pub_cert = Pgp::cert_to_armored(&revoked)?;
             oca.db().update_cert(&db_cert)
         } else {
-            Err(anyhow::anyhow!("no cert found for bridge"))
+            Err(anyhow::anyhow!("No cert found for bridge"))
         }
     } else {
-        Err(anyhow::anyhow!("bridge not found"))
+        Err(anyhow::anyhow!("Bridge not found"))
     }
 }
 
-/// Make regex for trust signature from domain-name.
+/// Make regex for trust signature from domain name.
 ///
 /// ("other.org" => "<[^>]+[@.]other\\.org>$")
 fn domain_to_regex(domain: &str) -> Result<String> {
@@ -155,6 +154,6 @@ fn domain_to_regex(domain: &str) -> Result<String> {
 
         Ok(format!("<[^>]+[@.]{}>$", escaped_domain))
     } else {
-        Err(anyhow::anyhow!("Parameter is not a valid domainname"))
+        Err(anyhow::anyhow!("Parameter is not a valid domain name"))
     }
 }
