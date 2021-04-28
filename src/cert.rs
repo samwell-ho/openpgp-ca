@@ -90,14 +90,15 @@ pub fn cert_import_new(
     duration_days: Option<u64>,
 ) -> Result<()> {
     let user_cert = Pgp::armored_to_cert(user_cert)
-        .context("cert_import_new: couldn't process user cert")?;
+        .context("cert_import_new: Couldn't process user cert.")?;
 
     let fp = user_cert.fingerprint().to_hex();
 
-    if let Some(_exists) = oca.db().get_cert(&fp).context(
-        "cert_import_new: error while checking for existing cert with the \
-        same fingerprint",
-    )? {
+    if let Some(_exists) = oca
+        .db()
+        .get_cert(&fp)
+        .context("cert_import_new(): get_cert() check by fingerprint failed")?
+    {
         // import_new is not intended for certs we already have a version of
         return Err(anyhow::anyhow!(
             "A cert with this fingerprint already exists in the DB"
@@ -108,7 +109,7 @@ pub fn cert_import_new(
     let certified = oca
         .secret()
         .sign_cert_emails(&user_cert, Some(emails), duration_days)
-        .context("sign_user_emails failed")?;
+        .context("sign_cert_emails() failed")?;
 
     // use name from User IDs, if no name was passed
     let name = match name {
@@ -125,7 +126,7 @@ pub fn cert_import_new(
 
     // Insert new user cert into DB
     let pub_cert = Pgp::cert_to_armored(&certified)
-        .context("cert_import_new: couldn't re-armor key")?;
+        .context("cert_import_new: Couldn't re-armor key")?;
 
     oca.db()
         .add_user(
@@ -147,8 +148,7 @@ pub fn cert_import_update(oca: &OpenpgpCa, cert: &str) -> Result<()> {
     let fp = cert_new.fingerprint().to_hex();
 
     if let Some(mut db_cert) = oca.db().get_cert(&fp).context(
-        "cert_import_update: error while checking for \
-            existing cert with the same fingerprint",
+        "cert_import_update(): get_cert() check by fingerprint failed",
     )? {
         // merge existing and new public key
         let cert_old = Pgp::armored_to_cert(&db_cert.pub_cert)?;
