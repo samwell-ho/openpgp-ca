@@ -25,15 +25,18 @@ use std::convert::identity;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
+use sequoia_openpgp::cert::prelude::ComponentAmalgamation;
 use sha2::Digest;
 
-const POLICY: &StandardPolicy = &StandardPolicy::new();
-
 const CA_KEY_NOTATION: &str = "openpgp-ca@notations.sequoia-pgp.org";
+
+const POLICY: &StandardPolicy = &StandardPolicy::new();
 
 pub struct Pgp {}
 
 impl Pgp {
+    pub const SECONDS_IN_DAY: u64 = 60 * 60 * 24;
+
     fn diceware() -> String {
         // FIXME: configurable dictionaries, ... ?
         use chbs::passphrase;
@@ -418,5 +421,40 @@ impl Pgp {
         }
 
         Ok(res)
+    }
+
+    /// For `uid` (which is part of Cert `c`), find all valid
+    /// certifications that have been made by `certifier`.
+    pub(crate) fn valid_certifications_by(
+        uid: &ComponentAmalgamation<UserID>,
+        c: &Cert,
+        certifier: Cert,
+    ) -> Vec<Signature> {
+        let certifier_keys: Vec<_> = certifier
+            .keys()
+            .with_policy(POLICY, None)
+            .alive()
+            .revoked(false)
+            .for_certification()
+            .collect();
+
+        let certifier_fp = certifier.fingerprint();
+
+        let pk = c.primary_key();
+
+        uid.certifications()
+            .filter(|&s| {
+                // does the signature appear to be issued by `certifier`?
+                s.issuer_fingerprints()
+                    .any(|issuer| issuer == &certifier_fp)
+            })
+            .filter(|&s| {
+                // check if the apparent certification by `certifier` is valid
+                certifier_keys.iter().any(|signer| {
+                    s.clone().verify_userid_binding(&signer, &pk, &uid).is_ok()
+                })
+            })
+            .cloned()
+            .collect()
     }
 }
