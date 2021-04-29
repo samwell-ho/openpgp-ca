@@ -11,7 +11,7 @@ use crate::pgp::Pgp;
 
 use openpgp_keylist::{Key, Keylist, Metadata};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -77,21 +77,21 @@ pub fn export_certs_as_files(
     };
 
     for email in &emails {
-        if let Ok(certs) = oca.certs_by_email(email) {
-            if !certs.is_empty() {
-                let mut c: Vec<_> = vec![];
-                for cert in certs {
-                    c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
-                }
+        let certs = oca
+            .certs_by_email(email)
+            .context(format!("Failed to load certs for email '{}'", email))?;
 
-                std::fs::write(
-                    path_append(path, &format!("{}.asc", email))?,
-                    Pgp::certs_to_armored(&c)?,
-                )?;
+        if !certs.is_empty() {
+            let mut c: Vec<_> = vec![];
+            for cert in certs {
+                c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
             }
-        } else {
-            println!("ERROR loading certs for email '{}'", email)
-        };
+
+            std::fs::write(
+                path_append(path, &format!("{}.asc", email))?,
+                Pgp::certs_to_armored(&c)?,
+            )?;
+        }
     }
 
     Ok(())
@@ -118,7 +118,7 @@ fn path_append(path: &str, filename: &str) -> Result<PathBuf> {
         || filename.chars().any(|c| c == ':')
     {
         Err(anyhow::anyhow!(
-            "filename contains special character - maybe a path traversal \
+            "Filename contains special character. May be a path traversal \
             attack? {}",
             filename
         ))
@@ -138,7 +138,7 @@ pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
     wkd::insert(&path, domain, None, &ca_cert)?;
 
     for cert in oca.user_certs_get_all()? {
-        // don't export to WKD if the cert is marked "delisted"
+        // Don't export to WKD if the cert is marked "delisted"
         if !cert.delisted {
             let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
@@ -163,7 +163,7 @@ pub fn export_keylist(
     let sigfile_name = match signature_uri.split('/').last() {
         Some(file) => file,
         None => {
-            return Err(anyhow::anyhow!("Unexpected signature_uri format"))
+            return Err(anyhow::anyhow!("Unexpected signature_uri format"));
         }
     };
 
