@@ -585,7 +585,7 @@ fn test_ca_signatures() -> Result<()> {
         assert_eq!(certs.len(), 1);
 
         let (sig_from_ca, tsig_on_ca) =
-            ca.cert_check_certifications(&certs[0])?;
+            ca.check_mutual_certifications(&certs[0])?;
 
         match name.as_str() {
             "Alice" => {
@@ -703,7 +703,8 @@ fn test_import_signed_cert() -> Result<()> {
     let certs = ca.user_certs_get_all()?;
     assert_eq!(certs.len(), 1);
 
-    let (sig_from_ca, tsig_on_ca) = ca.cert_check_certifications(&certs[0])?;
+    let (sig_from_ca, tsig_on_ca) =
+        ca.check_mutual_certifications(&certs[0])?;
 
     let name = ca.cert_get_name(&certs[0])?;
     match name.as_str() {

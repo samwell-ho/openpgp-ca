@@ -200,11 +200,11 @@ impl OpenpgpCa {
     /// - the CA key has a trust-signature from the Cert
     ///
     /// Returns a map 'cert -> (sig_from_ca, tsig_on_ca)'
-    pub fn cert_check_certifications(
+    pub fn check_mutual_certifications(
         &self,
         cert: &models::Cert,
     ) -> Result<(Vec<UserID>, bool)> {
-        cert::cert_check_certifications(self, cert)
+        cert::check_mutual_certifications(self, cert)
     }
 
     /// Check if this Cert has been certified by the CA Key, returns all
@@ -369,7 +369,7 @@ impl OpenpgpCa {
         for user in &users {
             for cert in self.get_certs_by_user(&user)? {
                 let (sig_from_ca, tsig_on_ca) =
-                    self.cert_check_certifications(&cert)?;
+                    self.check_mutual_certifications(&cert)?;
 
                 let ok = if !sig_from_ca.is_empty() {
                     true
@@ -447,7 +447,7 @@ impl OpenpgpCa {
 
             for cert in self.get_certs_by_user(&user)? {
                 let (sig_by_ca, tsig_on_ca) =
-                    self.cert_check_certifications(&cert)?;
+                    self.check_mutual_certifications(&cert)?;
 
                 println!("OpenPGP key {}", cert.fingerprint);
                 println!(" for user '{}'", name);

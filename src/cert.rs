@@ -257,7 +257,7 @@ pub fn certs_expired(
     Ok(res)
 }
 
-pub fn cert_check_certifications(
+pub fn check_mutual_certifications(
     oca: &OpenpgpCa,
     cert: &models::Cert,
 ) -> Result<(Vec<UserID>, bool)> {
