@@ -51,34 +51,41 @@ impl Pgp {
         }
     }
 
-    /// make a private CA key
+    /// Generate a new CA key (and a revocation).
+    ///
+    /// `domain` is the domainname for the CA (such as `example.org`).
+    /// A UserID for the CA is generated with the localpart `openpgp-ca`
+    /// (so for example `openpgp-ca@example.org`).
+    ///
+    /// `name` is an optional additional identifier that is added to the
+    /// UserID, if it is supplied.
     pub(crate) fn make_ca_cert(
-        domainname: &str,
+        domain: &str,
         name: Option<&str>,
     ) -> Result<(Cert, Signature)> {
-        // FIXME: should not be encryption capable (?)
-        // FIXME: should not have subkeys
-
-        // Generate a Cert, and create a keypair from the primary key.
-        let (cert, sig) = cert::CertBuilder::new()
+        // Generate key for a new CA
+        let (ca_key, revocation) = cert::CertBuilder::new()
+            // RHEL7 [eol 2026] is shipped with GnuPG 2.0.x, which doesn't
+            // support ECC
             .set_cipher_suite(CipherSuite::RSA4k)
             .add_signing_subkey()
             // FIXME: set expiration from CLI
             // .set_validity_period()
             .generate()?;
 
-        let mut keypair = cert
+        // Get keypair for the CA primary key
+        let mut keypair = ca_key
             .primary_key()
             .key()
             .clone()
             .parts_into_secret()?
             .into_keypair()?;
 
-        // Generate a userid and a binding signature.
-        let email = format!("openpgp-ca@{}", domainname);
+        // Generate a userid and a binding signature
+        let email = format!("openpgp-ca@{}", domain);
         let userid = Self::user_id(&email, name);
 
-        let direct_key_sig = cert
+        let direct_key_sig = ca_key
             .primary_key()
             .with_policy(Self::SP, None)?
             .binding_signature();
@@ -89,21 +96,28 @@ impl Pgp {
                 // notation: "openpgp-ca:domain=domain1;domain2"
                 .add_notation(
                     CA_KEY_NOTATION,
-                    (format!("domain={}", domainname)).as_bytes(),
+                    (format!("domain={}", domain)).as_bytes(),
                     signature::subpacket::NotationDataFlags::empty()
                         .set_human_readable(),
                     false,
                 )?;
-        let binding = userid.bind(&mut keypair, &cert, builder)?;
+        let binding = userid.bind(&mut keypair, &ca_key, builder)?;
 
-        // Now merge the userid and binding signature into the Cert.
-        let cert =
-            cert.insert_packets(vec![Packet::from(userid), binding.into()])?;
+        // Merge the User ID and binding signature into the Cert.
+        let ca = ca_key
+            .insert_packets(vec![Packet::from(userid), binding.into()])?;
 
-        Ok((cert, sig))
+        Ok((ca, revocation))
     }
 
-    /// Makes a user Cert with "emails" as UIDs.
+    /// Make a user Cert (with User IDs for each of `emails`).
+    ///
+    ///
+    /// The optional additional identifier `name` is added to each User ID,
+    /// if supplied.
+    ///
+    /// If `password` is true, the generated private key will be password
+    /// protected (with a generated diceware password).
     pub(crate) fn make_user_cert(
         emails: &[&str],
         name: Option<&str>,
@@ -134,8 +148,8 @@ impl Pgp {
             builder = builder.add_userid(Self::user_id(email, name));
         }
 
-        let (cert, revoc) = builder.generate()?;
-        Ok((cert, revoc, pass))
+        let (cert, revocation) = builder.generate()?;
+        Ok((cert, revocation, pass))
     }
 
     /// make a "public key" ascii-armored representation of a Cert
@@ -145,7 +159,7 @@ impl Pgp {
         Ok(String::from_utf8(v)?)
     }
 
-    /// Get the armored "keyring" representation of a List of public-key Certs
+    /// Get the armored "public keyring" representation of a set of Certs
     pub fn certs_to_armored(certs: &[Cert]) -> Result<String> {
         let mut writer =
             armor::Writer::new(Vec::new(), armor::Kind::PublicKey)?;
@@ -158,7 +172,7 @@ impl Pgp {
         Ok(String::from_utf8_lossy(&buffer).to_string())
     }
 
-    /// make a "private key" ascii-armored representation of a Cert
+    /// Get "private key" armored representation of a Cert
     pub fn cert_to_armored_private_key(cert: &Cert) -> Result<String> {
         let mut buffer = vec![];
 
@@ -180,7 +194,7 @@ impl Pgp {
         Ok(String::from_utf8(buffer)?)
     }
 
-    /// make a Vec of Cert from an ascii armored key(ring)
+    /// Make a Vec of Cert from an armored key(ring)
     pub fn armored_keyring_to_certs<D: AsRef<[u8]> + Send + Sync>(
         armored: &D,
     ) -> Result<Vec<Cert>> {
@@ -202,7 +216,7 @@ impl Pgp {
         Ok(cert)
     }
 
-    /// make a Signature from an ascii armored signature
+    /// Get a Signature object from an armored signature
     pub fn armored_to_signature(armored: &str) -> Result<Signature> {
         let p = Packet::from_bytes(armored)
             .context("Input could not be parsed")?;
@@ -214,10 +228,10 @@ impl Pgp {
         }
     }
 
-    /// Make an ascii-armored representation of a revocation signature.
+    /// Make an armored representation of a revocation signature.
     ///
-    /// This uses armor::Kind::PublicKey, because GnuPG doesn't seem to
-    /// accept revocations with the armor::Kind::Signature kind.
+    /// Note:this uses `armor::Kind::PublicKey`, because GnuPG doesn't
+    /// seem to accept revocations with the `armor::Kind::Signature` kind.
     pub fn revoc_to_armored(
         sig: &Signature,
         headers: Option<Vec<(String, String)>>,
@@ -238,7 +252,7 @@ impl Pgp {
         Ok(String::from_utf8(buf)?)
     }
 
-    /// get expiration of cert as SystemTime
+    /// Get expiration time of cert as a SystemTime
     pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
         let primary = cert.primary_key().with_policy(Self::SP, None)?;
         Ok(primary.key_expiration_time())
@@ -306,7 +320,8 @@ impl Pgp {
         Ok(hex)
     }
 
-    /// User tsigns CA key. All User IDs of signee get certified.
+    /// `signer` tsigns the `signee` key.
+    /// Each User ID of signee gets certified.
     pub fn tsign(
         signee: Cert,
         signer: &Cert,
@@ -322,7 +337,7 @@ impl Pgp {
 
         let mut sigs: Vec<Signature> = Vec::new();
 
-        // create a TSIG for each UserID
+        // Create a tsig for each UserID
         for ca_uidb in signee.userids() {
             for signer in &mut cert_keys {
                 let builder = signature::SignatureBuilder::new(
@@ -340,7 +355,7 @@ impl Pgp {
         Ok(signed)
     }
 
-    /// get all valid, certification capable keys with secret key material
+    /// Get all valid, certification capable keys (with secret key material)
     pub(crate) fn get_cert_keys(
         cert: &Cert,
         password: Option<&str>,
@@ -376,7 +391,7 @@ impl Pgp {
         Ok(())
     }
 
-    /// Is any uid of this cert for an email address in "domain"?
+    /// Does any User ID of this cert use an email address in "domain"?
     pub(crate) fn cert_has_uid_in_domain(
         c: &Cert,
         domain: &str,
@@ -422,11 +437,11 @@ impl Pgp {
         Ok(res)
     }
 
-    /// For `uid` (which is part of Cert `c`), find all valid
-    /// certifications that have been made by `certifier`.
+    /// For User ID `uid` (which is a part of `cert`):
+    /// find all valid certifications that have been made by `certifier`.
     pub(crate) fn valid_certifications_by(
         uid: &ComponentAmalgamation<UserID>,
-        c: &Cert,
+        cert: &Cert,
         certifier: Cert,
     ) -> Vec<Signature> {
         let certifier_keys: Vec<_> = certifier
@@ -439,7 +454,7 @@ impl Pgp {
 
         let certifier_fp = certifier.fingerprint();
 
-        let pk = c.primary_key();
+        let pk = cert.primary_key();
 
         uid.certifications()
             .filter(|&s| {
