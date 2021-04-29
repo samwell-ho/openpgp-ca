@@ -384,9 +384,9 @@ adversaries."#;
                 );
                 if let Some(days) = duration_days {
                     // the signature should be good for "days" days from now
-                    const SECONDS_IN_DAY: u64 = 60 * 60 * 24;
+
                     sb = sb.set_signature_validity_period(
-                        std::time::Duration::new(SECONDS_IN_DAY * days, 0),
+                        Duration::from_secs(Pgp::SECONDS_IN_DAY * days),
                     )?;
                 }
 
