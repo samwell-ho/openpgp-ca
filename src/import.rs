@@ -53,6 +53,8 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     Ok(())
 }
 
+/// Update a cert in the OpenPGP CA database from the "Hagrid" keyserver at
+/// `keys.openpgp.org`
 pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     let fp = (cert.fingerprint).parse::<Fingerprint>()?;
 
