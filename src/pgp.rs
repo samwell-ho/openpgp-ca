@@ -30,12 +30,12 @@ use sha2::Digest;
 
 const CA_KEY_NOTATION: &str = "openpgp-ca@notations.sequoia-pgp.org";
 
-const POLICY: &StandardPolicy = &StandardPolicy::new();
-
 pub struct Pgp {}
 
 impl Pgp {
     pub const SECONDS_IN_DAY: u64 = 60 * 60 * 24;
+
+    pub const SP: &'static StandardPolicy<'static> = &StandardPolicy::new();
 
     fn diceware() -> String {
         // FIXME: configurable dictionaries, ... ?
@@ -80,7 +80,7 @@ impl Pgp {
 
         let direct_key_sig = cert
             .primary_key()
-            .with_policy(POLICY, None)?
+            .with_policy(Self::SP, None)?
             .binding_signature();
         let builder =
             signature::SignatureBuilder::from(direct_key_sig.clone())
@@ -240,14 +240,14 @@ impl Pgp {
 
     /// get expiration of cert as SystemTime
     pub fn get_expiry(cert: &Cert) -> Result<Option<SystemTime>> {
-        let primary = cert.primary_key().with_policy(POLICY, None)?;
+        let primary = cert.primary_key().with_policy(Self::SP, None)?;
         Ok(primary.key_expiration_time())
     }
 
     /// Is cert (possibly) revoked?
     pub fn is_possibly_revoked(cert: &Cert) -> bool {
         RevocationStatus::NotAsFarAsWeKnow
-            != cert.revocation_status(POLICY, None)
+            != cert.revocation_status(Self::SP, None)
     }
 
     /// Normalize pretty-printed fingerprint strings (with spaces etc)
@@ -347,7 +347,7 @@ impl Pgp {
     ) -> Vec<KeyPair> {
         let keys = cert
             .keys()
-            .with_policy(POLICY, None)
+            .with_policy(Self::SP, None)
             .alive()
             .revoked(false)
             .for_certification()
@@ -412,11 +412,10 @@ impl Pgp {
     /// Get all third party sigs on User IDs in this Cert
     fn get_third_party_sigs(c: &Cert) -> Result<Vec<Signature>> {
         let mut res = Vec::new();
-        let policy = StandardPolicy::new();
 
         for uid in c.userids() {
             let sigs =
-                uid.with_policy(&policy, None)?.bundle().certifications();
+                uid.with_policy(Self::SP, None)?.bundle().certifications();
             sigs.iter().for_each(|s| res.push(s.clone()));
         }
 
@@ -432,7 +431,7 @@ impl Pgp {
     ) -> Vec<Signature> {
         let certifier_keys: Vec<_> = certifier
             .keys()
-            .with_policy(POLICY, None)
+            .with_policy(Self::SP, None)
             .alive()
             .revoked(false)
             .for_certification()

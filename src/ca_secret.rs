@@ -14,7 +14,6 @@ use sequoia_openpgp::cert;
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::cert::CertRevocationBuilder;
 use sequoia_openpgp::packet::{signature, Signature, UserID};
-use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::serialize::stream::Armorer;
 use sequoia_openpgp::serialize::stream::{Message, Signer};
 use sequoia_openpgp::types::{ReasonForRevocation, SignatureType};
@@ -27,8 +26,6 @@ use sequoia_openpgp::packet::signature::SignatureBuilder;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
-
-const POLICY: &StandardPolicy = &StandardPolicy::new();
 
 /// Abstraction of operations that need private key material
 pub trait CaSec {
@@ -285,7 +282,7 @@ adversaries."#;
         let signing_keypair = ca_cert
             .keys()
             .secret()
-            .with_policy(&StandardPolicy::new(), None)
+            .with_policy(Pgp::SP, None)
             .supported()
             .alive()
             .revoked(false)
@@ -331,7 +328,7 @@ adversaries."#;
             // if yes, don't add another one.
             if !uid
                 .clone()
-                .with_policy(POLICY, None)?
+                .with_policy(Pgp::SP, None)?
                 .certifications()
                 .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
             {

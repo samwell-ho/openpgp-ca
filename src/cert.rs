@@ -11,7 +11,6 @@ use crate::db::models;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::packet::{Signature, UserID};
-use sequoia_openpgp::policy::StandardPolicy;
 
 use anyhow::{Context, Result};
 
@@ -246,12 +245,10 @@ pub fn certs_expired(
     for db_cert in certs {
         let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
-        let p = StandardPolicy::new();
-
         // Notify only certs that are alive now, but not alive at
         // 'expiry_test'.
-        if c.with_policy(&p, None)?.alive().is_ok()
-            && c.with_policy(&p, expiry_test)?.alive().is_err()
+        if c.with_policy(Pgp::SP, None)?.alive().is_ok()
+            && c.with_policy(Pgp::SP, expiry_test)?.alive().is_err()
         {
             res.insert(db_cert, Pgp::get_expiry(&c)?);
         }
