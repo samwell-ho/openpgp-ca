@@ -290,20 +290,23 @@ impl OpenpgpCa {
         emails: &[&str],
         duration_days: Option<u64>,
     ) -> Result<()> {
-        cert::cert_import_new(
-            self,
-            cert,
-            revoc_certs,
-            name,
-            emails,
-            duration_days,
-        )
+        self.db().transaction(|| {
+            cert::cert_import_new(
+                self,
+                cert,
+                revoc_certs,
+                name,
+                emails,
+                duration_days,
+            )
+        })
     }
 
     /// Update existing Cert in database (e.g. if the user has extended
     /// the expiry date)
     pub fn cert_import_update(&self, cert: &str) -> Result<()> {
-        cert::cert_import_update(self, cert)
+        self.db()
+            .transaction(|| cert::cert_import_update(self, cert))
     }
 
     /// Get Cert by fingerprint.
@@ -502,14 +505,16 @@ impl OpenpgpCa {
     /// Verifies that applying the revocation cert can be validated by the
     /// cert. Only if this is successful is the revocation stored.
     pub fn revocation_add(&self, revoc_cert_str: &str) -> Result<()> {
-        revocation::revocation_add(&self, revoc_cert_str)
+        self.db()
+            .transaction(|| revocation::revocation_add(&self, revoc_cert_str))
     }
 
     /// Add a revocation certificate to the OpenPGP CA database (from a file).
     pub fn revocation_add_from_file(&self, filename: &Path) -> Result<()> {
-        let mut s = String::new();
-        File::open(filename)?.read_to_string(&mut s)?;
-        self.revocation_add(&s)
+        let mut rev = String::new();
+        File::open(filename)?.read_to_string(&mut rev)?;
+
+        self.db().transaction(|| self.revocation_add(&rev))
     }
 
     /// Get a Revocation by hash
@@ -670,7 +675,7 @@ impl OpenpgpCa {
     /// Both the revoked remote public key and the revocation cert are
     /// printed to stdout.
     pub fn bridge_revoke(&self, email: &str) -> Result<()> {
-        bridge::bridge_revoke(self, email)
+        self.db().transaction(|| bridge::bridge_revoke(self, email))
     }
 
     pub fn print_bridges(&self, email: Option<String>) -> Result<()> {
@@ -751,13 +756,15 @@ impl OpenpgpCa {
     /// Pull updates for a cert from WKD and merge them into our local
     /// storage for this cert.
     pub fn update_from_wkd(&self, cert: &models::Cert) -> Result<()> {
-        import::update_from_wkd(&self, cert)
+        self.db()
+            .transaction(|| import::update_from_wkd(&self, cert))
     }
 
     /// Pull updates for a cert from the hagrid keyserver
     /// (https://keys.openpgp.org/) and merge any updates into our local
     /// storage for this cert.
     pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<()> {
-        import::update_from_hagrid(&self, cert)
+        self.db()
+            .transaction(|| import::update_from_hagrid(&self, cert))
     }
 }
