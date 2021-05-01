@@ -106,17 +106,15 @@ pub trait CaSec {
 impl CaSec for DbCa {
     fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
         if self.db().check_ca_initialized()? {
-            return Err(anyhow::anyhow!(
-                "ERROR: CA has already been initialized",
-            ));
+            return Err(anyhow::anyhow!("CA has already been initialized",));
         }
 
         // domainname syntax check
         if !publicsuffix::Domain::has_valid_syntax(domainname) {
-            return Err(anyhow::anyhow!(format!(
-                "not a valid domainname: '{}'",
+            return Err(anyhow::anyhow!(
+                "Invalid domainname: '{}'",
                 domainname
-            )));
+            ));
         }
 
         let name = match name {
@@ -237,6 +235,9 @@ adversaries."#;
         Ok(())
     }
 
+    /// Accept a copy of the CA certificate that includes one or more trust
+    /// signatures from third parties. Take those third party trust
+    /// signatures and merge them into our local copy of the CA key.
     fn ca_import_tsig(&self, cert: &str) -> Result<()> {
         self.db().transaction(|| {
             let ca_cert = self.ca_get_priv_key()?;
@@ -259,16 +260,16 @@ adversaries."#;
 
             let signed = ca_cert
                 .insert_packets(packets)
-                .context("merging tsigs into CA Key failed")?;
+                .context("Merging tsigs into CA Key failed")?;
 
             // update in DB
             let (_, mut cacert) = self
                 .db()
                 .get_ca()
-                .context("failed to load CA from database")?;
+                .context("Failed to load CA cert from database")?;
 
             cacert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
-                .context("failed to armor CA Cert")?;
+                .context("Failed to re-armor CA Cert")?;
 
             self.db()
                 .update_cacert(&cacert)
@@ -337,9 +338,9 @@ adversaries."#;
                     .email_normalized()?
                     .expect("email normalization failed");
 
-                // certify this userid if we
+                // Certify this User ID if we
                 // a) have no filter-list, or
-                // b) if the userid is specified in the filter-list
+                // b) if the User ID is specified in the filter-list.
                 if emails_filter.is_none()
                     || emails_filter.unwrap().contains(&uid_addr.as_str())
                 {
@@ -362,9 +363,9 @@ adversaries."#;
         duration_days: Option<u64>,
     ) -> Result<Cert> {
         let ca_cert = self.ca_get_priv_key()?;
-
         let mut ca_keys = Pgp::get_cert_keys(&ca_cert, None);
 
+        // Collect certifications by the CA
         let mut packets: Vec<Packet> = Vec::new();
 
         let userids = cert
@@ -379,9 +380,12 @@ adversaries."#;
                 let mut sb = signature::SignatureBuilder::new(
                     SignatureType::GenericCertification,
                 );
-                if let Some(days) = duration_days {
-                    // the signature should be good for "days" days from now
 
+                // If an expiration setting for the certifications has been
+                // provided, apply it to the signatures
+                if let Some(days) = duration_days {
+                    // The signature should be valid for the specified
+                    // number of `days`
                     sb = sb.set_signature_validity_period(
                         Duration::from_secs(Pgp::SECONDS_IN_DAY * days),
                     )?;
@@ -401,12 +405,12 @@ adversaries."#;
 
                 let sig = userid.bind(signer, cert, sb)?;
 
-                // collect all certifications
+                // Collect certifications
                 packets.push(sig.into());
             }
         }
 
-        // insert all new certifications into cert
+        // Insert all newly created certifications into the user cert
         cert.clone().insert_packets(packets)
     }
 
@@ -421,7 +425,7 @@ adversaries."#;
     ) -> Result<Cert> {
         let ca_cert = self.ca_get_priv_key()?;
 
-        // there should be exactly one userid in the remote CA Cert
+        // There should be exactly one User ID in the remote CA Cert
         let uids: Vec<_> = remote_ca.userids().collect();
 
         if uids.len() == 1 {
@@ -431,7 +435,7 @@ adversaries."#;
 
             let mut packets: Vec<Packet> = Vec::new();
 
-            // create one tsig for each signer
+            // Create one tsig for each signer
             for signer in &mut ca_keys {
                 let mut builder =
                     SignatureBuilder::new(SignatureType::GenericCertification)

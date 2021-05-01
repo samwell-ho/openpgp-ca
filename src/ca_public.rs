@@ -28,7 +28,7 @@ impl CaPub for DbCa {
         if let Some(email) = email {
             Ok(email)
         } else {
-            Err(anyhow::anyhow!("ERROR: CA user_id has no email"))
+            Err(anyhow::anyhow!("CA user_id has no email"))
         }
     }
 
@@ -39,16 +39,14 @@ impl CaPub for DbCa {
         if email_split.len() == 2 {
             Ok(email_split[1].to_owned())
         } else {
-            Err(anyhow::anyhow!(
-                "ERROR: Error while splitting domain from CA email"
-            ))
+            Err(anyhow::anyhow!("Failed to split domain from CA email"))
         }
     }
 
     fn ca_get_pubkey_armored(&self) -> Result<String> {
         let cert = self.ca_get_cert_pub()?;
         let ca_pub = Pgp::cert_to_armored(&cert)
-            .context("failed to transform CA key to armored pubkey")?;
+            .context("Failed to transform CA key to armored pubkey")?;
 
         Ok(ca_pub)
     }

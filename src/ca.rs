@@ -221,11 +221,10 @@ impl OpenpgpCa {
         cert::cert_check_tsig_on_ca(self, cert)
     }
 
-    /// Check all Certs for certifications from the CA.
-    ///
-    /// If a certification expires in less than `threshold_days`, and it is
-    /// not marked as 'inactive', make a new certification that is good for
-    /// `validity_days`, and update the Cert.
+    /// Check all Certs for certifications from the CA. If a certification
+    /// expires in less than `threshold_days` and it is not marked as
+    /// 'inactive', make a new certification that is good for
+    /// `validity_days` and update the Cert.
     pub fn certs_refresh_ca_certifications(
         &self,
         threshold_days: u64,
@@ -245,7 +244,7 @@ impl OpenpgpCa {
     ///
     /// This generates a fresh OpenPGP key for the new User.
     /// The private key is printed to stdout and NOT stored in OpenPGP CA.
-    /// The Cert (public key material) is stored in the OpenPGP CA database.
+    /// The public key material (Cert) is stored in the OpenPGP CA database.
     ///
     /// The CA Cert is trust-signed by this new user key and the user
     /// Cert is certified by the CA.
@@ -311,14 +310,13 @@ impl OpenpgpCa {
 
     /// Get Cert by fingerprint.
     ///
-    /// If 'fingerprint' contains spaces, they will be
-    /// filtered out.
+    /// The fingerprint parameter is normalized (e.g. if it contains
+    /// spaces, they will be filtered out).
     pub fn cert_get_by_fingerprint(
         &self,
         fingerprint: &str,
     ) -> Result<Option<models::Cert>> {
-        let norm = Pgp::normalize_fp(fingerprint)?;
-        self.db.get_cert(&norm)
+        self.db.get_cert(&Pgp::normalize_fp(fingerprint)?)
     }
 
     /// Get a list of all Certs for one User
@@ -363,18 +361,18 @@ impl OpenpgpCa {
     pub fn print_certifications_status(&self) -> Result<()> {
         let mut count_ok = 0;
 
-        let users = self.users_get_all()?;
-        for user in &users {
-            for cert in self.get_certs_by_user(&user)? {
+        let db_users = self.users_get_all()?;
+        for db_user in &db_users {
+            for db_cert in self.get_certs_by_user(&db_user)? {
                 let (sig_from_ca, tsig_on_ca) =
-                    self.check_mutual_certifications(&cert)?;
+                    self.check_mutual_certifications(&db_cert)?;
 
                 let ok = if !sig_from_ca.is_empty() {
                     true
                 } else {
                     println!(
                         "No CA certification on any User ID of {}.",
-                        cert.fingerprint
+                        db_cert.fingerprint
                     );
                     false
                 } && if tsig_on_ca {
@@ -382,7 +380,7 @@ impl OpenpgpCa {
                 } else {
                     println!(
                         "CA Cert has not been tsigned by {}.",
-                        cert.fingerprint
+                        db_cert.fingerprint
                     );
                     false
                 };
@@ -395,9 +393,8 @@ impl OpenpgpCa {
 
         println!();
         println!(
-            "Checked {} user keys, {} of them had good certifications in both \
-        directions.",
-            users.len(),
+            "Checked {} user keys, {} of them have mutual certifications.",
+            db_users.len(),
             count_ok
         );
 
@@ -421,9 +418,9 @@ impl OpenpgpCa {
             println!();
         }
 
-        for (cert, expiry) in expiries {
-            let name = self.cert_get_name(&cert)?;
-            println!("name {}, fingerprint {}", name, cert.fingerprint);
+        for (db_cert, expiry) in expiries {
+            let name = self.cert_get_name(&db_cert)?;
+            println!("name {}, fingerprint {}", name, db_cert.fingerprint);
 
             if let Some(exp) = expiry {
                 let datetime: DateTime<Utc> = exp.into();
@@ -439,23 +436,25 @@ impl OpenpgpCa {
     }
 
     pub fn print_users(&self) -> Result<()> {
-        for user in self.users_get_all()? {
-            let name =
-                user.name.clone().unwrap_or_else(|| "<no name>".to_owned());
+        for db_user in self.users_get_all()? {
+            let name = db_user
+                .name
+                .clone()
+                .unwrap_or_else(|| "<no name>".to_owned());
 
-            for cert in self.get_certs_by_user(&user)? {
+            for db_cert in self.get_certs_by_user(&db_user)? {
                 let (sig_by_ca, tsig_on_ca) =
-                    self.check_mutual_certifications(&cert)?;
+                    self.check_mutual_certifications(&db_cert)?;
 
-                println!("OpenPGP key {}", cert.fingerprint);
+                println!("OpenPGP key {}", db_cert.fingerprint);
                 println!(" for user '{}'", name);
 
                 println!(" user cert signed by CA: {}", !sig_by_ca.is_empty());
                 println!(" user cert has tsigned CA: {}", tsig_on_ca);
 
-                let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+                let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
-                self.emails_get(&cert)?
+                self.emails_get(&db_cert)?
                     .iter()
                     .for_each(|email| println!(" - email {}", email.addr));
 
@@ -466,7 +465,7 @@ impl OpenpgpCa {
                     println!(" no expiration date is set for this user key");
                 }
 
-                let revs = self.revocations_get(&cert)?;
+                let revs = self.revocations_get(&db_cert)?;
                 println!(
                     " {} revocation certificate(s) available",
                     revs.len()
@@ -520,7 +519,7 @@ impl OpenpgpCa {
         if let Some(rev) = self.db.get_revocation_by_hash(hash)? {
             Ok(rev)
         } else {
-            Err(anyhow::anyhow!("no revocation found"))
+            Err(anyhow::anyhow!("No revocation found for {}", hash))
         }
     }
 
@@ -616,7 +615,7 @@ impl OpenpgpCa {
         if let Some(bridge) = self.db.search_bridge(email)? {
             Ok(bridge)
         } else {
-            Err(anyhow::anyhow!("bridge not found"))
+            Err(anyhow::anyhow!("Bridge not found"))
         }
     }
 
@@ -694,7 +693,7 @@ impl OpenpgpCa {
     pub fn list_bridges(&self) -> Result<()> {
         self.bridges_get()?.iter().for_each(|bridge| {
             println!(
-                "Bridge to '{}', (scope: '{}'",
+                "Bridge to '{}', (scope: '{}')",
                 bridge.email, bridge.scope
             )
         });
