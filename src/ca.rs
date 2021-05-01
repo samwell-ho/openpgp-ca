@@ -321,11 +321,6 @@ impl OpenpgpCa {
         self.db.get_cert(&norm)
     }
 
-    /// Get a Cert by id
-    pub fn cert_by_id(&self, cert_id: i32) -> Result<Option<models::Cert>> {
-        self.db.get_cert_by_id(cert_id)
-    }
-
     /// Get a list of all Certs for one User
     pub fn get_certs_by_user(
         &self,
@@ -687,8 +682,8 @@ impl OpenpgpCa {
 
         for bridge in bridges {
             println!("Bridge to '{}'", bridge.email);
-            if let Some(cert) = self.cert_by_id(bridge.cert_id)? {
-                println!("{}", cert.pub_cert);
+            if let Some(db_cert) = self.db.get_cert_by_id(bridge.cert_id)? {
+                println!("{}", db_cert.pub_cert);
             }
             println!();
         }
