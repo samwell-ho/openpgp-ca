@@ -176,10 +176,10 @@ impl OpenpgpCa {
 
     /// Get a list of all User Certs
     pub fn user_certs_get_all(&self) -> Result<Vec<models::Cert>> {
-        let users = self.db.get_users_sort_by_name()?;
+        let users = self.db.users_sorted_by_name()?;
         let mut user_certs = Vec::new();
         for user in users {
-            user_certs.append(&mut self.db.get_cert_by_user(&user)?);
+            user_certs.append(&mut self.db.certs_by_user(&user)?);
         }
         Ok(user_certs)
     }
@@ -316,7 +316,7 @@ impl OpenpgpCa {
         &self,
         fingerprint: &str,
     ) -> Result<Option<models::Cert>> {
-        self.db.get_cert(&Pgp::normalize_fp(fingerprint)?)
+        self.db.cert_by_fp(&Pgp::normalize_fp(fingerprint)?)
     }
 
     /// Get a list of all Certs for one User
@@ -324,17 +324,17 @@ impl OpenpgpCa {
         &self,
         user: &models::User,
     ) -> Result<Vec<models::Cert>> {
-        self.db.get_cert_by_user(&user)
+        self.db.certs_by_user(&user)
     }
 
     /// Get a list of all Users, ordered by name
     pub fn users_get_all(&self) -> Result<Vec<models::User>> {
-        self.db.get_users_sort_by_name()
+        self.db.users_sorted_by_name()
     }
 
     /// Get a list of the Certs that are associated with `email`
     pub fn certs_by_email(&self, email: &str) -> Result<Vec<models::Cert>> {
-        self.db.get_certs_by_email(email)
+        self.db.certs_by_email(email)
     }
 
     /// Get database User(s) for database Cert
@@ -342,7 +342,7 @@ impl OpenpgpCa {
         &self,
         cert: &models::Cert,
     ) -> Result<Option<models::User>> {
-        self.db.get_user_by_cert(cert)
+        self.db.user_by_cert(cert)
     }
 
     /// Get the user name that is associated with this Cert.
@@ -488,7 +488,7 @@ impl OpenpgpCa {
         &self,
         cert: &models::Cert,
     ) -> Result<Vec<models::Revocation>> {
-        self.db.get_revocations(cert)
+        self.db.revocations_by_cert(cert)
     }
 
     /// Add a revocation certificate to the OpenPGP CA database.
@@ -516,7 +516,7 @@ impl OpenpgpCa {
         &self,
         hash: &str,
     ) -> Result<models::Revocation> {
-        if let Some(rev) = self.db.get_revocation_by_hash(hash)? {
+        if let Some(rev) = self.db.revocation_by_hash(hash)? {
             Ok(rev)
         } else {
             Err(anyhow::anyhow!("No revocation found for {}", hash))
@@ -595,12 +595,12 @@ impl OpenpgpCa {
         &self,
         cert: &models::Cert,
     ) -> Result<Vec<models::CertEmail>> {
-        self.db.get_emails_by_cert(cert)
+        self.db.emails_by_cert(cert)
     }
 
     /// Get all Emails
     pub fn get_emails_all(&self) -> Result<Vec<models::CertEmail>> {
-        self.db.get_emails_all()
+        self.db.emails()
     }
 
     // --------- bridges
@@ -612,7 +612,7 @@ impl OpenpgpCa {
 
     /// Get a specific Bridge
     pub fn bridges_search(&self, email: &str) -> Result<models::Bridge> {
-        if let Some(bridge) = self.db.search_bridge(email)? {
+        if let Some(bridge) = self.db.bridge_by_email(email)? {
             Ok(bridge)
         } else {
             Err(anyhow::anyhow!("Bridge not found"))
@@ -681,7 +681,7 @@ impl OpenpgpCa {
 
         for bridge in bridges {
             println!("Bridge to '{}'", bridge.email);
-            if let Some(db_cert) = self.db.get_cert_by_id(bridge.cert_id)? {
+            if let Some(db_cert) = self.db.cert_by_id(bridge.cert_id)? {
                 println!("{}", db_cert.pub_cert);
             }
             println!();

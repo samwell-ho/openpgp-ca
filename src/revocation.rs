@@ -23,7 +23,7 @@ fn check_for_equivalent_revocation(
     revocation: &Signature,
     cert: &models::Cert,
 ) -> Result<bool> {
-    for db_rev in oca.db().get_revocations(cert)? {
+    for db_rev in oca.db().revocations_by_cert(cert)? {
         let r = Pgp::armored_to_signature(&db_rev.revocation)
             .context("Couldn't re-armor revocation cert from CA db")?;
 
@@ -41,7 +41,7 @@ fn check_for_equivalent_revocation(
 /// If no suitable cert is found, an error is returned.
 pub fn revocation_add(oca: &OpenpgpCa, revocation: &str) -> Result<()> {
     // Check if this revocation already exists in db
-    if oca.db().check_for_revocation(revocation)? {
+    if oca.db().revocation_exists(revocation)? {
         return Ok(()); // this revocation is already stored -> do nothing
     }
 
@@ -52,7 +52,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revocation: &str) -> Result<()> {
     let mut cert = None;
     // 1) Search by fingerprint, if possible
     if let Some(issuer_fp) = Pgp::get_revoc_issuer_fp(&revocation)? {
-        cert = oca.db().get_cert(&issuer_fp.to_hex())?;
+        cert = oca.db().cert_by_fp(&issuer_fp.to_hex())?;
     }
     // 2) If match by fingerprint failed: test revocation for each cert
     if cert.is_none() {
@@ -69,7 +69,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revocation: &str) -> Result<()> {
                 let armored = Pgp::revoc_to_armored(&revocation, None)
                     .context("couldn't armor revocation cert")?;
 
-                oca.db().add_revocation(&armored, &cert)?;
+                oca.db().revocation_add(&armored, &cert)?;
             }
 
             Ok(())
@@ -142,7 +142,7 @@ pub fn revocation_apply(
     oca: &OpenpgpCa,
     mut db_revoc: models::Revocation,
 ) -> Result<()> {
-    if let Some(mut db_cert) = oca.db().get_cert_by_id(db_revoc.cert_id)? {
+    if let Some(mut db_cert) = oca.db().cert_by_id(db_revoc.cert_id)? {
         let sig = Pgp::armored_to_signature(&db_revoc.revocation)?;
         let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
@@ -154,11 +154,11 @@ pub fn revocation_apply(
         db_revoc.published = true;
 
         oca.db()
-            .update_cert(&db_cert)
+            .cert_update(&db_cert)
             .context("Couldn't update Cert")?;
 
         oca.db()
-            .update_revocation(&db_revoc)
+            .revocation_update(&db_revoc)
             .context("Couldn't update Revocation")?;
 
         Ok(())

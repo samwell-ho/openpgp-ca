@@ -275,22 +275,14 @@ fn test_bridge() -> Result<()> {
     let bridges2 = ca2.bridges_get()?;
     assert_eq!(bridges2.len(), 1);
 
-    let ca1_cert = ca2
-        .db()
-        .get_cert_by_id(bridges2[0].cert_id)?
-        .unwrap()
-        .pub_cert;
+    let ca1_cert = ca2.db().cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
 
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)
     let bridges1 = ca1.bridges_get()?;
     assert_eq!(bridges1.len(), 1);
 
-    let ca2_cert = ca1
-        .db()
-        .get_cert_by_id(bridges1[0].cert_id)?
-        .unwrap()
-        .pub_cert;
+    let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
 
     // import CA keys into GnuPG
     gnupg::import(&ctx, ca1_cert.as_bytes());
@@ -413,21 +405,13 @@ fn test_multi_bridge() -> Result<()> {
     // (this has the signed version of the ca2 pubkey)
     let bridges1 = ca1.bridges_get()?;
     assert_eq!(bridges1.len(), 1);
-    let ca2_cert = ca1
-        .db()
-        .get_cert_by_id(bridges1[0].cert_id)?
-        .unwrap()
-        .pub_cert;
+    let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
 
     // get Cert for ca3 from ca2 bridge
     // (this has the tsig from ca3)
     let bridges2 = ca2.bridges_get()?;
     assert_eq!(bridges2.len(), 1);
-    let ca3_cert = ca2
-        .db()
-        .get_cert_by_id(bridges2[0].cert_id)?
-        .unwrap()
-        .pub_cert;
+    let ca3_cert = ca2.db().cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
 
     // import CA certs into GnuPG
     gnupg::import(&ctx, ca1_cert.as_bytes());
@@ -548,11 +532,7 @@ fn test_scoping() -> Result<()> {
     // (this has the signed version of the ca2 pubkey)
     let bridges1 = ca1.bridges_get()?;
     assert_eq!(bridges1.len(), 1);
-    let ca2_cert = ca1
-        .db()
-        .get_cert_by_id(bridges1[0].cert_id)?
-        .unwrap()
-        .pub_cert;
+    let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
 
     // import CA certs into GnuPG
     gnupg::import(&ctx, Pgp::cert_to_armored(&ca1_cert)?.as_bytes());

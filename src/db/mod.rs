@@ -27,7 +27,7 @@ impl OcaDb {
         let conn = SqliteConnection::establish(&db_url)
             .context(format!("Error connecting to {}", db_url))?;
 
-        // enable handling of foreign key constraints in sqlite
+        // Enable handling of foreign key constraints in sqlite
         diesel::sql_query("PRAGMA foreign_keys=1;")
             .execute(&conn)
             .context("Couldn't set 'PRAGMA foreign_keys=1;'")?;
@@ -45,7 +45,7 @@ impl OcaDb {
 
     // --- building block functions ---
 
-    fn insert_user(&self, user: NewUser) -> Result<User> {
+    fn user_insert(&self, user: NewUser) -> Result<User> {
         let inserted_count = diesel::insert_into(users::table)
             .values(&user)
             .execute(&self.conn)?;
@@ -56,6 +56,7 @@ impl OcaDb {
             ));
         }
 
+        // retrieve our new row, including the generated id
         let u: Vec<User> = users::table
             .order(users::id.desc())
             .limit(inserted_count as i64)
@@ -71,7 +72,7 @@ impl OcaDb {
         }
     }
 
-    fn insert_cert(&self, cert: NewCert) -> Result<Cert> {
+    fn cert_insert(&self, cert: NewCert) -> Result<Cert> {
         let inserted_count = diesel::insert_into(certs::table)
             .values(&cert)
             .execute(&self.conn)?;
@@ -82,6 +83,7 @@ impl OcaDb {
             ));
         }
 
+        // retrieve our new row, including the generated id
         let c: Vec<Cert> = certs::table
             .order(certs::id.desc())
             .limit(inserted_count as i64)
@@ -97,7 +99,7 @@ impl OcaDb {
         }
     }
 
-    fn insert_revocation(&self, revoc: NewRevocation) -> Result<Revocation> {
+    fn revocation_insert(&self, revoc: NewRevocation) -> Result<Revocation> {
         let inserted_count = diesel::insert_into(revocations::table)
             .values(&revoc)
             .execute(&self.conn)?;
@@ -108,6 +110,7 @@ impl OcaDb {
             ));
         }
 
+        // retrieve our new row, including the generated id
         let r: Vec<Revocation> = revocations::table
             .order(revocations::id.desc())
             .limit(inserted_count as i64)
@@ -125,7 +128,7 @@ impl OcaDb {
         }
     }
 
-    fn insert_email(&self, email: NewCertEmail) -> Result<CertEmail> {
+    fn email_insert(&self, email: NewCertEmail) -> Result<CertEmail> {
         let inserted_count = diesel::insert_into(certs_emails::table)
             .values(&email)
             .execute(&self.conn)
@@ -137,6 +140,7 @@ impl OcaDb {
             ));
         }
 
+        // retrieve our new row, including the generated id
         let e: Vec<CertEmail> = certs_emails::table
             .order(certs_emails::id.desc())
             .limit(inserted_count as i64)
@@ -155,7 +159,7 @@ impl OcaDb {
 
     // --- public ---
 
-    pub fn check_ca_initialized(&self) -> Result<bool> {
+    pub fn is_ca_initialized(&self) -> Result<bool> {
         let cas = cas::table
             .load::<Ca>(&self.conn)
             .context("Error loading CAs")?;
@@ -185,17 +189,19 @@ impl OcaDb {
                         // FIXME: which cert(s) should be returned?
                         // -> there can be more than one "active" cert,
                         // as well as even more "inactive" certs.
-                        unimplemented!("get_ca: more than one ca_cert in DB");
+                        Err(anyhow::anyhow!(
+                            "More than one ca_cert in DB, this is not yet implemented."
+                        ))
                     }
                 }
             }
             _ => Err(anyhow::anyhow!(
-                "more than 1 CA in database. this should never happen"
+                "More than one CA in database, this should never happen."
             )),
         }
     }
 
-    pub fn insert_ca(
+    pub fn ca_insert(
         &self,
         ca: NewCa,
         ca_key: &str,
@@ -206,12 +212,13 @@ impl OcaDb {
             .execute(&self.conn)
             .context("Error saving new CA")?;
 
+        // Retrieve our new row, including the generated id
         let cas = cas::table
             .load::<Ca>(&self.conn)
             .context("Error loading CAs")?;
-
         let ca = cas.first().unwrap();
 
+        // Store Cert for the CA
         let ca_cert = NewCacert {
             fingerprint,
             ca_id: ca.id,
@@ -225,7 +232,7 @@ impl OcaDb {
         Ok(())
     }
 
-    pub fn update_cacert(&self, cacert: &Cacert) -> Result<()> {
+    pub fn cacert_update(&self, cacert: &Cacert) -> Result<()> {
         diesel::update(cacert)
             .set(cacert)
             .execute(&self.conn)
@@ -234,14 +241,14 @@ impl OcaDb {
         Ok(())
     }
 
-    pub fn get_users_sort_by_name(&self) -> Result<Vec<User>> {
+    pub fn users_sorted_by_name(&self) -> Result<Vec<User>> {
         users::table
             .order((users::name, users::id))
             .load::<User>(&self.conn)
             .context("Error loading users")
     }
 
-    pub fn get_user_by_cert(&self, cert: &Cert) -> Result<Option<User>> {
+    pub fn user_by_cert(&self, cert: &Cert) -> Result<Option<User>> {
         match cert.user_id {
             None => Ok(None),
             Some(search_id) => {
@@ -252,15 +259,18 @@ impl OcaDb {
                 match users.len() {
                     0 => Ok(None),
                     1 => Ok(Some(users[0].clone())),
-                    _ => Err(anyhow::anyhow!(
-                        "get_user_by_cert: found more than 1 user for a cert. this should be impossible."
-                    )),
+                    _ => {
+                        // This should not be possible
+                        Err(anyhow::anyhow!(
+                             "get_user_by_cert: Found more than one user for cert"
+                        ))
+                    }
                 }
             }
         }
     }
 
-    pub fn add_user(
+    pub fn user_add(
         &self,
         name: Option<&str>,
         (pub_cert, fingerprint): (&str, &str),
@@ -279,19 +289,19 @@ impl OcaDb {
             cacert_db.priv_cert = Pgp::cert_to_armored_private_key(&merged)?;
 
             // update new version of CA cert in database
-            self.update_cacert(&cacert_db)?;
+            self.cacert_update(&cacert_db)?;
         }
 
         // User
         let newuser = NewUser { name, ca_id: ca.id };
-        let user = self.insert_user(newuser)?;
+        let user = self.user_insert(newuser)?;
 
-        let cert = self.add_cert(pub_cert, fingerprint, Some(user.id))?;
+        let cert = self.cert_add(pub_cert, fingerprint, Some(user.id))?;
 
         // Revocations
         for revocation in revocation_certs {
             let hash = &Pgp::revocation_to_hash(revocation)?;
-            self.insert_revocation(NewRevocation {
+            self.revocation_insert(NewRevocation {
                 hash,
                 revocation,
                 cert_id: cert.id,
@@ -301,7 +311,7 @@ impl OcaDb {
 
         // Emails
         for &addr in emails {
-            self.insert_email(NewCertEmail {
+            self.email_insert(NewCertEmail {
                 addr: addr.to_owned(),
                 cert_id: cert.id,
             })?;
@@ -309,7 +319,7 @@ impl OcaDb {
         Ok(user)
     }
 
-    pub fn update_user(&self, user: &User) -> Result<()> {
+    pub fn user_update(&self, user: &User) -> Result<()> {
         diesel::update(user)
             .set(user)
             .execute(&self.conn)
@@ -318,7 +328,7 @@ impl OcaDb {
         Ok(())
     }
 
-    pub fn add_cert(
+    pub fn cert_add(
         &self,
         pub_cert: &str,
         fingerprint: &str,
@@ -331,10 +341,10 @@ impl OcaDb {
             inactive: false,
             user_id,
         };
-        self.insert_cert(cert)
+        self.cert_insert(cert)
     }
 
-    pub fn update_cert(&self, cert: &Cert) -> Result<()> {
+    pub fn cert_update(&self, cert: &Cert) -> Result<()> {
         diesel::update(cert)
             .set(cert)
             .execute(&self.conn)
@@ -343,7 +353,7 @@ impl OcaDb {
         Ok(())
     }
 
-    pub fn get_cert_by_id(&self, id: i32) -> Result<Option<Cert>> {
+    pub fn cert_by_id(&self, id: i32) -> Result<Option<Cert>> {
         let db: Vec<Cert> = certs::table
             .filter(certs::id.eq(id))
             .load::<Cert>(&self.conn)
@@ -352,7 +362,7 @@ impl OcaDb {
         Ok(db.get(0).cloned())
     }
 
-    pub fn get_cert(&self, fingerprint: &str) -> Result<Option<Cert>> {
+    pub fn cert_by_fp(&self, fingerprint: &str) -> Result<Option<Cert>> {
         let c = certs::table
             .filter(certs::fingerprint.eq(fingerprint))
             .load::<Cert>(&self.conn)
@@ -365,7 +375,7 @@ impl OcaDb {
         }
     }
 
-    pub fn get_certs_by_email(&self, email: &str) -> Result<Vec<Cert>> {
+    pub fn certs_by_email(&self, email: &str) -> Result<Vec<Cert>> {
         let cert_ids = certs_emails::table
             .filter(certs_emails::addr.eq(email))
             .select(certs_emails::cert_id);
@@ -377,30 +387,31 @@ impl OcaDb {
     }
 
     /// All Certs that belong to `user`, ordered by certs::id
-    pub fn get_cert_by_user(&self, user: &User) -> Result<Vec<Cert>> {
+    pub fn certs_by_user(&self, user: &User) -> Result<Vec<Cert>> {
         Ok(Cert::belonging_to(user)
             .order(certs::id)
             .load::<Cert>(&self.conn)?)
     }
 
-    pub fn get_certs(&self) -> Result<Vec<Cert>> {
+    /// Get all Certs
+    pub fn certs(&self) -> Result<Vec<Cert>> {
         certs::table
             .load::<Cert>(&self.conn)
             .context("Error loading certs")
     }
 
-    pub fn get_revocations(&self, cert: &Cert) -> Result<Vec<Revocation>> {
+    pub fn revocations_by_cert(&self, cert: &Cert) -> Result<Vec<Revocation>> {
         Ok(Revocation::belonging_to(cert).load::<Revocation>(&self.conn)?)
     }
 
-    pub fn add_revocation(
+    pub fn revocation_add(
         &self,
         revocation: &str,
         cert: &Cert,
     ) -> Result<Revocation> {
         let hash = &Pgp::revocation_to_hash(revocation)?;
 
-        self.insert_revocation(NewRevocation {
+        self.revocation_insert(NewRevocation {
             hash,
             revocation,
             cert_id: cert.id,
@@ -408,13 +419,13 @@ impl OcaDb {
         })
     }
 
-    /// check if this exact revocation (bitwise) already exists in the db
-    pub fn check_for_revocation(&self, revocation: &str) -> Result<bool> {
+    /// Check if this exact revocation (bitwise) already exists in the DB
+    pub fn revocation_exists(&self, revocation: &str) -> Result<bool> {
         let hash = &Pgp::revocation_to_hash(revocation)?;
-        Ok(self.get_revocation_by_hash(hash)?.is_some())
+        Ok(self.revocation_by_hash(hash)?.is_some())
     }
 
-    pub fn get_revocation_by_hash(
+    pub fn revocation_by_hash(
         &self,
         hash: &str,
     ) -> Result<Option<Revocation>> {
@@ -431,7 +442,7 @@ impl OcaDb {
         Ok(db.get(0).cloned())
     }
 
-    pub fn update_revocation(&self, revocation: &Revocation) -> Result<()> {
+    pub fn revocation_update(&self, revocation: &Revocation) -> Result<()> {
         diesel::update(revocation)
             .set(revocation)
             .execute(&self.conn)
@@ -440,20 +451,20 @@ impl OcaDb {
         Ok(())
     }
 
-    pub fn get_emails_by_cert(&self, cert: &Cert) -> Result<Vec<CertEmail>> {
+    pub fn emails_by_cert(&self, cert: &Cert) -> Result<Vec<CertEmail>> {
         certs_emails::table
             .filter(certs_emails::cert_id.eq(cert.id))
             .load(&self.conn)
             .context("could not load emails")
     }
 
-    pub fn get_emails_all(&self) -> Result<Vec<CertEmail>> {
+    pub fn emails(&self) -> Result<Vec<CertEmail>> {
         certs_emails::table
             .load(&self.conn)
             .context("could not load emails")
     }
 
-    pub fn insert_bridge(&self, bridge: NewBridge) -> Result<Bridge> {
+    pub fn bridge_insert(&self, bridge: NewBridge) -> Result<Bridge> {
         let inserted_count = diesel::insert_into(bridges::table)
             .values(&bridge)
             .execute(&self.conn)
@@ -480,7 +491,7 @@ impl OcaDb {
         }
     }
 
-    pub fn search_bridge(&self, email: &str) -> Result<Option<Bridge>> {
+    pub fn bridge_by_email(&self, email: &str) -> Result<Option<Bridge>> {
         let res = bridges::table
             .filter(bridges::email.eq(email))
             .load::<Bridge>(&self.conn)

@@ -48,7 +48,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     let mut db_update = cert.clone();
     db_update.pub_cert = Pgp::cert_to_armored(&merge)?;
 
-    oca.db().update_cert(&db_update)?;
+    oca.db().cert_update(&db_update)?;
 
     Ok(())
 }
@@ -74,7 +74,7 @@ pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
         let mut db_update = cert.clone();
         db_update.pub_cert = Pgp::cert_to_armored(&merged)?;
 
-        oca.db().update_cert(&db_update)
+        oca.db().cert_update(&db_update)
     } else {
         // Silently ignore potential errors from merge_public().
         Ok(())

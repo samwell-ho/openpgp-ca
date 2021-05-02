@@ -48,7 +48,7 @@ pub fn user_new(
     let user_revoc = Pgp::revoc_to_armored(&user_revoc, None)?;
 
     oca.db()
-        .add_user(
+        .user_add(
             name,
             (&user_cert, &user_key.fingerprint().to_hex()),
             emails,
@@ -93,7 +93,7 @@ pub fn cert_import_new(
 
     if let Some(_exists) = oca
         .db()
-        .get_cert(&fp)
+        .cert_by_fp(&fp)
         .context("cert_import_new(): get_cert() check by fingerprint failed")?
     {
         // import_new is not intended for certs we already have a version of
@@ -126,7 +126,7 @@ pub fn cert_import_new(
         .context("cert_import_new: Couldn't re-armor key")?;
 
     oca.db()
-        .add_user(
+        .user_add(
             name.as_deref(),
             (&pub_cert, &fp),
             &emails,
@@ -144,7 +144,7 @@ pub fn cert_import_update(oca: &OpenpgpCa, cert: &str) -> Result<()> {
 
     let fp = cert_new.fingerprint().to_hex();
 
-    if let Some(mut db_cert) = oca.db().get_cert(&fp).context(
+    if let Some(mut db_cert) = oca.db().cert_by_fp(&fp).context(
         "cert_import_update(): get_cert() check by fingerprint failed",
     )? {
         // merge existing and new public key
@@ -154,7 +154,7 @@ pub fn cert_import_update(oca: &OpenpgpCa, cert: &str) -> Result<()> {
         let armored = Pgp::cert_to_armored(&updated)?;
 
         db_cert.pub_cert = armored;
-        oca.db().update_cert(&db_cert)
+        oca.db().cert_update(&db_cert)
     } else {
         Err(anyhow::anyhow!(
             "No cert with this fingerprint found in DB, cannot update"
@@ -174,7 +174,7 @@ pub fn certs_refresh_ca_certifications(
 
     for db_cert in oca
         .db()
-        .get_certs()?
+        .certs()?
         .iter()
         // ignore "inactive" Certs
         .filter(|c| !c.inactive)
@@ -218,7 +218,7 @@ pub fn certs_refresh_ca_certifications(
             // update cert in db
             let mut cert_update = db_cert.clone();
             cert_update.pub_cert = Pgp::cert_to_armored(&recertified)?;
-            oca.db().update_cert(&cert_update)?;
+            oca.db().cert_update(&cert_update)?;
         }
     }
 

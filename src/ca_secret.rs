@@ -105,7 +105,7 @@ pub trait CaSec {
 /// private key material for the CA.
 impl CaSec for DbCa {
     fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
-        if self.db().check_ca_initialized()? {
+        if self.db().is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA has already been initialized",));
         }
 
@@ -127,7 +127,7 @@ impl CaSec for DbCa {
         let ca_key = &Pgp::cert_to_armored_private_key(&cert)?;
 
         self.db().transaction(|| {
-            self.db().insert_ca(
+            self.db().ca_insert(
                 models::NewCa { domainname },
                 ca_key,
                 &cert.fingerprint().to_hex(),
@@ -272,7 +272,7 @@ adversaries."#;
                 .context("Failed to re-armor CA Cert")?;
 
             self.db()
-                .update_cacert(&cacert)
+                .cacert_update(&cacert)
                 .context("Update of CA Cert in DB failed")
         })
     }
