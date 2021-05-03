@@ -94,18 +94,18 @@ fn main() -> Result<()> {
         },
         Command::Ca { cmd } => match cmd {
             CaCommand::Init { domain, name } => {
-                ca.secret().ca_init(&domain, name.as_deref())?;
+                ca.ca_init(&domain, name.as_deref())?;
             }
             CaCommand::Export => {
                 println!("{}", ca.ca_get_pubkey_armored()?);
             }
             CaCommand::Revocations { output } => {
-                ca.secret().ca_generate_revocations(output)?;
+                ca.ca_generate_revocations(output)?;
                 println!("Wrote a set of revocations to the output file");
             }
             CaCommand::ImportTsig { cert_file } => {
                 let cert = std::fs::read_to_string(cert_file)?;
-                ca.secret().ca_import_tsig(&cert)?;
+                ca.ca_import_tsig(&cert)?;
             }
             CaCommand::Show => ca.ca_show()?,
         },

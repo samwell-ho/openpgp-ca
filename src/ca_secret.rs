@@ -126,13 +126,11 @@ impl CaSec for DbCa {
 
         let ca_key = &Pgp::cert_to_armored_private_key(&cert)?;
 
-        self.db().transaction(|| {
-            self.db().ca_insert(
-                models::NewCa { domainname },
-                ca_key,
-                &cert.fingerprint().to_hex(),
-            )
-        })
+        self.db().ca_insert(
+            models::NewCa { domainname },
+            ca_key,
+            &cert.fingerprint().to_hex(),
+        )
     }
 
     fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
@@ -239,42 +237,40 @@ adversaries."#;
     /// signatures from third parties. Take those third party trust
     /// signatures and merge them into our local copy of the CA key.
     fn ca_import_tsig(&self, cert: &str) -> Result<()> {
-        self.db().transaction(|| {
-            let ca_cert = self.ca_get_priv_key()?;
+        let ca_cert = self.ca_get_priv_key()?;
 
-            let cert_import = Pgp::armored_to_cert(cert)?;
+        let cert_import = Pgp::armored_to_cert(cert)?;
 
-            // The imported cert must have the same Fingerprint as the CA cert
-            if ca_cert.fingerprint() != cert_import.fingerprint() {
-                return Err(anyhow::anyhow!(
-                    "The imported cert has an unexpected Fingerprint",
-                ));
-            }
+        // The imported cert must have the same Fingerprint as the CA cert
+        if ca_cert.fingerprint() != cert_import.fingerprint() {
+            return Err(anyhow::anyhow!(
+                "The imported cert has an unexpected Fingerprint",
+            ));
+        }
 
-            // Get the third party tsig(s) from the imported cert
-            let tsigs = Pgp::get_trust_sigs(&cert_import)?;
+        // Get the third party tsig(s) from the imported cert
+        let tsigs = Pgp::get_trust_sigs(&cert_import)?;
 
-            // add tsig(s) to our "own" version of the CA key
-            let mut packets: Vec<Packet> = Vec::new();
-            tsigs.iter().for_each(|s| packets.push(s.clone().into()));
+        // add tsig(s) to our "own" version of the CA key
+        let mut packets: Vec<Packet> = Vec::new();
+        tsigs.iter().for_each(|s| packets.push(s.clone().into()));
 
-            let signed = ca_cert
-                .insert_packets(packets)
-                .context("Merging tsigs into CA Key failed")?;
+        let signed = ca_cert
+            .insert_packets(packets)
+            .context("Merging tsigs into CA Key failed")?;
 
-            // update in DB
-            let (_, mut cacert) = self
-                .db()
-                .get_ca()
-                .context("Failed to load CA cert from database")?;
+        // update in DB
+        let (_, mut cacert) = self
+            .db()
+            .get_ca()
+            .context("Failed to load CA cert from database")?;
 
-            cacert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
-                .context("Failed to re-armor CA Cert")?;
+        cacert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
+            .context("Failed to re-armor CA Cert")?;
 
-            self.db()
-                .cacert_update(&cacert)
-                .context("Update of CA Cert in DB failed")
-        })
+        self.db()
+            .cacert_update(&cacert)
+            .context("Update of CA Cert in DB failed")
     }
 
     fn sign_detached(&self, text: &str) -> Result<String> {

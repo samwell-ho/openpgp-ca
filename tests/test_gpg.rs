@@ -35,7 +35,7 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    ca.secret().ca_init("example.org", None)?;
+    ca.ca_init("example.org", None)?;
 
     // make CA users
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
@@ -44,7 +44,7 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     // ---- import keys from OpenPGP CA into GnuPG ----
 
     // get Cert for CA
-    let ca_cert = ca.secret().ca_get_priv_key()?;
+    let ca_cert = ca.ca_get_priv_key()?;
 
     // import CA key into GnuPG
     let mut buf = Vec::new();
@@ -115,7 +115,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     // make new CA key
-    ca.secret().ca_init("example.org", None)?;
+    ca.ca_init("example.org", None)?;
 
     let ca_key = ca.ca_get_pubkey_armored()?;
 
@@ -124,7 +124,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     gnupg::import(&ctx_bob, ca_key.as_bytes());
 
     // get Cert for CA
-    let ca_cert = ca.secret().ca_get_priv_key()?;
+    let ca_cert = ca.ca_get_priv_key()?;
 
     let ca_keyid = format!("{:X}", ca_cert.keyid());
 
@@ -140,11 +140,9 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let alice_ca_key = gnupg::export(&ctx_alice, &"openpgp-ca@example.org");
     let bob_ca_key = gnupg::export(&ctx_bob, &"openpgp-ca@example.org");
 
-    ca.secret()
-        .ca_import_tsig(&alice_ca_key)
+    ca.ca_import_tsig(&alice_ca_key)
         .context("import CA tsig from Alice failed")?;
-    ca.secret()
-        .ca_import_tsig(&bob_ca_key)
+    ca.ca_import_tsig(&bob_ca_key)
         .context("import CA tsig from Bob failed")?;
 
     // get public keys for alice and bob from their gnupg contexts
@@ -235,7 +233,7 @@ fn test_bridge() -> Result<()> {
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    ca1.secret().ca_init("some.org", None)?;
+    ca1.ca_init("some.org", None)?;
 
     // make CA user
     assert!(ca1
@@ -245,7 +243,7 @@ fn test_bridge() -> Result<()> {
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    ca2.secret().ca_init("other.org", None)?;
+    ca2.ca_init("other.org", None)?;
 
     // make CA user
     ca2.user_new(Some(&"Bob"), &["bob@other.org"], None, false, false)?;
@@ -371,12 +369,12 @@ fn test_multi_bridge() -> Result<()> {
 
     // ---- populate OpenPGP CA instances ----
 
-    ca1.secret().ca_init("alpha.org", None)?;
+    ca1.ca_init("alpha.org", None)?;
     ca1.user_new(Some(&"Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    ca2.secret().ca_init("beta.org", None)?;
+    ca2.ca_init("beta.org", None)?;
 
-    ca3.secret().ca_init("gamma.org", None)?;
+    ca3.ca_init("gamma.org", None)?;
     ca3.user_new(Some(&"Carol"), &["carol@gamma.org"], None, false, false)?;
     ca3.user_new(Some(&"Bob"), &["bob@beta.org"], None, false, false)?;
 
@@ -496,12 +494,12 @@ fn test_scoping() -> Result<()> {
     let ca3 = OpenpgpCa::new(Some(&db3))?;
 
     // ---- populate OpenPGP CA instances ----
-    ca1.secret().ca_init("alpha.org", None)?;
+    ca1.ca_init("alpha.org", None)?;
     ca1.user_new(Some(&"Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    ca2.secret().ca_init("beta.org", None)?;
+    ca2.ca_init("beta.org", None)?;
 
-    ca3.secret().ca_init("other.org", None)?;
+    ca3.ca_init("other.org", None)?;
     ca3.user_new(Some(&"Bob"), &["bob@beta.org"], None, false, false)?;
 
     // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---
@@ -514,19 +512,13 @@ fn test_scoping() -> Result<()> {
 
     // create unscoped trust signature from beta.org CA to other.org CA
     // ---- openpgp-ca@beta.org ---tsign---> openpgp-ca@other.org ----
-    let tsigned_ca3 = Pgp::tsign(
-        ca3.secret().ca_get_priv_key()?,
-        &ca2.secret().ca_get_priv_key()?,
-        None,
-    )?;
+    let tsigned_ca3 =
+        Pgp::tsign(ca3.ca_get_priv_key()?, &ca2.ca_get_priv_key()?, None)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
     // get Cert for ca1
-    let ca1_cert = ca1
-        .secret()
-        .ca_get_priv_key()
-        .expect("failed to get CA1 cert");
+    let ca1_cert = ca1.ca_get_priv_key().expect("failed to get CA1 cert");
 
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)

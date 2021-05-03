@@ -22,7 +22,7 @@
 //! let openpgp_ca = OpenpgpCa::new(Some(db_filename)).expect("Failed to set up CA");
 //!
 //! // initialize the CA Admin (with domainname and a symbolic name)
-//! openpgp_ca.secret().ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
+//! openpgp_ca.ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
 //!
 //! // create a new user, with all signatures
 //! // (the private key is printed to stdout and needs to be manually
@@ -133,8 +133,32 @@ impl OpenpgpCa {
 
     /// Get the CaSec implementation to run operations that need CA
     /// private key material.
-    pub fn secret(&self) -> &Rc<dyn CaSec> {
+    pub(crate) fn secret(&self) -> &Rc<dyn CaSec> {
         &self.ca_secret
+    }
+
+    pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
+        self.db()
+            .transaction(|| self.ca_secret.ca_init(domainname, name))
+    }
+
+    /// Getting private key material is not possible for all backends and
+    /// may result in panics.
+    ///
+    /// This fn is only intended for internal integration tests!\
+    ///
+    /// FIXME: different visibility?
+    pub fn ca_get_priv_key(&self) -> Result<Cert> {
+        self.ca_secret.ca_get_priv_key()
+    }
+
+    pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
+        self.ca_secret.ca_generate_revocations(output)
+    }
+
+    pub fn ca_import_tsig(&self, cert: &str) -> Result<()> {
+        self.db()
+            .transaction(|| self.ca_secret.ca_import_tsig(cert))
     }
 
     /// Get the Cert of the CA (without private key material).

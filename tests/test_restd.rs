@@ -238,7 +238,7 @@ async fn test_restd() {
 
     // -- init OpenPGP CA --
     let ca = OpenpgpCa::new(Some(&db)).unwrap();
-    ca.secret().ca_init("example.org", None).unwrap();
+    ca.ca_init("example.org", None).unwrap();
 
     // -- start restd --
     let abort_handle = start_restd(db);
