@@ -276,25 +276,11 @@ impl OcaDb {
         (pub_cert, fingerprint): (&str, &str),
         emails: &[&str],
         revocation_certs: &[String],
-        ca_cert_tsigned: Option<&str>,
     ) -> Result<User> {
-        let (ca, mut cacert_db) = self.get_ca().context("Couldn't find CA")?;
-
-        // merge new trust signature into local CA cert (if applicable)
-        if let Some(ca_cert_tsigned) = ca_cert_tsigned {
-            let tsigned = Pgp::armored_to_cert(&ca_cert_tsigned)?;
-
-            let merged = Pgp::armored_to_cert(&cacert_db.priv_cert)?
-                .merge_public(tsigned)?;
-            cacert_db.priv_cert = Pgp::cert_to_armored_private_key(&merged)?;
-
-            // update new version of CA cert in database
-            self.cacert_update(&cacert_db)?;
-        }
-
         // User
-        let newuser = NewUser { name, ca_id: ca.id };
-        let user = self.user_insert(newuser)?;
+        let (ca, _) = self.get_ca().context("Couldn't find CA")?;
+
+        let user = self.user_insert(NewUser { name, ca_id: ca.id })?;
 
         let cert = self.cert_add(pub_cert, fingerprint, Some(user.id))?;
 

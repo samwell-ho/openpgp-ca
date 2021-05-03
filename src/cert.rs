@@ -43,7 +43,10 @@ pub fn user_new(
 
     let tsigned_ca = Pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
-    // Store new user cert (and tsig for CA key) in DB
+    // Store tsig for the CA cert
+    oca.secret().ca_import_tsig(&tsigned_ca)?;
+
+    // Store new user cert in DB
     let user_cert = Pgp::cert_to_armored(&user_certified)?;
     let user_revoc = Pgp::revoc_to_armored(&user_revoc, None)?;
 
@@ -53,7 +56,6 @@ pub fn user_new(
             (&user_cert, &user_key.fingerprint().to_hex()),
             emails,
             &[user_revoc],
-            Some(&tsigned_ca),
         )
         .context("Failed to insert new user into DB")?;
 
@@ -126,13 +128,7 @@ pub fn cert_import_new(
         .context("cert_import_new: Couldn't re-armor key")?;
 
     oca.db()
-        .user_add(
-            name.as_deref(),
-            (&pub_cert, &fp),
-            &emails,
-            &revoc_certs,
-            None,
-        )
+        .user_add(name.as_deref(), (&pub_cert, &fp), &emails, &revoc_certs)
         .context("Couldn't insert user")?;
 
     Ok(())
