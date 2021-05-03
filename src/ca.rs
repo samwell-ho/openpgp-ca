@@ -18,7 +18,7 @@
 //! # let file = tempfile::NamedTempFile::new().unwrap();
 //! # let db_filename = file.path().to_str().unwrap();
 //!
-//! // start a new OpenPGP CA instance (implicitely creates the database file)
+//! // start a new OpenPGP CA instance (implicitly creates the database file)
 //! let openpgp_ca = OpenpgpCa::new(Some(db_filename)).expect("Failed to set up CA");
 //!
 //! // initialize the CA Admin (with domainname and a symbolic name)
