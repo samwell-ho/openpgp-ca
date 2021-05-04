@@ -10,7 +10,9 @@ use crate::ca::OpenpgpCa;
 use crate::db::models;
 use crate::pgp::Pgp;
 
+use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::packet::{Signature, UserID};
+use sequoia_openpgp::Cert;
 
 use anyhow::{Context, Result};
 
@@ -31,10 +33,9 @@ pub fn user_new(
             .context("make_user_cert failed")?;
 
     // CA certifies user cert
-    let user_certified = oca
-        .secret()
-        .sign_cert_emails(&user_key, Some(emails), duration_days)
-        .context("sign_user_emails failed")?;
+    let user_certified =
+        sign_cert_emails(&oca, &user_key, Some(emails), duration_days)
+            .context("sign_user_emails failed")?;
 
     // User tsigns CA cert
     let ca_cert = oca.ca_get_cert_pub()?;
@@ -105,10 +106,9 @@ pub fn cert_import_new(
     }
 
     // Sign user cert with CA key (only the User IDs that have been specified)
-    let certified = oca
-        .secret()
-        .sign_cert_emails(&user_cert, Some(emails), duration_days)
-        .context("sign_cert_emails() failed")?;
+    let certified =
+        sign_cert_emails(&oca, &user_cert, Some(emails), duration_days)
+            .context("sign_cert_emails() failed")?;
 
     // use name from User IDs, if no name was passed
     let name = match name {
@@ -297,4 +297,46 @@ pub fn cert_check_tsig_on_ca(
         t.issuer_fingerprints()
             .any(|fp| fp == &user_cert.fingerprint())
     }))
+}
+
+/// CA certifies either all or a subset of User IDs of cert.
+///
+/// 'emails_filter' (if not None) specifies the subset of User IDs to
+/// certify.
+fn sign_cert_emails(
+    oca: &OpenpgpCa,
+    cert: &Cert,
+    emails_filter: Option<&[&str]>,
+    duration_days: Option<u64>,
+) -> Result<Cert> {
+    let fp_ca = oca.ca_get_cert_pub()?.fingerprint();
+
+    let mut uids = Vec::new();
+
+    for uid in cert.userids() {
+        // check if this uid already has a valid signature by ca_cert.
+        // if yes, don't add another one.
+        if !uid
+            .clone()
+            .with_policy(Pgp::SP, None)?
+            .certifications()
+            .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
+        {
+            let userid = uid.userid();
+            let uid_addr = userid
+                .email_normalized()?
+                .expect("email normalization failed");
+
+            // Certify this User ID if we
+            // a) have no filter-list, or
+            // b) if the User ID is specified in the filter-list.
+            if emails_filter.is_none()
+                || emails_filter.unwrap().contains(&uid_addr.as_str())
+            {
+                uids.push(userid);
+            }
+        }
+    }
+
+    oca.secret().sign_user_ids(cert, &uids, duration_days)
 }

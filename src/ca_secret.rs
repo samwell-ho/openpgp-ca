@@ -11,7 +11,6 @@ use crate::db::models;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::cert;
-use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::cert::CertRevocationBuilder;
 use sequoia_openpgp::packet::{signature, Signature, UserID};
 use sequoia_openpgp::serialize::stream::Armorer;
@@ -63,13 +62,6 @@ pub trait CaSec {
 
     /// Generate a detached signature with the CA key, for 'text'
     fn sign_detached(&self, text: &str) -> Result<String>;
-
-    fn sign_cert_emails(
-        &self,
-        user_cert: &Cert,
-        emails_filter: Option<&[&str]>,
-        duration_days: Option<u64>,
-    ) -> Result<Cert>;
 
     fn sign_user_ids(
         &self,
@@ -304,48 +296,6 @@ adversaries."#;
         }
 
         Ok(std::str::from_utf8(&sink)?.to_string())
-    }
-
-    /// CA certifies either all or a subset of User IDs of cert.
-    ///
-    /// 'emails_filter' (if not None) specifies the subset of User IDs to
-    /// certify.
-    fn sign_cert_emails(
-        &self,
-        cert: &Cert,
-        emails_filter: Option<&[&str]>,
-        duration_days: Option<u64>,
-    ) -> Result<Cert> {
-        let fp_ca = self.ca_get_priv_key()?.fingerprint();
-
-        let mut uids = Vec::new();
-
-        for uid in cert.userids() {
-            // check if this uid already has a valid signature by ca_cert.
-            // if yes, don't add another one.
-            if !uid
-                .clone()
-                .with_policy(Pgp::SP, None)?
-                .certifications()
-                .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
-            {
-                let userid = uid.userid();
-                let uid_addr = userid
-                    .email_normalized()?
-                    .expect("email normalization failed");
-
-                // Certify this User ID if we
-                // a) have no filter-list, or
-                // b) if the User ID is specified in the filter-list.
-                if emails_filter.is_none()
-                    || emails_filter.unwrap().contains(&uid_addr.as_str())
-                {
-                    uids.push(userid);
-                }
-            }
-        }
-
-        self.sign_user_ids(cert, &uids, duration_days)
     }
 
     /// CA certifies a specified list of User IDs of a cert.
