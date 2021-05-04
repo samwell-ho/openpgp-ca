@@ -31,7 +31,6 @@
 //! ```
 
 use crate::bridge;
-use crate::ca_public::CaPub;
 use crate::ca_secret::CaSec;
 use crate::cert;
 use crate::db::models;
@@ -65,16 +64,19 @@ impl DbCa {
     pub fn new(db: Rc<OcaDb>) -> Self {
         Self { db }
     }
-
     pub fn db(&self) -> &OcaDb {
         &self.db
     }
 
-    pub fn ca_email(&self) -> Result<String> {
-        self.get_ca_email()
+    /// Get the Cert of the CA (without private key material).
+    pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
+        let (_, cacert) = self.db().get_ca()?;
+
+        let cert = Pgp::armored_to_cert(&cacert.priv_cert)?;
+        Ok(cert.strip_secret_key_material())
     }
 
-    pub(crate) fn ca_userid(&self) -> Result<UserID> {
+    fn ca_userid(&self) -> Result<UserID> {
         let cert = self.ca_get_cert_pub()?;
         let uids: Vec<_> = cert.userids().collect();
 
@@ -84,6 +86,17 @@ impl DbCa {
 
         Ok(uids[0].userid().clone())
     }
+
+    /// Get the email of this CA
+    pub fn ca_email(&self) -> Result<String> {
+        let email = self.ca_userid()?.email()?;
+
+        if let Some(email) = email {
+            Ok(email)
+        } else {
+            Err(anyhow::anyhow!("CA user_id has no email"))
+        }
+    }
 }
 
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
@@ -91,7 +104,7 @@ impl DbCa {
 pub struct OpenpgpCa {
     db: Rc<OcaDb>,
 
-    ca_public: Rc<dyn CaPub>,
+    ca: Rc<DbCa>,
     ca_secret: Rc<dyn CaSec>,
 }
 
@@ -119,9 +132,8 @@ impl OpenpgpCa {
 
         Ok(OpenpgpCa {
             db,
-
-            ca_secret: dbca.clone(),
-            ca_public: dbca,
+            ca: dbca.clone(),
+            ca_secret: dbca,
         })
     }
 
@@ -161,24 +173,33 @@ impl OpenpgpCa {
             .transaction(|| self.ca_secret.ca_import_tsig(cert))
     }
 
-    /// Get the Cert of the CA (without private key material).
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
-        self.ca_public.ca_get_cert_pub()
-    }
-
-    /// Get the domainname for this CA
-    pub fn get_ca_domain(&self) -> Result<String> {
-        self.ca_public.get_ca_domain()
-    }
-
-    /// Get the email of this CA
-    pub fn get_ca_email(&self) -> Result<String> {
-        self.ca_public.get_ca_email()
+        self.ca.ca_get_cert_pub()
     }
 
     /// Returns the public key of the CA as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
-        self.ca_public.ca_get_pubkey_armored()
+        let cert = self.ca_get_cert_pub()?;
+        let ca_pub = Pgp::cert_to_armored(&cert)
+            .context("Failed to transform CA key to armored pubkey")?;
+
+        Ok(ca_pub)
+    }
+
+    pub fn get_ca_email(&self) -> Result<String> {
+        self.ca.ca_email()
+    }
+
+    /// Get the domainname for this CA
+    pub fn get_ca_domain(&self) -> Result<String> {
+        let email = self.get_ca_email()?;
+        let email_split: Vec<_> = email.split('@').collect();
+
+        if email_split.len() == 2 {
+            Ok(email_split[1].to_owned())
+        } else {
+            Err(anyhow::anyhow!("Failed to split domain from CA email"))
+        }
     }
 
     /// Print information about the Ca to stdout.
