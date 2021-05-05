@@ -52,13 +52,18 @@ pub enum Command {
         #[structopt(subcommand)]
         cmd: KeyListCommand,
     },
+    /// Update
+    Update {
+        #[structopt(subcommand)]
+        cmd: UpdateCommand,
+    },
     //    /// Manage Directories
     //    Directory {
     //        #[structopt(subcommand)]
     //        cmd: DirCommand,
     //    },
     //    /// Manage key-profiles
-    //    KeyProfile {},
+    //    KeyProfile {}
 }
 
 #[derive(StructOpt, Debug)]
@@ -282,4 +287,10 @@ pub enum KeyListCommand {
         )]
         force: bool,
     },
+}
+
+#[derive(StructOpt, Debug)]
+pub enum UpdateCommand {
+    /// Update certificates from a keyserver
+    Keyserver {},
 }

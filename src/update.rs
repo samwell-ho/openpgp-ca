@@ -55,7 +55,10 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
 
 /// Update a cert in the OpenPGP CA database from the "Hagrid" keyserver at
 /// `keys.openpgp.org`
-pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
+pub fn update_from_hagrid(
+    oca: &OpenpgpCa,
+    cert: &models::Cert,
+) -> Result<bool> {
     let fp = (cert.fingerprint).parse::<Fingerprint>()?;
 
     let c = Pgp::armored_to_cert(&cert.pub_cert)?;
@@ -68,15 +71,21 @@ pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
     let update =
         rt.block_on(async move { hagrid.get(&KeyID::from(fp)).await })?;
 
-    // Merge new certificate information into existing cert
-    if let Ok(merged) = c.merge_public(update) {
-        // Store merged cert in DB
-        let mut db_update = cert.clone();
-        db_update.pub_cert = Pgp::cert_to_armored(&merged)?;
+    // Merge new certificate information into existing cert.
+    // (Silently ignore potential errors from merge_public())
+    if let Ok(merged) = c.clone().merge_public(update) {
+        if merged != c {
+            // Store merged cert in DB
+            let mut db_update = cert.clone();
+            db_update.pub_cert = Pgp::cert_to_armored(&merged)?;
 
-        oca.db().cert_update(&db_update)
-    } else {
-        // Silently ignore potential errors from merge_public().
-        Ok(())
+            oca.db().cert_update(&db_update)?;
+
+            // An update for this cert was received
+            return Ok(true);
+        }
     }
+
+    // No update was received
+    Ok(false)
 }

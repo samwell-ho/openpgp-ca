@@ -140,6 +140,9 @@ fn main() -> Result<()> {
                 ca.export_keylist(path, signature_uri, force)?;
             }
         },
+        Command::Update { cmd } => match cmd {
+            UpdateCommand::Keyserver {} => ca.update_from_keyserver()?,
+        },
     }
 
     Ok(())

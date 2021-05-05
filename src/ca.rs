@@ -803,10 +803,23 @@ impl OpenpgpCa {
             .transaction(|| update::update_from_wkd(&self, cert))
     }
 
+    /// Update all certs from keyserver
+    pub fn update_from_keyserver(&self) -> Result<()> {
+        for c in self.user_certs_get_all()? {
+            let updated = self.update_from_hagrid(&c)?;
+            if updated {
+                println!("Got update for cert {}", c.fingerprint);
+            }
+        }
+        Ok(())
+    }
+
     /// Pull updates for a cert from the hagrid keyserver
     /// (https://keys.openpgp.org/) and merge any updates into our local
     /// storage for this cert.
-    pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<()> {
+    ///
+    /// Returns "true" if updated data was received, false if not.
+    pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<bool> {
         self.db()
             .transaction(|| update::update_from_hagrid(&self, cert))
     }
