@@ -482,42 +482,46 @@ impl OpenpgpCa {
 
     pub fn print_users(&self) -> Result<()> {
         for db_user in self.users_get_all()? {
-            let name = db_user
-                .name
-                .clone()
-                .unwrap_or_else(|| "<no name>".to_owned());
-
             for db_cert in self.get_certs_by_user(&db_user)? {
                 let (sig_by_ca, tsig_on_ca) =
                     self.check_mutual_certifications(&db_cert)?;
 
-                println!("OpenPGP key {}", db_cert.fingerprint);
-                println!(" for user '{}'", name);
+                println!("OpenPGP certificate {}", db_cert.fingerprint);
+                if let Some(name) = &db_user.name {
+                    println!(" User '{}'", name);
+                }
 
-                println!(" user cert signed by CA: {}", !sig_by_ca.is_empty());
-                println!(" user cert has tsigned CA: {}", tsig_on_ca);
+                if !sig_by_ca.is_empty() {
+                    println!(" Identities certified by this CA:");
+                    for uid in sig_by_ca {
+                        println!(
+                            " - '{} <{}>'",
+                            uid.name()?.unwrap_or("".to_string()),
+                            uid.email()?.unwrap_or("".to_string())
+                        );
+                    }
+                }
+
+                if tsig_on_ca {
+                    println!(" Has trust-signed this CA");
+                }
 
                 let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
-                self.emails_get(&db_cert)?
-                    .iter()
-                    .for_each(|email| println!(" - email {}", email.addr));
-
                 if let Some(exp) = Pgp::get_expiry(&c)? {
                     let datetime: DateTime<Utc> = exp.into();
-                    println!(" expires: {}", datetime.format("%d/%m/%Y"));
+                    println!(" Expiration {}", datetime.format("%d/%m/%Y"));
                 } else {
-                    println!(" no expiration date is set for this user key");
+                    println!(" No expiration is set");
                 }
 
                 let revs = self.revocations_get(&db_cert)?;
-                println!(
-                    " {} revocation certificate(s) available",
-                    revs.len()
-                );
+                if !revs.is_empty() {
+                    println!(" {} revocations available", revs.len());
+                }
 
                 if Pgp::is_possibly_revoked(&c) {
-                    println!(" this user key has (possibly) been REVOKED");
+                    println!(" This certificate has (possibly) been REVOKED");
                 }
                 println!();
             }
