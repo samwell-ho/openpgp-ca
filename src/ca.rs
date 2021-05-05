@@ -36,9 +36,9 @@ use crate::cert;
 use crate::db::models;
 use crate::db::OcaDb;
 use crate::export;
-use crate::import;
 use crate::pgp::Pgp;
 use crate::revocation;
+use crate::update;
 
 use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
@@ -800,7 +800,7 @@ impl OpenpgpCa {
     /// storage for this cert.
     pub fn update_from_wkd(&self, cert: &models::Cert) -> Result<()> {
         self.db()
-            .transaction(|| import::update_from_wkd(&self, cert))
+            .transaction(|| update::update_from_wkd(&self, cert))
     }
 
     /// Pull updates for a cert from the hagrid keyserver
@@ -808,6 +808,6 @@ impl OpenpgpCa {
     /// storage for this cert.
     pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<()> {
         self.db()
-            .transaction(|| import::update_from_hagrid(&self, cert))
+            .transaction(|| update::update_from_hagrid(&self, cert))
     }
 }

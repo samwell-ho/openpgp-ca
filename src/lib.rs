@@ -24,8 +24,8 @@ mod ca_secret;
 mod cert;
 mod db;
 mod export;
-mod import;
 pub mod pgp;
 mod revocation;
+mod update;
 
 pub mod restd;
