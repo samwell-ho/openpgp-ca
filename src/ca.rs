@@ -496,8 +496,8 @@ impl OpenpgpCa {
                     for uid in sig_by_ca {
                         println!(
                             " - '{} <{}>'",
-                            uid.name()?.unwrap_or("".to_string()),
-                            uid.email()?.unwrap_or("".to_string())
+                            uid.name()?.unwrap_or_else(|| "".to_string()),
+                            uid.email()?.unwrap_or_else(|| "".to_string())
                         );
                     }
                 }
