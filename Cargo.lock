@@ -1737,27 +1737,48 @@ name = "openpgp-ca"
 version = "0.10.1"
 dependencies = [
  "anyhow",
+ "clap",
+ "openpgp-ca-lib",
+ "structopt",
+]
+
+[[package]]
+name = "openpgp-ca-lib"
+version = "0.10.1"
+dependencies = [
+ "anyhow",
  "chbs",
  "chrono",
- "clap",
  "csv",
  "diesel",
  "diesel_migrations",
- "futures",
- "futures-util",
- "lazy_static",
- "once_cell",
  "openpgp-keylist",
  "publicsuffix",
+ "rexpect",
+ "sequoia-net",
+ "sequoia-openpgp",
+ "sha2",
+ "tempfile",
+ "tokio 0.2.25",
+]
+
+[[package]]
+name = "openpgp-ca-restd"
+version = "0.10.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "csv",
+ "once_cell",
+ "openpgp-ca-lib",
  "reqwest 0.10.10",
  "rexpect",
  "rocket",
  "rocket_contrib",
- "sequoia-net",
  "sequoia-openpgp",
  "serde",
  "serde_json",
- "sha2",
  "structopt",
  "tempfile",
  "tokio 0.2.25",

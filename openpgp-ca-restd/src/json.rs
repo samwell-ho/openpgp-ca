@@ -10,8 +10,8 @@ use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
 
-use crate::db::models;
-use crate::restd::cert_info::CertInfo;
+use crate::cert_info::CertInfo;
+use openpgp_ca_lib::db::models;
 
 /// A container for return-data about one Cert.
 ///

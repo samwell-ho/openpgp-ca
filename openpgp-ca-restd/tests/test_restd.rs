@@ -6,12 +6,13 @@
 // SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use openpgp_ca_lib::ca::OpenpgpCa;
-use openpgp_ca_lib::restd;
-use openpgp_ca_lib::restd::client::Client;
-use openpgp_ca_lib::restd::json::{
+use openpgp_ca_restd::client::Client;
+use openpgp_ca_restd::json::{
     Action, CertResultJson, CertStatus, Certificate,
 };
+use openpgp_ca_restd::restd;
+
+use openpgp_ca_lib::ca::OpenpgpCa;
 
 use rocket::futures::prelude::future::{AbortHandle, Abortable};
 

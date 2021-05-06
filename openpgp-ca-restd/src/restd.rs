@@ -14,22 +14,13 @@ use rocket::http::Status;
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
 
-use crate::ca::OpenpgpCa;
-use crate::db::models;
-use crate::pgp::Pgp;
-use crate::restd::cert_info::CertInfo;
-use crate::restd::json::*;
-use crate::restd::process_certs::{
-    cert_to_cert_info, cert_to_warn, process_certs,
-};
+use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::db::models;
+use openpgp_ca_lib::pgp::Pgp;
 
-mod cli;
-mod process_certs;
-mod util;
-
-pub mod cert_info;
-pub mod client;
-pub mod json;
+use crate::cert_info::CertInfo;
+use crate::json::*;
+use crate::process_certs::{cert_to_cert_info, cert_to_warn, process_certs};
 
 static DB: OnceCell<Option<String>> = OnceCell::new();
 
@@ -39,10 +30,10 @@ thread_local! {
 }
 
 // CA certifications are good for 365 days
-const CERTIFICATION_DAYS: u64 = 365;
+pub const CERTIFICATION_DAYS: u64 = 365;
 
 // armored cert size limit (1 MiB)
-const CERT_SIZE_LIMIT: usize = 1024 * 1024;
+pub const CERT_SIZE_LIMIT: usize = 1024 * 1024;
 
 // FIXME: link for information about bad certificates
 // - and what to do about them

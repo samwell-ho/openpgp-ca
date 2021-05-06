@@ -15,17 +15,12 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
-#[macro_use]
-extern crate rocket;
-
 mod bridge;
 pub mod ca;
 mod ca_secret;
 mod cert;
-mod db;
+pub mod db;
 mod export;
 pub mod pgp;
 mod revocation;
 mod update;
-
-pub mod restd;

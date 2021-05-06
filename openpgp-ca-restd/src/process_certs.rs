@@ -8,6 +8,7 @@
 
 use core::time::Duration;
 use std::collections::HashSet;
+use std::error::Error;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::time::SystemTime;
@@ -19,13 +20,13 @@ use sequoia_openpgp::types::{
 };
 use sequoia_openpgp::{Cert, Message, Packet};
 
-use crate::ca::OpenpgpCa;
-use crate::pgp::Pgp;
+use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::pgp::Pgp;
+
+use crate::cert_info::CertInfo;
+use crate::json::*;
 use crate::restd;
-use crate::restd::cert_info::CertInfo;
-use crate::restd::json::*;
-use crate::restd::util::{is_email_in_domain, split_emails, user_id_filter};
-use std::error::Error;
+use crate::util::{is_email_in_domain, split_emails, user_id_filter};
 
 const STANDARD_POLICY: &StandardPolicy = &StandardPolicy::new();
 
@@ -604,7 +605,7 @@ pub fn process_certs(
 
 #[cfg(test)]
 mod tests {
-    use crate::restd::process_certs::unpack_certring;
+    use crate::process_certs::unpack_certring;
 
     #[test]
     fn test_certring() {

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "openpgp-ca"
+version = "0.10.1"
+description = "OpenPGP CA is a tool for managing and certifying OpenPGP keys"
+authors = ["Heiko Schaefer <heiko@schaefer.name>"]
+license = "GPL-3.0-or-later"
+categories = ["cryptography", "email"]
+keywords = ["OpenPGP", "Sequoia", "PGP"]
+homepage = "https://openpgp-ca.org"
+repository = "https://gitlab.com/openpgp-ca/openpgp-ca"
+documentation = "https://openpgp-ca.org/doc/"
+edition = "2018"
+
+[[bin]]
+name = "openpgp-ca"
+path = "src/bin.rs"
+
+[dependencies]
+structopt = "0.3"
+clap = "2.33"
+anyhow = "1.0"
+
+openpgp-ca-lib = { path = "../openpgp-ca-lib" }

@@ -12,11 +12,14 @@
 #[macro_use]
 extern crate rocket;
 
+mod cert_info;
 mod cli;
+pub mod json;
+mod process_certs;
+mod restd;
 pub mod util;
 
 use cli::RestdCli;
-use openpgp_ca_lib::restd;
 use structopt::StructOpt;
 
 #[launch]

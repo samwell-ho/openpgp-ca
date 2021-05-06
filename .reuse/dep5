@@ -8,7 +8,7 @@ Copyright: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 License: GPL-3.0-or-later
 
 
-Files: src/db/schema.rs Cargo.lock
+Files: openpgp-ca-lib/src/db/schema.rs Cargo.lock
 Copyright: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 License: CC0-1.0
 

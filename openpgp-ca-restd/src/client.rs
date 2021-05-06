@@ -11,9 +11,7 @@
 
 use reqwest::{Response, StatusCode};
 
-use crate::restd::json::{
-    CertResultJson, Certificate, ReturnError, ReturnGoodJson,
-};
+use crate::json::{CertResultJson, Certificate, ReturnError, ReturnGoodJson};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
 pub struct Client {
