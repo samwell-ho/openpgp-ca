@@ -21,7 +21,6 @@ use sequoia_openpgp::serialize::{Serialize, SerializeInto};
 use sequoia_openpgp::types::{KeyFlags, RevocationStatus, SignatureType};
 use sequoia_openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 
-use std::convert::identity;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
