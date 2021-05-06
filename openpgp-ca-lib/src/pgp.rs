@@ -283,7 +283,7 @@ impl Pgp {
                     None
                 }
             })
-            .filter_map(identity)
+            .flatten()
             .collect();
 
         match sig_fingerprints.len() {
