@@ -6,4 +6,5 @@ members = [
     "openpgp-ca-lib",
     "openpgp-ca-bin",
     "openpgp-ca-restd",
+    "gnupg-test-wrapper",
 ]

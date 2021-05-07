@@ -25,7 +25,7 @@ use openpgp_ca_lib::ca::OpenpgpCa;
 use openpgp_ca_lib::pgp::Pgp;
 use sequoia_net::Policy;
 
-pub mod gnupg;
+use gnupg_test_wrapper as gnupg;
 
 #[test]
 /// Creates a CA (with a custom name) and a user.

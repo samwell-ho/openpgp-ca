@@ -12,11 +12,10 @@ use openpgp_ca_restd::json::{
 };
 use openpgp_ca_restd::restd;
 
+use gnupg_test_wrapper as gnupg;
 use openpgp_ca_lib::ca::OpenpgpCa;
 
 use rocket::futures::prelude::future::{AbortHandle, Abortable};
-
-pub mod gnupg;
 
 const ALICE_CERT: &str = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----
 

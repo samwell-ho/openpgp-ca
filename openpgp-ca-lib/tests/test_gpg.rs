@@ -15,7 +15,7 @@ use openpgp_ca_lib::pgp::Pgp;
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
-pub mod gnupg;
+use gnupg_test_wrapper as gnupg;
 
 #[test]
 /// Create a new CA. Create user certs for Alice and Bob in OpenPGP CA.
