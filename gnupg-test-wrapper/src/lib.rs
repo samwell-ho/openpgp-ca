@@ -313,6 +313,7 @@ pub enum GnupgError {
 
 pub fn import(ctx: &Ctx, what: &[u8]) {
     let mut gpg = Command::new("gpg")
+        .env("LC_ALL", "C")
         .stdin(Stdio::piped())
         .arg("--homedir")
         .arg(ctx.directory("homedir").unwrap())
@@ -328,6 +329,7 @@ pub fn export(ctx: &Ctx, search: &str) -> String {
     let mut out = String::new();
 
     let mut gpg = Command::new("gpg")
+        .env("LC_ALL", "C")
         .stdout(Stdio::piped())
         .arg("--homedir")
         .arg(ctx.directory("homedir").unwrap())
@@ -351,6 +353,7 @@ pub fn export_secret(ctx: &Ctx, search: &str) -> String {
     let mut out = String::new();
 
     let mut gpg = Command::new("gpg")
+        .env("LC_ALL", "C")
         .stdout(Stdio::piped())
         .arg("--homedir")
         .arg(ctx.directory("homedir").unwrap())
@@ -389,6 +392,7 @@ pub fn list_keys(ctx: &Ctx) -> Result<HashMap<String, String>> {
 
 fn list_keys_raw(ctx: &Ctx) -> Vec<StringRecord> {
     let gpg = Command::new("gpg")
+        .env("LC_ALL", "C")
         .stdin(Stdio::piped())
         .arg("--homedir")
         .arg(ctx.directory("homedir").unwrap())
@@ -485,6 +489,7 @@ pub fn edit_expire(ctx: &Ctx, user_id: &str, expires: &str) -> Result<()> {
 
 pub fn create_user(ctx: &Ctx, user_id: &str) {
     let mut gpg = Command::new("gpg")
+        .env("LC_ALL", "C")
         .stdin(Stdio::piped())
         .arg("--homedir")
         .arg(ctx.directory("homedir").unwrap())
