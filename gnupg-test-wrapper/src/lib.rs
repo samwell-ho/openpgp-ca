@@ -18,6 +18,7 @@ use std::process::Stdio;
 
 use anyhow::{Context, Result};
 use csv::StringRecord;
+use rexpect::session::spawn_command;
 
 // FIXME: `LC_ALL=C` to make calls locale-independent (rexpect calls)
 
@@ -377,12 +378,15 @@ impl Ctx {
     }
 
     pub fn edit_trust(&self, user_id: &str, trust: u8) -> Result<()> {
-        let homedir =
-            String::from(self.directory("homedir").unwrap().to_str().unwrap());
+        let mut cmd = Command::new("gpg");
+        cmd.env("LC_ALL", "C")
+            .arg("--homedir")
+            .arg(self.directory("homedir").unwrap())
+            .arg("--edit-key")
+            .arg(user_id);
 
-        let cmd = format!("gpg --homedir {} --edit-key {}", homedir, user_id);
+        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
 
-        let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
         p.exp_string("gpg>").unwrap();
         p.send_line("trust").unwrap();
         p.exp_string("Your decision?").unwrap();
@@ -405,15 +409,17 @@ impl Ctx {
         filename: &str,
         reason: u8,
     ) -> Result<()> {
-        let homedir =
-            String::from(self.directory("homedir").unwrap().to_str().unwrap());
+        let mut cmd = Command::new("gpg");
+        cmd.env("LC_ALL", "C")
+            .arg("--homedir")
+            .arg(self.directory("homedir").unwrap())
+            .arg("--output")
+            .arg(filename)
+            .arg("--gen-revoke")
+            .arg(user_id);
 
-        let cmd = format!(
-            "gpg --homedir {} --output {} --gen-revoke {}",
-            homedir, filename, user_id
-        );
+        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
 
-        let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
         p.exp_string("Create a revocation certificate for this key? (y/N)")
             .unwrap();
         p.send_line("y").unwrap();
@@ -429,12 +435,15 @@ impl Ctx {
     }
 
     pub fn edit_expire(&self, user_id: &str, expires: &str) -> Result<()> {
-        let homedir =
-            String::from(self.directory("homedir").unwrap().to_str().unwrap());
+        let mut cmd = Command::new("gpg");
+        cmd.env("LC_ALL", "C")
+            .arg("--homedir")
+            .arg(self.directory("homedir").unwrap())
+            .arg("--edit-key")
+            .arg(user_id);
 
-        let cmd = format!("gpg --homedir {} --edit-key {}", homedir, user_id);
+        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
 
-        let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
         p.exp_string("gpg>").unwrap();
         p.send_line("expire").unwrap();
         p.exp_string("Key is valid for? (0)").unwrap();
@@ -468,12 +477,15 @@ impl Ctx {
     }
 
     pub fn sign(&self, user_id: &str) -> Result<()> {
-        let homedir =
-            String::from(self.directory("homedir").unwrap().to_str().unwrap());
+        let mut cmd = Command::new("gpg");
+        cmd.env("LC_ALL", "C")
+            .arg("--homedir")
+            .arg(self.directory("homedir").unwrap())
+            .arg("--edit-key")
+            .arg(user_id);
 
-        let cmd = format!("gpg --homedir {} --edit-key {}", homedir, user_id);
+        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
 
-        let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
         p.exp_string("gpg>").unwrap();
         p.send_line("sign").unwrap();
         p.exp_string("Really sign? (y/N)").unwrap();
@@ -486,12 +498,15 @@ impl Ctx {
     }
 
     pub fn tsign(&self, user_id: &str, level: u8, trust: u8) -> Result<()> {
-        let homedir =
-            String::from(self.directory("homedir").unwrap().to_str().unwrap());
+        let mut cmd = Command::new("gpg");
+        cmd.env("LC_ALL", "C")
+            .arg("--homedir")
+            .arg(self.directory("homedir").unwrap())
+            .arg("--edit-key")
+            .arg(user_id);
 
-        let cmd = format!("gpg --homedir {} --edit-key {}", homedir, user_id);
+        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
 
-        let mut p = rexpect::spawn(&cmd, Some(10_000)).unwrap();
         p.exp_string("gpg>").unwrap();
         p.send_line("tsign").unwrap();
         p.exp_string("Your selection?").unwrap();
