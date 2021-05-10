@@ -25,9 +25,9 @@ use gnupg_test_wrapper as gnupg;
 ///
 /// Check that gnupg considers Bob and the CA admin as "full"ly trusted.
 fn test_alice_authenticates_bob_centralized() -> Result<()> {
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     // ---- use OpenPGP CA to make a set of keys ----
@@ -49,7 +49,7 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     // import CA key into GnuPG
     let mut buf = Vec::new();
     ca_cert.as_tsk().serialize(&mut buf)?;
-    gnupg::import(&ctx, &buf);
+    gpg.import(&buf);
 
     // import CA users into GnuPG
     let certs = ca.user_certs_get_all()?;
@@ -57,14 +57,14 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     assert_eq!(certs.len(), 2);
 
     for cert in certs {
-        gnupg::import(&ctx, cert.pub_cert.as_bytes());
+        gpg.import(cert.pub_cert.as_bytes());
     }
 
     // ---- set "ultimate" ownertrust for alice ----
-    gnupg::edit_trust(&ctx, "alice", 5)?;
+    gpg.edit_trust("alice", 5)?;
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gnupg::list_keys(&ctx)?;
+    let gpg_trust = gpg.list_keys()?;
 
     assert_eq!(gpg_trust.len(), 3);
 
@@ -82,7 +82,7 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     );
 
     // don't delete home dir (for manual inspection)
-    //    ctx.leak_tempdir();
+    //    gpg.leak_tempdir();
 
     Ok(())
 }
@@ -103,12 +103,12 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
 /// Expect gnupg in Alice's instance to consider both the CA Admin key and
 /// Bob and "full"ly trusted.
 fn test_alice_authenticates_bob_decentralized() -> Result<()> {
-    let ctx_alice = gnupg::make_context()?;
-    let ctx_bob = gnupg::make_context()?;
+    let gpg_alice = gnupg::make_context()?;
+    let gpg_bob = gnupg::make_context()?;
 
-    let ctx_ca = gnupg::make_context()?;
+    let gpg_ca = gnupg::make_context()?;
 
-    let home_path_ca = String::from(ctx_ca.get_homedir().to_str().unwrap());
+    let home_path_ca = String::from(gpg_ca.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path_ca);
 
     // ---- init OpenPGP CA key ----
@@ -120,8 +120,8 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let ca_key = ca.ca_get_pubkey_armored()?;
 
     // ---- import CA key from OpenPGP CA into GnuPG instances ----
-    gnupg::import(&ctx_alice, ca_key.as_bytes());
-    gnupg::import(&ctx_bob, ca_key.as_bytes());
+    gpg_alice.import(ca_key.as_bytes());
+    gpg_bob.import(ca_key.as_bytes());
 
     // get Cert for CA
     let ca_cert = ca.ca_get_priv_key()?;
@@ -129,16 +129,18 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let ca_keyid = format!("{:X}", ca_cert.keyid());
 
     // create users in their respective GnuPG contexts
-    gnupg::create_user(&ctx_alice, "Alice <alice@example.org>");
-    gnupg::create_user(&ctx_bob, "Bob <bob@example.org>");
+    gpg_alice.create_user("Alice <alice@example.org>");
+    gpg_bob.create_user("Bob <bob@example.org>");
 
     // create tsig for ca key in user GnuPG contexts
-    gnupg::tsign(&ctx_alice, &ca_keyid, 1, 2).expect("tsign alice failed");
-    gnupg::tsign(&ctx_bob, &ca_keyid, 1, 2).expect("tsign bob failed");
+    gpg_alice
+        .tsign(&ca_keyid, 1, 2)
+        .expect("tsign alice failed");
+    gpg_bob.tsign(&ca_keyid, 1, 2).expect("tsign bob failed");
 
     // export CA key from both contexts, import to CA
-    let alice_ca_key = gnupg::export(&ctx_alice, &"openpgp-ca@example.org");
-    let bob_ca_key = gnupg::export(&ctx_bob, &"openpgp-ca@example.org");
+    let alice_ca_key = gpg_alice.export(&"openpgp-ca@example.org");
+    let bob_ca_key = gpg_bob.export(&"openpgp-ca@example.org");
 
     ca.ca_import_tsig(&alice_ca_key)
         .context("import CA tsig from Alice failed")?;
@@ -146,8 +148,8 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
         .context("import CA tsig from Bob failed")?;
 
     // get public keys for alice and bob from their gnupg contexts
-    let alice_key = gnupg::export(&ctx_alice, &"alice@example.org");
-    let bob_key = gnupg::export(&ctx_bob, &"bob@example.org");
+    let alice_key = gpg_alice.export(&"alice@example.org");
+    let bob_key = gpg_bob.export(&"bob@example.org");
 
     // import public keys for alice and bob into CA
     ca.cert_import_new(
@@ -174,14 +176,14 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let bob = certs.first().unwrap();
 
     // import bob+CA key into alice's GnuPG context
-    gnupg::import(&ctx_alice, ca_key.as_bytes());
-    gnupg::import(&ctx_alice, bob.pub_cert.as_bytes());
+    gpg_alice.import(ca_key.as_bytes());
+    gpg_alice.import(bob.pub_cert.as_bytes());
 
     // ---- set "ultimate" ownertrust for alice ----
-    gnupg::edit_trust(&ctx_alice, "alice", 5)?;
+    gpg_alice.edit_trust("alice", 5)?;
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gnupg::list_keys(&ctx_alice)?;
+    let gpg_trust = gpg_alice.list_keys()?;
 
     assert_eq!(gpg_trust.len(), 3);
 
@@ -217,12 +219,12 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
 /// However, users of CA1 will not, because their trust of keys that CA2
 /// signed is scoped to the main domain of CA2's organization.
 fn test_bridge() -> Result<()> {
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
     // don't delete home dir (for manual inspection)
-    // ctx.leak_tempdir();
+    // gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
 
     let db1 = format!("{}/ca1.sqlite", home_path);
     let db2 = format!("{}/ca2.sqlite", home_path);
@@ -283,8 +285,8 @@ fn test_bridge() -> Result<()> {
     let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
 
     // import CA keys into GnuPG
-    gnupg::import(&ctx, ca1_cert.as_bytes());
-    gnupg::import(&ctx, ca2_cert.as_bytes());
+    gpg.import(ca1_cert.as_bytes());
+    gpg.import(ca2_cert.as_bytes());
 
     // import CA1 users into GnuPG
     let certs1 = ca1.user_certs_get_all()?;
@@ -292,7 +294,7 @@ fn test_bridge() -> Result<()> {
     assert_eq!(certs1.len(), 1);
 
     for cert in certs1 {
-        gnupg::import(&ctx, cert.pub_cert.as_bytes());
+        gpg.import(cert.pub_cert.as_bytes());
     }
 
     // import CA2 users into GnuPG
@@ -301,14 +303,14 @@ fn test_bridge() -> Result<()> {
     assert_eq!(certs2.len(), 2);
 
     for cert in certs2 {
-        gnupg::import(&ctx, cert.pub_cert.as_bytes());
+        gpg.import(cert.pub_cert.as_bytes());
     }
 
     // ---- set "ultimate" ownertrust for alice ----
-    gnupg::edit_trust(&ctx, "alice", 5)?;
+    gpg.edit_trust("alice", 5)?;
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gnupg::list_keys(&ctx)?;
+    let gpg_trust = gpg.list_keys()?;
 
     assert_eq!(gpg_trust.len(), 5);
 
@@ -352,12 +354,12 @@ fn test_bridge() -> Result<()> {
 /// expected outcome: alice has "full" trust for openpgp-ca@alpha.org and openpgp-ca@beta.org,
 /// but no trust for openpgp-ca@gamma.org and carol@gamma.org
 fn test_multi_bridge() -> Result<()> {
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
     // don't delete home dir (for manual inspection)
-    // ctx.leak_tempdir();
+    // gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
 
     let db1 = format!("{}/ca1.sqlite", home_path);
     let db2 = format!("{}/ca2.sqlite", home_path);
@@ -412,29 +414,29 @@ fn test_multi_bridge() -> Result<()> {
     let ca3_cert = ca2.db().cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
 
     // import CA certs into GnuPG
-    gnupg::import(&ctx, ca1_cert.as_bytes());
-    gnupg::import(&ctx, ca2_cert.as_bytes());
-    gnupg::import(&ctx, ca3_cert.as_bytes());
+    gpg.import(ca1_cert.as_bytes());
+    gpg.import(ca2_cert.as_bytes());
+    gpg.import(ca3_cert.as_bytes());
 
     // import CA1 users into GnuPG
     let certs1 = ca1.user_certs_get_all()?;
     assert_eq!(certs1.len(), 1);
     certs1
         .iter()
-        .for_each(|c| gnupg::import(&ctx, c.pub_cert.as_bytes()));
+        .for_each(|c| gpg.import(c.pub_cert.as_bytes()));
 
     // import CA3 users into GnuPG
     let certs3 = ca3.user_certs_get_all()?;
     assert_eq!(certs3.len(), 2);
     certs3
         .iter()
-        .for_each(|c| gnupg::import(&ctx, c.pub_cert.as_bytes()));
+        .for_each(|c| gpg.import(c.pub_cert.as_bytes()));
 
     // ---- set "ultimate" ownertrust for alice ----
-    gnupg::edit_trust(&ctx, "alice", 5)?;
+    gpg.edit_trust("alice", 5)?;
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gnupg::list_keys(&ctx)?;
+    let gpg_trust = gpg.list_keys()?;
 
     assert_eq!(gpg_trust.len(), 6);
 
@@ -478,12 +480,12 @@ fn test_multi_bridge() -> Result<()> {
 ///     ---tsign---> openpgp-ca@other.org
 ///       ---sign--> bob@beta.org
 fn test_scoping() -> Result<()> {
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
     // don't delete home dir (for manual inspection)
-    // ctx.leak_tempdir();
+    // gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
 
     let db1 = format!("{}/ca1.sqlite", home_path);
     let db2 = format!("{}/ca2.sqlite", home_path);
@@ -527,29 +529,29 @@ fn test_scoping() -> Result<()> {
     let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
 
     // import CA certs into GnuPG
-    gnupg::import(&ctx, Pgp::cert_to_armored(&ca1_cert)?.as_bytes());
-    gnupg::import(&ctx, ca2_cert.as_bytes());
-    gnupg::import(&ctx, Pgp::cert_to_armored(&tsigned_ca3)?.as_bytes());
+    gpg.import(Pgp::cert_to_armored(&ca1_cert)?.as_bytes());
+    gpg.import(ca2_cert.as_bytes());
+    gpg.import(Pgp::cert_to_armored(&tsigned_ca3)?.as_bytes());
 
     // import CA1 users into GnuPG
     let certs1 = ca1.user_certs_get_all()?;
     assert_eq!(certs1.len(), 1);
     certs1
         .iter()
-        .for_each(|c| gnupg::import(&ctx, c.pub_cert.as_bytes()));
+        .for_each(|c| gpg.import(c.pub_cert.as_bytes()));
 
     // import CA3 users into GnuPG
     let certs3 = ca3.user_certs_get_all()?;
     assert_eq!(certs3.len(), 1);
     certs3
         .iter()
-        .for_each(|c| gnupg::import(&ctx, c.pub_cert.as_bytes()));
+        .for_each(|c| gpg.import(c.pub_cert.as_bytes()));
 
     // ---- set "ultimate" ownertrust for alice ----
-    gnupg::edit_trust(&ctx, "alice", 5)?;
+    gpg.edit_trust("alice", 5)?;
 
     // ---- read calculated "trust" per uid from GnuPG ----
-    let gpg_trust = gnupg::list_keys(&ctx)?;
+    let gpg_trust = gpg.list_keys()?;
 
     assert_eq!(gpg_trust.len(), 5);
 

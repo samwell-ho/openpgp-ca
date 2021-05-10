@@ -33,9 +33,9 @@ use gnupg_test_wrapper as gnupg;
 /// Checks that CA (with custom name) and one user (with one revocation) are
 /// visible via CA API.
 fn test_ca() -> Result<()> {
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -81,9 +81,9 @@ fn test_ca() -> Result<()> {
 ///
 /// Checks that the certification indeed has a limited validity.
 fn test_expiring_certification() -> Result<()> {
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -160,10 +160,10 @@ fn test_update_cert_key() -> Result<()> {
         now.checked_add(Duration::from_secs(3600 * 24 * 365 * 6));
 
     // update key with new version, but same fingerprint
-    let ctx = gnupg::make_context()?;
-    //    ctx.leak_tempdir();
+    let gpg = gnupg::make_context()?;
+    //    gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -172,8 +172,8 @@ fn test_update_cert_key() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // import key as new user
-    gnupg::create_user(&ctx, "alice@example.org");
-    let alice1_key = gnupg::export(&ctx, &"alice@example.org");
+    gpg.create_user("alice@example.org");
+    let alice1_key = gpg.export(&"alice@example.org");
 
     ca.cert_import_new(
         &alice1_key,
@@ -205,8 +205,8 @@ fn test_update_cert_key() -> Result<()> {
     assert_eq!(exp3.len(), 1);
 
     // edit key with gpg, then import new version into CA
-    gnupg::edit_expire(&ctx, "alice@example.org", "5y")?;
-    let alice2_key = gnupg::export(&ctx, &"alice@example.org");
+    gpg.edit_expire("alice@example.org", "5y")?;
+    let alice2_key = gpg.export(&"alice@example.org");
 
     // get cert for alice
     let certs = ca.certs_by_email("alice@example.org")?;
@@ -240,10 +240,10 @@ fn test_update_cert_key() -> Result<()> {
 #[test]
 fn test_ca_import() -> Result<()> {
     // update key with new version, but same fingerprint
-    let ctx = gnupg::make_context()?;
-    //    ctx.leak_tempdir();
+    let gpg = gnupg::make_context()?;
+    //    gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -252,8 +252,8 @@ fn test_ca_import() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // import key as new user
-    gnupg::create_user(&ctx, "alice@example.org");
-    let alice1_key = gnupg::export(&ctx, &"alice@example.org");
+    gpg.create_user("alice@example.org");
+    let alice1_key = gpg.export(&"alice@example.org");
 
     ca.cert_import_new(
         &alice1_key,
@@ -282,8 +282,8 @@ fn test_ca_import() -> Result<()> {
     // the fingerprint stays the same
 
     // make a new key
-    gnupg::create_user(&ctx, "bob@example.org");
-    let bob_key = gnupg::export(&ctx, &"bob@example.org");
+    gpg.create_user("bob@example.org");
+    let bob_key = gpg.export(&"bob@example.org");
 
     // call "cert_import_update" with a new key
 
@@ -303,9 +303,9 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     // two certs with the same email are considered distinct certs
     // (e.g. "normal cert" vs "code signing cert")
 
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -341,10 +341,10 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
 /// Expected outcome: the WKD contains three keys (CA + 2x user).
 /// Check that the expected filenames exist in the WKD data.
 fn test_ca_export_wkd() -> Result<()> {
-    let ctx = gnupg::make_context()?;
-    // ctx.leak_tempdir();
+    let gpg = gnupg::make_context()?;
+    // gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -405,10 +405,10 @@ fn test_ca_export_wkd() -> Result<()> {
 /// Get sequoia-pgp.org keys for Justus and Neal from Hagrid.
 /// Import into a fresh CA instance, then export as WKD.
 fn test_ca_export_wkd_sequoia() -> Result<()> {
-    let ctx = gnupg::make_context()?;
-    //    ctx.leak_tempdir();
+    let gpg = gnupg::make_context()?;
+    //    gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
 
     // -- get keys from hagrid
 
@@ -472,9 +472,9 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 fn test_ca_multiple_revocations() -> Result<()> {
     // create two different revocation certificates for one key and import them
 
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -483,9 +483,9 @@ fn test_ca_multiple_revocations() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // gpg: make key for Alice
-    gnupg::create_user(&ctx, "Alice <alice@example.org>");
+    gpg.create_user("Alice <alice@example.org>");
 
-    let alice_key = gnupg::export(&ctx, &"alice@example.org");
+    let alice_key = gpg.export(&"alice@example.org");
 
     ca.cert_import_new(
         &alice_key,
@@ -497,10 +497,10 @@ fn test_ca_multiple_revocations() -> Result<()> {
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
-    gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file1, 1)?;
+    gpg.make_revocation("alice@example.org", &revoc_file1, 1)?;
 
     let revoc_file3 = format!("{}/alice.revoc3", home_path);
-    gnupg::make_revocation(&ctx, "alice@example.org", &revoc_file3, 3)?;
+    gpg.make_revocation("alice@example.org", &revoc_file3, 3)?;
 
     ca.revocation_add_from_file(&PathBuf::from(revoc_file1))?;
     ca.revocation_add_from_file(&PathBuf::from(revoc_file3))?;
@@ -541,17 +541,17 @@ fn test_ca_multiple_revocations() -> Result<()> {
 /// - Bob is not signed and hasn't tsigned the CA,
 /// - Carol is signed and has tsigned the CA.
 fn test_ca_signatures() -> Result<()> {
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
     ca.ca_init("example.org", None)?;
 
     // create/import alice, CA signs alice's key
-    gnupg::create_user(&ctx, "alice@example.org");
-    let alice_key = gnupg::export(&ctx, &"alice@example.org");
+    gpg.create_user("alice@example.org");
+    let alice_key = gpg.export(&"alice@example.org");
 
     ca.cert_import_new(
         &alice_key,
@@ -563,8 +563,8 @@ fn test_ca_signatures() -> Result<()> {
     .context("import Alice to CA failed")?;
 
     // create/import bob
-    gnupg::create_user(&ctx, "bob@example.org");
-    let bob_key = gnupg::export(&ctx, &"bob@example.org");
+    gpg.create_user("bob@example.org");
+    let bob_key = gpg.export(&"bob@example.org");
 
     // CA does not signs bob's key because the "email" parameter is empty.
     // Only userids that are supplied in `email` are signed by the CA.
@@ -610,10 +610,10 @@ fn test_ca_signatures() -> Result<()> {
 ///
 /// Check that the revocation has been published to the user's cert.
 fn test_apply_revocation() -> Result<()> {
-    let ctx = gnupg::make_context()?;
-    //    ctx.leak_tempdir();
+    let gpg = gnupg::make_context()?;
+    //    gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -648,10 +648,10 @@ fn test_apply_revocation() -> Result<()> {
 fn test_import_signed_cert() -> Result<()> {
     let policy = StandardPolicy::new();
 
-    let ctx = gnupg::make_context()?;
-    // ctx.leak_tempdir();
+    let gpg = gnupg::make_context()?;
+    // gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -661,14 +661,14 @@ fn test_import_signed_cert() -> Result<()> {
     let ca_cert = ca.ca_get_priv_key()?;
     let mut buf = Vec::new();
     ca_cert.as_tsk().serialize(&mut buf)?;
-    gnupg::import(&ctx, &buf);
+    gpg.import(&buf);
 
     // set up, sign Alice key with gnupg
-    gnupg::create_user(&ctx, "Alice <alice@example.org>");
-    gnupg::sign(&ctx, "alice@example.org").expect("signing alice failed");
+    gpg.create_user("Alice <alice@example.org>");
+    gpg.sign("alice@example.org").expect("signing alice failed");
 
     // import alice into OpenPGP CA
-    let alice_key = gnupg::export(&ctx, &"alice@example.org");
+    let alice_key = gpg.export(&"alice@example.org");
     ca.cert_import_new(
         &alice_key,
         vec![],
@@ -728,9 +728,9 @@ fn test_import_signed_cert() -> Result<()> {
 fn test_revocation_no_fingerprint() -> Result<()> {
     // create two different revocation certificates for one key and import them
 
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -742,13 +742,13 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
 
     // gpg: make key for Bob
-    gnupg::create_user(&ctx, "Bob <bob@example.org>");
-    let bob_key = gnupg::export(&ctx, &"bob@example.org");
+    gpg.create_user("Bob <bob@example.org>");
+    let bob_key = gpg.export(&"bob@example.org");
     ca.cert_import_new(&bob_key, vec![], None, &[], None)?;
 
     // make a revocation certificate for bob ...
     let revoc_file = format!("{}/bob.revoc", home_path);
-    gnupg::make_revocation(&ctx, "bob@example.org", &revoc_file, 1)?;
+    gpg.make_revocation("bob@example.org", &revoc_file, 1)?;
 
     // ... remove the issuer fingerprint ...
     let p = openpgp::Packet::from_file(&revoc_file)
@@ -756,7 +756,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
 
     let armored = if let openpgp::Packet::Signature(s) = p {
         // use Bob as a Signer
-        let bob_sec = gnupg::export_secret(&ctx, &"bob@example.org");
+        let bob_sec = gpg.export_secret(&"bob@example.org");
         let bob_cert = Cert::from_bytes(&bob_sec)?;
         let mut keypair = bob_cert
             .primary_key()
@@ -857,10 +857,10 @@ fn test_revocation_no_fingerprint() -> Result<()> {
 /// Check that the CA admin key is signed by the user (even with password
 /// encrypted user key)
 fn test_create_user_with_pw() -> Result<()> {
-    let ctx = gnupg::make_context()?;
-    //    ctx.leak_tempdir();
+    let gpg = gnupg::make_context()?;
+    //    gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -887,10 +887,10 @@ fn test_create_user_with_pw() -> Result<()> {
 ///
 /// Run a refresh and check if the results are as expected
 fn test_refresh() -> Result<()> {
-    let ctx = gnupg::make_context()?;
-    //    ctx.leak_tempdir();
+    let gpg = gnupg::make_context()?;
+    //    gpg.leak_tempdir();
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
@@ -975,9 +975,9 @@ fn test_refresh() -> Result<()> {
 /// Create a CA and two users. "delist" one user.
 /// Export to WKD. Check that only the other user has been exported.
 fn test_wkd_delist() -> Result<()> {
-    let ctx = gnupg::make_context()?;
+    let gpg = gnupg::make_context()?;
 
-    let home_path = String::from(ctx.get_homedir().to_str().unwrap());
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
     let ca = OpenpgpCa::new(Some(&db))?;
