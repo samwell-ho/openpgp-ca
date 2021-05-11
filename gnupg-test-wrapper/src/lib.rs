@@ -19,6 +19,15 @@ use anyhow::{Context, Result};
 use csv::StringRecord;
 use rexpect::session::spawn_command;
 
+/// A simple wrapper for GnuPG, for use in OpenPGP CA integration tests.
+///
+/// NOTE: This wrapper is not defensively written.
+/// It is absolutely not intended for production PGP usage!
+///
+/// NOTE: gpg.wait() may deadlock if the child process stdout pipe is full.
+/// This doesn't seem to be a problem for the current set of tests, but is a
+/// limitation of this wrapper.
+
 pub fn make_context() -> Result<Ctx> {
     let ctx = Ctx::ephemeral().context(
         "SKIP: Failed to create GnuPG context. Is GnuPG installed?",
