@@ -13,14 +13,11 @@ use std::fmt;
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::process::Stdio;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result};
 use csv::StringRecord;
 use rexpect::session::spawn_command;
-
-// FIXME: `LC_ALL=C` to make calls locale-independent (rexpect calls)
 
 pub fn make_context() -> Result<Ctx> {
     let ctx = Ctx::ephemeral().context(
@@ -274,63 +271,53 @@ impl Ctx {
     }
 
     pub fn import(&self, what: &[u8]) {
-        let mut gpg = Command::new("gpg")
-            .env("LC_ALL", "C")
+        let mut gpg = self
+            .build_gpg_command(&["--import"])
             .stdin(Stdio::piped())
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--import")
             .spawn()
             .expect("failed to start gpg");
+
         gpg.stdin.as_mut().unwrap().write_all(what).unwrap();
         let status = gpg.wait().unwrap();
         assert!(status.success());
     }
 
     pub fn export(&self, search: &str) -> String {
-        let mut out = String::new();
-
-        let mut gpg = Command::new("gpg")
-            .env("LC_ALL", "C")
+        let mut gpg = self
+            .build_gpg_command(&["--armor", "--export", search])
             .stdout(Stdio::piped())
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--armor")
-            .arg("--export")
-            .arg(search)
             .spawn()
             .expect("failed to start gpg");
+
         let status = gpg.wait().unwrap();
+        assert!(status.success());
+
+        let mut out = String::new();
         gpg.stdout
             .as_mut()
             .unwrap()
             .read_to_string(&mut out)
             .unwrap();
-        assert!(status.success());
 
         out
     }
 
     pub fn export_secret(&self, search: &str) -> String {
-        let mut out = String::new();
-
-        let mut gpg = Command::new("gpg")
-            .env("LC_ALL", "C")
+        let mut gpg = self
+            .build_gpg_command(&["--armor", "--export-secret-keys", search])
             .stdout(Stdio::piped())
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--armor")
-            .arg("--export-secret-keys")
-            .arg(search)
             .spawn()
             .expect("failed to start gpg");
+
         let status = gpg.wait().unwrap();
+        assert!(status.success());
+
+        let mut out = String::new();
         gpg.stdout
             .as_mut()
             .unwrap()
             .read_to_string(&mut out)
             .unwrap();
-        assert!(status.success());
 
         out
     }
@@ -355,13 +342,8 @@ impl Ctx {
     }
 
     fn list_keys_raw(&self) -> Vec<StringRecord> {
-        let gpg = Command::new("gpg")
-            .env("LC_ALL", "C")
-            .stdin(Stdio::piped())
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--list-keys")
-            .arg("--with-colons")
+        let gpg = self
+            .build_gpg_command(&["--list-keys", "--with-colons"])
             .output()
             .expect("failed to start gpg");
 
@@ -378,14 +360,9 @@ impl Ctx {
     }
 
     pub fn edit_trust(&self, user_id: &str, trust: u8) -> Result<()> {
-        let mut cmd = Command::new("gpg");
-        cmd.env("LC_ALL", "C")
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--edit-key")
-            .arg(user_id);
+        let gpg = self.build_gpg_command(&["--edit-key", user_id]);
 
-        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
+        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
 
         p.exp_string("gpg>").unwrap();
         p.send_line("trust").unwrap();
@@ -409,16 +386,14 @@ impl Ctx {
         filename: &str,
         reason: u8,
     ) -> Result<()> {
-        let mut cmd = Command::new("gpg");
-        cmd.env("LC_ALL", "C")
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--output")
-            .arg(filename)
-            .arg("--gen-revoke")
-            .arg(user_id);
+        let gpg = self.build_gpg_command(&[
+            "--output",
+            filename,
+            "--gen-revoke",
+            user_id,
+        ]);
 
-        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
+        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
 
         p.exp_string("Create a revocation certificate for this key? (y/N)")
             .unwrap();
@@ -435,14 +410,9 @@ impl Ctx {
     }
 
     pub fn edit_expire(&self, user_id: &str, expires: &str) -> Result<()> {
-        let mut cmd = Command::new("gpg");
-        cmd.env("LC_ALL", "C")
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--edit-key")
-            .arg(user_id);
+        let gpg = self.build_gpg_command(&["--edit-key", user_id]);
 
-        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
+        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
 
         p.exp_string("gpg>").unwrap();
         p.send_line("expire").unwrap();
@@ -460,31 +430,25 @@ impl Ctx {
     }
 
     pub fn create_user(&self, user_id: &str) {
-        let mut gpg = Command::new("gpg")
-            .env("LC_ALL", "C")
-            .stdin(Stdio::piped())
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--quick-generate-key")
-            .arg("--batch")
-            .arg("--passphrase")
-            .arg("")
-            .arg(user_id.to_string())
+        let mut gpg = self
+            .build_gpg_command(&[
+                "--quick-generate-key",
+                "--batch",
+                "--passphrase",
+                "",
+                user_id,
+            ])
             .spawn()
             .expect("failed to start gpg");
+
         let status = gpg.wait().unwrap();
         assert!(status.success());
     }
 
     pub fn sign(&self, user_id: &str) -> Result<()> {
-        let mut cmd = Command::new("gpg");
-        cmd.env("LC_ALL", "C")
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--edit-key")
-            .arg(user_id);
+        let gpg = self.build_gpg_command(&["--edit-key", user_id]);
 
-        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
+        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
 
         p.exp_string("gpg>").unwrap();
         p.send_line("sign").unwrap();
@@ -498,14 +462,9 @@ impl Ctx {
     }
 
     pub fn tsign(&self, user_id: &str, level: u8, trust: u8) -> Result<()> {
-        let mut cmd = Command::new("gpg");
-        cmd.env("LC_ALL", "C")
-            .arg("--homedir")
-            .arg(self.directory("homedir").unwrap())
-            .arg("--edit-key")
-            .arg(user_id);
+        let gpg = self.build_gpg_command(&["--edit-key", user_id]);
 
-        let mut p = spawn_command(cmd, Some(10_000)).unwrap();
+        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
 
         p.exp_string("gpg>").unwrap();
         p.send_line("tsign").unwrap();
@@ -524,6 +483,21 @@ impl Ctx {
         p.exp_eof().unwrap();
 
         Ok(())
+    }
+
+    /// Build a 'Command' for running gpg with homedir set according to
+    /// this Ctx, "LC_ALL=C", and a list of additional args.
+    fn build_gpg_command(&self, args: &[&str]) -> Command {
+        let mut cmd = Command::new("gpg");
+        cmd.env("LC_ALL", "C")
+            .arg("--homedir")
+            .arg(self.directory("homedir").unwrap());
+
+        args.iter().for_each(|&arg| {
+            cmd.arg(arg);
+        });
+
+        cmd
     }
 }
 
