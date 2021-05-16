@@ -21,6 +21,7 @@ use openpgp_ca_lib::pgp::Pgp;
 use crate::cert_info::CertInfo;
 use crate::json::*;
 use crate::process_certs::{cert_to_cert_info, cert_to_warn, process_certs};
+use std::convert::TryInto;
 
 static DB: OnceCell<Option<String>> = OnceCell::new();
 
@@ -357,7 +358,7 @@ fn check_expiring(
                 )
             })?;
 
-            let ci = CertInfo::from_cert(&cert).map_err(|e| {
+            let ci = (&cert).try_into().map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!(

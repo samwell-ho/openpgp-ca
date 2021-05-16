@@ -19,6 +19,7 @@ use sequoia_openpgp::packet::key;
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::Cert;
+use std::convert::{TryFrom, TryInto};
 use std::time::SystemTime;
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
@@ -84,22 +85,26 @@ pub struct Revocation {
     pub time: Option<DateTime<Utc>>,
 }
 
-impl CertInfo {
-    pub fn from_cert(cert: &Cert) -> Result<CertInfo, anyhow::Error> {
+impl TryFrom<&Cert> for CertInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(cert: &Cert) -> Result<Self, Self::Error> {
         let mut user_ids: Vec<UserId> = vec![];
 
         for userid in cert.userids() {
-            let uid = UserId::from_component_amalgamation(&userid)?;
-
-            user_ids.push(uid)
+            user_ids.push((&userid).try_into()?)
         }
 
-        let primary = Key::from_key_amalgamation(&cert.primary_key().into());
+        let ka: ErasedKeyAmalgamation<_> = cert.primary_key().into();
+        let primary: Key = (&ka).into();
 
         let subkeys = cert
             .keys()
             .subkeys()
-            .map(|ka| Key::from_key_amalgamation(&ka.into()))
+            .map(|ka| {
+                let ka: ErasedKeyAmalgamation<_> = ka.into();
+                (&ka).into()
+            })
             .collect();
 
         let ci = CertInfo {
@@ -112,10 +117,14 @@ impl CertInfo {
     }
 }
 
-impl UserId {
-    fn from_component_amalgamation(
+impl TryFrom<&ComponentAmalgamation<'_, sequoia_openpgp::packet::UserID>>
+    for UserId
+{
+    type Error = anyhow::Error;
+
+    fn try_from(
         uid: &ComponentAmalgamation<sequoia_openpgp::packet::UserID>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, Self::Error> {
         let email =
             uid.email().context("ERROR while converting userid.email")?;
 
@@ -123,10 +132,8 @@ impl UserId {
 
         let raw = String::from_utf8(uid.value().to_vec()).ok();
 
-        let revocations: Vec<_> = uid
-            .self_revocations()
-            .map(|rev| Revocation::from_sig(rev))
-            .collect();
+        let revocations: Vec<_> =
+            uid.self_revocations().map(|rev| rev.into()).collect();
 
         let revocations = if revocations.is_empty() {
             None
@@ -143,10 +150,8 @@ impl UserId {
     }
 }
 
-impl Key {
-    fn from_key_amalgamation(
-        ka: &ErasedKeyAmalgamation<key::PublicParts>,
-    ) -> Self {
+impl From<&ErasedKeyAmalgamation<'_, key::PublicParts>> for Key {
+    fn from(ka: &ErasedKeyAmalgamation<key::PublicParts>) -> Self {
         let (expiration, flags) =
             if let Ok(valid_sk) = ka.clone().with_policy(POLICY, None) {
                 (valid_sk.key_expiration_time(), valid_sk.key_flags())
@@ -186,10 +191,8 @@ impl Key {
             None
         };
 
-        let revocations: Vec<_> = ka
-            .self_revocations()
-            .map(|rev| Revocation::from_sig(rev))
-            .collect();
+        let revocations: Vec<_> =
+            ka.self_revocations().map(|rev| rev.into()).collect();
 
         let revocations = if revocations.is_empty() {
             None
@@ -210,8 +213,8 @@ impl Key {
     }
 }
 
-impl Revocation {
-    fn from_sig(rev: &Signature) -> Self {
+impl From<&Signature> for Revocation {
+    fn from(rev: &Signature) -> Self {
         let rfr = rev.reason_for_revocation();
 
         if let Some(r) = rfr {

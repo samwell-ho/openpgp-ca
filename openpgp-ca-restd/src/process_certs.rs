@@ -27,6 +27,7 @@ use crate::cert_info::CertInfo;
 use crate::json::*;
 use crate::restd;
 use crate::util::{is_email_in_domain, split_emails, user_id_filter};
+use std::convert::TryInto;
 
 const STANDARD_POLICY: &StandardPolicy = &StandardPolicy::new();
 
@@ -107,10 +108,10 @@ pub fn cert_to_warn(cert: &Cert) -> Result<Option<Vec<Warning>>, CertError> {
 }
 
 pub fn cert_to_cert_info(cert: &Cert) -> Result<CertInfo, ReturnError> {
-    CertInfo::from_cert(cert).map_err(|e| {
+    cert.try_into().map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
-            format!("Error in CertInfo::from_cert() '{:?}'", e),
+            format!("Error getting CertInfo from Cert '{:?}'", e),
         )
     })
 }
@@ -202,7 +203,7 @@ fn validate_and_strip_user_ids(
 }
 
 fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
-    let ci = CertInfo::from_cert(cert).map_err(|e| {
+    let ci = cert.try_into().map_err(|e| {
         ReturnBadJson::new(
             CertError::new(
                 CertStatus::InternalError,
@@ -379,7 +380,7 @@ fn process_cert(
     )
     .map_err(|e| ReturnBadJson::new(e, Some(cert_info.clone())))?;
 
-    let cert_info_norm = CertInfo::from_cert(&norm)
+    let cert_info_norm: CertInfo = (&norm).try_into()
         .map_err(|e| {
             CertError::new(
                 CertStatus::InternalError,
