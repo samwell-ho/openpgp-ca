@@ -20,7 +20,7 @@ use openpgp_ca_lib::pgp::Pgp;
 
 use crate::cert_info::CertInfo;
 use crate::json::*;
-use crate::process_certs::{cert_to_cert_info, cert_to_warn, process_certs};
+use crate::process_certs::{get_cert_info, get_warnings, process_certs};
 use std::convert::TryInto;
 
 static DB: OnceCell<Option<String>> = OnceCell::new();
@@ -116,8 +116,8 @@ fn certs_by_email(
                 )
             })?;
 
-            let cert_info = cert_to_cert_info(&cert)?;
-            let warn = cert_to_warn(&cert).map_err(|ce| {
+            let cert_info = get_cert_info(&cert)?;
+            let warn = get_warnings(&cert).map_err(|ce| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!(
@@ -167,8 +167,8 @@ fn cert_by_fp(
                 )
             })?;
 
-            let cert_info = cert_to_cert_info(&cert)?;
-            let warn = cert_to_warn(&cert).map_err(|ce| {
+            let cert_info = get_cert_info(&cert)?;
+            let warn = get_warnings(&cert).map_err(|ce| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!(

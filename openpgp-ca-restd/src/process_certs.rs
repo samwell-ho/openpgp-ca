@@ -39,7 +39,7 @@ const STANDARD_POLICY: &StandardPolicy = &StandardPolicy::new();
 ///
 /// Assumption: the cert has been checked and found good by the
 /// StandardPolicy for `now`.
-pub fn cert_to_warn(cert: &Cert) -> Result<Option<Vec<Warning>>, CertError> {
+pub fn get_warnings(cert: &Cert) -> Result<Option<Vec<Warning>>, CertError> {
     let mut warns = Vec::new();
     let now = SystemTime::now();
 
@@ -107,7 +107,7 @@ pub fn cert_to_warn(cert: &Cert) -> Result<Option<Vec<Warning>>, CertError> {
     }
 }
 
-pub fn cert_to_cert_info(cert: &Cert) -> Result<CertInfo, ReturnError> {
+pub fn get_cert_info(cert: &Cert) -> Result<CertInfo, ReturnError> {
     cert.try_into().map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
@@ -506,7 +506,7 @@ fn process_cert(
         inactive: Some(inactive),
     };
 
-    let warn = cert_to_warn(&norm)
+    let warn = get_warnings(&norm)
         .map_err(|ce| ReturnBadJson::new(ce, Some(cert_info.clone())))?;
 
     Ok(ReturnGoodJson {
