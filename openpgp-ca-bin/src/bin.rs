@@ -142,6 +142,7 @@ fn main() -> Result<()> {
         },
         Command::Update { cmd } => match cmd {
             UpdateCommand::Keyserver {} => ca.update_from_keyserver()?,
+            UpdateCommand::Wkd {} => ca.update_from_wkd()?,
         },
     }
 

@@ -23,34 +23,43 @@ use tokio::runtime::Runtime;
 /// all certs retrieved in that way, if they have a  matching fingerprint,
 /// the cert data from wkd is merged into the existing cert (failed merges are
 /// ignored silently).
-pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<()> {
+pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let mut rt = Runtime::new()?;
 
     let emails = oca.emails_get(&cert)?;
 
     // Collect all updates for 'cert' in 'merge'
-    let mut merge = Pgp::armored_to_cert(&cert.pub_cert)?;
+    let orig = Pgp::armored_to_cert(&cert.pub_cert)?;
+    let mut merged = orig.clone();
 
     for email in emails {
-        let certs = rt.block_on(async move { wkd::get(&email.addr).await });
+        let res = rt.block_on(async move { wkd::get(&email.addr).await });
 
-        for c in certs? {
-            if c.fingerprint() == Fingerprint::from_hex(&cert.fingerprint)? {
-                // If 'c' can't be merged, silently ignore the error that
-                // sequoia returns
-                if let Ok(m) = merge.clone().merge_public(c) {
-                    merge = m;
+        // silently ignore errors on wkd lookup
+        if let Ok(certs) = res {
+            for c in certs {
+                if c.fingerprint() == Fingerprint::from_hex(&cert.fingerprint)?
+                {
+                    // If 'c' can't be merged, silently ignore the error that
+                    // sequoia returns
+                    if let Ok(m) = merged.clone().merge_public(c) {
+                        merged = m;
+                    }
                 }
             }
         }
     }
 
-    let mut db_update = cert.clone();
-    db_update.pub_cert = Pgp::cert_to_armored(&merge)?;
+    if merged != orig {
+        let mut db_update = cert.clone();
+        db_update.pub_cert = Pgp::cert_to_armored(&merged)?;
 
-    oca.db().cert_update(&db_update)?;
+        oca.db().cert_update(&db_update)?;
 
-    Ok(())
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 /// Update a cert in the OpenPGP CA database from the "Hagrid" keyserver at

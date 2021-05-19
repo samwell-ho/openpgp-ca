@@ -293,4 +293,6 @@ pub enum KeyListCommand {
 pub enum UpdateCommand {
     /// Update certificates from a keyserver
     Keyserver {},
+    /// Update certificates from WKD
+    Wkd {},
 }

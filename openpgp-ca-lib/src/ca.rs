@@ -796,11 +796,19 @@ impl OpenpgpCa {
 
     // -------- Update certs from public sources
 
-    /// Pull updates for a cert from WKD and merge them into our local
-    /// storage for this cert.
-    pub fn update_from_wkd(&self, cert: &models::Cert) -> Result<()> {
-        self.db()
-            .transaction(|| update::update_from_wkd(&self, cert))
+    /// Pull updates for all certs from WKD and merge them into our local
+    /// storage.
+    pub fn update_from_wkd(&self) -> Result<()> {
+        for c in self.user_certs_get_all()? {
+            self.db().transaction::<_, anyhow::Error, _>(|| {
+                let updated = update::update_from_wkd(&self, &c)?;
+                if updated {
+                    println!("Got update for cert {}", c.fingerprint);
+                }
+                Ok(())
+            })?;
+        }
+        Ok(())
     }
 
     /// Update all certs from keyserver
