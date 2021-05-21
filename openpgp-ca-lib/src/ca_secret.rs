@@ -102,7 +102,9 @@ impl CaSec for DbCa {
         }
 
         // domainname syntax check
-        if !publicsuffix::Domain::has_valid_syntax(domainname) {
+        use addr::parser::DomainName;
+        use addr::psl::List;
+        if List.parse_domain_name(domainname).is_err() {
             return Err(anyhow::anyhow!(
                 "Invalid domainname: '{}'",
                 domainname

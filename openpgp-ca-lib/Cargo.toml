@@ -28,7 +28,7 @@ chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "0.2.22", features = ["fs", "io-std", "io-util", "rt-threaded", "sync", "signal", "macros"] }
 
 chbs = "0.0.8"
-publicsuffix = "1.5"
+addr = "0.14"
 
 sha2 = "0.9"
 

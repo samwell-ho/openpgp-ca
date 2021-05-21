@@ -147,7 +147,9 @@ pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
 ///
 /// ("other.org" => "<[^>]+[@.]other\\.org>$")
 fn domain_to_regex(domain: &str) -> Result<String> {
-    if publicsuffix::Domain::has_valid_syntax(domain) {
+    use addr::parser::DomainName;
+    use addr::psl::List;
+    if List.parse_domain_name(domain).is_ok() {
         // if valid syntax: transform domain to regex
         let escaped_domain =
             &domain.split('.').collect::<Vec<_>>().join("\\.");
