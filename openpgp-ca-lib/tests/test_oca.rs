@@ -945,15 +945,15 @@ fn test_refresh() -> Result<()> {
                     ca_sigs[1].signature_validity_period(),
                     Some(Duration::new(864000, 0))
                 );
-                assert_eq!(cert.inactive, false);
+                assert!(!cert.inactive);
             }
             "Bob" => {
                 assert_eq!(ca_sigs.len(), 1);
-                assert_eq!(cert.inactive, false);
+                assert!(!cert.inactive);
             }
             "Carol" => {
                 assert_eq!(ca_sigs.len(), 1);
-                assert_eq!(cert.inactive, false);
+                assert!(!cert.inactive);
             }
             "Dave" => {
                 assert_eq!(ca_sigs.len(), 1);
@@ -961,7 +961,7 @@ fn test_refresh() -> Result<()> {
                     ca_sigs[0].signature_validity_period(),
                     Some(Duration::new(864000, 0))
                 );
-                assert_eq!(cert.inactive, true);
+                assert!(cert.inactive);
             }
 
             _ => panic!("unexpected cert found"),
