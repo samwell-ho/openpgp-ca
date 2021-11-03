@@ -167,13 +167,13 @@ fn validate_and_strip_user_ids(
     }
 
     // split up user_ids between "external" and "internal" emails, then:
-    match split_emails(&my_domain, user_emails) {
+    match split_emails(my_domain, user_emails) {
         Ok((int_provided, _)) => {
             let mut filter_uid = Vec::new();
 
             for user_id in cert.userids() {
                 if let Ok(Some(email)) = user_id.email() {
-                    let in_domain = is_email_in_domain(&email, &my_domain);
+                    let in_domain = is_email_in_domain(&email, my_domain);
 
                     if in_domain.is_ok() && in_domain.unwrap() {
                         // this is a User ID with an email in the domain
@@ -190,7 +190,7 @@ fn validate_and_strip_user_ids(
             // strip unexpected "internal" user_ids from the Cert
             let mut stripped = cert.clone();
             for filter in filter_uid {
-                stripped = user_id_filter(stripped, &filter)
+                stripped = user_id_filter(stripped, filter)
             }
 
             Ok(stripped)
@@ -264,7 +264,7 @@ fn process_cert(
     ca: &OpenpgpCa,
     persist: bool,
 ) -> Result<ReturnGoodJson, ReturnBadJson> {
-    let cert_info = check_cert(&cert)?;
+    let cert_info = check_cert(cert)?;
 
     // check if a cert with this fingerprint exists already in db
     // (new vs update)
@@ -375,7 +375,7 @@ fn process_cert(
     // check and normalize user_ids
     let norm = validate_and_strip_user_ids(
         &valid_cert,
-        &my_domain,
+        my_domain,
         &certificate.email,
     )
     .map_err(|e| ReturnBadJson::new(e, Some(cert_info.clone())))?;
@@ -591,15 +591,8 @@ pub fn process_certs(
         .enumerate()
         .map(|(n, cert)| {
             let is_signer = Some(n) == signer;
-            process_cert(
-                &cert,
-                is_signer,
-                &my_domain,
-                &certificate,
-                ca,
-                persist,
-            )
-            .into()
+            process_cert(cert, is_signer, &my_domain, certificate, ca, persist)
+                .into()
         })
         .collect())
 }

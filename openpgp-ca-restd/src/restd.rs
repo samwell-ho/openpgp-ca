@@ -45,7 +45,7 @@ fn load_certificate_data(
     ca: &OpenpgpCa,
     cert: &models::Cert,
 ) -> Result<Certificate, ReturnError> {
-    let user = ca.cert_get_users(&cert).map_err(|e| {
+    let user = ca.cert_get_users(cert).map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
             format!(
@@ -63,7 +63,7 @@ fn load_certificate_data(
         ));
     }
 
-    let emails = ca.emails_get(&cert).map_err(|e| {
+    let emails = ca.emails_get(cert).map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
             format!(
@@ -73,7 +73,7 @@ fn load_certificate_data(
         )
     })?;
 
-    let rev = ca.revocations_get(&cert).map_err(|e| {
+    let rev = ca.revocations_get(cert).map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
             format!(
@@ -84,7 +84,7 @@ fn load_certificate_data(
         )
     })?;
 
-    Ok(Certificate::from(&cert, &user.unwrap(), &emails, &rev))
+    Ok(Certificate::from(cert, &user.unwrap(), &emails, &rev))
 }
 
 #[get("/certs/by_email/<email>")]
@@ -127,7 +127,7 @@ fn certs_by_email(
                 )
             })?;
 
-            let certificate = load_certificate_data(&ca, &c)?;
+            let certificate = load_certificate_data(ca, &c)?;
 
             res.push(ReturnGoodJson {
                 certificate,
@@ -155,7 +155,7 @@ fn cert_by_fp(
         })?;
 
         if let Some(c) = c {
-            let certificate = load_certificate_data(&ca, &c)?;
+            let certificate = load_certificate_data(ca, &c)?;
 
             let cert = Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
                 ReturnError::new(
@@ -199,7 +199,7 @@ fn check_certs(
     certificate: Json<Certificate>,
 ) -> Result<Json<Vec<CertResultJson>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
-        Ok(Json(process_certs(&ca, &certificate.into_inner(), false)?))
+        Ok(Json(process_certs(ca, &certificate.into_inner(), false)?))
     })
 }
 
@@ -216,9 +216,7 @@ fn check_certs(
 fn post_certs(
     certificate: Json<Certificate>,
 ) -> Result<Json<Vec<CertResultJson>>, BadRequest<Json<ReturnError>>> {
-    CA.with(|ca| {
-        Ok(Json(process_certs(&ca, &certificate.into_inner(), true)?))
-    })
+    CA.with(|ca| Ok(Json(process_certs(ca, &certificate.into_inner(), true)?)))
 }
 
 /// Mark a certificate as "deactivated".
