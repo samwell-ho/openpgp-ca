@@ -76,6 +76,10 @@ fn main() -> Result<()> {
                     None,
                 )?;
             }
+            UserCommand::Update { cert_file } => {
+                let cert = std::fs::read_to_string(cert_file)?;
+                ca.cert_import_update(&cert)?;
+            }
             UserCommand::Export { email, path } => {
                 if let Some(path) = path {
                     ca.export_certs_as_files(email, &path)?;

@@ -171,6 +171,15 @@ pub enum UserCommand {
         )]
         revocation_file: Vec<PathBuf>,
     },
+    /// Update User (use existing Public Key)
+    Update {
+        #[structopt(
+            short = "f",
+            long = "key-file",
+            help = "File that contains the User's Public Key"
+        )]
+        cert_file: PathBuf,
+    },
     /// Export User Public Key (bulk, if no email address is given)
     Export {
         #[structopt(short = "e", long = "email", help = "Email address")]
