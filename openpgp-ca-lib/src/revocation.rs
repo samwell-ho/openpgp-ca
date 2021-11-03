@@ -56,7 +56,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revocation: &str) -> Result<()> {
     }
     // 2) If match by fingerprint failed: test revocation for each cert
     if cert.is_none() {
-        cert = search_revocable_cert_by_keyid(&oca, &mut revocation)?;
+        cert = search_revocable_cert_by_keyid(oca, &mut revocation)?;
     }
 
     if let Some(cert) = cert {
@@ -64,7 +64,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revocation: &str) -> Result<()> {
 
         // verify that revocation certificate validates with cert
         if validate_revocation(&c, &mut revocation)? {
-            if !check_for_equivalent_revocation(&oca, &revocation, &cert)? {
+            if !check_for_equivalent_revocation(oca, &revocation, &cert)? {
                 // update sig in DB
                 let armored = Pgp::revoc_to_armored(&revocation, None)
                     .context("couldn't armor revocation cert")?;

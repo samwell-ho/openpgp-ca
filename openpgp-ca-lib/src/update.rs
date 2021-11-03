@@ -26,7 +26,7 @@ use tokio::runtime::Runtime;
 pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let mut rt = Runtime::new()?;
 
-    let emails = oca.emails_get(&cert)?;
+    let emails = oca.emails_get(cert)?;
 
     // Collect all updates for 'cert' in 'merge'
     let orig = Pgp::armored_to_cert(&cert.pub_cert)?;

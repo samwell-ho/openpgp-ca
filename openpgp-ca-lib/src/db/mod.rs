@@ -24,7 +24,7 @@ pub struct OcaDb {
 
 impl OcaDb {
     pub fn new(db_url: &str) -> Result<Self> {
-        let conn = SqliteConnection::establish(&db_url)
+        let conn = SqliteConnection::establish(db_url)
             .context(format!("Error connecting to {}", db_url))?;
 
         // Enable handling of foreign key constraints in sqlite

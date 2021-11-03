@@ -326,7 +326,7 @@ impl Pgp {
         signer: &Cert,
         pass: Option<&str>,
     ) -> Result<Cert> {
-        let mut cert_keys = Self::get_cert_keys(&signer, pass);
+        let mut cert_keys = Self::get_cert_keys(signer, pass);
 
         if cert_keys.is_empty() {
             return Err(anyhow::anyhow!(
@@ -382,7 +382,7 @@ impl Pgp {
     // -------- helper functions
 
     pub fn print_cert_info(armored: &str) -> Result<()> {
-        let c = Pgp::armored_to_cert(&armored)?;
+        let c = Pgp::armored_to_cert(armored)?;
         for uid in c.userids() {
             println!("User ID: {}", uid.userid());
         }
@@ -464,7 +464,7 @@ impl Pgp {
             .filter(|&s| {
                 // check if the apparent certification by `certifier` is valid
                 certifier_keys.iter().any(|signer| {
-                    s.clone().verify_userid_binding(&signer, &pk, &uid).is_ok()
+                    s.clone().verify_userid_binding(signer, &pk, uid).is_ok()
                 })
             })
             .cloned()

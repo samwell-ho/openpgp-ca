@@ -439,7 +439,7 @@ adversaries."#;
                     ReasonForRevocation::Unspecified,
                     b"removing OpenPGP CA bridge",
                 )?
-                .build(signer, &remote_ca, remote_uid, None)?;
+                .build(signer, remote_ca, remote_uid, None)?;
 
             let revoked = remote_ca
                 .clone()

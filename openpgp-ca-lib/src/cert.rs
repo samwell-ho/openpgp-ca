@@ -34,7 +34,7 @@ pub fn user_new(
 
     // CA certifies user cert
     let user_certified =
-        sign_cert_emails(&oca, &user_key, Some(emails), duration_days)
+        sign_cert_emails(oca, &user_key, Some(emails), duration_days)
             .context("sign_user_emails failed")?;
 
     // User tsigns CA cert
@@ -107,7 +107,7 @@ pub fn cert_import_new(
 
     // Sign user cert with CA key (only the User IDs that have been specified)
     let certified =
-        sign_cert_emails(&oca, &user_cert, Some(emails), duration_days)
+        sign_cert_emails(oca, &user_cert, Some(emails), duration_days)
             .context("sign_cert_emails() failed")?;
 
     // use name from User IDs, if no name was passed
@@ -128,7 +128,7 @@ pub fn cert_import_new(
         .context("cert_import_new: Couldn't re-armor key")?;
 
     oca.db()
-        .user_add(name.as_deref(), (&pub_cert, &fp), &emails, &revoc_certs)
+        .user_add(name.as_deref(), (&pub_cert, &fp), emails, &revoc_certs)
         .context("Couldn't insert user")?;
 
     Ok(())
@@ -258,11 +258,11 @@ pub fn check_mutual_certifications(
     cert: &models::Cert,
 ) -> Result<(Vec<UserID>, bool)> {
     let sig_from_ca = oca
-        .cert_check_ca_sig(&cert)
+        .cert_check_ca_sig(cert)
         .context("Failed while checking CA sig")?;
 
     let tsig_on_ca = oca
-        .cert_check_tsig_on_ca(&cert)
+        .cert_check_tsig_on_ca(cert)
         .context("Failed while checking tsig on CA")?;
 
     Ok((sig_from_ca, tsig_on_ca))
@@ -277,7 +277,7 @@ pub fn cert_check_ca_sig(
 
     Ok(c.userids()
         .filter(|uid| {
-            !Pgp::valid_certifications_by(&uid, &c, ca.clone()).is_empty()
+            !Pgp::valid_certifications_by(uid, &c, ca.clone()).is_empty()
         })
         .map(|uid| uid.userid())
         .cloned()

@@ -44,7 +44,7 @@ fn test_ca() -> Result<()> {
     ca.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -96,7 +96,7 @@ fn test_expiring_certification() -> Result<()> {
 
     // make CA user
     ca.user_new(
-        Some(&"Alice"),
+        Some("Alice"),
         &["alice@example.org"],
         Some(365),
         false,
@@ -173,7 +173,7 @@ fn test_update_cert_key() -> Result<()> {
 
     // import key as new user
     gpg.create_user("alice@example.org");
-    let alice1_key = gpg.export(&"alice@example.org");
+    let alice1_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
         &alice1_key,
@@ -206,7 +206,7 @@ fn test_update_cert_key() -> Result<()> {
 
     // edit key with gpg, then import new version into CA
     gpg.edit_expire("alice@example.org", "5y")?;
-    let alice2_key = gpg.export(&"alice@example.org");
+    let alice2_key = gpg.export("alice@example.org");
 
     // get cert for alice
     let certs = ca.certs_by_email("alice@example.org")?;
@@ -253,7 +253,7 @@ fn test_ca_import() -> Result<()> {
 
     // import key as new user
     gpg.create_user("alice@example.org");
-    let alice1_key = gpg.export(&"alice@example.org");
+    let alice1_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
         &alice1_key,
@@ -283,7 +283,7 @@ fn test_ca_import() -> Result<()> {
 
     // make a new key
     gpg.create_user("bob@example.org");
-    let bob_key = gpg.export(&"bob@example.org");
+    let bob_key = gpg.export("bob@example.org");
 
     // call "cert_import_update" with a new key
 
@@ -314,10 +314,10 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     assert!(ca.ca_init("example.org", None).is_ok());
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
 
     // make another CA user with the same email address
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -325,7 +325,7 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
 
     // ca cert should be tsigned by all user certs.
     for c in &certs {
-        let tsig = ca.cert_check_tsig_on_ca(&c)?;
+        let tsig = ca.cert_check_tsig_on_ca(c)?;
         assert!(tsig);
     }
 
@@ -350,25 +350,25 @@ fn test_ca_export_wkd() -> Result<()> {
     let ca = OpenpgpCa::new(Some(&db))?;
 
     ca.ca_init("example.org", None)?;
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
     ca.user_new(
-        Some(&"Bob"),
+        Some("Bob"),
         &["bob@example.org", "bob@other.org"],
         None,
         false,
         false,
     )?;
-    ca.user_new(Some(&"Carol"), &["carol@other.org"], None, false, false)?;
+    ca.user_new(Some("Carol"), &["carol@other.org"], None, false, false)?;
 
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
-    ca.export_wkd("example.org", &wkd_path)?;
+    ca.export_wkd("example.org", wkd_path)?;
 
     // expect 3 exported keys (carol should not be in the export)
     let test_path = wkd_path.join(".well-known/openpgpkey/example.org/hu/");
-    let paths: Vec<_> = fs::read_dir(test_path)?.collect();
-    assert_eq!(paths.len(), 3);
+    let paths = fs::read_dir(test_path)?;
+    assert_eq!(paths.count(), 3);
 
     // check that both user keys have been written to files
     let test_path = wkd_path.join(
@@ -459,7 +459,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
-    ca.export_wkd("sequoia-pgp.org", &wkd_path)?;
+    ca.export_wkd("sequoia-pgp.org", wkd_path)?;
 
     Ok(())
 }
@@ -485,7 +485,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
     // gpg: make key for Alice
     gpg.create_user("Alice <alice@example.org>");
 
-    let alice_key = gpg.export(&"alice@example.org");
+    let alice_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
         &alice_key,
@@ -513,7 +513,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
     let alice = &certs[0];
 
     // check that name has been autodetected on CA import from the pubkey
-    let name = ca.cert_get_name(&alice)?;
+    let name = ca.cert_get_name(alice)?;
     assert_eq!(name, "Alice".to_string());
 
     let emails = ca.emails_get(alice)?;
@@ -551,7 +551,7 @@ fn test_ca_signatures() -> Result<()> {
 
     // create/import alice, CA signs alice's key
     gpg.create_user("alice@example.org");
-    let alice_key = gpg.export(&"alice@example.org");
+    let alice_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
         &alice_key,
@@ -564,7 +564,7 @@ fn test_ca_signatures() -> Result<()> {
 
     // create/import bob
     gpg.create_user("bob@example.org");
-    let bob_key = gpg.export(&"bob@example.org");
+    let bob_key = gpg.export("bob@example.org");
 
     // CA does not signs bob's key because the "email" parameter is empty.
     // Only userids that are supplied in `email` are signed by the CA.
@@ -573,7 +573,7 @@ fn test_ca_signatures() -> Result<()> {
 
     // create carol, CA will sign carol's key.
     // also, CA key gets a tsig by carol
-    ca.user_new(Some(&"Carol"), &["carol@example.org"], None, false, false)?;
+    ca.user_new(Some("Carol"), &["carol@example.org"], None, false, false)?;
 
     for user in ca.users_get_all()? {
         let certs = ca.get_certs_by_user(&user)?;
@@ -620,7 +620,7 @@ fn test_apply_revocation() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
 
     let certs = ca.user_certs_get_all()?;
 
@@ -668,7 +668,7 @@ fn test_import_signed_cert() -> Result<()> {
     gpg.sign("alice@example.org").expect("signing alice failed");
 
     // import alice into OpenPGP CA
-    let alice_key = gpg.export(&"alice@example.org");
+    let alice_key = gpg.export("alice@example.org");
     ca.cert_import_new(
         &alice_key,
         vec![],
@@ -739,11 +739,11 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // create Alice
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
 
     // gpg: make key for Bob
     gpg.create_user("Bob <bob@example.org>");
-    let bob_key = gpg.export(&"bob@example.org");
+    let bob_key = gpg.export("bob@example.org");
     ca.cert_import_new(&bob_key, vec![], None, &[], None)?;
 
     // make a revocation certificate for bob ...
@@ -756,7 +756,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
 
     let armored = if let openpgp::Packet::Signature(s) = p {
         // use Bob as a Signer
-        let bob_sec = gpg.export_secret(&"bob@example.org");
+        let bob_sec = gpg.export_secret("bob@example.org");
         let bob_cert = Cert::from_bytes(&bob_sec)?;
         let mut keypair = bob_cert
             .primary_key()
@@ -825,7 +825,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     let alice = certs
         .iter()
         .find(|c| {
-            ca.cert_get_users(&c)
+            ca.cert_get_users(c)
                 .unwrap()
                 .iter()
                 .any(|u| u.name == Some("Alice".to_owned()))
@@ -839,7 +839,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     let bob = certs
         .iter()
         .find(|c| {
-            ca.cert_get_users(&c)
+            ca.cert_get_users(c)
                 .unwrap()
                 .iter()
                 .any(|u| u.name == Some("Bob".to_owned()))
@@ -867,7 +867,7 @@ fn test_create_user_with_pw() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA user
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, true, false)?;
 
     let certs = ca.user_certs_get_all()?;
     assert_eq!(certs.len(), 1);
@@ -900,16 +900,10 @@ fn test_refresh() -> Result<()> {
     let ca_fp = ca_cert.fingerprint();
 
     // make CA user
-    ca.user_new(
-        Some(&"Alice"),
-        &["alice@example.org"],
-        Some(10),
-        true,
-        false,
-    )?;
-    ca.user_new(Some(&"Bob"), &["bob@example.org"], Some(365), true, false)?;
-    ca.user_new(Some(&"Carol"), &["carol@example.org"], None, true, false)?;
-    ca.user_new(Some(&"Dave"), &["dave@example.org"], Some(10), true, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], Some(10), true, false)?;
+    ca.user_new(Some("Bob"), &["bob@example.org"], Some(365), true, false)?;
+    ca.user_new(Some("Carol"), &["carol@example.org"], None, true, false)?;
+    ca.user_new(Some("Dave"), &["dave@example.org"], Some(10), true, false)?;
 
     // set dave to "inactive"
     let cert = ca.certs_by_email("dave@example.org")?;
@@ -984,8 +978,8 @@ fn test_wkd_delist() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA users
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, true, false)?;
-    ca.user_new(Some(&"Bob"), &["bob@example.org"], None, true, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, true, false)?;
+    ca.user_new(Some("Bob"), &["bob@example.org"], None, true, false)?;
 
     // set bob to "delisted"
     let cert = ca.certs_by_email("bob@example.org")?;
@@ -998,12 +992,12 @@ fn test_wkd_delist() -> Result<()> {
     let wkd_dir = home_path + "/wkd/";
     let wkd_path = Path::new(&wkd_dir);
 
-    ca.export_wkd("example.org", &wkd_path)?;
+    ca.export_wkd("example.org", wkd_path)?;
 
     // expect 3 exported keys (carol should not be in the export)
     let test_path = wkd_path.join(".well-known/openpgpkey/example.org/hu/");
-    let paths: Vec<_> = fs::read_dir(test_path)?.collect();
-    assert_eq!(paths.len(), 2);
+    let paths = fs::read_dir(test_path)?;
+    assert_eq!(paths.count(), 2);
 
     // check that Alice's and the CA's keys have been written to files
 

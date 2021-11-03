@@ -38,8 +38,8 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // make CA users
-    ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)?;
-    ca.user_new(Some(&"Bob"), &["bob@example.org"], None, false, false)?;
+    ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
+    ca.user_new(Some("Bob"), &["bob@example.org"], None, false, false)?;
 
     // ---- import keys from OpenPGP CA into GnuPG ----
 
@@ -139,8 +139,8 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     gpg_bob.tsign(&ca_keyid, 1, 2).expect("tsign bob failed");
 
     // export CA key from both contexts, import to CA
-    let alice_ca_key = gpg_alice.export(&"openpgp-ca@example.org");
-    let bob_ca_key = gpg_bob.export(&"openpgp-ca@example.org");
+    let alice_ca_key = gpg_alice.export("openpgp-ca@example.org");
+    let bob_ca_key = gpg_bob.export("openpgp-ca@example.org");
 
     ca.ca_import_tsig(&alice_ca_key)
         .context("import CA tsig from Alice failed")?;
@@ -148,8 +148,8 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
         .context("import CA tsig from Bob failed")?;
 
     // get public keys for alice and bob from their gnupg contexts
-    let alice_key = gpg_alice.export(&"alice@example.org");
-    let bob_key = gpg_bob.export(&"bob@example.org");
+    let alice_key = gpg_alice.export("alice@example.org");
+    let bob_key = gpg_bob.export("bob@example.org");
 
     // import public keys for alice and bob into CA
     ca.cert_import_new(
@@ -172,7 +172,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
 
     // export bob, CA-key from CA
     let ca_key = ca.ca_get_pubkey_armored()?;
-    let certs = ca.certs_by_email(&"bob@example.org")?;
+    let certs = ca.certs_by_email("bob@example.org")?;
     let bob = certs.first().unwrap();
 
     // import bob+CA key into alice's GnuPG context
@@ -239,7 +239,7 @@ fn test_bridge() -> Result<()> {
 
     // make CA user
     assert!(ca1
-        .user_new(Some(&"Alice"), &["alice@some.org"], None, false, false)
+        .user_new(Some("Alice"), &["alice@some.org"], None, false, false)
         .is_ok());
 
     // ---- populate second OpenPGP CA instance ----
@@ -248,10 +248,10 @@ fn test_bridge() -> Result<()> {
     ca2.ca_init("other.org", None)?;
 
     // make CA user
-    ca2.user_new(Some(&"Bob"), &["bob@other.org"], None, false, false)?;
+    ca2.user_new(Some("Bob"), &["bob@other.org"], None, false, false)?;
 
     // make CA user that is out of the domain scope for ca2
-    ca2.user_new(Some(&"Carol"), &["carol@third.org"], None, false, false)?;
+    ca2.user_new(Some("Carol"), &["carol@third.org"], None, false, false)?;
 
     // ---- setup bridges: scoped trust between one.org and two.org ---
 
@@ -372,13 +372,13 @@ fn test_multi_bridge() -> Result<()> {
     // ---- populate OpenPGP CA instances ----
 
     ca1.ca_init("alpha.org", None)?;
-    ca1.user_new(Some(&"Alice"), &["alice@alpha.org"], None, false, false)?;
+    ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
     ca2.ca_init("beta.org", None)?;
 
     ca3.ca_init("gamma.org", None)?;
-    ca3.user_new(Some(&"Carol"), &["carol@gamma.org"], None, false, false)?;
-    ca3.user_new(Some(&"Bob"), &["bob@beta.org"], None, false, false)?;
+    ca3.user_new(Some("Carol"), &["carol@gamma.org"], None, false, false)?;
+    ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
 
     // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---
     let ca2_file = format!("{}/ca2.pubkey", home_path);
@@ -497,12 +497,12 @@ fn test_scoping() -> Result<()> {
 
     // ---- populate OpenPGP CA instances ----
     ca1.ca_init("alpha.org", None)?;
-    ca1.user_new(Some(&"Alice"), &["alice@alpha.org"], None, false, false)?;
+    ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
     ca2.ca_init("beta.org", None)?;
 
     ca3.ca_init("other.org", None)?;
-    ca3.user_new(Some(&"Bob"), &["bob@beta.org"], None, false, false)?;
+    ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
 
     // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---
     let ca2_file = format!("{}/ca2.pubkey", home_path);

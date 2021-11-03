@@ -303,7 +303,7 @@ impl OpenpgpCa {
     ) -> Result<()> {
         self.db().transaction(|| {
             cert::user_new(
-                &self,
+                self,
                 name,
                 emails,
                 duration_days,
@@ -369,7 +369,7 @@ impl OpenpgpCa {
         &self,
         user: &models::User,
     ) -> Result<Vec<models::Cert>> {
-        self.db.certs_by_user(&user)
+        self.db.certs_by_user(user)
     }
 
     /// Get a list of all Users, ordered by name
@@ -408,7 +408,7 @@ impl OpenpgpCa {
 
         let db_users = self.users_get_all()?;
         for db_user in &db_users {
-            for db_cert in self.get_certs_by_user(&db_user)? {
+            for db_cert in self.get_certs_by_user(db_user)? {
                 let (sig_from_ca, tsig_on_ca) =
                     self.check_mutual_certifications(&db_cert)?;
 
@@ -549,7 +549,7 @@ impl OpenpgpCa {
     /// cert. Only if this is successful is the revocation stored.
     pub fn revocation_add(&self, revoc_cert_str: &str) -> Result<()> {
         self.db()
-            .transaction(|| revocation::revocation_add(&self, revoc_cert_str))
+            .transaction(|| revocation::revocation_add(self, revoc_cert_str))
     }
 
     /// Add a revocation certificate to the OpenPGP CA database (from a file).
@@ -577,7 +577,7 @@ impl OpenpgpCa {
     /// The revocation is merged into out copy of the OpenPGP Cert.
     pub fn revocation_apply(&self, revoc: models::Revocation) -> Result<()> {
         self.db()
-            .transaction(|| revocation::revocation_apply(&self, revoc))
+            .transaction(|| revocation::revocation_apply(self, revoc))
     }
 
     /// Get reason and creation time for a Revocation
@@ -678,7 +678,7 @@ impl OpenpgpCa {
         if commit {
             self.db.transaction::<_, anyhow::Error, _>(|| {
                 let (bridge, fingerprint) =
-                    bridge::bridge_new(&self, key_file, email, scope)?;
+                    bridge::bridge_new(self, key_file, email, scope)?;
 
                 println!(
                     "Signed OpenPGP key for {} as bridge.\n",
@@ -756,7 +756,7 @@ impl OpenpgpCa {
     ///
     /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
     pub fn export_wkd(&self, domain: &str, path: &Path) -> Result<()> {
-        export::wkd_export(&self, domain, path)
+        export::wkd_export(self, domain, path)
     }
 
     /// Export the contents of a CA in Keylist format.
@@ -777,7 +777,7 @@ impl OpenpgpCa {
         signature_uri: String,
         force: bool,
     ) -> Result<()> {
-        export::export_keylist(&self, path, signature_uri, force)
+        export::export_keylist(self, path, signature_uri, force)
     }
 
     /// Export Certs from this CA into files, with filenames based on email
@@ -787,11 +787,11 @@ impl OpenpgpCa {
         email_filter: Option<String>,
         path: &str,
     ) -> Result<()> {
-        export::export_certs_as_files(&self, email_filter, path)
+        export::export_certs_as_files(self, email_filter, path)
     }
 
     pub fn print_certring(&self, email_filter: Option<String>) -> Result<()> {
-        export::print_certring(&self, email_filter)
+        export::print_certring(self, email_filter)
     }
 
     // -------- Update certs from public sources
@@ -801,7 +801,7 @@ impl OpenpgpCa {
     pub fn update_from_wkd(&self) -> Result<()> {
         for c in self.user_certs_get_all()? {
             self.db().transaction::<_, anyhow::Error, _>(|| {
-                let updated = update::update_from_wkd(&self, &c)?;
+                let updated = update::update_from_wkd(self, &c)?;
                 if updated {
                     println!("Got update for cert {}", c.fingerprint);
                 }
@@ -829,6 +829,6 @@ impl OpenpgpCa {
     /// Returns "true" if updated data was received, false if not.
     pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<bool> {
         self.db()
-            .transaction(|| update::update_from_hagrid(&self, cert))
+            .transaction(|| update::update_from_hagrid(self, cert))
     }
 }
