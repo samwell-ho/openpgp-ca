@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --buildsystem cargo
+
+override_dh_auto_build:
+	cargo build --all-targets --workspace
+
+override_dh_auto_test:
+	echo test are disabled due to problems with gnugp and rexpect interaction
+
+override_dh_auto_install:
+	cargo install --path=openpgp-ca-bin --root=debian/openpgp-ca
+	find debian/openpgp-ca -name '.crates*' -delete

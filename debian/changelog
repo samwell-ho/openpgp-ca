@@ -1,0 +1,6 @@
+openpgp-ca (0.10.1-1) unstable; urgency=low
+
+  * Initial packaging. This is not intended to be uploaded to Debian, so
+    no closing of an ITP bug.
+
+ -- Lars Wirzenius <liw@liw.fi>  Sat, 28 Sep 2019 16:45:49 +0300
