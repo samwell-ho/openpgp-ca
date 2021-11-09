@@ -172,7 +172,7 @@ fn test_update_cert_key() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // import key as new user
-    gpg.create_user("alice@example.org");
+    gpg.create_user("Alice <alice@example.org>");
     let alice1_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
@@ -252,7 +252,7 @@ fn test_ca_import() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // import key as new user
-    gpg.create_user("alice@example.org");
+    gpg.create_user("Alice <alice@example.org>");
     let alice1_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
@@ -282,7 +282,7 @@ fn test_ca_import() -> Result<()> {
     // the fingerprint stays the same
 
     // make a new key
-    gpg.create_user("bob@example.org");
+    gpg.create_user("Bob <bob@example.org>");
     let bob_key = gpg.export("bob@example.org");
 
     // call "cert_import_update" with a new key
@@ -550,7 +550,7 @@ fn test_ca_signatures() -> Result<()> {
     ca.ca_init("example.org", None)?;
 
     // create/import alice, CA signs alice's key
-    gpg.create_user("alice@example.org");
+    gpg.create_user("Alice <alice@example.org>");
     let alice_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
@@ -563,7 +563,7 @@ fn test_ca_signatures() -> Result<()> {
     .context("import Alice to CA failed")?;
 
     // create/import bob
-    gpg.create_user("bob@example.org");
+    gpg.create_user("Bob <bob@example.org>");
     let bob_key = gpg.export("bob@example.org");
 
     // CA does not signs bob's key because the "email" parameter is empty.
