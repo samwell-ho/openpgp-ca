@@ -1,0 +1,15 @@
+Source: openpgp-ca
+Maintainer: Lars Wirzenius <liw@liw.fi>
+Section: utils
+Priority: optional
+Standards-Version: 4.2.0
+Build-Depends: debhelper (>= 10~),
+  dh-cargo
+Homepage: https://gitlab.com/openpgp-ca/openpgp-ca
+
+Package: openpgp-ca
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Built-Using: ${cargo:Built-Using}
+Description: certify OpenPGP keys for organizations
+ A certificate authority for OpenPGP for use within an organization.
