@@ -17,7 +17,8 @@ use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result};
 use csv::StringRecord;
-use rexpect::session::spawn_command;
+use expectrl::{session::Session, Eof};
+use std::time::Duration;
 
 /// A simple wrapper for GnuPG, for use in OpenPGP CA integration tests.
 ///
@@ -371,20 +372,26 @@ impl Ctx {
     pub fn edit_trust(&self, user_id: &str, trust: u8) -> Result<()> {
         let gpg = self.build_gpg_command(&["--edit-key", user_id]);
 
-        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
+        let mut p = Session::spawn(gpg).unwrap();
+        p.set_expect_timeout(Some(Duration::from_secs(10)));
 
-        p.exp_string("gpg>").unwrap();
+        p.expect("gpg>").unwrap();
         p.send_line("trust").unwrap();
-        p.exp_string("Your decision?").unwrap();
+        p.expect("Your decision?").unwrap();
         p.send_line(&format!("{}", trust)).unwrap();
-        p.exp_string(
+
+        // FIXME: match against Regex
+        p.expect(
             "Do you really want to set this key to ultimate trust? (y/N)",
         )
         .unwrap();
+
         p.send_line("y").unwrap();
-        p.exp_string("gpg>").unwrap();
+        p.expect("gpg>").unwrap();
         p.send_line("quit").unwrap();
-        p.exp_eof().unwrap();
+
+        let res = p.expect(Eof);
+        res.unwrap();
 
         Ok(())
     }
@@ -402,18 +409,19 @@ impl Ctx {
             user_id,
         ]);
 
-        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
+        let mut p = Session::spawn(gpg).unwrap();
+        p.set_expect_timeout(Some(Duration::from_secs(10)));
 
-        p.exp_string("Create a revocation certificate for this key? (y/N)")
+        p.expect("Create a revocation certificate for this key? (y/N)")
             .unwrap();
         p.send_line("y").unwrap();
-        p.exp_string("Your decision?").unwrap();
+        p.expect("Your decision?").unwrap();
         p.send_line(&format!("{}", reason)).unwrap();
-        p.exp_string(">").unwrap();
+        p.expect(">").unwrap();
         p.send_line("").unwrap();
-        p.exp_string("Is this okay? (y/N)").unwrap();
+        p.expect("Is this okay? (y/N)").unwrap();
         p.send_line("y").unwrap();
-        p.exp_eof().unwrap();
+        p.expect(Eof).unwrap();
 
         Ok(())
     }
@@ -421,19 +429,20 @@ impl Ctx {
     pub fn edit_expire(&self, user_id: &str, expires: &str) -> Result<()> {
         let gpg = self.build_gpg_command(&["--edit-key", user_id]);
 
-        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
+        let mut p = Session::spawn(gpg).unwrap();
+        p.set_expect_timeout(Some(Duration::from_secs(10)));
 
-        p.exp_string("gpg>").unwrap();
+        p.expect("gpg>").unwrap();
         p.send_line("expire").unwrap();
-        p.exp_string("Key is valid for? (0)").unwrap();
+        p.expect("Key is valid for? (0)").unwrap();
         p.send_line(expires).unwrap();
-        p.exp_string("Is this correct? (y/N)").unwrap();
+        p.expect("Is this correct? (y/N)").unwrap();
         p.send_line("y").unwrap();
-        p.exp_string("gpg>").unwrap();
+        p.expect("gpg>").unwrap();
         p.send_line("quit").unwrap();
-        p.exp_string("Save changes? (y/N)").unwrap();
+        p.expect("Save changes? (y/N)").unwrap();
         p.send_line("y").unwrap();
-        p.exp_eof().unwrap();
+        p.expect(Eof).unwrap();
 
         Ok(())
     }
@@ -457,15 +466,16 @@ impl Ctx {
     pub fn sign(&self, user_id: &str) -> Result<()> {
         let gpg = self.build_gpg_command(&["--edit-key", user_id]);
 
-        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
+        let mut p = Session::spawn(gpg).unwrap();
+        p.set_expect_timeout(Some(Duration::from_secs(10)));
 
-        p.exp_string("gpg>").unwrap();
+        p.expect("gpg>").unwrap();
         p.send_line("sign").unwrap();
-        p.exp_string("Really sign? (y/N)").unwrap();
+        p.expect("Really sign? (y/N)").unwrap();
         p.send_line("y").unwrap();
-        p.exp_string("gpg>").unwrap();
+        p.expect("gpg>").unwrap();
         p.send_line("save").unwrap();
-        p.exp_eof().unwrap();
+        p.expect(Eof).unwrap();
 
         Ok(())
     }
@@ -473,23 +483,24 @@ impl Ctx {
     pub fn tsign(&self, user_id: &str, level: u8, trust: u8) -> Result<()> {
         let gpg = self.build_gpg_command(&["--edit-key", user_id]);
 
-        let mut p = spawn_command(gpg, Some(10_000)).unwrap();
+        let mut p = Session::spawn(gpg).unwrap();
+        p.set_expect_timeout(Some(Duration::from_secs(10)));
 
-        p.exp_string("gpg>").unwrap();
+        p.expect("gpg>").unwrap();
         p.send_line("tsign").unwrap();
-        p.exp_string("Your selection?").unwrap();
+        p.expect("Your selection?").unwrap();
         p.send_line(&format!("{}", trust)).unwrap();
-        p.exp_string("Your selection?").unwrap();
+        p.expect("Your selection?").unwrap();
         p.send_line(&format!("{}", level)).unwrap();
-        p.exp_string("Your selection?").unwrap();
+        p.expect("Your selection?").unwrap();
         p.send_line("").unwrap(); // domain
-        p.exp_string("Really sign? (y/N)").unwrap();
+        p.expect("Really sign? (y/N)").unwrap();
         p.send_line("y").unwrap();
-        p.exp_string("gpg>").unwrap();
+        p.expect("gpg>").unwrap();
         p.send_line("quit").unwrap();
-        p.exp_string("Save changes? (y/N)").unwrap();
+        p.expect("Save changes? (y/N)").unwrap();
         p.send_line("y").unwrap();
-        p.exp_eof().unwrap();
+        p.expect(Eof).unwrap();
 
         Ok(())
     }
