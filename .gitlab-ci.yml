@@ -49,7 +49,7 @@ pages:
     paths:
       - public
   only:
-    - master
+    - main
 
 build_docker:
   stage: deploy
