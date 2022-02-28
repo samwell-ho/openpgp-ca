@@ -257,14 +257,13 @@ impl Pgp {
         let issuers = revoc_cert.get_issuers();
         let sig_fingerprints: Vec<&Fingerprint> = issuers
             .iter()
-            .map(|keyhandle| {
+            .filter_map(|keyhandle| {
                 if let KeyHandle::Fingerprint(fp) = keyhandle {
                     Some(fp)
                 } else {
                     None
                 }
             })
-            .flatten()
             .collect();
 
         match sig_fingerprints.len() {

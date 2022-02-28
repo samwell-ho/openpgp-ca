@@ -107,7 +107,7 @@ fn validate_revocation(cert: &Cert, revocation: &mut Signature) -> Result<bool> 
 /// (This is used when the revocation has no issuer fingerprint)
 fn search_revocable_cert_by_keyid(
     oca: &OpenpgpCa,
-    mut revoc: &mut Signature,
+    revoc: &mut Signature,
 ) -> Result<Option<models::Cert>> {
     let revoc_keyhandles = revoc.get_issuers();
     if revoc_keyhandles.is_empty() {
@@ -126,7 +126,7 @@ fn search_revocable_cert_by_keyid(
         }
 
         // if KeyID matches, check if revocation validates
-        if validate_revocation(&c, &mut revoc)? {
+        if validate_revocation(&c, revoc)? {
             return Ok(Some(db_cert));
         }
     }

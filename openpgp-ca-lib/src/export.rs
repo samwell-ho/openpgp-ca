@@ -209,11 +209,11 @@ pub fn export_keylist(
     // Write keylist and signature to the filesystem
     let mut keylist = path.clone();
     keylist.push(KEYLIST_FILE);
-    open_file(keylist, overwrite)?.write_all(&skl.keylist.as_bytes().to_vec())?;
+    open_file(keylist, overwrite)?.write_all(skl.keylist.as_bytes())?;
 
     let mut sigfile = path;
     sigfile.push(sigfile_name);
-    open_file(sigfile, overwrite)?.write_all(&skl.sig.as_bytes().to_vec())?;
+    open_file(sigfile, overwrite)?.write_all(skl.sig.as_bytes())?;
 
     Ok(())
 }

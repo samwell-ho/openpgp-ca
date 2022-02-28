@@ -545,7 +545,7 @@ impl OpenpgpCa {
 
         if let Some((code, reason)) = rev.reason_for_revocation() {
             let reason = String::from_utf8(reason.to_vec())?;
-            Ok((format!("{} ({})", code.to_string(), reason), creation))
+            Ok((format!("{} ({})", code, reason), creation))
         } else {
             Ok(("Revocation reason unknown".to_string(), creation))
         }
