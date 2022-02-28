@@ -32,7 +32,7 @@ communicating securely.
 
 # Setting up your OpenPGP CA instance
 
-OpenPGP CA is a flexible tool is designed to integrate usefully with a wide 
+OpenPGP CA is a flexible tool, designed to integrate usefully with a wide 
 range of environments. There are many ways to make OpenPGP CA work for you.
 Here, we show one typical workflow. Please read our
 [documentation](https://openpgp-ca.org/doc/) for more details, or 
@@ -61,11 +61,11 @@ $ openpgp-ca -d example.oca ca init example.org
 
 In this initialization step, OpenPGP CA creates an OpenPGP key for your CA.
 The key's User ID is set to `openpgp-ca@example.org` (you should make sure
-that that the CA email address is configured in your email setup to forward 
+that the CA email address is configured in your email setup to forward 
 mail to you).
 
 The parameter `-d <filename>` specifies where OpenPGP CA will store the 
-information in CA. This includes the private OpenPGP key of your CA and the 
+information of the CA. This includes the private OpenPGP key of your CA and the 
 public keys of members of your organization. In this example, we'll use 
 the file `example.oca` as storage for our CA's data.
 
@@ -104,7 +104,7 @@ private key material).
 
 Once Carol has obtained and verified the keys, she can import them into 
 the group's OpenPGP CA instance. The CA will certify user keys 
-(based on Carol's verfication), and based on these certifications, 
+(based on Carol's verification), and based on these certifications, 
 everyone else in the organization can rely on getting the correct keys 
 without having to personally verify every single one. Normally, users will 
 only need to verify the CA's key.
@@ -241,7 +241,7 @@ uid           [  full  ] Alice <alice@example.org>
 OpenPGP CA not only makes it easy for users within an organization to
 authenticate each other, but provides support to create so-called bridges
 between organizations.  In this case, the CA admins from two OpenPGP CA
-using organizations sign each others CA key using a scoped trust signature.
+using organizations sign each other's CA key using a scoped trust signature.
 
 See the section on how bridges allow for authentication between organizations
 [in our background documentation](https://openpgp-ca.org/background/details/)
