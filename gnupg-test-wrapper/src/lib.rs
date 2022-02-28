@@ -30,13 +30,11 @@ use std::time::Duration;
 /// limitation of this wrapper.
 
 pub fn make_context() -> Result<Ctx> {
-    let ctx = Ctx::ephemeral().context(
-        "SKIP: Failed to create GnuPG context. Is GnuPG installed?",
-    )?;
+    let ctx =
+        Ctx::ephemeral().context("SKIP: Failed to create GnuPG context. Is GnuPG installed?")?;
 
-    ctx.start("gpg-agent").context(
-        "SKIP: Failed to to start gpg-agent. Is the GnuPG agent installed?",
-    )?;
+    ctx.start("gpg-agent")
+        .context("SKIP: Failed to to start gpg-agent. Is the GnuPG agent installed?")?;
 
     Ok(ctx)
 }
@@ -90,10 +88,7 @@ impl Ctx {
         self.ephemeral.take().map(tempfile::TempDir::into_path)
     }
 
-    fn make(
-        homedir: Option<&Path>,
-        ephemeral: Option<tempfile::TempDir>,
-    ) -> Result<Self> {
+    fn make(homedir: Option<&Path>, ephemeral: Option<tempfile::TempDir>) -> Result<Self> {
         let mut components: BTreeMap<String, PathBuf> = Default::default();
         let mut directories: BTreeMap<String, PathBuf> = Default::default();
         let mut sockets: BTreeMap<String, PathBuf> = Default::default();
@@ -104,30 +99,21 @@ impl Ctx {
             .or(homedir)
             .map(|p| p.into());
 
-        for fields in
-            Self::gpgconf(&homedir, &["--list-components"], 3)?.into_iter()
-        {
+        for fields in Self::gpgconf(&homedir, &["--list-components"], 3)?.into_iter() {
             components.insert(
                 String::from_utf8(fields[0].clone())?,
                 String::from_utf8(fields[2].clone())?.into(),
             );
         }
 
-        for fields in Self::gpgconf(&homedir, &["--list-dirs"], 2)?.into_iter()
-        {
+        for fields in Self::gpgconf(&homedir, &["--list-dirs"], 2)?.into_iter() {
             let (mut key, value) = (fields[0].clone(), fields[1].clone());
             if key.ends_with(b"-socket") {
                 let l = key.len();
                 key.truncate(l - b"-socket".len());
-                sockets.insert(
-                    String::from_utf8(key)?,
-                    String::from_utf8(value)?.into(),
-                );
+                sockets.insert(String::from_utf8(key)?, String::from_utf8(value)?.into());
             } else {
-                directories.insert(
-                    String::from_utf8(key)?,
-                    String::from_utf8(value)?.into(),
-                );
+                directories.insert(String::from_utf8(key)?, String::from_utf8(value)?.into());
             }
         }
 
@@ -159,9 +145,9 @@ impl Ctx {
         for argument in arguments {
             gpgconf.arg(argument);
         }
-        let output = gpgconf.output().map_err(|e| -> anyhow::Error {
-            GnupgError::GgpConf(e.to_string()).into()
-        })?;
+        let output = gpgconf
+            .output()
+            .map_err(|e| -> anyhow::Error { GnupgError::GgpConf(e.to_string()).into() })?;
 
         if output.status.success() {
             let mut result = Vec::new();
@@ -189,10 +175,7 @@ impl Ctx {
             }
             Ok(result)
         } else {
-            Err(GnupgError::GgpConf(
-                String::from_utf8_lossy(&output.stderr).into_owned(),
-            )
-            .into())
+            Err(GnupgError::GgpConf(String::from_utf8_lossy(&output.stderr).into_owned()).into())
         }
     }
 
@@ -205,11 +188,7 @@ impl Ctx {
             .get(component.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                GnupgError::GgpConf(format!(
-                    "No such component {:?}",
-                    component.as_ref()
-                ))
-                .into()
+                GnupgError::GgpConf(format!("No such component {:?}", component.as_ref())).into()
             })
     }
 
@@ -222,11 +201,7 @@ impl Ctx {
             .get(directory.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                GnupgError::GgpConf(format!(
-                    "No such directory {:?}",
-                    directory.as_ref()
-                ))
-                .into()
+                GnupgError::GgpConf(format!("No such directory {:?}", directory.as_ref())).into()
             })
     }
 
@@ -239,11 +214,7 @@ impl Ctx {
             .get(socket.as_ref())
             .map(|p| p.as_path())
             .ok_or_else(|| {
-                GnupgError::GgpConf(format!(
-                    "No such socket {:?}",
-                    socket.as_ref()
-                ))
-                .into()
+                GnupgError::GgpConf(format!("No such socket {:?}", socket.as_ref())).into()
             })
     }
 
@@ -345,9 +316,7 @@ impl Ctx {
         // map: uid -> trust
         Ok(uids
             .iter()
-            .map(|u| {
-                (u.get(9).unwrap().to_owned(), u.get(1).unwrap().to_owned())
-            })
+            .map(|u| (u.get(9).unwrap().to_owned(), u.get(1).unwrap().to_owned()))
             .collect())
     }
 
@@ -381,10 +350,8 @@ impl Ctx {
         p.send_line(&format!("{}", trust)).unwrap();
 
         // FIXME: match against Regex
-        p.expect(
-            "Do you really want to set this key to ultimate trust? (y/N)",
-        )
-        .unwrap();
+        p.expect("Do you really want to set this key to ultimate trust? (y/N)")
+            .unwrap();
 
         p.send_line("y").unwrap();
         p.expect("gpg>").unwrap();
@@ -396,18 +363,8 @@ impl Ctx {
         Ok(())
     }
 
-    pub fn make_revocation(
-        &self,
-        user_id: &str,
-        filename: &str,
-        reason: u8,
-    ) -> Result<()> {
-        let gpg = self.build_gpg_command(&[
-            "--output",
-            filename,
-            "--gen-revoke",
-            user_id,
-        ]);
+    pub fn make_revocation(&self, user_id: &str, filename: &str, reason: u8) -> Result<()> {
+        let gpg = self.build_gpg_command(&["--output", filename, "--gen-revoke", user_id]);
 
         let mut p = Session::spawn(gpg).unwrap();
         p.set_expect_timeout(Some(Duration::from_secs(10)));

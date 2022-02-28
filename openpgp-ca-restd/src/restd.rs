@@ -41,25 +41,18 @@ pub const CERT_SIZE_LIMIT: usize = 1024 * 1024;
 // const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org";
 
 /// Load all of the associated data for a Cert from the CA database
-fn load_certificate_data(
-    ca: &OpenpgpCa,
-    cert: &models::Cert,
-) -> Result<Certificate, ReturnError> {
+fn load_certificate_data(ca: &OpenpgpCa, cert: &models::Cert) -> Result<Certificate, ReturnError> {
     let user = ca.cert_get_users(cert).map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
-            format!(
-                "load_certificate_data: error while loading users '{:?}'",
-                e
-            ),
+            format!("load_certificate_data: error while loading users '{:?}'", e),
         )
     })?;
 
     if user.is_none() {
         return Err(ReturnError::new(
             ReturnStatus::InternalError,
-            "load_certificate_data: not found while loading users'"
-                .to_string(),
+            "load_certificate_data: not found while loading users'".to_string(),
         ));
     }
 
@@ -97,10 +90,7 @@ fn certs_by_email(
         let certs = ca.certs_by_email(&email).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
-                format!(
-                    "certs_by_email: error loading certs from db '{:?}'",
-                    e
-                ),
+                format!("certs_by_email: error loading certs from db '{:?}'", e),
             )
         })?;
 
@@ -120,10 +110,7 @@ fn certs_by_email(
             let warn = get_warnings(&cert).map_err(|ce| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
-                    format!(
-                        "certs_by_email: error during cert_to_warn '{:?}'",
-                        ce
-                    ),
+                    format!("certs_by_email: error during cert_to_warn '{:?}'", ce),
                 )
             })?;
 
@@ -143,9 +130,7 @@ fn certs_by_email(
 }
 
 #[get("/certs/by_fp/<fp>")]
-fn cert_by_fp(
-    fp: String,
-) -> Result<Json<Option<ReturnGoodJson>>, BadRequest<Json<ReturnError>>> {
+fn cert_by_fp(fp: String) -> Result<Json<Option<ReturnGoodJson>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let c = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::new(
@@ -160,10 +145,7 @@ fn cert_by_fp(
             let cert = Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
-                    format!(
-                        "cert_by_fp: error during armored_to_cert '{:?}'",
-                        e
-                    ),
+                    format!("cert_by_fp: error during armored_to_cert '{:?}'", e),
                 )
             })?;
 
@@ -171,10 +153,7 @@ fn cert_by_fp(
             let warn = get_warnings(&cert).map_err(|ce| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
-                    format!(
-                        "cert_by_fp: error during cert_to_warn '{:?}'",
-                        ce
-                    ),
+                    format!("cert_by_fp: error during cert_to_warn '{:?}'", ce),
                 )
             })?;
 
@@ -198,9 +177,7 @@ fn cert_by_fp(
 fn check_certs(
     certificate: Json<Certificate>,
 ) -> Result<Json<Vec<CertResultJson>>, BadRequest<Json<ReturnError>>> {
-    CA.with(|ca| {
-        Ok(Json(process_certs(ca, &certificate.into_inner(), false)?))
-    })
+    CA.with(|ca| Ok(Json(process_certs(ca, &certificate.into_inner(), false)?)))
 }
 
 /// Store new User-Key data in the OpenPGP CA database.
@@ -231,10 +208,7 @@ fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
         let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
-                format!(
-                    "deactivate_cert: Error looking up Fingerprint '{:?}'",
-                    e
-                ),
+                format!("deactivate_cert: Error looking up Fingerprint '{:?}'", e),
             )
         })?;
 
@@ -312,10 +286,7 @@ fn refresh_certifications() -> Result<(), BadRequest<Json<ReturnError>>> {
             .map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
-                    format!(
-                        "Error during certs_refresh_ca_certifications '{:?}'",
-                        e
-                    ),
+                    format!("Error during certs_refresh_ca_certifications '{:?}'", e),
                 )
             })?)
     })
@@ -329,17 +300,12 @@ fn poll_for_updates() -> String {
 
 /// Check for certs that will expire within "days" days.
 #[get("/certs/expire/<days>")]
-fn check_expiring(
-    days: u64,
-) -> Result<Json<Vec<CertInfo>>, BadRequest<Json<ReturnError>>> {
+fn check_expiring(days: u64) -> Result<Json<Vec<CertInfo>>, BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
         let expired = ca.certs_expired(days).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
-                format!(
-                    "check_expiring: Error looking up expired certs '{:?}'",
-                    e
-                ),
+                format!("check_expiring: Error looking up expired certs '{:?}'", e),
             )
         })?;
 
@@ -349,10 +315,7 @@ fn check_expiring(
             let cert = Pgp::armored_to_cert(&cert.pub_cert).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
-                    format!(
-                        "check_expiring: Error in armored_to_cert '{:?}'",
-                        e
-                    ),
+                    format!("check_expiring: Error in armored_to_cert '{:?}'", e),
                 )
             })?;
 

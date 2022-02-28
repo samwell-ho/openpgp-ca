@@ -85,10 +85,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revocation: &str) -> Result<()> {
 }
 
 /// Verify that `revoc_cert` can be used to revoke the primary key of `cert`.
-fn validate_revocation(
-    cert: &Cert,
-    revocation: &mut Signature,
-) -> Result<bool> {
+fn validate_revocation(cert: &Cert, revocation: &mut Signature) -> Result<bool> {
     let before = cert.primary_key().self_revocations().count();
 
     let revoked = cert.to_owned().insert_packets(revocation.to_owned())?;
@@ -138,10 +135,7 @@ fn search_revocable_cert_by_keyid(
 
 /// Merge a revocation into the cert that it applies to, thus revoking that
 /// cert in the OpenPGP CA database.
-pub fn revocation_apply(
-    oca: &OpenpgpCa,
-    mut db_revoc: models::Revocation,
-) -> Result<()> {
+pub fn revocation_apply(oca: &OpenpgpCa, mut db_revoc: models::Revocation) -> Result<()> {
     if let Some(mut db_cert) = oca.db().cert_by_id(db_revoc.cert_id)? {
         let sig = Pgp::armored_to_signature(&db_revoc.revocation)?;
         let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;

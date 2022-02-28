@@ -7,9 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use openpgp_ca_restd::client::Client;
-use openpgp_ca_restd::json::{
-    Action, CertResultJson, CertStatus, Certificate,
-};
+use openpgp_ca_restd::json::{Action, CertResultJson, CertStatus, Certificate};
 use openpgp_ca_restd::restd;
 
 use gnupg_test_wrapper as gnupg;

@@ -15,9 +15,7 @@ use std::time::SystemTime;
 
 use sequoia_openpgp::cert::ValidCert;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::types::{
-    HashAlgorithm, PublicKeyAlgorithm, RevocationStatus,
-};
+use sequoia_openpgp::types::{HashAlgorithm, PublicKeyAlgorithm, RevocationStatus};
 use sequoia_openpgp::{Cert, Message, Packet};
 
 use openpgp_ca_lib::ca::OpenpgpCa;
@@ -218,9 +216,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
         return Err(ReturnBadJson::new(
             CertError::new(
                 CertStatus::PrivateKey,
-                String::from(
-                    "check_cert: The user provided private key material",
-                ),
+                String::from("check_cert: The user provided private key material"),
             ),
             Some(ci),
         ));
@@ -233,10 +229,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
             return Err(ReturnBadJson::new(
                 CertError::new(
                     CertStatus::CertSizeLimit,
-                    format!(
-                        "check_cert: User cert is too big ({} bytes)",
-                        len
-                    ),
+                    format!("check_cert: User cert is too big ({} bytes)", len),
                 ),
                 Some(ci),
             ));
@@ -289,11 +282,9 @@ fn process_cert(
         // input parameter, for now
 
         if (certificate.delisted.is_some()
-            && certificate.delisted
-                != Some(cert_in_ca_db.as_ref().unwrap().delisted))
+            && certificate.delisted != Some(cert_in_ca_db.as_ref().unwrap().delisted))
             || (certificate.inactive.is_some()
-                && certificate.inactive
-                    != Some(cert_in_ca_db.as_ref().unwrap().inactive))
+                && certificate.inactive != Some(cert_in_ca_db.as_ref().unwrap().inactive))
         {
             let ce = CertError::new(
                 CertStatus::InternalError,
@@ -311,18 +302,14 @@ fn process_cert(
     let merged = match cert_in_ca_db {
         None => cert.clone(),
         Some(ref c) => {
-            let db_cert =
-                Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
-                    let error = CertError::new(
-                        CertStatus::InternalError,
-                        format!(
-                            "process_cert: Error un-armoring cert from CA DB: {:?}",
-                            e
-                        ),
-                    );
+            let db_cert = Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
+                let error = CertError::new(
+                    CertStatus::InternalError,
+                    format!("process_cert: Error un-armoring cert from CA DB: {:?}", e),
+                );
 
-                    ReturnBadJson::new(error, Some(cert_info.clone()))
-                })?;
+                ReturnBadJson::new(error, Some(cert_info.clone()))
+            })?;
 
             db_cert.merge_public(cert.clone()).map_err(|e| {
                 let error = CertError::new(
@@ -364,23 +351,19 @@ fn process_cert(
     }
 
     // perform sequoia policy check
-    let valid_cert = cert_policy_check(&merged)
-        .map_err(|ce| ReturnBadJson::new(ce, Some(cert_info.clone())))?;
+    let valid_cert =
+        cert_policy_check(&merged).map_err(|ce| ReturnBadJson::new(ce, Some(cert_info.clone())))?;
     let _ = merged; // drop previous version of the cert
 
     // check if the cert is revoked
-    let is_revoked =
-        matches!(valid_cert.revocation_status(), RevocationStatus::Revoked(_));
+    let is_revoked = matches!(valid_cert.revocation_status(), RevocationStatus::Revoked(_));
 
     // check and normalize user_ids
-    let norm = validate_and_strip_user_ids(
-        &valid_cert,
-        my_domain,
-        &certificate.email,
-    )
-    .map_err(|e| ReturnBadJson::new(e, Some(cert_info.clone())))?;
+    let norm = validate_and_strip_user_ids(&valid_cert, my_domain, &certificate.email)
+        .map_err(|e| ReturnBadJson::new(e, Some(cert_info.clone())))?;
 
-    let cert_info_norm: CertInfo = (&norm).try_into()
+    let cert_info_norm: CertInfo = (&norm)
+        .try_into()
         .map_err(|e| {
             CertError::new(
                 CertStatus::InternalError,
@@ -420,10 +403,7 @@ fn process_cert(
             ca.cert_import_update(&armored).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
-                    format!(
-                        "process_cert: Error updating Cert in database: {:?}",
-                        e
-                    ),
+                    format!("process_cert: Error updating Cert in database: {:?}", e),
                 );
 
                 ReturnBadJson::new(error, cert_info.clone())
@@ -463,10 +443,7 @@ fn process_cert(
             .map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
-                    format!(
-                        "process_cert: Error importing Cert into db: {:?}",
-                        e
-                    ),
+                    format!("process_cert: Error importing Cert into db: {:?}", e),
                 );
                 ReturnBadJson::new(error, cert_info.clone())
             })?;
@@ -506,8 +483,7 @@ fn process_cert(
         inactive: Some(inactive),
     };
 
-    let warn = get_warnings(&norm)
-        .map_err(|ce| ReturnBadJson::new(ce, Some(cert_info.clone())))?;
+    let warn = get_warnings(&norm).map_err(|ce| ReturnBadJson::new(ce, Some(cert_info.clone())))?;
 
     Ok(ReturnGoodJson {
         certificate,
@@ -527,9 +503,7 @@ fn process_cert(
 ///
 /// Returns a vec of Cert - and the position of the (claimed) signer Cert, if
 /// any (the signature is not verified, only the issuer is checked).
-fn unpack_certring(
-    certring: &str,
-) -> Result<(Vec<Cert>, Option<usize>), Box<dyn Error>> {
+fn unpack_certring(certring: &str) -> Result<(Vec<Cert>, Option<usize>), Box<dyn Error>> {
     // determine the shape of our input data
     if let Ok(msg) = Message::from_str(certring) {
         // 1) a signed message that contains a certring (?)
@@ -591,8 +565,7 @@ pub fn process_certs(
         .enumerate()
         .map(|(n, cert)| {
             let is_signer = Some(n) == signer;
-            process_cert(cert, is_signer, &my_domain, certificate, ca, persist)
-                .into()
+            process_cert(cert, is_signer, &my_domain, certificate, ca, persist).into()
         })
         .collect())
 }

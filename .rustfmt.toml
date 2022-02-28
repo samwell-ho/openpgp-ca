@@ -1,9 +1,0 @@
-# SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
-# SPDX-License-Identifier: CC0-1.0
-
-# The following configuration gives warnings in stable rust versions since
-# they're unstable (Jan 2020).
-max_width = 79
-comment_width = 79
-#report_fixme = "Always"
-

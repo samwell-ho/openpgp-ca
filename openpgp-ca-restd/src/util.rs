@@ -29,10 +29,7 @@ pub fn is_email_in_domain(email: &str, domain: &str) -> Result<bool> {
 /// these addresses are "internal" to the domain.
 ///
 /// returns two lists of email addresses: (internal, external)
-pub fn split_emails(
-    domain: &str,
-    emails: &[String],
-) -> Result<(Vec<String>, Vec<String>)> {
+pub fn split_emails(domain: &str, emails: &[String]) -> Result<(Vec<String>, Vec<String>)> {
     let mut int: Vec<String> = Vec::new();
     let mut ext: Vec<String> = Vec::new();
 

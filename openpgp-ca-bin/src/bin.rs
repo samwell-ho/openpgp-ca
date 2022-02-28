@@ -28,16 +28,9 @@ fn main() -> Result<()> {
             } => {
                 // TODO: key-profile?
 
-                let emails: Vec<_> =
-                    email.iter().map(String::as_str).collect();
+                let emails: Vec<_> = email.iter().map(String::as_str).collect();
 
-                ca.user_new(
-                    name.as_deref(),
-                    &emails[..],
-                    None,
-                    true,
-                    minimal,
-                )?;
+                ca.user_new(name.as_deref(), &emails[..], None, true, minimal)?;
             }
             UserCommand::AddRevocation { revocation_file } => {
                 ca.revocation_add_from_file(&revocation_file)?
@@ -65,16 +58,9 @@ fn main() -> Result<()> {
                     revoc_certs.push(rev);
                 }
 
-                let emails: Vec<_> =
-                    email.iter().map(String::as_str).collect();
+                let emails: Vec<_> = email.iter().map(String::as_str).collect();
 
-                ca.cert_import_new(
-                    &cert,
-                    revoc_certs,
-                    name.as_deref(),
-                    &emails,
-                    None,
-                )?;
+                ca.cert_import_new(&cert, revoc_certs, name.as_deref(), &emails, None)?;
             }
             UserCommand::Update { cert_file } => {
                 let cert = std::fs::read_to_string(cert_file)?;
@@ -88,9 +74,7 @@ fn main() -> Result<()> {
                 }
             }
             UserCommand::List => OpenpgpCa::print_users(&ca)?,
-            UserCommand::ShowRevocations { email } => {
-                OpenpgpCa::print_revocations(&ca, &email)?
-            }
+            UserCommand::ShowRevocations { email } => OpenpgpCa::print_revocations(&ca, &email)?,
             UserCommand::ApplyRevocation { hash } => {
                 let rev = ca.revocation_get_by_hash(&hash)?;
                 ca.revocation_apply(rev)?;
@@ -119,12 +103,7 @@ fn main() -> Result<()> {
                 scope,
                 remote_key_file,
                 commit,
-            } => ca.add_bridge(
-                email.as_deref(),
-                &remote_key_file,
-                scope.as_deref(),
-                commit,
-            )?,
+            } => ca.add_bridge(email.as_deref(), &remote_key_file, scope.as_deref(), commit)?,
             BridgeCommand::Revoke { email } => ca.bridge_revoke(&email)?,
             BridgeCommand::List => ca.list_bridges()?,
             BridgeCommand::Export { email } => ca.print_bridges(email)?,

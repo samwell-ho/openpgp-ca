@@ -31,8 +31,7 @@ pub fn bridge_new(
     remote_email: Option<&str>,
     remote_scope: Option<&str>,
 ) -> Result<(models::Bridge, Fingerprint)> {
-    let remote_ca_cert =
-        Cert::from_file(remote_cert_file).context("Failed to read key")?;
+    let remote_ca_cert = Cert::from_file(remote_cert_file).context("Failed to read key")?;
 
     let remote_uids: Vec<_> = remote_ca_cert.userids().collect();
 
@@ -61,9 +60,7 @@ pub fn bridge_new(
             let domain = split[1];
             (remote_email.to_owned(), domain.to_owned())
         } else {
-            return Err(anyhow::anyhow!(
-                "Couldn't get email from remote CA Cert"
-            ));
+            return Err(anyhow::anyhow!("Couldn't get email from remote CA Cert"));
         }
     };
 
@@ -121,8 +118,7 @@ pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
             let bridge_cert = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
             // Generate revocation for the bridge
-            let (revocation, revoked) =
-                oca.secret().bridge_revoke(&bridge_cert)?;
+            let (revocation, revoked) = oca.secret().bridge_revoke(&bridge_cert)?;
 
             // Print the revocation in case the user wants to publish it
             // using external mechanisms.
@@ -151,8 +147,7 @@ fn domain_to_regex(domain: &str) -> Result<String> {
     use addr::psl::List;
     if List.parse_domain_name(domain).is_ok() {
         // if valid syntax: transform domain to regex
-        let escaped_domain =
-            &domain.split('.').collect::<Vec<_>>().join("\\.");
+        let escaped_domain = &domain.split('.').collect::<Vec<_>>().join("\\.");
 
         Ok(format!("<[^>]+[@.]{}>$", escaped_domain))
     } else {

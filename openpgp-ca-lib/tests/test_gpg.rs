@@ -161,14 +161,8 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     )
     .context("import Alice to CA failed")?;
 
-    ca.cert_import_new(
-        &bob_key,
-        vec![],
-        Some("Bob"),
-        &["bob@example.org"],
-        None,
-    )
-    .context("import Bob to CA failed")?;
+    ca.cert_import_new(&bob_key, vec![], Some("Bob"), &["bob@example.org"], None)
+        .context("import Bob to CA failed")?;
 
     // export bob, CA-key from CA
     let ca_key = ca.ca_get_pubkey_armored()?;
@@ -514,8 +508,7 @@ fn test_scoping() -> Result<()> {
 
     // create unscoped trust signature from beta.org CA to other.org CA
     // ---- openpgp-ca@beta.org ---tsign---> openpgp-ca@other.org ----
-    let tsigned_ca3 =
-        Pgp::tsign(ca3.ca_get_priv_key()?, &ca2.ca_get_priv_key()?, None)?;
+    let tsigned_ca3 = Pgp::tsign(ca3.ca_get_priv_key()?, &ca2.ca_get_priv_key()?, None)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 

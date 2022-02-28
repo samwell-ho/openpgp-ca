@@ -29,18 +29,16 @@ pub fn user_new(
 ) -> Result<()> {
     // Generate new user key
     let (user_key, user_revoc, pass) =
-        Pgp::make_user_cert(emails, name, password)
-            .context("make_user_cert failed")?;
+        Pgp::make_user_cert(emails, name, password).context("make_user_cert failed")?;
 
     // CA certifies user cert
-    let user_certified =
-        sign_cert_emails(oca, &user_key, Some(emails), duration_days)
-            .context("sign_user_emails failed")?;
+    let user_certified = sign_cert_emails(oca, &user_key, Some(emails), duration_days)
+        .context("sign_user_emails failed")?;
 
     // User tsigns CA cert
     let ca_cert = oca.ca_get_cert_pub()?;
-    let tsigned_ca = Pgp::tsign(ca_cert, &user_key, pass.as_deref())
-        .context("tsign for CA cert failed")?;
+    let tsigned_ca =
+        Pgp::tsign(ca_cert, &user_key, pass.as_deref()).context("tsign for CA cert failed")?;
 
     let tsigned_ca = Pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
@@ -89,8 +87,8 @@ pub fn cert_import_new(
     emails: &[&str],
     duration_days: Option<u64>,
 ) -> Result<()> {
-    let user_cert = Pgp::armored_to_cert(user_cert)
-        .context("cert_import_new: Couldn't process user cert.")?;
+    let user_cert =
+        Pgp::armored_to_cert(user_cert).context("cert_import_new: Couldn't process user cert.")?;
 
     let fp = user_cert.fingerprint().to_hex();
 
@@ -106,9 +104,8 @@ pub fn cert_import_new(
     }
 
     // Sign user cert with CA key (only the User IDs that have been specified)
-    let certified =
-        sign_cert_emails(oca, &user_cert, Some(emails), duration_days)
-            .context("sign_cert_emails() failed")?;
+    let certified = sign_cert_emails(oca, &user_cert, Some(emails), duration_days)
+        .context("sign_cert_emails() failed")?;
 
     // use name from User IDs, if no name was passed
     let name = match name {
@@ -124,8 +121,8 @@ pub fn cert_import_new(
     };
 
     // Insert new user cert into DB
-    let pub_cert = Pgp::cert_to_armored(&certified)
-        .context("cert_import_new: Couldn't re-armor key")?;
+    let pub_cert =
+        Pgp::cert_to_armored(&certified).context("cert_import_new: Couldn't re-armor key")?;
 
     oca.db()
         .user_add(name.as_deref(), (&pub_cert, &fp), emails, &revoc_certs)
@@ -135,14 +132,16 @@ pub fn cert_import_new(
 }
 
 pub fn cert_import_update(oca: &OpenpgpCa, cert: &str) -> Result<()> {
-    let cert_new = Pgp::armored_to_cert(cert)
-        .context("cert_import_update: couldn't process cert")?;
+    let cert_new =
+        Pgp::armored_to_cert(cert).context("cert_import_update: couldn't process cert")?;
 
     let fp = cert_new.fingerprint().to_hex();
 
-    if let Some(mut db_cert) = oca.db().cert_by_fp(&fp).context(
-        "cert_import_update(): get_cert() check by fingerprint failed",
-    )? {
+    if let Some(mut db_cert) = oca
+        .db()
+        .cert_by_fp(&fp)
+        .context("cert_import_update(): get_cert() check by fingerprint failed")?
+    {
         // merge existing and new public key
         let cert_old = Pgp::armored_to_cert(&db_cert.pub_cert)?;
 
@@ -163,8 +162,8 @@ pub fn certs_refresh_ca_certifications(
     threshold_days: u64,
     validity_days: u64,
 ) -> Result<()> {
-    let threshold_time = SystemTime::now()
-        + Duration::from_secs(threshold_days * Pgp::SECONDS_IN_DAY);
+    let threshold_time =
+        SystemTime::now() + Duration::from_secs(threshold_days * Pgp::SECONDS_IN_DAY);
 
     let ca = oca.ca_get_cert_pub()?;
 
@@ -181,8 +180,7 @@ pub fn certs_refresh_ca_certifications(
 
         for uid in c.userids() {
             // find valid certifications by the CA on this uid
-            let ca_certifications =
-                Pgp::valid_certifications_by(&uid, &c, ca.clone());
+            let ca_certifications = Pgp::valid_certifications_by(&uid, &c, ca.clone());
 
             let sig_valid_past_threshold = |sig: &Signature| {
                 if let Some(expiration) = sig.signature_expiration_time() {
@@ -205,11 +203,9 @@ pub fn certs_refresh_ca_certifications(
         }
         if !recertify.is_empty() {
             // Make new certifications for the User IDs identified above
-            let recertified = oca.secret().sign_user_ids(
-                &c,
-                &recertify[..],
-                Some(validity_days),
-            )?;
+            let recertified =
+                oca.secret()
+                    .sign_user_ids(&c, &recertify[..], Some(validity_days))?;
 
             // update cert in db
             let mut cert_update = db_cert.clone();
@@ -268,26 +264,18 @@ pub fn check_mutual_certifications(
     Ok((sig_from_ca, tsig_on_ca))
 }
 
-pub fn cert_check_ca_sig(
-    oca: &OpenpgpCa,
-    cert: &models::Cert,
-) -> Result<Vec<UserID>> {
+pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<Vec<UserID>> {
     let c = Pgp::armored_to_cert(&cert.pub_cert)?;
     let ca = oca.ca_get_cert_pub()?;
 
     Ok(c.userids()
-        .filter(|uid| {
-            !Pgp::valid_certifications_by(uid, &c, ca.clone()).is_empty()
-        })
+        .filter(|uid| !Pgp::valid_certifications_by(uid, &c, ca.clone()).is_empty())
         .map(|uid| uid.userid())
         .cloned()
         .collect())
 }
 
-pub fn cert_check_tsig_on_ca(
-    oca: &OpenpgpCa,
-    cert: &models::Cert,
-) -> Result<bool> {
+pub fn cert_check_tsig_on_ca(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let ca = oca.ca_get_cert_pub()?;
     let tsigs = Pgp::get_trust_sigs(&ca)?;
 
@@ -330,9 +318,7 @@ fn sign_cert_emails(
             // Certify this User ID if we
             // a) have no filter-list, or
             // b) if the User ID is specified in the filter-list.
-            if emails_filter.is_none()
-                || emails_filter.unwrap().contains(&uid_addr.as_str())
-            {
+            if emails_filter.is_none() || emails_filter.unwrap().contains(&uid_addr.as_str()) {
                 uids.push(userid);
             }
         }

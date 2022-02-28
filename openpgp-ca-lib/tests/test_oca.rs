@@ -154,10 +154,8 @@ fn test_update_cert_key() -> Result<()> {
 
     let now = SystemTime::now();
     let in_one_year = now.checked_add(Duration::from_secs(3600 * 24 * 365));
-    let in_three_years =
-        now.checked_add(Duration::from_secs(3600 * 24 * 365 * 3));
-    let in_six_years =
-        now.checked_add(Duration::from_secs(3600 * 24 * 365 * 6));
+    let in_three_years = now.checked_add(Duration::from_secs(3600 * 24 * 365 * 3));
+    let in_six_years = now.checked_add(Duration::from_secs(3600 * 24 * 365 * 6));
 
     // update key with new version, but same fingerprint
     let gpg = gnupg::make_context()?;
@@ -417,16 +415,14 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     let j: Fingerprint = "CBCD8F030588653EEDD7E2659B7DD433F254904A".parse()?;
     let justus: Cert = rt.block_on(async move {
-        let mut hagrid =
-            sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
+        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
         hagrid.get(&KeyID::from(j)).await
     })?;
     let justus_key = Pgp::cert_to_armored(&justus)?;
 
     let n: Fingerprint = "8F17777118A33DDA9BA48E62AACB3243630052D9".parse()?;
     let neal: Cert = rt.block_on(async move {
-        let mut hagrid =
-            sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
+        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
         hagrid.get(&KeyID::from(n)).await
     })?;
     let neal_key = Pgp::cert_to_armored(&neal)?;
@@ -439,20 +435,8 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     ca.ca_init("sequoia-pgp.org", None)?;
 
-    ca.cert_import_new(
-        &justus_key,
-        vec![],
-        None,
-        &["justus@sequoia-pgp.org"],
-        None,
-    )?;
-    ca.cert_import_new(
-        &neal_key,
-        vec![],
-        None,
-        &["neal@sequoia-pgp.org"],
-        None,
-    )?;
+    ca.cert_import_new(&justus_key, vec![], None, &["justus@sequoia-pgp.org"], None)?;
+    ca.cert_import_new(&neal_key, vec![], None, &["neal@sequoia-pgp.org"], None)?;
 
     // -- export as WKD
 
@@ -487,13 +471,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
 
     let alice_key = gpg.export("alice@example.org");
 
-    ca.cert_import_new(
-        &alice_key,
-        vec![],
-        None,
-        &["alice@example.org"],
-        None,
-    )?;
+    ca.cert_import_new(&alice_key, vec![], None, &["alice@example.org"], None)?;
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
@@ -582,8 +560,7 @@ fn test_ca_signatures() -> Result<()> {
 
         assert_eq!(certs.len(), 1);
 
-        let (sig_from_ca, tsig_on_ca) =
-            ca.check_mutual_certifications(&certs[0])?;
+        let (sig_from_ca, tsig_on_ca) = ca.check_mutual_certifications(&certs[0])?;
 
         match name.as_str() {
             "Alice" => {
@@ -701,8 +678,7 @@ fn test_import_signed_cert() -> Result<()> {
     let certs = ca.user_certs_get_all()?;
     assert_eq!(certs.len(), 1);
 
-    let (sig_from_ca, tsig_on_ca) =
-        ca.check_mutual_certifications(&certs[0])?;
+    let (sig_from_ca, tsig_on_ca) = ca.check_mutual_certifications(&certs[0])?;
 
     let name = ca.cert_get_name(&certs[0])?;
     match name.as_str() {
@@ -751,8 +727,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     gpg.make_revocation("bob@example.org", &revoc_file, 1)?;
 
     // ... remove the issuer fingerprint ...
-    let p = openpgp::Packet::from_file(&revoc_file)
-        .context("Input could not be parsed")?;
+    let p = openpgp::Packet::from_file(&revoc_file).context("Input could not be parsed")?;
 
     let armored = if let openpgp::Packet::Signature(s) = p {
         // use Bob as a Signer
@@ -789,10 +764,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
         // two signatures with the same timestamp are not allowed
         std::thread::sleep(std::time::Duration::from_millis(1_000));
 
-        let mut sig = b.sign_direct_key(
-            &mut keypair,
-            Some(bob_cert.primary_key().key()),
-        )?;
+        let mut sig = b.sign_direct_key(&mut keypair, Some(bob_cert.primary_key().key()))?;
 
         sig.unhashed_area_mut()
             .remove_all(SubpacketTag::IssuerFingerprint);
@@ -803,8 +775,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
             .iter()
             .any(|kh| { matches!(kh, KeyHandle::Fingerprint(_)) }));
 
-        OpenpgpCa::revoc_to_armored(&sig)
-            .context("couldn't armor revocation cert")?
+        OpenpgpCa::revoc_to_armored(&sig).context("couldn't armor revocation cert")?
     } else {
         panic!("Error handling Signature Packet");
     };

@@ -38,17 +38,7 @@ pub struct NewCacert<'a> {
     pub ca_id: i32,
 }
 
-#[derive(
-    Identifiable,
-    Queryable,
-    Debug,
-    Associations,
-    Clone,
-    AsChangeset,
-    PartialEq,
-    Eq,
-    Hash,
-)]
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset, PartialEq, Eq, Hash)]
 #[belongs_to(Ca)]
 pub struct User {
     pub id: i32,
@@ -64,17 +54,7 @@ pub struct NewUser<'a> {
     pub ca_id: i32,
 }
 
-#[derive(
-    Identifiable,
-    Queryable,
-    Debug,
-    Associations,
-    Clone,
-    AsChangeset,
-    PartialEq,
-    Eq,
-    Hash,
-)]
+#[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset, PartialEq, Eq, Hash)]
 #[belongs_to(User)]
 pub struct Cert {
     pub id: i32,

@@ -36,8 +36,7 @@ impl Client {
                     if o.content_length() == Some(0) {
                         Ok(None)
                     } else {
-                        let resp =
-                            o.json::<Option<ReturnGoodJson>>().await.unwrap();
+                        let resp = o.json::<Option<ReturnGoodJson>>().await.unwrap();
 
                         Ok(resp)
                     }
@@ -69,9 +68,7 @@ impl Client {
                             .expect("Ok Status, but JSON mapping failed"))
                     }
                 }
-                StatusCode::BAD_REQUEST => {
-                    Err(o.json::<ReturnError>().await.unwrap())
-                }
+                StatusCode::BAD_REQUEST => Err(o.json::<ReturnError>().await.unwrap()),
                 _ => panic!("unexpected status code {}", o.status()),
             },
             Err(e) => {
@@ -85,12 +82,8 @@ impl Client {
     ) -> Result<Vec<ReturnGoodJson>, ReturnError> {
         match resp {
             Ok(o) => match o.status() {
-                StatusCode::OK => {
-                    Ok(o.json::<Vec<ReturnGoodJson>>().await.unwrap())
-                }
-                StatusCode::BAD_REQUEST => {
-                    Err(o.json::<ReturnError>().await.unwrap())
-                }
+                StatusCode::OK => Ok(o.json::<Vec<ReturnGoodJson>>().await.unwrap()),
+                StatusCode::BAD_REQUEST => Err(o.json::<ReturnError>().await.unwrap()),
                 _ => panic!("unexpected status code {}", o.status()),
             },
             Err(e) => {
@@ -99,10 +92,7 @@ impl Client {
         }
     }
 
-    pub async fn check(
-        &self,
-        cert: &Certificate,
-    ) -> Result<Vec<CertResultJson>, ReturnError> {
+    pub async fn check(&self, cert: &Certificate) -> Result<Vec<CertResultJson>, ReturnError> {
         let cert_json = serde_json::to_string(&cert).unwrap();
 
         let resp = self
@@ -115,10 +105,7 @@ impl Client {
         Client::map_result_keyring(resp).await
     }
 
-    pub async fn persist(
-        &self,
-        cert: &Certificate,
-    ) -> Result<Vec<CertResultJson>, ReturnError> {
+    pub async fn persist(&self, cert: &Certificate) -> Result<Vec<CertResultJson>, ReturnError> {
         let cert_json = serde_json::to_string(&cert).unwrap();
 
         let mut header_map = HeaderMap::new();
@@ -138,10 +125,7 @@ impl Client {
         Client::map_result_keyring(resp).await
     }
 
-    pub async fn get_by_email(
-        &self,
-        email: String,
-    ) -> Result<Vec<ReturnGoodJson>, ReturnError> {
+    pub async fn get_by_email(&self, email: String) -> Result<Vec<ReturnGoodJson>, ReturnError> {
         let resp = self
             .client
             .get(&format!("{}certs/by_email/{}", &self.uri, email))
@@ -151,10 +135,7 @@ impl Client {
         Client::map_result_vec(resp).await
     }
 
-    pub async fn get_by_fp(
-        &self,
-        fp: String,
-    ) -> Result<Option<ReturnGoodJson>, ReturnError> {
+    pub async fn get_by_fp(&self, fp: String) -> Result<Option<ReturnGoodJson>, ReturnError> {
         let resp = self
             .client
             .get(&format!("{}certs/by_fp/{}", &self.uri, fp))
@@ -164,10 +145,7 @@ impl Client {
         Client::map_result(resp).await
     }
 
-    pub async fn deactivate(
-        &self,
-        fp: String,
-    ) -> Result<Option<ReturnGoodJson>, ReturnError> {
+    pub async fn deactivate(&self, fp: String) -> Result<Option<ReturnGoodJson>, ReturnError> {
         let resp = self
             .client
             .post(&format!("{}certs/deactivate/{}", &self.uri, fp))
@@ -177,10 +155,7 @@ impl Client {
         Client::map_result(resp).await
     }
 
-    pub async fn delist(
-        &self,
-        fp: String,
-    ) -> Result<Option<ReturnGoodJson>, ReturnError> {
+    pub async fn delist(&self, fp: String) -> Result<Option<ReturnGoodJson>, ReturnError> {
         let resp = self
             .client
             .delete(&format!("{}certs/{}", &self.uri, fp))

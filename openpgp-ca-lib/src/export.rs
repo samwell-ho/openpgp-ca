@@ -23,10 +23,7 @@ const KEYLIST_FILE: &str = "keylist.json";
 
 /// Write all Certs to stdout as one armored certring (or a subset of certs,
 /// filtered by User ID via email)
-pub fn print_certring(
-    oca: &OpenpgpCa,
-    email_filter: Option<String>,
-) -> Result<()> {
+pub fn print_certring(oca: &OpenpgpCa, email_filter: Option<String>) -> Result<()> {
     // Load all user-certs (optionally filtered by email)
     let certs = match &email_filter {
         Some(email) => oca.certs_by_email(email)?,
@@ -114,9 +111,7 @@ fn open_file(name: PathBuf, overwrite: bool) -> std::io::Result<File> {
 /// If `filename` contains suspicious chars, this fn returns an Err.
 fn path_append(path: &str, filename: &str) -> Result<PathBuf> {
     // colon is a special char on windows (and illegal in emails)
-    if filename.chars().any(std::path::is_separator)
-        || filename.chars().any(|c| c == ':')
-    {
+    if filename.chars().any(std::path::is_separator) || filename.chars().any(|c| c == ':') {
         Err(anyhow::anyhow!(
             "Filename contains special character. May be a path traversal \
             attack? {}",
@@ -214,8 +209,7 @@ pub fn export_keylist(
     // Write keylist and signature to the filesystem
     let mut keylist = path.clone();
     keylist.push(KEYLIST_FILE);
-    open_file(keylist, overwrite)?
-        .write_all(&skl.keylist.as_bytes().to_vec())?;
+    open_file(keylist, overwrite)?.write_all(&skl.keylist.as_bytes().to_vec())?;
 
     let mut sigfile = path;
     sigfile.push(sigfile_name);

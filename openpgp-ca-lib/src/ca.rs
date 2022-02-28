@@ -120,9 +120,7 @@ impl OpenpgpCa {
         } else if let Ok(database) = env::var("OPENPGP_CA_DB") {
             database
         } else {
-            return Err(anyhow::anyhow!(
-                "ERROR: no database configuration found"
-            ));
+            return Err(anyhow::anyhow!("ERROR: no database configuration found"));
         };
 
         let db = Rc::new(OcaDb::new(&db_url)?);
@@ -180,8 +178,8 @@ impl OpenpgpCa {
     /// Returns the public key of the CA as an armored String
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
         let cert = self.ca_get_cert_pub()?;
-        let ca_pub = Pgp::cert_to_armored(&cert)
-            .context("Failed to transform CA key to armored pubkey")?;
+        let ca_pub =
+            Pgp::cert_to_armored(&cert).context("Failed to transform CA key to armored pubkey")?;
 
         Ok(ca_pub)
     }
@@ -233,10 +231,7 @@ impl OpenpgpCa {
     ///
     /// If a cert is not "alive" now, it will not get returned as expiring
     /// (otherwise old/abandoned certs would clutter the results)
-    pub fn certs_expired(
-        &self,
-        days: u64,
-    ) -> Result<HashMap<models::Cert, Option<SystemTime>>> {
+    pub fn certs_expired(&self, days: u64) -> Result<HashMap<models::Cert, Option<SystemTime>>> {
         cert::certs_expired(self, days)
     }
 
@@ -245,19 +240,13 @@ impl OpenpgpCa {
     /// - the CA key has a trust-signature from the Cert
     ///
     /// Returns a map 'cert -> (sig_from_ca, tsig_on_ca)'
-    pub fn check_mutual_certifications(
-        &self,
-        cert: &models::Cert,
-    ) -> Result<(Vec<UserID>, bool)> {
+    pub fn check_mutual_certifications(&self, cert: &models::Cert) -> Result<(Vec<UserID>, bool)> {
         cert::check_mutual_certifications(self, cert)
     }
 
     /// Check if this Cert has been certified by the CA Key, returns all
     /// certified User IDs
-    pub fn cert_check_ca_sig(
-        &self,
-        cert: &models::Cert,
-    ) -> Result<Vec<UserID>> {
+    pub fn cert_check_ca_sig(&self, cert: &models::Cert) -> Result<Vec<UserID>> {
         cert::cert_check_ca_sig(self, cert)
     }
 
@@ -276,11 +265,7 @@ impl OpenpgpCa {
         validity_days: u64,
     ) -> Result<()> {
         self.db().transaction(|| {
-            cert::certs_refresh_ca_certifications(
-                self,
-                threshold_days,
-                validity_days,
-            )
+            cert::certs_refresh_ca_certifications(self, threshold_days, validity_days)
         })
     }
 
@@ -335,14 +320,7 @@ impl OpenpgpCa {
         duration_days: Option<u64>,
     ) -> Result<()> {
         self.db().transaction(|| {
-            cert::cert_import_new(
-                self,
-                cert,
-                revoc_certs,
-                name,
-                emails,
-                duration_days,
-            )
+            cert::cert_import_new(self, cert, revoc_certs, name, emails, duration_days)
         })
     }
 
@@ -357,18 +335,12 @@ impl OpenpgpCa {
     ///
     /// The fingerprint parameter is normalized (e.g. if it contains
     /// spaces, they will be filtered out).
-    pub fn cert_get_by_fingerprint(
-        &self,
-        fingerprint: &str,
-    ) -> Result<Option<models::Cert>> {
+    pub fn cert_get_by_fingerprint(&self, fingerprint: &str) -> Result<Option<models::Cert>> {
         self.db.cert_by_fp(&Pgp::normalize_fp(fingerprint)?)
     }
 
     /// Get a list of all Certs for one User
-    pub fn get_certs_by_user(
-        &self,
-        user: &models::User,
-    ) -> Result<Vec<models::Cert>> {
+    pub fn get_certs_by_user(&self, user: &models::User) -> Result<Vec<models::Cert>> {
         self.db.certs_by_user(user)
     }
 
@@ -383,10 +355,7 @@ impl OpenpgpCa {
     }
 
     /// Get database User(s) for database Cert
-    pub fn cert_get_users(
-        &self,
-        cert: &models::Cert,
-    ) -> Result<Option<models::User>> {
+    pub fn cert_get_users(&self, cert: &models::Cert) -> Result<Option<models::User>> {
         self.db.user_by_cert(cert)
     }
 
@@ -409,8 +378,7 @@ impl OpenpgpCa {
         let db_users = self.users_get_all()?;
         for db_user in &db_users {
             for db_cert in self.get_certs_by_user(db_user)? {
-                let (sig_from_ca, tsig_on_ca) =
-                    self.check_mutual_certifications(&db_cert)?;
+                let (sig_from_ca, tsig_on_ca) = self.check_mutual_certifications(&db_cert)?;
 
                 let ok = if !sig_from_ca.is_empty() {
                     true
@@ -423,10 +391,7 @@ impl OpenpgpCa {
                 } && if tsig_on_ca {
                     true
                 } else {
-                    println!(
-                        "CA Cert has not been tsigned by {}.",
-                        db_cert.fingerprint
-                    );
+                    println!("CA Cert has not been tsigned by {}.", db_cert.fingerprint);
                     false
                 };
 
@@ -450,10 +415,7 @@ impl OpenpgpCa {
         let expiries = self.certs_expired(exp_days)?;
 
         if expiries.is_empty() {
-            println!(
-                "No certificates will expire in the next {} days.",
-                exp_days
-            );
+            println!("No certificates will expire in the next {} days.", exp_days);
         } else {
             println!(
                 "The following {} certificates will expire in the next {} days.",
@@ -483,8 +445,7 @@ impl OpenpgpCa {
     pub fn print_users(&self) -> Result<()> {
         for db_user in self.users_get_all()? {
             for db_cert in self.get_certs_by_user(&db_user)? {
-                let (sig_by_ca, tsig_on_ca) =
-                    self.check_mutual_certifications(&db_cert)?;
+                let (sig_by_ca, tsig_on_ca) = self.check_mutual_certifications(&db_cert)?;
 
                 println!("OpenPGP certificate {}", db_cert.fingerprint);
                 if let Some(name) = &db_user.name {
@@ -533,10 +494,7 @@ impl OpenpgpCa {
     // -------- revocations
 
     /// Get a list of all Revocations for a cert
-    pub fn revocations_get(
-        &self,
-        cert: &models::Cert,
-    ) -> Result<Vec<models::Revocation>> {
+    pub fn revocations_get(&self, cert: &models::Cert) -> Result<Vec<models::Revocation>> {
         self.db.revocations_by_cert(cert)
     }
 
@@ -561,10 +519,7 @@ impl OpenpgpCa {
     }
 
     /// Get a Revocation by hash
-    pub fn revocation_get_by_hash(
-        &self,
-        hash: &str,
-    ) -> Result<models::Revocation> {
+    pub fn revocation_get_by_hash(&self, hash: &str) -> Result<models::Revocation> {
         if let Some(rev) = self.db.revocation_by_hash(hash)? {
             Ok(rev)
         } else {
@@ -622,10 +577,7 @@ impl OpenpgpCa {
                     } else {
                         "".to_string()
                     };
-                    println!(
-                        " - revocation id {}: {} ({})",
-                        r.hash, reason, time
-                    );
+                    println!(" - revocation id {}: {} ({})", r.hash, reason, time);
                     if r.published {
                         println!("   this revocation has been APPLIED");
                     }
@@ -640,10 +592,7 @@ impl OpenpgpCa {
     // -------- emails
 
     /// Get all Emails for a Cert
-    pub fn emails_get(
-        &self,
-        cert: &models::Cert,
-    ) -> Result<Vec<models::CertEmail>> {
+    pub fn emails_get(&self, cert: &models::Cert) -> Result<Vec<models::CertEmail>> {
         self.db.emails_by_cert(cert)
     }
 
@@ -677,13 +626,9 @@ impl OpenpgpCa {
     ) -> Result<()> {
         if commit {
             self.db.transaction::<_, anyhow::Error, _>(|| {
-                let (bridge, fingerprint) =
-                    bridge::bridge_new(self, key_file, email, scope)?;
+                let (bridge, fingerprint) = bridge::bridge_new(self, key_file, email, scope)?;
 
-                println!(
-                    "Signed OpenPGP key for {} as bridge.\n",
-                    bridge.email
-                );
+                println!("Signed OpenPGP key for {} as bridge.\n", bridge.email);
                 println!("The fingerprint of the remote CA key is");
                 println!("{}\n", fingerprint);
 
@@ -741,10 +686,7 @@ impl OpenpgpCa {
 
     pub fn list_bridges(&self) -> Result<()> {
         self.bridges_get()?.iter().for_each(|bridge| {
-            println!(
-                "Bridge to '{}', (scope: '{}')",
-                bridge.email, bridge.scope
-            )
+            println!("Bridge to '{}', (scope: '{}')", bridge.email, bridge.scope)
         });
         Ok(())
     }
@@ -771,22 +713,13 @@ impl OpenpgpCa {
     ///
     /// `force`: by default, this fn fails if the files exist; when force is
     /// true, overwrite.
-    pub fn export_keylist(
-        &self,
-        path: PathBuf,
-        signature_uri: String,
-        force: bool,
-    ) -> Result<()> {
+    pub fn export_keylist(&self, path: PathBuf, signature_uri: String, force: bool) -> Result<()> {
         export::export_keylist(self, path, signature_uri, force)
     }
 
     /// Export Certs from this CA into files, with filenames based on email
     /// addresses of user ids.
-    pub fn export_certs_as_files(
-        &self,
-        email_filter: Option<String>,
-        path: &str,
-    ) -> Result<()> {
+    pub fn export_certs_as_files(&self, email_filter: Option<String>, path: &str) -> Result<()> {
         export::export_certs_as_files(self, email_filter, path)
     }
 

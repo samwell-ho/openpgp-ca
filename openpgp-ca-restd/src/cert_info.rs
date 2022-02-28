@@ -12,9 +12,7 @@ use serde::{Deserialize, Serialize};
 use anyhow::Context;
 
 use sequoia_openpgp::cert::amalgamation::key::ErasedKeyAmalgamation;
-use sequoia_openpgp::cert::amalgamation::{
-    ComponentAmalgamation, ValidateAmalgamation,
-};
+use sequoia_openpgp::cert::amalgamation::{ComponentAmalgamation, ValidateAmalgamation};
 use sequoia_openpgp::packet::key;
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::policy::StandardPolicy;
@@ -117,23 +115,19 @@ impl TryFrom<&Cert> for CertInfo {
     }
 }
 
-impl TryFrom<&ComponentAmalgamation<'_, sequoia_openpgp::packet::UserID>>
-    for UserId
-{
+impl TryFrom<&ComponentAmalgamation<'_, sequoia_openpgp::packet::UserID>> for UserId {
     type Error = anyhow::Error;
 
     fn try_from(
         uid: &ComponentAmalgamation<sequoia_openpgp::packet::UserID>,
     ) -> Result<Self, Self::Error> {
-        let email =
-            uid.email().context("ERROR while converting userid.email")?;
+        let email = uid.email().context("ERROR while converting userid.email")?;
 
         let name = uid.name().context("ERROR while converting userid.name")?;
 
         let raw = String::from_utf8(uid.value().to_vec()).ok();
 
-        let revocations: Vec<_> =
-            uid.self_revocations().map(|rev| rev.into()).collect();
+        let revocations: Vec<_> = uid.self_revocations().map(|rev| rev.into()).collect();
 
         let revocations = if revocations.is_empty() {
             None
@@ -152,12 +146,11 @@ impl TryFrom<&ComponentAmalgamation<'_, sequoia_openpgp::packet::UserID>>
 
 impl From<&ErasedKeyAmalgamation<'_, key::PublicParts>> for Key {
     fn from(ka: &ErasedKeyAmalgamation<key::PublicParts>) -> Self {
-        let (expiration, flags) =
-            if let Ok(valid_sk) = ka.clone().with_policy(POLICY, None) {
-                (valid_sk.key_expiration_time(), valid_sk.key_flags())
-            } else {
-                (None, None)
-            };
+        let (expiration, flags) = if let Ok(valid_sk) = ka.clone().with_policy(POLICY, None) {
+            (valid_sk.key_expiration_time(), valid_sk.key_flags())
+        } else {
+            (None, None)
+        };
 
         let expires_in_sec = if let Some(exp) = expiration {
             let now = SystemTime::now();
@@ -191,8 +184,7 @@ impl From<&ErasedKeyAmalgamation<'_, key::PublicParts>> for Key {
             None
         };
 
-        let revocations: Vec<_> =
-            ka.self_revocations().map(|rev| rev.into()).collect();
+        let revocations: Vec<_> = ka.self_revocations().map(|rev| rev.into()).collect();
 
         let revocations = if revocations.is_empty() {
             None
@@ -220,8 +212,7 @@ impl From<&Signature> for Revocation {
         if let Some(r) = rfr {
             let reason = Some(r.0.to_string());
 
-            let information = if let Ok(msg) = String::from_utf8(r.1.to_vec())
-            {
+            let information = if let Ok(msg) = String::from_utf8(r.1.to_vec()) {
                 if !msg.is_empty() {
                     Some(msg)
                 } else {

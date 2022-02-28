@@ -38,8 +38,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
         // silently ignore errors on wkd lookup
         if let Ok(certs) = res {
             for c in certs {
-                if c.fingerprint() == Fingerprint::from_hex(&cert.fingerprint)?
-                {
+                if c.fingerprint() == Fingerprint::from_hex(&cert.fingerprint)? {
                     // If 'c' can't be merged, silently ignore the error that
                     // sequoia returns
                     if let Ok(m) = merged.clone().merge_public(c) {
@@ -64,21 +63,16 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
 
 /// Update a cert in the OpenPGP CA database from the "Hagrid" keyserver at
 /// `keys.openpgp.org`
-pub fn update_from_hagrid(
-    oca: &OpenpgpCa,
-    cert: &models::Cert,
-) -> Result<bool> {
+pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let fp = (cert.fingerprint).parse::<Fingerprint>()?;
 
     let c = Pgp::armored_to_cert(&cert.pub_cert)?;
 
     // get key from hagrid
-    let mut hagrid =
-        sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
+    let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
 
     let mut rt = Runtime::new()?;
-    let update =
-        rt.block_on(async move { hagrid.get(&KeyID::from(fp)).await })?;
+    let update = rt.block_on(async move { hagrid.get(&KeyID::from(fp)).await })?;
 
     // Merge new certificate information into existing cert.
     // (Silently ignore potential errors from merge_public())

@@ -73,11 +73,7 @@ pub enum CaCommand {
         #[structopt(help = "CA domain name")]
         domain: String,
 
-        #[structopt(
-            short = "n",
-            long = "name",
-            help = "Descriptive User Name"
-        )]
+        #[structopt(short = "n", long = "name", help = "Descriptive User Name")]
         name: Option<String>,
     },
     /// Export CA public key
@@ -111,11 +107,7 @@ pub enum UserCommand {
         )]
         email: Vec<String>,
 
-        #[structopt(
-            short = "n",
-            long = "name",
-            help = "Descriptive User Name"
-        )]
+        #[structopt(short = "n", long = "name", help = "Descriptive User Name")]
         name: Option<String>,
 
         #[structopt(
@@ -155,11 +147,7 @@ pub enum UserCommand {
         )]
         cert_file: PathBuf,
 
-        #[structopt(
-            short = "n",
-            long = "name",
-            help = "Descriptive User Name"
-        )]
+        #[structopt(short = "n", long = "name", help = "Descriptive User Name")]
         name: Option<String>,
 
         #[structopt(
@@ -230,18 +218,10 @@ pub enum BridgeCommand {
 
     /// Add New Bridge (certify existing remote CA Public Key)
     New {
-        #[structopt(
-            short = "e",
-            long = "email",
-            help = "Bridge remote Email"
-        )]
+        #[structopt(short = "e", long = "email", help = "Bridge remote Email")]
         email: Option<String>,
 
-        #[structopt(
-            short = "c",
-            long = "commit",
-            help = "Commit Bridge certification"
-        )]
+        #[structopt(short = "c", long = "commit", help = "Commit Bridge certification")]
         commit: bool,
 
         #[structopt(help = "File that contains the remote CA's Public Key")]
@@ -257,11 +237,7 @@ pub enum BridgeCommand {
     },
     /// Revoke Bridge
     Revoke {
-        #[structopt(
-            short = "e",
-            long = "email",
-            help = "Bridge remote Email"
-        )]
+        #[structopt(short = "e", long = "email", help = "Bridge remote Email")]
         email: String,
     },
 }

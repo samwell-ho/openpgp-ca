@@ -70,16 +70,10 @@ pub trait CaSec {
         duration_days: Option<u64>,
     ) -> Result<Cert>;
 
-    fn bridge_to_remote_ca(
-        &self,
-        remote_ca_cert: Cert,
-        scope_regexes: Vec<String>,
-    ) -> Result<Cert>;
+    fn bridge_to_remote_ca(&self, remote_ca_cert: Cert, scope_regexes: Vec<String>)
+        -> Result<Cert>;
 
-    fn bridge_revoke(
-        &self,
-        remote_ca_cert: &Cert,
-    ) -> Result<(Signature, Cert)>;
+    fn bridge_revoke(&self, remote_ca_cert: &Cert) -> Result<(Signature, Cert)>;
 
     /// Get a sequoia `Cert` object for the CA from the database.
     ///
@@ -105,10 +99,7 @@ impl CaSec for DbCa {
         use addr::parser::DomainName;
         use addr::psl::List;
         if List.parse_domain_name(domainname).is_err() {
-            return Err(anyhow::anyhow!(
-                "Invalid domainname: '{}'",
-                domainname
-            ));
+            return Err(anyhow::anyhow!("Invalid domainname: '{}'", domainname));
         }
 
         let name = match name {
@@ -194,10 +185,7 @@ adversaries."#;
 
             let header = vec![(
                 "Comment".to_string(),
-                format!(
-                    "Hard revocation (certificate compromised) ({})",
-                    date
-                ),
+                format!("Hard revocation (certificate compromised) ({})", date),
             )];
             writeln!(
                 &mut file,
@@ -207,10 +195,7 @@ adversaries."#;
 
             let soft = CertRevocationBuilder::new()
                 .set_signature_creation_time(t)?
-                .set_reason_for_revocation(
-                    ReasonForRevocation::KeyRetired,
-                    b"Certificate retired",
-                )?
+                .set_reason_for_revocation(ReasonForRevocation::KeyRetired, b"Certificate retired")?
                 .build(&mut signer, &ca, None)?;
 
             let header = vec![(
@@ -259,8 +244,8 @@ adversaries."#;
             .get_ca()
             .context("Failed to load CA cert from database")?;
 
-        cacert.priv_cert = Pgp::cert_to_armored_private_key(&signed)
-            .context("Failed to re-armor CA Cert")?;
+        cacert.priv_cert =
+            Pgp::cert_to_armored_private_key(&signed).context("Failed to re-armor CA Cert")?;
 
         self.db()
             .cacert_update(&cacert)
@@ -289,8 +274,7 @@ adversaries."#;
             let message = Message::new(&mut sink);
             let message = Armorer::new(message).build()?;
 
-            let mut signer =
-                Signer::new(message, signing_keypair).detached().build()?;
+            let mut signer = Signer::new(message, signing_keypair).detached().build()?;
 
             // Write the data directly to the `Signer`.
             signer.write_all(text.as_bytes())?;
@@ -325,18 +309,16 @@ adversaries."#;
         for userid in userids {
             for signer in &mut ca_keys {
                 // make certification
-                let mut sb = signature::SignatureBuilder::new(
-                    SignatureType::GenericCertification,
-                );
+                let mut sb = signature::SignatureBuilder::new(SignatureType::GenericCertification);
 
                 // If an expiration setting for the certifications has been
                 // provided, apply it to the signatures
                 if let Some(days) = duration_days {
                     // The signature should be valid for the specified
                     // number of `days`
-                    sb = sb.set_signature_validity_period(
-                        Duration::from_secs(Pgp::SECONDS_IN_DAY * days),
-                    )?;
+                    sb = sb.set_signature_validity_period(Duration::from_secs(
+                        Pgp::SECONDS_IN_DAY * days,
+                    ))?;
                 }
 
                 // Include 'Signer's UserID' packet
@@ -366,11 +348,7 @@ adversaries."#;
     ///
     /// If `scope_regexes` is empty, no regex scoping is added to the trust
     /// signature.
-    fn bridge_to_remote_ca(
-        &self,
-        remote_ca: Cert,
-        scope_regexes: Vec<String>,
-    ) -> Result<Cert> {
+    fn bridge_to_remote_ca(&self, remote_ca: Cert, scope_regexes: Vec<String>) -> Result<Cert> {
         let ca_cert = self.ca_get_priv_key()?;
 
         // There should be exactly one User ID in the remote CA Cert
@@ -385,14 +363,12 @@ adversaries."#;
 
             // Create one tsig for each signer
             for signer in &mut ca_keys {
-                let mut builder =
-                    SignatureBuilder::new(SignatureType::GenericCertification)
-                        .set_trust_signature(255, 120)?;
+                let mut builder = SignatureBuilder::new(SignatureType::GenericCertification)
+                    .set_trust_signature(255, 120)?;
 
                 // add all regexes
                 for regex in &scope_regexes {
-                    builder =
-                        builder.add_regular_expression(regex.as_bytes())?;
+                    builder = builder.add_regular_expression(regex.as_bytes())?;
                 }
 
                 let tsig = userid.bind(signer, &remote_ca, builder)?;

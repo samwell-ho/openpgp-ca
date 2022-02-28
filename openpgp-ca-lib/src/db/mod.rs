@@ -201,12 +201,7 @@ impl OcaDb {
         }
     }
 
-    pub fn ca_insert(
-        &self,
-        ca: NewCa,
-        ca_key: &str,
-        fingerprint: &str,
-    ) -> Result<()> {
+    pub fn ca_insert(&self, ca: NewCa, ca_key: &str, fingerprint: &str) -> Result<()> {
         diesel::insert_into(cas::table)
             .values(&ca)
             .execute(&self.conn)
@@ -262,7 +257,7 @@ impl OcaDb {
                     _ => {
                         // This should not be possible
                         Err(anyhow::anyhow!(
-                             "get_user_by_cert: Found more than one user for cert"
+                            "get_user_by_cert: Found more than one user for cert"
                         ))
                     }
                 }
@@ -390,11 +385,7 @@ impl OcaDb {
         Ok(Revocation::belonging_to(cert).load::<Revocation>(&self.conn)?)
     }
 
-    pub fn revocation_add(
-        &self,
-        revocation: &str,
-        cert: &Cert,
-    ) -> Result<Revocation> {
+    pub fn revocation_add(&self, revocation: &str, cert: &Cert) -> Result<Revocation> {
         let hash = &Pgp::revocation_to_hash(revocation)?;
 
         self.revocation_insert(NewRevocation {
@@ -411,10 +402,7 @@ impl OcaDb {
         Ok(self.revocation_by_hash(hash)?.is_some())
     }
 
-    pub fn revocation_by_hash(
-        &self,
-        hash: &str,
-    ) -> Result<Option<Revocation>> {
+    pub fn revocation_by_hash(&self, hash: &str) -> Result<Option<Revocation>> {
         let db: Vec<Revocation> = revocations::table
             .filter(revocations::hash.eq(hash))
             .load::<Revocation>(&self.conn)
