@@ -91,7 +91,7 @@ Carol can obtain the public keys in any of a number of ways: Alice and Bob
 might have handed their keys to Carol on USB storage, sent them to 
 Carol by email, or Carol might have pulled them from a public keyserver.
 
-However, before proceeding, it's Carols responsibility to verify the 
+However, before proceeding, it's Carol's responsibility to verify the 
 fingerprints of the keys. That is, she needs to make sure the fingerprints 
 of the keys she has obtained match with the keys that Alice and Bob have 
 on their machines. A typical approach is for Carol to meet Alice and Bob 
