@@ -223,7 +223,7 @@ fn test_update_cert_key() -> Result<()> {
     let cert = Pgp::armored_to_cert(&certs[0].pub_cert)?;
 
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_ok());
-    assert!(!cert.with_policy(&policy, in_six_years)?.alive().is_ok());
+    assert!(cert.with_policy(&policy, in_six_years)?.alive().is_err());
 
     // check the same with ca.cert_expired()
     let exp3 = ca.certs_expired(3 * 365)?;
