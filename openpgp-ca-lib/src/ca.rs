@@ -418,8 +418,9 @@ impl OpenpgpCa {
             println!("No certificates will expire in the next {} days.", exp_days);
         } else {
             println!(
-                "The following {} certificates will expire in the next {} days.",
+                "The following {} certificate{} will expire in the next {} days.",
                 expiries.len(),
+                if expiries.len() == 1 { "" } else { "s" },
                 exp_days
             );
             println!();
