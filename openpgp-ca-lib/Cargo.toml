@@ -34,8 +34,8 @@ sha2 = "0.9"
 
 openpgp-keylist = "0.2"
 
-sequoia-openpgp = "1.3"
-sequoia-net = "0.23"
+sequoia-openpgp = "1.8"
+sequoia-net = "0.24"
 
 # for tests
 [dev-dependencies]

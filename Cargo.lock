@@ -2485,30 +2485,32 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "sequoia-net"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "743151162e9c25b1c80b9f40bbceb1308144e2501b96a872056059fc4701fb15"
+checksum = "fef4106809f4d785832ccfe0e06fbfc098b7cfad9b24779d8286752f3344c7ad"
 dependencies = [
  "anyhow",
+ "base64",
  "futures-util",
  "http",
- "hyper 0.13.10",
- "hyper-tls 0.4.3",
+ "hyper 0.14.17",
+ "hyper-tls 0.5.0",
  "libc",
  "native-tls",
  "percent-encoding",
  "sequoia-openpgp",
  "tempfile",
  "thiserror",
+ "tokio 1.17.0",
  "url",
  "zbase32",
 ]
 
 [[package]]
 name = "sequoia-openpgp"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "998013e22616f601b289a3f8718b57108783b270f87163025e20899b49ff3ed4"
+checksum = "adb4b27d94976e5cd885a6f2b76cf881aeaca69d93a15bc71e8f4e27917e850c"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -2967,7 +2969,7 @@ dependencies = [
  "pin-project-lite 0.1.12",
  "signal-hook-registry",
  "slab",
- "tokio-macros",
+ "tokio-macros 0.2.6",
  "winapi 0.3.9",
 ]
 
@@ -2984,6 +2986,7 @@ dependencies = [
  "num_cpus",
  "pin-project-lite 0.2.8",
  "socket2 0.4.4",
+ "tokio-macros 1.7.0",
  "winapi 0.3.9",
 ]
 
@@ -2992,6 +2995,17 @@ name = "tokio-macros"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e44da00bfc73a25f814cd8d7e57a68a5c31b74b3152a0a1d1f590c97ed06265a"
+dependencies = [
+ "proc-macro2 1.0.36",
+ "quote 1.0.15",
+ "syn 1.0.86",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b557f72f448c511a979e2564e55d74e6c4432fc96ff4f6241bc6bded342643b7"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.15",
