@@ -89,8 +89,10 @@ pub enum CaCommand {
         #[structopt(help = "File that contains the tsigned CA Key")]
         cert_file: PathBuf,
     },
-    /// Show CA
+    /// Show CA information
     Show,
+    /// Print CA private key
+    Private,
 }
 
 #[derive(StructOpt, Debug)]

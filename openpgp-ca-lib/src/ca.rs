@@ -53,6 +53,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::str::FromStr;
 use std::time::SystemTime;
 
 /// a DB backend for a CA instance
@@ -143,13 +144,21 @@ impl OpenpgpCa {
 
     /// Get the CaSec implementation to run operations that need CA
     /// private key material.
+    ///
+    /// Print information about the created CA instance to stdout.
     pub(crate) fn secret(&self) -> &Rc<dyn CaSec> {
         &self.ca_secret
     }
 
     pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
-        self.db()
-            .transaction(|| self.ca_secret.ca_init(domainname, name))
+        let res = self
+            .db()
+            .transaction(|| self.ca_secret.ca_init(domainname, name));
+
+        println!("Created OpenPGP CA instance\n");
+        self.ca_show()?;
+
+        res
     }
 
     /// Getting private key material is not possible for all backends and
@@ -202,15 +211,31 @@ impl OpenpgpCa {
 
     /// Print information about the Ca to stdout.
     ///
-    /// This shows the domainname of this OpenPGP CA instance and the
-    /// private Cert of the CA.
+    /// This shows the domainname, fingerprint and creation time of this OpenPGP CA instance.
     pub fn ca_show(&self) -> Result<()> {
         let (ca, ca_cert) = self
             .db
             .get_ca()
             .context("failed to load CA from database")?;
-        println!("\nOpenPGP CA for Domain: {}", ca.domainname);
-        println!();
+
+        let cert = Cert::from_str(&ca_cert.priv_cert)?;
+
+        let created = cert.primary_key().key().creation_time();
+        let created: DateTime<Utc> = created.into();
+
+        println!("    CA Domain: {}", ca.domainname);
+        println!("  Fingerprint: {}", cert.fingerprint());
+        println!("Creation time: {}", created.format("%F %T %Z"));
+
+        Ok(())
+    }
+
+    /// Print private key of the Ca to stdout.
+    pub fn ca_print_private(&self) -> Result<()> {
+        let (_, ca_cert) = self
+            .db
+            .get_ca()
+            .context("failed to load CA from database")?;
         println!("{}", ca_cert.priv_cert);
         Ok(())
     }

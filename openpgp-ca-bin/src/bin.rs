@@ -96,6 +96,7 @@ fn main() -> Result<()> {
                 ca.ca_import_tsig(&cert)?;
             }
             CaCommand::Show => ca.ca_show()?,
+            CaCommand::Private => ca.ca_print_private()?,
         },
         Command::Bridge { cmd } => match cmd {
             BridgeCommand::New {
