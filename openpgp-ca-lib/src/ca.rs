@@ -260,24 +260,15 @@ impl OpenpgpCa {
         cert::certs_expired(self, days)
     }
 
-    /// For each Cert, check if:
-    /// - the Cert has been signed by the CA, and
-    /// - the CA key has a trust-signature from the Cert
-    ///
-    /// Returns a map 'cert -> (sig_from_ca, tsig_on_ca)'
-    pub fn check_mutual_certifications(&self, cert: &models::Cert) -> Result<(Vec<UserID>, bool)> {
-        cert::check_mutual_certifications(self, cert)
-    }
-
     /// Check if this Cert has been certified by the CA Key, returns all
     /// certified User IDs
     pub fn cert_check_ca_sig(&self, cert: &models::Cert) -> Result<Vec<UserID>> {
-        cert::cert_check_ca_sig(self, cert)
+        cert::cert_check_ca_sig(self, cert).context("Failed while checking CA sig")
     }
 
     /// Check if this Cert has tsigned the CA Key
     pub fn cert_check_tsig_on_ca(&self, cert: &models::Cert) -> Result<bool> {
-        cert::cert_check_tsig_on_ca(self, cert)
+        cert::cert_check_tsig_on_ca(self, cert).context("Failed while checking tsig on CA")
     }
 
     /// Check all Certs for certifications from the CA. If a certification
@@ -403,30 +394,29 @@ impl OpenpgpCa {
         let db_users = self.users_get_all()?;
         for db_user in &db_users {
             for db_cert in self.get_certs_by_user(db_user)? {
-                let (sig_from_ca, tsig_on_ca) = self.check_mutual_certifications(&db_cert)?;
+                let sigs_by_ca = self.cert_check_ca_sig(&db_cert)?;
+                let tsig_on_ca = self.cert_check_tsig_on_ca(&db_cert)?;
 
-                let ok = if !sig_from_ca.is_empty() {
-                    true
-                } else {
-                    println!(
-                        "No CA certification on any User ID of {}.",
-                        db_cert.fingerprint
-                    );
-                    false
-                } && if tsig_on_ca {
-                    true
-                } else {
-                    println!("CA Cert has not been tsigned by {}.", db_cert.fingerprint);
-                    false
-                };
+                let sig_by_ca = !sigs_by_ca.is_empty();
 
-                if ok {
+                if sig_by_ca && tsig_on_ca {
                     count_ok += 1;
+                } else {
+                    println!("No mutual certification for {}:", db_cert.fingerprint);
+
+                    if !sig_by_ca {
+                        println!("  No CA certification on any User ID");
+                    }
+
+                    if !tsig_on_ca {
+                        println!("  Has not tsigned CA key.");
+                    };
+
+                    println!();
                 }
             }
         }
 
-        println!();
         println!(
             "Checked {} user keys, {} of them have mutual certifications.",
             db_users.len(),
@@ -471,7 +461,8 @@ impl OpenpgpCa {
     pub fn print_users(&self) -> Result<()> {
         for db_user in self.users_get_all()? {
             for db_cert in self.get_certs_by_user(&db_user)? {
-                let (sig_by_ca, tsig_on_ca) = self.check_mutual_certifications(&db_cert)?;
+                let sig_by_ca = self.cert_check_ca_sig(&db_cert)?;
+                let tsig_on_ca = self.cert_check_tsig_on_ca(&db_cert)?;
 
                 println!("OpenPGP certificate {}", db_cert.fingerprint);
                 if let Some(name) = &db_user.name {

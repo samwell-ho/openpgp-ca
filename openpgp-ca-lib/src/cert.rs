@@ -249,21 +249,6 @@ pub fn certs_expired(
     Ok(res)
 }
 
-pub fn check_mutual_certifications(
-    oca: &OpenpgpCa,
-    cert: &models::Cert,
-) -> Result<(Vec<UserID>, bool)> {
-    let sig_from_ca = oca
-        .cert_check_ca_sig(cert)
-        .context("Failed while checking CA sig")?;
-
-    let tsig_on_ca = oca
-        .cert_check_tsig_on_ca(cert)
-        .context("Failed while checking tsig on CA")?;
-
-    Ok((sig_from_ca, tsig_on_ca))
-}
-
 pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<Vec<UserID>> {
     let c = Pgp::armored_to_cert(&cert.pub_cert)?;
     let ca = oca.ca_get_cert_pub()?;
