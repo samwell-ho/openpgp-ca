@@ -408,7 +408,15 @@ impl OpenpgpCa {
                 if sig_by_ca && tsig_on_ca {
                     count_ok += 1;
                 } else {
-                    println!("No mutual certification for {}:", db_cert.fingerprint);
+                    println!(
+                        "No mutual certification for {}{}:",
+                        db_cert.fingerprint,
+                        db_user
+                            .name
+                            .as_deref()
+                            .map(|s| format!(" ({})", s))
+                            .unwrap_or_else(|| "".to_string()),
+                    );
 
                     if !sig_by_ca {
                         println!("  No CA certification on any User ID");
