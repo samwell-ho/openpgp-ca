@@ -6,12 +6,12 @@
 // SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ca::OpenpgpCa;
+use crate::ca::{CertificationStatus, OpenpgpCa};
 use crate::db::models;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
-use sequoia_openpgp::packet::{Signature, UserID};
+use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::Cert;
 
 use anyhow::{Context, Result};
@@ -249,15 +249,25 @@ pub fn certs_expired(
     Ok(res)
 }
 
-pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<Vec<UserID>> {
+pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<CertificationStatus> {
     let c = Pgp::armored_to_cert(&cert.pub_cert)?;
     let ca = oca.ca_get_cert_pub()?;
 
-    Ok(c.userids()
-        .filter(|uid| !Pgp::valid_certifications_by(uid, &c, ca.clone()).is_empty())
-        .map(|uid| uid.userid())
-        .cloned()
-        .collect())
+    let mut certified = vec![];
+    let mut uncertified = vec![];
+
+    for uid in c.userids() {
+        if Pgp::valid_certifications_by(&uid, &c, ca.clone()).is_empty() {
+            uncertified.push(uid.userid().clone());
+        } else {
+            certified.push(uid.userid().clone());
+        }
+    }
+
+    Ok(CertificationStatus {
+        certified,
+        uncertified,
+    })
 }
 
 pub fn cert_check_tsig_on_ca(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
