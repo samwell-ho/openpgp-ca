@@ -109,6 +109,12 @@ pub struct OpenpgpCa {
     ca_secret: Rc<dyn CaSec>,
 }
 
+/// This struct models which User IDs of a Cert have (and which have not) been certified by a CA
+pub struct CertificationStatus {
+    pub certified: Vec<UserID>,
+    pub uncertified: Vec<UserID>,
+}
+
 impl OpenpgpCa {
     /// Instantiate a new OpenpgpCa object.
     ///
@@ -262,7 +268,7 @@ impl OpenpgpCa {
 
     /// Check if this Cert has been certified by the CA Key, returns all
     /// certified User IDs
-    pub fn cert_check_ca_sig(&self, cert: &models::Cert) -> Result<Vec<UserID>> {
+    pub fn cert_check_ca_sig(&self, cert: &models::Cert) -> Result<CertificationStatus> {
         cert::cert_check_ca_sig(self, cert).context("Failed while checking CA sig")
     }
 
@@ -397,7 +403,7 @@ impl OpenpgpCa {
                 let sigs_by_ca = self.cert_check_ca_sig(&db_cert)?;
                 let tsig_on_ca = self.cert_check_tsig_on_ca(&db_cert)?;
 
-                let sig_by_ca = !sigs_by_ca.is_empty();
+                let sig_by_ca = !sigs_by_ca.certified.is_empty();
 
                 if sig_by_ca && tsig_on_ca {
                     count_ok += 1;
@@ -469,9 +475,9 @@ impl OpenpgpCa {
                     println!(" User '{}'", name);
                 }
 
-                if !sig_by_ca.is_empty() {
+                if !sig_by_ca.certified.is_empty() {
                     println!(" Identities certified by this CA:");
-                    for uid in sig_by_ca {
+                    for uid in sig_by_ca.certified {
                         println!(
                             " - '{} <{}>'",
                             uid.name()?.unwrap_or_else(|| "".to_string()),

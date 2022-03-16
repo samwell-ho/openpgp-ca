@@ -560,19 +560,20 @@ fn test_ca_signatures() -> Result<()> {
 
         assert_eq!(certs.len(), 1);
 
-        let (sig_from_ca, tsig_on_ca) = ca.check_mutual_certifications(&certs[0])?;
+        let sig_from_ca = ca.cert_check_ca_sig(&certs[0])?;
+        let tsig_on_ca = ca.cert_check_tsig_on_ca(&certs[0])?;
 
         match name.as_str() {
             "Alice" => {
-                assert!(!sig_from_ca.is_empty());
+                assert!(!sig_from_ca.certified.is_empty());
                 assert!(!tsig_on_ca);
             }
             "Bob" => {
-                assert!(sig_from_ca.is_empty());
+                assert!(sig_from_ca.certified.is_empty());
                 assert!(!tsig_on_ca);
             }
             "Carol" => {
-                assert!(!sig_from_ca.is_empty());
+                assert!(!sig_from_ca.certified.is_empty());
                 assert!(tsig_on_ca);
             }
             _ => panic!(),
@@ -678,12 +679,13 @@ fn test_import_signed_cert() -> Result<()> {
     let certs = ca.user_certs_get_all()?;
     assert_eq!(certs.len(), 1);
 
-    let (sig_from_ca, tsig_on_ca) = ca.check_mutual_certifications(&certs[0])?;
+    let sig_from_ca = ca.cert_check_ca_sig(&certs[0])?;
+    let tsig_on_ca = ca.cert_check_tsig_on_ca(&certs[0])?;
 
     let name = ca.cert_get_name(&certs[0])?;
     match name.as_str() {
         "Alice" => {
-            assert!(!sig_from_ca.is_empty());
+            assert!(!sig_from_ca.certified.is_empty());
             assert!(!tsig_on_ca);
         }
         _ => panic!(),
