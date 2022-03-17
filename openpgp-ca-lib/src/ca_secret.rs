@@ -59,8 +59,8 @@ pub trait CaSec {
     /// FIXME: should this be in ca_public?
     fn ca_import_tsig(&self, cert: &[u8]) -> Result<()>;
 
-    /// Generate a detached signature with the CA key, for 'text'
-    fn sign_detached(&self, text: &str) -> Result<String>;
+    /// Generate a detached signature with the CA key, for 'data'
+    fn sign_detached(&self, data: &[u8]) -> Result<String>;
 
     fn sign_user_ids(
         &self,
@@ -248,7 +248,7 @@ adversaries."#;
             .context("Update of CA Cert in DB failed")
     }
 
-    fn sign_detached(&self, text: &str) -> Result<String> {
+    fn sign_detached(&self, data: &[u8]) -> Result<String> {
         let ca_cert = self.ca_get_priv_key()?;
 
         let signing_keypair = ca_cert
@@ -273,7 +273,7 @@ adversaries."#;
             let mut signer = Signer::new(message, signing_keypair).detached().build()?;
 
             // Write the data directly to the `Signer`.
-            signer.write_all(text.as_bytes())?;
+            signer.write_all(data)?;
             signer.finalize()?;
         }
 
