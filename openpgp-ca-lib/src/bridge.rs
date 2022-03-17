@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Context, Result};
@@ -115,7 +115,7 @@ pub fn bridge_new(
 pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
     if let Some(bridge) = oca.db().bridge_by_email(email)? {
         if let Some(mut db_cert) = oca.db().cert_by_id(bridge.cert_id)? {
-            let bridge_cert = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+            let bridge_cert = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
             // Generate revocation for the bridge
             let (revocation, revoked) = oca.secret().bridge_revoke(&bridge_cert)?;

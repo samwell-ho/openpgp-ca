@@ -1,9 +1,9 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use openpgp::serialize::Serialize;
@@ -142,9 +142,9 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let alice_ca_key = gpg_alice.export("openpgp-ca@example.org");
     let bob_ca_key = gpg_bob.export("openpgp-ca@example.org");
 
-    ca.ca_import_tsig(&alice_ca_key)
+    ca.ca_import_tsig(alice_ca_key.as_bytes())
         .context("import CA tsig from Alice failed")?;
-    ca.ca_import_tsig(&bob_ca_key)
+    ca.ca_import_tsig(bob_ca_key.as_bytes())
         .context("import CA tsig from Bob failed")?;
 
     // get public keys for alice and bob from their gnupg contexts
@@ -153,16 +153,22 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
 
     // import public keys for alice and bob into CA
     ca.cert_import_new(
-        &alice_key,
-        vec![],
+        alice_key.as_bytes(),
+        &[],
         Some("Alice"),
         &["alice@example.org"],
         None,
     )
     .context("import Alice to CA failed")?;
 
-    ca.cert_import_new(&bob_key, vec![], Some("Bob"), &["bob@example.org"], None)
-        .context("import Bob to CA failed")?;
+    ca.cert_import_new(
+        bob_key.as_bytes(),
+        &[],
+        Some("Bob"),
+        &["bob@example.org"],
+        None,
+    )
+    .context("import Bob to CA failed")?;
 
     // export bob, CA-key from CA
     let ca_key = ca.ca_get_pubkey_armored()?;

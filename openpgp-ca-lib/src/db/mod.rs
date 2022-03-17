@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Context, Result};
@@ -281,7 +281,7 @@ impl OcaDb {
 
         // Revocations
         for revocation in revocation_certs {
-            let hash = &Pgp::revocation_to_hash(revocation)?;
+            let hash = &Pgp::revocation_to_hash(revocation.as_bytes())?;
             self.revocation_insert(NewRevocation {
                 hash,
                 revocation,
@@ -386,7 +386,7 @@ impl OcaDb {
     }
 
     pub fn revocation_add(&self, revocation: &str, cert: &Cert) -> Result<Revocation> {
-        let hash = &Pgp::revocation_to_hash(revocation)?;
+        let hash = &Pgp::revocation_to_hash(revocation.as_bytes())?;
 
         self.revocation_insert(NewRevocation {
             hash,
@@ -397,7 +397,7 @@ impl OcaDb {
     }
 
     /// Check if this exact revocation (bitwise) already exists in the DB
-    pub fn revocation_exists(&self, revocation: &str) -> Result<bool> {
+    pub fn revocation_exists(&self, revocation: &[u8]) -> Result<bool> {
         let hash = &Pgp::revocation_to_hash(revocation)?;
         Ok(self.revocation_by_hash(hash)?.is_some())
     }

@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use sequoia_openpgp::armor;
@@ -194,16 +194,16 @@ impl Pgp {
         Ok(res)
     }
 
-    /// Returns the first Cert found in 'armored'.
-    pub fn armored_to_cert(armored: &str) -> Result<Cert> {
-        let cert = Cert::from_bytes(armored).context("Cert::from_bytes failed")?;
+    /// Returns the first Cert found in 'data'.
+    pub fn to_cert(data: &[u8]) -> Result<Cert> {
+        let cert = Cert::from_bytes(data).context("Cert::from_bytes failed")?;
 
         Ok(cert)
     }
 
-    /// Get a Signature object from an armored signature
-    pub fn armored_to_signature(armored: &str) -> Result<Signature> {
-        let p = Packet::from_bytes(armored).context("Input could not be parsed")?;
+    /// Get a Signature object from signature data (optionally armored)
+    pub fn to_signature(data: &[u8]) -> Result<Signature> {
+        let p = Packet::from_bytes(data).context("Input could not be parsed")?;
 
         if let Packet::Signature(s) = p {
             Ok(s)
@@ -279,8 +279,8 @@ impl Pgp {
     /// (represented as 16 character hex strings).
     ///
     /// These hashes can be used to refer to specific revocations.
-    pub(crate) fn revocation_to_hash(revoc: &str) -> Result<String> {
-        let sig = Pgp::armored_to_signature(revoc)?;
+    pub(crate) fn revocation_to_hash(data: &[u8]) -> Result<String> {
+        let sig = Pgp::to_signature(data)?;
 
         let p: Packet = sig.into();
         let bits = p.to_vec()?;
@@ -353,8 +353,8 @@ impl Pgp {
 
     // -------- helper functions
 
-    pub fn print_cert_info(armored: &str) -> Result<()> {
-        let c = Pgp::armored_to_cert(armored)?;
+    pub fn print_cert_info(data: &[u8]) -> Result<()> {
+        let c = Pgp::to_cert(data)?;
         for uid in c.userids() {
             println!("User ID: {}", uid.userid());
         }

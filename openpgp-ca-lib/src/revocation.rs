@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::OpenpgpCa;
@@ -24,7 +24,7 @@ fn check_for_equivalent_revocation(
     cert: &models::Cert,
 ) -> Result<bool> {
     for db_rev in oca.db().revocations_by_cert(cert)? {
-        let r = Pgp::armored_to_signature(&db_rev.revocation)
+        let r = Pgp::to_signature(db_rev.revocation.as_bytes())
             .context("Couldn't re-armor revocation cert from CA db")?;
 
         if revocation.normalized_eq(&r) {
@@ -39,14 +39,14 @@ fn check_for_equivalent_revocation(
 ///
 /// This implicitly searches for a cert that the revocation can be applied to.
 /// If no suitable cert is found, an error is returned.
-pub fn revocation_add(oca: &OpenpgpCa, revocation: &str) -> Result<()> {
+pub fn revocation_add(oca: &OpenpgpCa, revocation: &[u8]) -> Result<()> {
     // Check if this revocation already exists in db
     if oca.db().revocation_exists(revocation)? {
         return Ok(()); // this revocation is already stored -> do nothing
     }
 
-    let mut revocation = Pgp::armored_to_signature(revocation)
-        .context("revocation_add: Couldn't process revocation")?;
+    let mut revocation =
+        Pgp::to_signature(revocation).context("revocation_add: Couldn't process revocation")?;
 
     // Find the matching cert for this revocation certificate
     let mut cert = None;
@@ -60,7 +60,7 @@ pub fn revocation_add(oca: &OpenpgpCa, revocation: &str) -> Result<()> {
     }
 
     if let Some(cert) = cert {
-        let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+        let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
 
         // verify that revocation certificate validates with cert
         if validate_revocation(&c, &mut revocation)? {
@@ -115,7 +115,7 @@ fn search_revocable_cert_by_keyid(
     }
 
     for db_cert in oca.user_certs_get_all()? {
-        let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+        let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         // require that keyid of cert and Signature issuer match
         let c_keyid = c.keyid();
@@ -137,8 +137,8 @@ fn search_revocable_cert_by_keyid(
 /// cert in the OpenPGP CA database.
 pub fn revocation_apply(oca: &OpenpgpCa, mut db_revoc: models::Revocation) -> Result<()> {
     if let Some(mut db_cert) = oca.db().cert_by_id(db_revoc.cert_id)? {
-        let sig = Pgp::armored_to_signature(&db_revoc.revocation)?;
-        let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+        let sig = Pgp::to_signature(db_revoc.revocation.as_bytes())?;
+        let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         let revocation: Packet = sig.into();
         let revoked = c.insert_packets(vec![revocation])?;
