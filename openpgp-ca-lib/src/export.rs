@@ -201,7 +201,7 @@ pub fn export_keylist(
         }
     }
 
-    let signer = Box::new(|text: &str| oca.secret().sign_detached(text));
+    let signer = Box::new(|text: &str| oca.secret().sign_detached(text.as_bytes()));
 
     // Make a signed list object
     let skl = ukl.sign(signer)?;
