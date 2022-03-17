@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::DbCa;
@@ -53,12 +53,11 @@ pub trait CaSec {
 
     /// Add trust-signature(s) from CA users to the CA's Cert.
     ///
-    /// This receives an armored version of the CA's public key, finds
-    /// any trust-signatures on it and merges those into "our" local copy of
-    /// the CA key.
+    /// This receives the CA's public key (optionally armored), finds any trust-signatures on
+    /// it and merges those into "our" local copy of the CA key.
     ///
     /// FIXME: should this be in ca_public?
-    fn ca_import_tsig(&self, cert: &str) -> Result<()>;
+    fn ca_import_tsig(&self, cert: &[u8]) -> Result<()>;
 
     /// Generate a detached signature with the CA key, for 'text'
     fn sign_detached(&self, text: &str) -> Result<String>;
@@ -212,13 +211,10 @@ adversaries."#;
         Ok(())
     }
 
-    /// Accept a copy of the CA certificate that includes one or more trust
-    /// signatures from third parties. Take those third party trust
-    /// signatures and merge them into our local copy of the CA key.
-    fn ca_import_tsig(&self, cert: &str) -> Result<()> {
+    fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
         let ca_cert = self.ca_get_priv_key()?;
 
-        let cert_import = Pgp::armored_to_cert(cert)?;
+        let cert_import = Pgp::to_cert(cert)?;
 
         // The imported cert must have the same Fingerprint as the CA cert
         if ca_cert.fingerprint() != cert_import.fingerprint() {
@@ -432,6 +428,6 @@ adversaries."#;
     fn ca_get_priv_key(&self) -> Result<Cert> {
         let (_, cert) = self.db().get_ca()?;
 
-        Pgp::armored_to_cert(&cert.priv_cert)
+        Pgp::to_cert(cert.priv_cert.as_bytes())
     }
 }

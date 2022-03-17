@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! OpenPGP CA as a library
@@ -49,8 +49,6 @@ use chrono::DateTime;
 
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
@@ -73,7 +71,7 @@ impl DbCa {
     pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
         let (_, cacert) = self.db().get_ca()?;
 
-        let cert = Pgp::armored_to_cert(&cacert.priv_cert)?;
+        let cert = Pgp::to_cert(cacert.priv_cert.as_bytes())?;
         Ok(cert.strip_secret_key_material())
     }
 
@@ -181,7 +179,7 @@ impl OpenpgpCa {
         self.ca_secret.ca_generate_revocations(output)
     }
 
-    pub fn ca_import_tsig(&self, cert: &str) -> Result<()> {
+    pub fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
         self.db()
             .transaction(|| self.ca_secret.ca_import_tsig(cert))
     }
@@ -335,8 +333,8 @@ impl OpenpgpCa {
     /// OpenPGP CA.
     pub fn cert_import_new(
         &self,
-        cert: &str,
-        revoc_certs: Vec<String>,
+        cert: &[u8],
+        revoc_certs: &[&[u8]],
         name: Option<&str>,
         emails: &[&str],
         duration_days: Option<u64>,
@@ -348,7 +346,7 @@ impl OpenpgpCa {
 
     /// Update existing Cert in database (e.g. if the user has extended
     /// the expiry date)
-    pub fn cert_import_update(&self, cert: &str) -> Result<()> {
+    pub fn cert_import_update(&self, cert: &[u8]) -> Result<()> {
         self.db()
             .transaction(|| cert::cert_import_update(self, cert))
     }
@@ -498,7 +496,7 @@ impl OpenpgpCa {
                     println!(" Has trust-signed this CA");
                 }
 
-                let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+                let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
                 if let Some(exp) = Pgp::get_expiry(&c)? {
                     let datetime: DateTime<Utc> = exp.into();
@@ -536,15 +534,14 @@ impl OpenpgpCa {
     ///
     /// Verifies that applying the revocation cert can be validated by the
     /// cert. Only if this is successful is the revocation stored.
-    pub fn revocation_add(&self, revoc_cert_str: &str) -> Result<()> {
+    pub fn revocation_add(&self, revoc_cert: &[u8]) -> Result<()> {
         self.db()
-            .transaction(|| revocation::revocation_add(self, revoc_cert_str))
+            .transaction(|| revocation::revocation_add(self, revoc_cert))
     }
 
     /// Add a revocation certificate to the OpenPGP CA database (from a file).
     pub fn revocation_add_from_file(&self, filename: &Path) -> Result<()> {
-        let mut rev = String::new();
-        File::open(filename)?.read_to_string(&mut rev)?;
+        let rev = std::fs::read(filename)?;
 
         self.db().transaction(|| self.revocation_add(&rev))
     }
@@ -570,7 +567,7 @@ impl OpenpgpCa {
     pub fn revocation_details(
         revocation: &models::Revocation,
     ) -> Result<(String, Option<SystemTime>)> {
-        let rev = Pgp::armored_to_signature(&revocation.revocation)?;
+        let rev = Pgp::to_signature(revocation.revocation.as_bytes())?;
 
         let creation = rev.signature_creation_time();
 
@@ -675,7 +672,7 @@ impl OpenpgpCa {
             );
             println!();
 
-            let key = std::fs::read_to_string(key_file)?;
+            let key = std::fs::read(key_file)?;
             Pgp::print_cert_info(&key)?;
 
             println!();

@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! REST Interface for OpenPGP CA.
@@ -95,7 +95,7 @@ fn certs_by_email(
         })?;
 
         for c in certs {
-            let cert = Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
+            let cert = Pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!(
@@ -142,7 +142,7 @@ fn cert_by_fp(fp: String) -> Result<Json<Option<ReturnGoodJson>>, BadRequest<Jso
         if let Some(c) = c {
             let certificate = load_certificate_data(ca, &c)?;
 
-            let cert = Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
+            let cert = Pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!("cert_by_fp: error during armored_to_cert '{:?}'", e),
@@ -312,7 +312,7 @@ fn check_expiring(days: u64) -> Result<Json<Vec<CertInfo>>, BadRequest<Json<Retu
         let mut res = vec![];
 
         for cert in expired.keys() {
-            let cert = Pgp::armored_to_cert(&cert.pub_cert).map_err(|e| {
+            let cert = Pgp::to_cert(cert.pub_cert.as_bytes()).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!("check_expiring: Error in armored_to_cert '{:?}'", e),

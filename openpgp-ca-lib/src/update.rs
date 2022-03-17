@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::OpenpgpCa;
@@ -29,7 +29,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let emails = oca.emails_get(cert)?;
 
     // Collect all updates for 'cert' in 'merge'
-    let orig = Pgp::armored_to_cert(&cert.pub_cert)?;
+    let orig = Pgp::to_cert(cert.pub_cert.as_bytes())?;
     let mut merged = orig.clone();
 
     for email in emails {
@@ -66,7 +66,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
 pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let fp = (cert.fingerprint).parse::<Fingerprint>()?;
 
-    let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+    let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
 
     // get key from hagrid
     let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;

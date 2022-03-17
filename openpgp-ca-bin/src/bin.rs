@@ -1,4 +1,4 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
@@ -50,20 +50,30 @@ fn main() -> Result<()> {
                 email,
                 revocation_file,
             } => {
-                let cert = std::fs::read_to_string(cert_file)?;
+                let cert = std::fs::read(cert_file)?;
 
                 let mut revoc_certs = Vec::new();
                 for path in revocation_file {
-                    let rev = std::fs::read_to_string(path)?;
+                    let rev = std::fs::read(path)?;
                     revoc_certs.push(rev);
                 }
 
                 let emails: Vec<_> = email.iter().map(String::as_str).collect();
 
-                ca.cert_import_new(&cert, revoc_certs, name.as_deref(), &emails, None)?;
+                ca.cert_import_new(
+                    &cert,
+                    revoc_certs
+                        .iter()
+                        .map(|v| v.as_slice())
+                        .collect::<Vec<_>>()
+                        .as_ref(),
+                    name.as_deref(),
+                    &emails,
+                    None,
+                )?;
             }
             UserCommand::Update { cert_file } => {
-                let cert = std::fs::read_to_string(cert_file)?;
+                let cert = std::fs::read(cert_file)?;
                 ca.cert_import_update(&cert)?;
             }
             UserCommand::Export { email, path } => {
@@ -92,7 +102,7 @@ fn main() -> Result<()> {
                 println!("Wrote a set of revocations to the output file");
             }
             CaCommand::ImportTsig { cert_file } => {
-                let cert = std::fs::read_to_string(cert_file)?;
+                let cert = std::fs::read(cert_file)?;
                 ca.ca_import_tsig(&cert)?;
             }
             CaCommand::Show => ca.ca_show()?,

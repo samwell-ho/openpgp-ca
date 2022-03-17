@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::OpenpgpCa;
@@ -38,7 +38,7 @@ pub fn print_certring(oca: &OpenpgpCa, email_filter: Option<String>) -> Result<(
     }
 
     for cert in certs {
-        c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
+        c.push(Pgp::to_cert(cert.pub_cert.as_bytes())?);
     }
 
     println!("{}", Pgp::certs_to_armored(&c)?);
@@ -81,7 +81,7 @@ pub fn export_certs_as_files(
         if !certs.is_empty() {
             let mut c: Vec<_> = vec![];
             for cert in certs {
-                c.push(Pgp::armored_to_cert(&cert.pub_cert)?);
+                c.push(Pgp::to_cert(cert.pub_cert.as_bytes())?);
             }
 
             std::fs::write(
@@ -135,7 +135,7 @@ pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
     for cert in oca.user_certs_get_all()? {
         // Don't export to WKD if the cert is marked "delisted"
         if !cert.delisted {
-            let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+            let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
 
             if Pgp::cert_has_uid_in_domain(&c, domain)? {
                 wkd::insert(&path, domain, None, &c)?;

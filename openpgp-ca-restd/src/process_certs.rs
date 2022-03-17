@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use core::time::Duration;
@@ -302,7 +302,7 @@ fn process_cert(
     let merged = match cert_in_ca_db {
         None => cert.clone(),
         Some(ref c) => {
-            let db_cert = Pgp::armored_to_cert(&c.pub_cert).map_err(|e| {
+            let db_cert = Pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
                     format!("process_cert: Error un-armoring cert from CA DB: {:?}", e),
@@ -400,7 +400,7 @@ fn process_cert(
 
             // FIXME: how/when should changes to name/email be persisted?
 
-            ca.cert_import_update(&armored).map_err(|e| {
+            ca.cert_import_update(armored.as_bytes()).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
                     format!("process_cert: Error updating Cert in database: {:?}", e),
@@ -410,7 +410,7 @@ fn process_cert(
             })?;
 
             for rev in &certificate.revocations {
-                ca.revocation_add(rev).map_err(|e| {
+                ca.revocation_add(rev.as_bytes()).map_err(|e| {
                     let ce = CertError::new(
                         CertStatus::InternalError,
                         format!(
@@ -434,8 +434,13 @@ fn process_cert(
                 .collect::<Vec<_>>();
 
             ca.cert_import_new(
-                &armored,
-                certificate.revocations.clone(),
+                armored.as_bytes(),
+                certificate
+                    .revocations
+                    .iter()
+                    .map(|r| r.as_bytes())
+                    .collect::<Vec<_>>()
+                    .as_ref(),
                 name,
                 emails.as_slice(),
                 Some(restd::CERTIFICATION_DAYS),

@@ -1,9 +1,9 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::{CertificationStatus, OpenpgpCa};
@@ -43,7 +43,7 @@ pub fn user_new(
     let tsigned_ca = Pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
     // Store tsig for the CA cert
-    oca.secret().ca_import_tsig(&tsigned_ca)?;
+    oca.secret().ca_import_tsig(tsigned_ca.as_bytes())?;
 
     // Store new user cert in DB
     let user_cert = Pgp::cert_to_armored(&user_certified)?;
@@ -81,14 +81,14 @@ pub fn user_new(
 
 pub fn cert_import_new(
     oca: &OpenpgpCa,
-    user_cert: &str,
-    revoc_certs: Vec<String>,
+    user_cert: &[u8],
+    revoc_certs: &[&[u8]],
     name: Option<&str>,
     emails: &[&str],
     duration_days: Option<u64>,
 ) -> Result<()> {
     let user_cert =
-        Pgp::armored_to_cert(user_cert).context("cert_import_new: Couldn't process user cert.")?;
+        Pgp::to_cert(user_cert).context("cert_import_new: Couldn't process user cert.")?;
 
     let fp = user_cert.fingerprint().to_hex();
 
@@ -124,16 +124,22 @@ pub fn cert_import_new(
     let pub_cert =
         Pgp::cert_to_armored(&certified).context("cert_import_new: Couldn't re-armor key")?;
 
+    // (filter revocations through Sequoia, to get (re-)armored representations)
+    let rev_sig: Result<Vec<_>> = revoc_certs.iter().map(|r| Pgp::to_signature(r)).collect();
+    let rev_armored: Result<Vec<_>> = rev_sig?
+        .iter()
+        .map(|s| Pgp::revoc_to_armored(s, None))
+        .collect();
+
     oca.db()
-        .user_add(name.as_deref(), (&pub_cert, &fp), emails, &revoc_certs)
+        .user_add(name.as_deref(), (&pub_cert, &fp), emails, &rev_armored?)
         .context("Couldn't insert user")?;
 
     Ok(())
 }
 
-pub fn cert_import_update(oca: &OpenpgpCa, cert: &str) -> Result<()> {
-    let cert_new =
-        Pgp::armored_to_cert(cert).context("cert_import_update: couldn't process cert")?;
+pub fn cert_import_update(oca: &OpenpgpCa, cert: &[u8]) -> Result<()> {
+    let cert_new = Pgp::to_cert(cert).context("cert_import_update: couldn't process cert")?;
 
     let fp = cert_new.fingerprint().to_hex();
 
@@ -143,7 +149,7 @@ pub fn cert_import_update(oca: &OpenpgpCa, cert: &str) -> Result<()> {
         .context("cert_import_update(): get_cert() check by fingerprint failed")?
     {
         // merge existing and new public key
-        let cert_old = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+        let cert_old = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         let updated = cert_old.merge_public(cert_new)?;
         let armored = Pgp::cert_to_armored(&updated)?;
@@ -174,7 +180,7 @@ pub fn certs_refresh_ca_certifications(
         // ignore "inactive" Certs
         .filter(|c| !c.inactive)
     {
-        let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+        let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         let mut recertify = Vec::new();
 
@@ -235,7 +241,7 @@ pub fn certs_expired(
     let certs = oca.user_certs_get_all().context("couldn't load certs")?;
 
     for db_cert in certs {
-        let c = Pgp::armored_to_cert(&db_cert.pub_cert)?;
+        let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         // Notify only certs that are alive now, but not alive at
         // 'expiry_test'.
@@ -250,7 +256,7 @@ pub fn certs_expired(
 }
 
 pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<CertificationStatus> {
-    let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+    let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
     let ca = oca.ca_get_cert_pub()?;
 
     let mut certified = vec![];
@@ -274,7 +280,7 @@ pub fn cert_check_tsig_on_ca(oca: &OpenpgpCa, cert: &models::Cert) -> Result<boo
     let ca = oca.ca_get_cert_pub()?;
     let tsigs = Pgp::get_trust_sigs(&ca)?;
 
-    let user_cert = Pgp::armored_to_cert(&cert.pub_cert)?;
+    let user_cert = Pgp::to_cert(cert.pub_cert.as_bytes())?;
 
     Ok(tsigs.iter().any(|t| {
         t.issuer_fingerprints()

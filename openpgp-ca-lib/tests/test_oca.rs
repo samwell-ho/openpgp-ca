@@ -1,9 +1,9 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Context, Result};
@@ -109,7 +109,7 @@ fn test_expiring_certification() -> Result<()> {
 
     let cert = &certs[0];
 
-    let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+    let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
 
     // alice should have one user id
     assert_eq!(c.userids().len(), 1);
@@ -174,8 +174,8 @@ fn test_update_cert_key() -> Result<()> {
     let alice1_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
-        &alice1_key,
-        vec![],
+        alice1_key.as_bytes(),
+        &[],
         Some("Alice"),
         &["alice@example.org"],
         None,
@@ -190,7 +190,7 @@ fn test_update_cert_key() -> Result<()> {
     let alice = &certs[0];
 
     // check that expiry is ~2y
-    let cert = Pgp::armored_to_cert(&alice.pub_cert)?;
+    let cert = Pgp::to_cert(alice.pub_cert.as_bytes())?;
 
     cert.with_policy(&policy, in_one_year)?.alive()?;
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_err());
@@ -212,7 +212,7 @@ fn test_update_cert_key() -> Result<()> {
     let _alice = &certs[0];
 
     // store updated version of cert
-    ca.cert_import_update(&alice2_key)?;
+    ca.cert_import_update(alice2_key.as_bytes())?;
 
     // check the state of CA data
     let certs = ca.user_certs_get_all()?;
@@ -220,7 +220,7 @@ fn test_update_cert_key() -> Result<()> {
     assert_eq!(certs.len(), 1);
 
     // check that expiry is not ~2y but ~5y
-    let cert = Pgp::armored_to_cert(&certs[0].pub_cert)?;
+    let cert = Pgp::to_cert(certs[0].pub_cert.as_bytes())?;
 
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_ok());
     assert!(cert.with_policy(&policy, in_six_years)?.alive().is_err());
@@ -254,8 +254,8 @@ fn test_ca_import() -> Result<()> {
     let alice1_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
-        &alice1_key,
-        vec![],
+        alice1_key.as_bytes(),
+        &[],
         Some("Alice"),
         &["alice@example.org"],
         None,
@@ -266,8 +266,8 @@ fn test_ca_import() -> Result<()> {
     // cause an error, because no two certs with the same fingerprint can be
     // imported as distinct certs
     let res = ca.cert_import_new(
-        &alice1_key,
-        vec![],
+        alice1_key.as_bytes(),
+        &[],
         Some("Alice"),
         &["alice@example.org"],
         None,
@@ -287,7 +287,7 @@ fn test_ca_import() -> Result<()> {
 
     // -> expect error, because this key doesn't exist in OpenPGP CA and
     // thus is not a legal update
-    let res = ca.cert_import_update(&bob_key);
+    let res = ca.cert_import_update(bob_key.as_bytes());
     assert!(res.is_err());
 
     Ok(())
@@ -435,8 +435,20 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     ca.ca_init("sequoia-pgp.org", None)?;
 
-    ca.cert_import_new(&justus_key, vec![], None, &["justus@sequoia-pgp.org"], None)?;
-    ca.cert_import_new(&neal_key, vec![], None, &["neal@sequoia-pgp.org"], None)?;
+    ca.cert_import_new(
+        justus_key.as_bytes(),
+        &[],
+        None,
+        &["justus@sequoia-pgp.org"],
+        None,
+    )?;
+    ca.cert_import_new(
+        neal_key.as_bytes(),
+        &[],
+        None,
+        &["neal@sequoia-pgp.org"],
+        None,
+    )?;
 
     // -- export as WKD
 
@@ -471,7 +483,13 @@ fn test_ca_multiple_revocations() -> Result<()> {
 
     let alice_key = gpg.export("alice@example.org");
 
-    ca.cert_import_new(&alice_key, vec![], None, &["alice@example.org"], None)?;
+    ca.cert_import_new(
+        alice_key.as_bytes(),
+        &[],
+        None,
+        &["alice@example.org"],
+        None,
+    )?;
 
     // make two different revocation certificates and import them into the CA
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
@@ -532,8 +550,8 @@ fn test_ca_signatures() -> Result<()> {
     let alice_key = gpg.export("alice@example.org");
 
     ca.cert_import_new(
-        &alice_key,
-        vec![],
+        alice_key.as_bytes(),
+        &[],
         Some("Alice"),
         &["alice@example.org"],
         None,
@@ -546,7 +564,7 @@ fn test_ca_signatures() -> Result<()> {
 
     // CA does not signs bob's key because the "email" parameter is empty.
     // Only userids that are supplied in `email` are signed by the CA.
-    ca.cert_import_new(&bob_key, vec![], Some("Bob"), &[], None)
+    ca.cert_import_new(bob_key.as_bytes(), &[], Some("Bob"), &[], None)
         .context("import Bob to CA failed")?;
 
     // create carol, CA will sign carol's key.
@@ -648,8 +666,8 @@ fn test_import_signed_cert() -> Result<()> {
     // import alice into OpenPGP CA
     let alice_key = gpg.export("alice@example.org");
     ca.cert_import_new(
-        &alice_key,
-        vec![],
+        alice_key.as_bytes(),
+        &[],
         Some("Alice"),
         &["alice@example.org"],
         None,
@@ -660,7 +678,7 @@ fn test_import_signed_cert() -> Result<()> {
     assert_eq!(certs.len(), 1);
 
     let alice = &certs[0];
-    let cert = Pgp::armored_to_cert(&alice.pub_cert)?;
+    let cert = Pgp::to_cert(alice.pub_cert.as_bytes())?;
 
     assert_eq!(cert.userids().len(), 1);
 
@@ -722,7 +740,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     // gpg: make key for Bob
     gpg.create_user("Bob <bob@example.org>");
     let bob_key = gpg.export("bob@example.org");
-    ca.cert_import_new(&bob_key, vec![], None, &[], None)?;
+    ca.cert_import_new(bob_key.as_bytes(), &[], None, &[], None)?;
 
     // make a revocation certificate for bob ...
     let revoc_file = format!("{}/bob.revoc", home_path);
@@ -891,7 +909,7 @@ fn test_refresh() -> Result<()> {
     let certs = ca.user_certs_get_all()?;
     for cert in certs {
         let u = ca.cert_get_users(&cert)?.unwrap();
-        let c = Pgp::armored_to_cert(&cert.pub_cert)?;
+        let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
 
         // get all certifications from the CA
         assert_eq!(c.userids().len(), 1);
