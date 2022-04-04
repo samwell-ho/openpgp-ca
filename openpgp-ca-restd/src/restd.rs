@@ -12,7 +12,9 @@
 use once_cell::sync::OnceCell;
 use rocket::http::Status;
 use rocket::response::status::BadRequest;
-use rocket_contrib::json::Json;
+use rocket::serde::json::Json;
+use rocket::Build;
+use std::convert::TryInto;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
 use openpgp_ca_lib::db::models;
@@ -21,7 +23,6 @@ use openpgp_ca_lib::pgp::Pgp;
 use crate::cert_info::CertInfo;
 use crate::json::*;
 use crate::process_certs::{get_cert_info, get_warnings, process_certs};
-use std::convert::TryInto;
 
 static DB: OnceCell<Option<String>> = OnceCell::new();
 
@@ -356,10 +357,10 @@ fn healthz() -> Status {
     }
 }
 
-pub fn run(db: Option<String>) -> rocket::Rocket {
+pub fn run(db: Option<String>) -> rocket::Rocket<Build> {
     DB.set(db).unwrap();
 
-    rocket::ignite().mount(
+    rocket::build().mount(
         "/",
         routes![
             certs_by_email,
