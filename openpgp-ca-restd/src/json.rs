@@ -1,13 +1,13 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use rocket::response::status::BadRequest;
-use rocket_contrib::json::Json;
+use rocket::serde::json::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::cert_info::CertInfo;

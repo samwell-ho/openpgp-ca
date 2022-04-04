@@ -1,9 +1,9 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! REST Interface for OpenPGP CA.
@@ -23,7 +23,7 @@ use cli::RestdCli;
 use structopt::StructOpt;
 
 #[launch]
-fn rocket() -> rocket::Rocket {
+fn rocket() -> rocket::Rocket<rocket::Build> {
     let cli = RestdCli::from_args();
 
     let db = RestdCli::from_args().database;

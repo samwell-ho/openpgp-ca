@@ -1,9 +1,9 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 //
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use openpgp_ca_restd::client::Client;
@@ -221,7 +221,7 @@ fn start_restd(db: String) -> AbortHandle {
     abort_handle
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_restd() {
     // Run all "restd" tests in one test-case.
     //
