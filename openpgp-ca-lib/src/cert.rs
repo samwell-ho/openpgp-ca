@@ -16,7 +16,7 @@ use sequoia_openpgp::Cert;
 
 use anyhow::{Context, Result};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
 pub fn user_new(
@@ -302,6 +302,13 @@ fn sign_cert_emails(
 
     let mut uids = Vec::new();
 
+    // make sure we find suitable user ids to certify for each passed email
+    let mut unused_email: HashSet<&str> = if let Some(emails) = emails_filter {
+        emails.iter().copied().collect()
+    } else {
+        HashSet::new()
+    };
+
     for uid in cert.userids() {
         // check if this uid already has a valid signature by ca_cert.
         // if yes, don't add another one.
@@ -320,9 +327,26 @@ fn sign_cert_emails(
             // a) have no filter-list, or
             // b) if the User ID is specified in the filter-list.
             if emails_filter.is_none() || emails_filter.unwrap().contains(&uid_addr.as_str()) {
+                unused_email.remove(uid_addr.as_str());
+
                 uids.push(userid);
             }
         }
+    }
+
+    // Print a message when specified email addresses couldn't be found and certified on a User ID.
+    //
+    // FIXME: this information should not be printed here, but returned to the user of the library
+    // as a list
+    if !unused_email.is_empty() {
+        let mut unused: Vec<_> = unused_email.into_iter().collect();
+        unused.sort_unstable();
+
+        println!(
+            "Warning: Couldn't find a User ID to certify for '{}' in {}",
+            unused.join(", "),
+            cert.fingerprint()
+        );
     }
 
     oca.secret().sign_user_ids(cert, &uids, duration_days)
