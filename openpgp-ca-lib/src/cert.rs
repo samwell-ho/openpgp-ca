@@ -319,15 +319,25 @@ fn sign_cert_emails(
             .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
         {
             let userid = uid.userid();
-            let uid_addr = userid
-                .email_normalized()?
-                .expect("email normalization failed");
+
+            // Some, if this user id contains a valid email part, None otherwise.
+            let uid_email: Option<String> = match userid.email_normalized() {
+                Ok(email) => email.clone(),
+                Err(_) => None,
+            };
 
             // Certify this User ID if we
             // a) have no filter-list, or
-            // b) if the User ID is specified in the filter-list.
-            if emails_filter.is_none() || emails_filter.unwrap().contains(&uid_addr.as_str()) {
-                unused_email.remove(uid_addr.as_str());
+            // b) if the User ID contains an email that is specified in the filter-list.
+            if emails_filter.is_none()
+                || (uid_email.is_some()
+                    && emails_filter
+                        .unwrap()
+                        .contains(&uid_email.clone().unwrap().as_str()))
+            {
+                if let Some(uid_email) = uid_email {
+                    unused_email.remove(uid_email.as_str());
+                }
 
                 uids.push(userid);
             }
