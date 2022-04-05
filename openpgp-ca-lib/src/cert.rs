@@ -99,7 +99,7 @@ pub fn cert_import_new(
     {
         // import_new is not intended for certs we already have a version of
         return Err(anyhow::anyhow!(
-            "A cert with this fingerprint already exists in the DB"
+            "A key with this fingerprint already exists in the DB.\nTo update it, use the 'user update' command."
         ));
     }
 
