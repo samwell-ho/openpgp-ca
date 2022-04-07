@@ -22,6 +22,7 @@ use sequoia_openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
+use chbs::probability::Probability;
 use sequoia_openpgp::cert::prelude::ComponentAmalgamation;
 use sha2::Digest;
 
@@ -34,10 +35,16 @@ impl Pgp {
 
     pub const SP: &'static StandardPolicy<'static> = &StandardPolicy::new();
 
+    // FIXME: configurable dictionaries, ... ?
     fn diceware() -> String {
-        // FIXME: configurable dictionaries, ... ?
-        use chbs::passphrase;
-        passphrase()
+        use chbs::{config::BasicConfig, prelude::*};
+
+        let config = BasicConfig {
+            capitalize_first: Probability::Never,
+            capitalize_words: Probability::Never,
+            ..Default::default()
+        };
+        config.to_scheme().generate()
     }
 
     fn user_id(email: &str, name: Option<&str>) -> UserID {
