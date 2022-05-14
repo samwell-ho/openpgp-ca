@@ -157,12 +157,15 @@ impl Pgp {
         Ok(String::from_utf8(v)?)
     }
 
-    /// Get the armored "public keyring" representation of a set of Certs
+    /// Get the armored "public keyring" representation of a set of Certs.
+    ///
+    /// This transformation strips non-exportable signatures, and any components bound merely by
+    /// non-exportable signatures.
     pub fn certs_to_armored(certs: &[Cert]) -> Result<String> {
         let mut writer = armor::Writer::new(Vec::new(), armor::Kind::PublicKey)?;
 
         for cert in certs {
-            cert.serialize(&mut writer)?;
+            cert.export(&mut writer)?;
         }
         let buffer = writer.finalize()?;
 
@@ -221,6 +224,8 @@ impl Pgp {
 
     /// Make an armored representation of a revocation signature.
     ///
+    /// Errors for non-exportable signatures.
+    ///
     /// Note:this uses `armor::Kind::PublicKey`, because GnuPG doesn't
     /// seem to accept revocations with the `armor::Kind::Signature` kind.
     pub fn revoc_to_armored(
@@ -236,7 +241,7 @@ impl Pgp {
                 armor::Kind::PublicKey,
                 headers.unwrap_or_default(),
             )?;
-            rev.serialize(&mut writer)?;
+            rev.export(&mut writer)?;
             writer.finalize()?;
         }
 
