@@ -114,16 +114,24 @@ pub fn cert_import_new(
     let certified = sign_cert_emails(oca, &user_cert, Some(emails), duration_days)
         .context("sign_cert_emails() failed")?;
 
-    // use name from User IDs, if no name was passed
-    let name = match name {
-        Some(name) => Some(name.to_owned()),
-        None => {
-            let userids: Vec<_> = user_cert.userids().collect();
-            if userids.len() == 1 {
-                userids[0].userid().name()?
-            } else {
-                None
-            }
+    // Determine "name" for this user in the CA database
+    let name = if let Some(name) = name {
+        // Use explicitly specified name
+        Some(name.to_string())
+    } else {
+        // If no user name was specified explicitly, we try deriving one from User IDs:
+
+        // Collect all names that are used in User IDs
+        let names: HashSet<_> = user_cert
+            .userids()
+            .filter_map(|u| u.userid().name().ok().flatten())
+            .collect();
+
+        // If there is exactly one name variant between all UserIDs -> use as CA database name
+        if names.len() == 1 {
+            names.into_iter().next()
+        } else {
+            None
         }
     };
 
