@@ -36,7 +36,7 @@ OpenPGP CA is a flexible tool, designed to integrate usefully with a wide
 range of environments. There are many ways to make OpenPGP CA work for you.
 Here, we show one typical workflow. Please read our
 [documentation](https://openpgp-ca.org/doc/) for more details, or 
-[talk to us](#get-in-touch-for-support) if you're unsure if OpenPGP CA is 
+[talk to us](https://openpgp-ca.org/contact/) if you're unsure if OpenPGP CA is 
 a good fit for your use case.
 
 
@@ -258,14 +258,3 @@ Or you can read our hands on documentation about how to
 
 End users can read our [client documentation](https://openpgp-ca.org/client/)
 to learn how to take advantage of an existing CA.
-
-
-# Get in touch for support
-
-If you are interested in deploying OpenPGP CA in your organization, please
-contact <heiko@schaefer.name> 
-([68C8B3725276BEBB3EEA0E208ACFC41124CCB82E](https://openpgp-ca.org/heiko.asc)).
-We can consult, help you with your setup, or even add features.
-
-For non-profit organizations reduced rates are available.  This is also a
-useful way for companies to support the project.
