@@ -93,6 +93,24 @@ pub enum CaCommand {
     Show,
     /// Print CA private key
     Private,
+
+    /// Re-certify User IDs (e.g after CA key rotation)
+    ReCertify {
+        #[structopt(
+            short = "p",
+            long = "public-old",
+            help = "A file that contains the old CA public key"
+        )]
+        pubkey_file_old: String,
+
+        #[structopt(
+            short = "v",
+            long = "validity",
+            help = "Validity of the new certifications in days",
+            default_value = "365"
+        )]
+        validity_days: u64,
+    },
 }
 
 #[derive(StructOpt, Debug)]
