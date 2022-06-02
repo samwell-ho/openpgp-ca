@@ -418,7 +418,7 @@ impl Pgp {
 
     /// For User ID `uid` (which is a part of `cert`):
     /// find all valid certifications that have been made by `certifier`.
-    pub(crate) fn valid_certifications_by(
+    pub fn valid_certifications_by(
         uid: &ComponentAmalgamation<UserID>,
         cert: &Cert,
         certifier: Cert,

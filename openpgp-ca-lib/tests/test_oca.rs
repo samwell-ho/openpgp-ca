@@ -24,6 +24,7 @@ use sequoia_openpgp as openpgp;
 use openpgp_ca_lib::ca::OpenpgpCa;
 use openpgp_ca_lib::pgp::Pgp;
 use sequoia_net::Policy;
+use sequoia_openpgp::cert::CertBuilder;
 
 use gnupg_test_wrapper as gnupg;
 
@@ -1012,6 +1013,87 @@ fn test_wkd_delist() -> Result<()> {
          /policy",
     );
     assert!(test_path.is_file());
+
+    Ok(())
+}
+
+#[test]
+/// Create a CA with two users, one not certified by the CA.
+///
+/// Create a new CA, import the two users (with the certifications by the old CA key).
+/// Re-certify with the new CA, check that certifications exist as expected
+fn test_ca_re_certify() -> Result<()> {
+    let gpg = gnupg::make_context()?;
+
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
+    let db1 = format!("{}/ca1.sqlite", home_path);
+
+    let ca1 = OpenpgpCa::new(Some(&db1))?;
+
+    // make first/old CA
+    ca1.ca_init("example.org", Some("example.org CA old"))?;
+
+    // make CA user (certified by the CA)
+    ca1.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
+
+    let (bob, _rev) = CertBuilder::new()
+        .add_userid("Bob Baker <bob@example.org>")
+        .add_signing_subkey()
+        .add_transport_encryption_subkey()
+        .add_storage_encryption_subkey()
+        .generate()?;
+
+    ca1.cert_import_new(Pgp::cert_to_armored(&bob)?.as_bytes(), &[], None, &[], None)?;
+
+    // make "new" CA
+    let db2 = format!("{}/ca2.sqlite", home_path);
+    let ca2 = OpenpgpCa::new(Some(&db2))?;
+    ca2.ca_init("example.org", Some("example.org CA new"))?;
+
+    // import certs from old CA, without certifying anything
+    for cert in ca1.user_certs_get_all()? {
+        ca2.cert_import_new(cert.pub_cert.as_bytes(), &[], None, &[], None)?;
+    }
+
+    // assert that no user id is certified at this point
+    let certs = ca2.user_certs_get_all()?;
+    assert_eq!(certs.len(), 2);
+
+    let ca_cert = ca2.ca_get_cert_pub()?;
+
+    for cert in certs.iter().map(|c| {
+        Pgp::to_cert(c.pub_cert.as_bytes()).expect("pub_cert should be convertible to a Cert")
+    }) {
+        for uid in cert.userids() {
+            let ca_certifications = Pgp::valid_certifications_by(&uid, &cert, ca_cert.clone());
+            assert!(ca_certifications.is_empty());
+        }
+    }
+
+    // re-certify
+    ca2.ca_re_certify(ca1.ca_get_pubkey_armored()?.as_bytes(), 365)?;
+
+    let ca_new_cert = ca2.ca_get_cert_pub()?;
+
+    // get all certs
+    let certs = ca2.user_certs_get_all()?;
+    assert_eq!(certs.len(), 2);
+
+    // FIXME: this relies on stable ordering of the certs, which is probably not guaranteed
+
+    // assert that alice's userid is certified by the new CA
+    let cert = Pgp::to_cert(certs[0].pub_cert.as_bytes())?;
+    for uid in cert.userids() {
+        let ca_certifications = Pgp::valid_certifications_by(&uid, &cert, ca_new_cert.clone());
+        assert_eq!(ca_certifications.len(), 1);
+    }
+
+    // assert that bob's userid is NOT certified by the new CA
+    let cert = Pgp::to_cert(certs[1].pub_cert.as_bytes())?;
+    for uid in cert.userids() {
+        let ca_certifications = Pgp::valid_certifications_by(&uid, &cert, ca_new_cert.clone());
+        assert_eq!(ca_certifications.len(), 0);
+    }
 
     Ok(())
 }
