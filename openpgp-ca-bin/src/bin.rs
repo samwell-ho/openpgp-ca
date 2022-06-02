@@ -107,6 +107,14 @@ fn main() -> Result<()> {
             }
             CaCommand::Show => ca.ca_show()?,
             CaCommand::Private => ca.ca_print_private()?,
+
+            CaCommand::ReCertify {
+                pubkey_file_old: cert_file_old,
+                validity_days,
+            } => {
+                let cert_old = std::fs::read(cert_file_old)?;
+                ca.ca_re_certify(&cert_old, validity_days)?;
+            }
         },
         Command::Bridge { cmd } => match cmd {
             BridgeCommand::New {

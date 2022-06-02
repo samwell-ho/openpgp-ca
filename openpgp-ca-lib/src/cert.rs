@@ -11,7 +11,7 @@ use crate::db::models;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
-use sequoia_openpgp::packet::Signature;
+use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
 
 use anyhow::{Context, Result};
@@ -178,6 +178,30 @@ pub fn cert_import_update(oca: &OpenpgpCa, cert: &[u8]) -> Result<()> {
     }
 }
 
+/// Certify the User IDs in `certify` in the Cert `c` (with validity of `validity_days`).
+/// Then update `db_cert` in the database to contain the resulting armored cert.
+fn add_certifications(
+    oca: &OpenpgpCa,
+    certify: Vec<&UserID>,
+    c: &Cert,
+    db_cert: models::Cert,
+    validity_days: u64,
+) -> Result<()> {
+    if !certify.is_empty() {
+        // Make new certifications for the User IDs identified above
+        let certified = oca
+            .secret()
+            .sign_user_ids(c, &certify[..], Some(validity_days))?;
+
+        // update cert in db
+        let mut cert_update = db_cert;
+        cert_update.pub_cert = Pgp::cert_to_armored(&certified)?;
+        oca.db().cert_update(&cert_update)?;
+    }
+
+    Ok(())
+}
+
 pub fn certs_refresh_ca_certifications(
     oca: &OpenpgpCa,
     threshold_days: u64,
@@ -191,13 +215,13 @@ pub fn certs_refresh_ca_certifications(
     for db_cert in oca
         .db()
         .certs()?
-        .iter()
+        .into_iter()
         // ignore "inactive" Certs
         .filter(|c| !c.inactive)
     {
         let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
-        let mut recertify = Vec::new();
+        let mut re_certify = Vec::new();
 
         for uid in c.userids() {
             // find valid certifications by the CA on this uid
@@ -219,20 +243,47 @@ pub fn certs_refresh_ca_certifications(
                 && !ca_certifications.iter().any(sig_valid_past_threshold)
             {
                 // A new certification for this uid should be created
-                recertify.push(uid.userid());
+                re_certify.push(uid.userid());
             }
         }
-        if !recertify.is_empty() {
-            // Make new certifications for the User IDs identified above
-            let recertified =
-                oca.secret()
-                    .sign_user_ids(&c, &recertify[..], Some(validity_days))?;
 
-            // update cert in db
-            let mut cert_update = db_cert.clone();
-            cert_update.pub_cert = Pgp::cert_to_armored(&recertified)?;
-            oca.db().cert_update(&cert_update)?;
+        add_certifications(oca, re_certify, &c, db_cert, validity_days)?;
+    }
+
+    Ok(())
+}
+
+pub fn certs_re_certify(oca: &OpenpgpCa, cert_old: Cert, validity_days: u64) -> Result<()> {
+    // FIXME: de-deduplicate code with certs_refresh_ca_certifications()?
+
+    for db_cert in oca
+        .db()
+        .certs()?
+        .into_iter()
+        // ignore "inactive" Certs
+        .filter(|c| !c.inactive)
+    {
+        let ca_new = oca.ca_get_cert_pub()?;
+
+        let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
+
+        let mut re_certify = Vec::new();
+
+        for uid in c.userids() {
+            // find valid certifications by the old CA on this uid
+            let ca_certifications = Pgp::valid_certifications_by(&uid, &c, cert_old.clone());
+
+            // A new certification is created if any certification by old_cert exists
+            if !ca_certifications.is_empty() {
+                // Only certify if there is not yet any certification by the current CA key
+                if Pgp::valid_certifications_by(&uid, &c, ca_new.clone()).is_empty() {
+                    // A new certification for this uid should be created
+                    re_certify.push(uid.userid());
+                }
+            }
         }
+
+        add_certifications(oca, re_certify, &c, db_cert, validity_days)?;
     }
 
     Ok(())

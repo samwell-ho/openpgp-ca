@@ -244,6 +244,18 @@ impl OpenpgpCa {
         Ok(())
     }
 
+    /// Find all User IDs that have been certified by `cert_old` and re-certify them
+    /// with the current CA key.
+    ///
+    /// This can be useful after CA key rotation: when the CA has a new key, `ca_re_certify` issues
+    /// fresh certifications for all previously CA-certified user certs.
+    pub fn ca_re_certify(&self, cert_old: &[u8], validity_days: u64) -> Result<()> {
+        let cert_old = Pgp::to_cert(cert_old)?;
+
+        self.db()
+            .transaction(|| cert::certs_re_certify(self, cert_old, validity_days))
+    }
+
     // -------- users / certs
 
     /// Get a list of all User Certs
