@@ -155,14 +155,13 @@ impl OpenpgpCa {
     }
 
     pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
-        let res = self
-            .db()
-            .transaction(|| self.ca_secret.ca_init(domainname, name));
+        self.db()
+            .transaction(|| self.ca_secret.ca_init(domainname, name))?;
 
         println!("Created OpenPGP CA instance\n");
         self.ca_show()?;
 
-        res
+        Ok(())
     }
 
     /// Getting private key material is not possible for all backends and
