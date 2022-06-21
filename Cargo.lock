@@ -1567,7 +1567,7 @@ dependencies = [
 
 [[package]]
 name = "openpgp-ca-restd"
-version = "0.10.1"
+version = "0.11.1"
 dependencies = [
  "anyhow",
  "chrono",
