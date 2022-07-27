@@ -1,10 +1,11 @@
-// Copyright 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
-// SPDX-License-Identifier: GPL-3.0-or-later
+
+// temporary workaround for https://github.com/rust-lang/rust-clippy/issues/9014 [2022-07-27]
+#![allow(clippy::extra_unused_lifetimes)]
 
 use crate::db::schema::*;
 
