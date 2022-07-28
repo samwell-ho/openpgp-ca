@@ -43,7 +43,7 @@ a good fit for your use case.
 ## Installing OpenPGP CA
 
 To run an OpenPGP CA instance for your organization, first, you need to 
-install the openpgp-ca tool on your machine.
+install the oca tool on your machine.
 
 Currently, you can either
 [build OpenPGP CA on your machine](https://openpgp-ca.org/doc/start/),
@@ -56,7 +56,7 @@ deploy it to a [kubernetes cluster](https://openpgp-ca.org/doc/kubernetes/).
 Then you can create an OpenPGP CA instance for your organization:
 
 ```
-$ openpgp-ca -d example.oca ca init example.org 
+$ oca -d example.oca ca init example.org 
 ```
 
 In this initialization step, OpenPGP CA creates an OpenPGP key for your CA.
@@ -112,8 +112,8 @@ only need to verify the CA's key.
 To import the keys into the CA, Carol will perform the following steps:
 
 ```
-openpgp-ca -d example.oca user import -e alice@example.org --key-file alice.pub
-openpgp-ca -d example.oca user import -e bob@example.org -e bob.baker.39472384@gmail.com --key-file bob.pub
+oca -d example.oca user import -e alice@example.org --key-file alice.pub
+oca -d example.oca user import -e bob@example.org -e bob.baker.39472384@gmail.com --key-file bob.pub
 ```
 
 (Recall that `-d example.oca` specifies the location of your CA database, 
@@ -147,7 +147,7 @@ To publish your CA as a WKD, you can export all public keys for your
 domain, like this:
 
 ```
-openpgp-ca -d example.oca wkd export /tmp/wkd/
+oca -d example.oca wkd export /tmp/wkd/
 ```
 
 When you serve the contents of this directory with a webserver under the 

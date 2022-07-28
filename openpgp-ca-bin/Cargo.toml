@@ -15,7 +15,7 @@ documentation = "https://openpgp-ca.org/doc/"
 edition = "2018"
 
 [[bin]]
-name = "openpgp-ca"
+name = "oca"
 path = "src/bin.rs"
 
 [dependencies]

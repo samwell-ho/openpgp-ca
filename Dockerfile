@@ -47,7 +47,7 @@ CMD ["run"]
 # putting this stage last makes openpgp-ca the "default image"
 FROM base as openpgp-ca
 
-COPY --from=builder /opt/openpgp-ca/target/release/openpgp-ca /usr/local/bin/openpgp-ca
+COPY --from=builder /opt/openpgp-ca/target/release/oca /usr/local/bin/oca
 
-ENTRYPOINT ["/usr/local/bin/openpgp-ca"]
+ENTRYPOINT ["/usr/local/bin/oca"]
 CMD ["--help"]

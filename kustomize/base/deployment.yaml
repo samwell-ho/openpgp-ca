@@ -28,7 +28,7 @@ spec:
           command: ["/bin/sh"]
           args:
             - "-c"
-            - "/usr/local/bin/openpgp-ca ca init ${DOMAIN} || true"
+            - "/usr/local/bin/oca ca init ${DOMAIN} || true"
           volumeMounts:
             - name: persistence
               mountPath: /var/run/openpgp-ca/
