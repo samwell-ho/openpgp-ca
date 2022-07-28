@@ -24,7 +24,7 @@ use tokio::runtime::Runtime;
 /// the cert data from wkd is merged into the existing cert (failed merges are
 /// ignored silently).
 pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
-    let mut rt = Runtime::new()?;
+    let rt = Runtime::new()?;
 
     let emails = oca.emails_get(cert)?;
 
@@ -71,7 +71,7 @@ pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> 
     // get key from hagrid
     let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
 
-    let mut rt = Runtime::new()?;
+    let rt = Runtime::new()?;
     let update = rt.block_on(async move { hagrid.get(&KeyID::from(fp)).await })?;
 
     // Merge new certificate information into existing cert.

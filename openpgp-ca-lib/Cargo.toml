@@ -25,7 +25,7 @@ diesel_migrations = "1.4"
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 
-tokio = { version = "0.2.22", features = ["fs", "io-std", "io-util", "rt-threaded", "sync", "signal", "macros"] }
+tokio = { version = "1.13.1" }
 
 chbs = "0.1"
 addr = "0.14"

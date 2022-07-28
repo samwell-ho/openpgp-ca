@@ -412,7 +412,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
     // -- get keys from hagrid
 
     use tokio::runtime::Runtime;
-    let mut rt = Runtime::new()?;
+    let rt = Runtime::new()?;
 
     let j: Fingerprint = "CBCD8F030588653EEDD7E2659B7DD433F254904A".parse()?;
     let justus: Cert = rt.block_on(async move {
