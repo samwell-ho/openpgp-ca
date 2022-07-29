@@ -5,18 +5,26 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches};
 
 use openpgp_ca_lib::ca::OpenpgpCa;
 
 mod cli;
 
 fn main() -> Result<()> {
-    let cli = cli::Cli::parse();
+    let version = format!(
+        "{} (openpgp-ca-lib {})",
+        env!("CARGO_PKG_VERSION"),
+        openpgp_ca_lib::VERSION,
+    );
 
-    let ca = OpenpgpCa::new(cli.database.as_deref())?;
+    let cli = cli::Cli::command().version(&*version);
 
-    match cli.cmd {
+    let c = cli::Cli::from_arg_matches(&cli.get_matches())?;
+
+    let ca = OpenpgpCa::new(c.database.as_deref())?;
+
+    match c.cmd {
         cli::Commands::User { cmd } => match cmd {
             cli::UserCommand::Add {
                 email,

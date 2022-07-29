@@ -22,4 +22,4 @@ path = "src/bin.rs"
 clap = { version = "3", features = ["derive"] }
 anyhow = "1.0"
 
-openpgp-ca-lib = { path = "../openpgp-ca-lib", version = "0.11" }
+openpgp-ca-lib = { path = "../openpgp-ca-lib", version = "0.11.3" }
