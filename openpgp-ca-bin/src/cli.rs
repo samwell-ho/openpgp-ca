@@ -1,92 +1,90 @@
-// Copyright 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
-// SPDX-License-Identifier: GPL-3.0-or-later
 
-use clap::AppSettings;
+use clap::{AppSettings, Parser, Subcommand};
 use std::path::PathBuf;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "openpgp-ca",
-author = "Heiko Schäfer <heiko@schaefer.name>",
-global_settings(& [AppSettings::VersionlessSubcommands,
-AppSettings::DisableHelpSubcommand, AppSettings::DeriveDisplayOrder]),
-about = "OpenPGP CA is a tool for managing OpenPGP keys within organizations."
+#[derive(Parser)]
+#[clap(
+    name = "openpgp-ca",
+    author = "Heiko Schäfer <heiko@schaefer.name>",
+    version,
+    global_setting(AppSettings::DeriveDisplayOrder),
+    about = "OpenPGP CA is a tool for managing OpenPGP keys within organizations."
 )]
 pub struct Cli {
-    #[structopt(name = "filename", short = "d", long = "database")]
+    #[clap(name = "filename", short = 'd', long = "database")]
     pub database: Option<String>,
 
-    #[structopt(subcommand)]
-    pub cmd: Command,
+    #[clap(subcommand)]
+    pub cmd: Commands,
 }
 
-#[derive(StructOpt, Debug)]
-pub enum Command {
+#[derive(Subcommand)]
+pub enum Commands {
     /// Manage CA
     Ca {
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         cmd: CaCommand,
     },
     /// Manage Users
     User {
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         cmd: UserCommand,
     },
     /// Manage Bridges
     Bridge {
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         cmd: BridgeCommand,
     },
     /// WKD
     Wkd {
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         cmd: WkdCommand,
     },
     /// Keylist
     Keylist {
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         cmd: KeyListCommand,
     },
     /// Update
     Update {
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         cmd: UpdateCommand,
     },
     //    /// Manage Directories
     //    Directory {
-    //        #[structopt(subcommand)]
+    //        #[clap(subcommand)]
     //        cmd: DirCommand,
     //    },
     //    /// Manage key-profiles
     //    KeyProfile {}
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand)]
 pub enum CaCommand {
     /// Create CA
     Init {
-        #[structopt(help = "CA domain name")]
+        #[clap(help = "CA domain name")]
         domain: String,
 
-        #[structopt(short = "n", long = "name", help = "Descriptive User Name")]
+        #[clap(short = 'n', long = "name", help = "Descriptive User Name")]
         name: Option<String>,
     },
     /// Export CA public key
     Export,
     /// Generate a set of revocations for the CA key
     Revocations {
-        #[structopt(short = "o", long = "output", help = "File to export to")]
+        #[clap(short = 'o', long = "output", help = "File to export to")]
         output: PathBuf,
     },
 
     /// Import trust signature for CA Key
     ImportTsig {
-        #[structopt(help = "File that contains the tsigned CA Key")]
+        #[clap(help = "File that contains the tsigned CA Key")]
         cert_file: PathBuf,
     },
     /// Show CA information
@@ -96,15 +94,15 @@ pub enum CaCommand {
 
     /// Re-certify User IDs (e.g after CA key rotation)
     ReCertify {
-        #[structopt(
-            short = "p",
+        #[clap(
+            short = 'p',
             long = "public-old",
             help = "A file that contains the old CA public key"
         )]
         pubkey_file_old: String,
 
-        #[structopt(
-            short = "v",
+        #[clap(
+            short = 'v',
             long = "validity",
             help = "Validity of the new certifications in days",
             default_value = "365"
@@ -113,12 +111,12 @@ pub enum CaCommand {
     },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand)]
 pub enum UserCommand {
     /// Add User (create new Key-Pair)
     Add {
-        #[structopt(
-            short = "e",
+        #[clap(
+            short = 'e',
             long = "email",
             required = true,
             number_of_values = 1,
@@ -127,11 +125,11 @@ pub enum UserCommand {
         )]
         email: Vec<String>,
 
-        #[structopt(short = "n", long = "name", help = "Descriptive User Name")]
+        #[clap(short = 'n', long = "name", help = "Descriptive User Name")]
         name: Option<String>,
 
-        #[structopt(
-            short = "m",
+        #[clap(
+            short = 'm',
             long = "minimal",
             help = "Minimal output (for consumption by tools such as 'pass')"
         )]
@@ -140,18 +138,18 @@ pub enum UserCommand {
 
     /// Add Revocation Certificate
     AddRevocation {
-        #[structopt(help = "File that contains a revocation cert")]
+        #[clap(help = "File that contains a revocation cert")]
         revocation_file: PathBuf,
     },
     /// Bulk checks on Users
     Check {
-        #[structopt(subcommand)]
+        #[clap(subcommand)]
         cmd: UserCheckSubcommand,
     },
     /// Import User (use existing Public Key)
     Import {
-        #[structopt(
-            short = "e",
+        #[clap(
+            short = 'e',
             long = "email",
             required = true,
             number_of_values = 1,
@@ -160,18 +158,18 @@ pub enum UserCommand {
         )]
         email: Vec<String>,
 
-        #[structopt(
-            short = "f",
+        #[clap(
+            short = 'f',
             long = "key-file",
             help = "File that contains the User's Public Key"
         )]
         cert_file: PathBuf,
 
-        #[structopt(short = "n", long = "name", help = "Descriptive User Name")]
+        #[clap(short = 'n', long = "name", help = "Descriptive User Name")]
         name: Option<String>,
 
-        #[structopt(
-            short = "r",
+        #[clap(
+            short = 'r',
             long = "revocation-file",
             number_of_values = 1,
             multiple = true,
@@ -181,8 +179,8 @@ pub enum UserCommand {
     },
     /// Update User (use existing Public Key)
     Update {
-        #[structopt(
-            short = "f",
+        #[clap(
+            short = 'f',
             long = "key-file",
             help = "File that contains the User's Public Key"
         )]
@@ -190,32 +188,32 @@ pub enum UserCommand {
     },
     /// Export User Public Key (bulk, if no email address is given)
     Export {
-        #[structopt(short = "e", long = "email", help = "Email address")]
+        #[clap(short = 'e', long = "email", help = "Email address")]
         email: Option<String>,
 
-        #[structopt(short = "p", long = "path", help = "Output path")]
+        #[clap(short = 'p', long = "path", help = "Output path")]
         path: Option<String>,
     },
     /// List Users
     List,
     /// Apply a Revocation Certificate
     ApplyRevocation {
-        #[structopt(help = "Id of a revocation cert")]
+        #[clap(help = "Id of a revocation cert")]
         hash: String,
     },
     /// Show Revocation Certificates (if available)
     ShowRevocations {
-        #[structopt(short = "e", long = "email", help = "Email address")]
+        #[clap(short = 'e', long = "email", help = "Email address")]
         email: String,
     },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand)]
 pub enum UserCheckSubcommand {
     /// Check user key expiry
     Expiry {
-        #[structopt(
-            short = "d",
+        #[clap(
+            short = 'd',
             long = "days",
             help = "Check for keys that expire within 'days' days",
             default_value = "30"
@@ -226,30 +224,30 @@ pub enum UserCheckSubcommand {
     Certifications,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand)]
 pub enum BridgeCommand {
     /// List Bridges
     List,
     /// Export Bridge Public Key (bulk, if no domain name is given)
     Export {
-        #[structopt(help = "Remote CA Email address")]
+        #[clap(help = "Remote CA Email address")]
         email: Option<String>,
     },
 
     /// Add New Bridge (certify existing remote CA Public Key)
     New {
-        #[structopt(short = "e", long = "email", help = "Bridge remote Email")]
+        #[clap(short = 'e', long = "email", help = "Bridge remote Email")]
         email: Option<String>,
 
-        #[structopt(short = "c", long = "commit", help = "Commit Bridge certification")]
+        #[clap(short = 'c', long = "commit", help = "Commit Bridge certification")]
         commit: bool,
 
-        #[structopt(help = "File that contains the remote CA's Public Key")]
+        #[clap(help = "File that contains the remote CA's Public Key")]
         remote_key_file: PathBuf,
 
-        #[structopt(
+        #[clap(
             name = "domainname",
-            short = "s",
+            short = 's',
             long = "scope",
             help = "Scope for trust of this bridge"
         )]
@@ -257,36 +255,36 @@ pub enum BridgeCommand {
     },
     /// Revoke Bridge
     Revoke {
-        #[structopt(short = "e", long = "email", help = "Bridge remote Email")]
+        #[clap(short = 'e', long = "email", help = "Bridge remote Email")]
         email: String,
     },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand)]
 pub enum WkdCommand {
     /// Export WKD structure
     Export {
-        #[structopt(help = "Filesystem directory for WKD export")]
+        #[clap(help = "Filesystem directory for WKD export")]
         path: PathBuf,
     },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand)]
 pub enum KeyListCommand {
     /// Export KeyList
     Export {
-        #[structopt(
-            short = "p",
+        #[clap(
+            short = 'p',
             long = "path",
             help = "Filesystem directory for KeyList export"
         )]
         path: PathBuf,
 
-        #[structopt(short = "s", long = "sig-uri", help = "Sinature URI")]
+        #[clap(short = 's', long = "sig-uri", help = "Sinature URI")]
         signature_uri: String,
 
-        #[structopt(
-            short = "f",
+        #[clap(
+            short = 'f',
             long = "force",
             help = "Overwrite keylist/sig files if they exist"
         )]
@@ -294,7 +292,7 @@ pub enum KeyListCommand {
     },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand)]
 pub enum UpdateCommand {
     /// Update certificates from a keyserver
     Keyserver {},

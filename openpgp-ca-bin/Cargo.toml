@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+# SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 [package]
@@ -19,8 +19,7 @@ name = "openpgp-ca"
 path = "src/bin.rs"
 
 [dependencies]
-structopt = "0.3"
-clap = "2.33"
+clap = { version = "3", features = ["derive"] }
 anyhow = "1.0"
 
 openpgp-ca-lib = { path = "../openpgp-ca-lib", version = "0.11" }
