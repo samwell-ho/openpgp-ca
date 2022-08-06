@@ -9,7 +9,7 @@
 use openpgp::serialize::Serialize;
 use sequoia_openpgp as openpgp;
 
-use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::ca::OpenpgpCaUninit;
 use openpgp_ca_lib::pgp::Pgp;
 
 use anyhow::{Context, Result};
@@ -32,10 +32,10 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
 
     // ---- use OpenPGP CA to make a set of keys ----
 
-    let ca = OpenpgpCa::new(Some(&db))?;
+    let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    ca.ca_init("example.org", None)?;
+    let ca = cau.ca_init("example.org", None)?;
 
     // make CA users
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -112,10 +112,10 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path_ca);
 
     // ---- init OpenPGP CA key ----
-    let ca = OpenpgpCa::new(Some(&db))?;
+    let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    ca.ca_init("example.org", None)?;
+    let ca = cau.ca_init("example.org", None)?;
 
     let ca_key = ca.ca_get_pubkey_armored()?;
 
@@ -229,13 +229,13 @@ fn test_bridge() -> Result<()> {
     let db1 = format!("{}/ca1.sqlite", home_path);
     let db2 = format!("{}/ca2.sqlite", home_path);
 
-    let ca1 = OpenpgpCa::new(Some(&db1))?;
-    let ca2 = OpenpgpCa::new(Some(&db2))?;
+    let ca1u = OpenpgpCaUninit::new(Some(&db1))?;
+    let ca2u = OpenpgpCaUninit::new(Some(&db2))?;
 
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    ca1.ca_init("some.org", None)?;
+    let ca1 = ca1u.ca_init("some.org", None)?;
 
     // make CA user
     assert!(ca1
@@ -245,7 +245,7 @@ fn test_bridge() -> Result<()> {
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    ca2.ca_init("other.org", None)?;
+    let ca2 = ca2u.ca_init("other.org", None)?;
 
     // make CA user
     ca2.user_new(Some("Bob"), &["bob@other.org"], None, false, false)?;
@@ -365,18 +365,18 @@ fn test_multi_bridge() -> Result<()> {
     let db2 = format!("{}/ca2.sqlite", home_path);
     let db3 = format!("{}/ca3.sqlite", home_path);
 
-    let ca1 = OpenpgpCa::new(Some(&db1))?;
-    let ca2 = OpenpgpCa::new(Some(&db2))?;
-    let ca3 = OpenpgpCa::new(Some(&db3))?;
+    let ca1u = OpenpgpCaUninit::new(Some(&db1))?;
+    let ca2u = OpenpgpCaUninit::new(Some(&db2))?;
+    let ca3u = OpenpgpCaUninit::new(Some(&db3))?;
 
     // ---- populate OpenPGP CA instances ----
 
-    ca1.ca_init("alpha.org", None)?;
+    let ca1 = ca1u.ca_init("alpha.org", None)?;
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    ca2.ca_init("beta.org", None)?;
+    let ca2 = ca2u.ca_init("beta.org", None)?;
 
-    ca3.ca_init("gamma.org", None)?;
+    let ca3 = ca3u.ca_init("gamma.org", None)?;
     ca3.user_new(Some("Carol"), &["carol@gamma.org"], None, false, false)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
 
@@ -491,17 +491,17 @@ fn test_scoping() -> Result<()> {
     let db2 = format!("{}/ca2.sqlite", home_path);
     let db3 = format!("{}/ca3.sqlite", home_path);
 
-    let ca1 = OpenpgpCa::new(Some(&db1))?;
-    let ca2 = OpenpgpCa::new(Some(&db2))?;
-    let ca3 = OpenpgpCa::new(Some(&db3))?;
+    let ca1u = OpenpgpCaUninit::new(Some(&db1))?;
+    let ca2u = OpenpgpCaUninit::new(Some(&db2))?;
+    let ca3u = OpenpgpCaUninit::new(Some(&db3))?;
 
     // ---- populate OpenPGP CA instances ----
-    ca1.ca_init("alpha.org", None)?;
+    let ca1 = ca1u.ca_init("alpha.org", None)?;
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    ca2.ca_init("beta.org", None)?;
+    let ca2 = ca2u.ca_init("beta.org", None)?;
 
-    ca3.ca_init("other.org", None)?;
+    let ca3 = ca3u.ca_init("other.org", None)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
 
     // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---

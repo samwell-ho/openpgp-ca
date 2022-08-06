@@ -10,7 +10,7 @@
 //!
 //! Example usage:
 //! ```
-//! # use openpgp_ca_lib::ca::OpenpgpCa;
+//! # use openpgp_ca_lib::ca::OpenpgpCaUninit;
 //! # use tempfile;
 //! // all state of an OpenPGP CA instance is persisted in one SQLite database
 //! let db_filename = "/tmp/openpgp-ca.sqlite";
@@ -19,10 +19,10 @@
 //! # let db_filename = file.path().to_str().unwrap();
 //!
 //! // start a new OpenPGP CA instance (implicitly creates the database file)
-//! let openpgp_ca = OpenpgpCa::new(Some(db_filename)).expect("Failed to set up CA");
+//! let openpgp_ca_uninit = OpenpgpCaUninit::new(Some(db_filename)).expect("Failed to set up CA");
 //!
 //! // initialize the CA Admin (with domainname and a symbolic name)
-//! openpgp_ca.ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
+//! let openpgp_ca = openpgp_ca_uninit.ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
 //!
 //! // create a new user, with all signatures
 //! // (the private key is printed to stdout and needs to be manually
@@ -98,6 +98,13 @@ impl DbCa {
     }
 }
 
+/// A CA instance that has a database, but is (possibly) not initialized and doesn't
+/// have a backend for private key operations yet.
+pub struct OpenpgpCaUninit {
+    db: Rc<OcaDb>,
+    ca: Rc<DbCa>,
+}
+
 /// OpenpgpCa exposes the functionality of OpenPGP CA as a library
 /// (the command line utility 'openpgp-ca' is built on top of this library)
 pub struct OpenpgpCa {
@@ -113,8 +120,10 @@ pub struct CertificationStatus {
     pub uncertified: Vec<UserID>,
 }
 
-impl OpenpgpCa {
-    /// Instantiate a new OpenpgpCa object.
+impl OpenpgpCaUninit {
+    /// Instantiate a new OpenpgpCa object (with db, but without private key backend).
+    ///
+    /// This CA may be fully uninitialized and not be linked to a CA key yet.
     ///
     /// The SQLite backend filename can be configured:
     /// - explicitly via the db_url parameter, or
@@ -133,13 +142,47 @@ impl OpenpgpCa {
 
         let dbca = Rc::new(DbCa::new(db.clone()));
 
-        Ok(OpenpgpCa {
-            db,
-            ca: dbca.clone(),
-            ca_secret: dbca,
-        })
+        Ok(Self { db, ca: dbca })
     }
 
+    pub fn ca_init(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
+        self.ca_init_card(domainname, None, name)
+    }
+
+    pub fn ca_init_card(
+        self,
+        domainname: &str,
+        card: Option<&str>,
+        name: Option<&str>,
+    ) -> Result<OpenpgpCa> {
+        if let Some(_ident) = card {
+            unimplemented!();
+        } else {
+            self.db.transaction(|| self.ca.ca_init(domainname, name))?;
+        };
+
+        let ca = self.init_from_db_state()?;
+
+        println!("Created OpenPGP CA instance\n");
+        ca.ca_show()?;
+
+        Ok(ca)
+    }
+    /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
+    pub fn init_from_db_state(self) -> Result<OpenpgpCa> {
+        // FIXME: look at database state!
+        // FIXME: ->  pick softkey/card backend
+        // FIXME: ->  handle uninitialized (-> error?)
+
+        Ok(OpenpgpCa {
+            db: self.db,
+            ca: self.ca.clone(),
+            ca_secret: self.ca,
+        })
+    }
+}
+
+impl OpenpgpCa {
     pub fn db(&self) -> &OcaDb {
         &self.db
     }
@@ -152,16 +195,6 @@ impl OpenpgpCa {
     /// Print information about the created CA instance to stdout.
     pub(crate) fn secret(&self) -> &Rc<dyn CaSec> {
         &self.ca_secret
-    }
-
-    pub fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
-        self.db()
-            .transaction(|| self.ca_secret.ca_init(domainname, name))?;
-
-        println!("Created OpenPGP CA instance\n");
-        self.ca_show()?;
-
-        Ok(())
     }
 
     /// Getting private key material is not possible for all backends and

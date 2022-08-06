@@ -16,7 +16,7 @@ use rocket::serde::json::Json;
 use rocket::Build;
 use std::convert::TryInto;
 
-use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
 use openpgp_ca_lib::db::models;
 use openpgp_ca_lib::pgp::Pgp;
 
@@ -27,8 +27,10 @@ use crate::process_certs::{get_cert_info, get_warnings, process_certs};
 static DB: OnceCell<Option<String>> = OnceCell::new();
 
 thread_local! {
-    static CA: OpenpgpCa = OpenpgpCa::new(DB.get().unwrap().as_deref())
-        .expect("OpenPGP CA new() failed - database problem?");
+    static CA: OpenpgpCa = OpenpgpCaUninit::new(DB.get().unwrap().as_deref())
+        .expect("OpenpgpCaUninit new() failed - database problem?")
+        .init_from_db_state()
+        .expect("OpenPGP CA init_from_db_state() failed - database problem?");
 }
 
 // CA certifications are good for 365 days

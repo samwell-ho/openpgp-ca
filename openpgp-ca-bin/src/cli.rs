@@ -71,6 +71,9 @@ pub enum CaCommand {
         #[clap(help = "CA domain name")]
         domain: String,
 
+        #[clap(short = 'c', long = "card", help = "OpenPGP card ident")]
+        card: Option<String>,
+
         #[clap(short = 'n', long = "name", help = "Descriptive User Name")]
         name: Option<String>,
     },

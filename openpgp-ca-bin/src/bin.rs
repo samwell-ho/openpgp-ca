@@ -7,7 +7,7 @@
 use anyhow::Result;
 use clap::{CommandFactory, FromArgMatches};
 
-use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
 
 mod cli;
 
@@ -22,7 +22,20 @@ fn main() -> Result<()> {
 
     let c = cli::Cli::from_arg_matches(&cli.get_matches())?;
 
-    let ca = OpenpgpCa::new(c.database.as_deref())?;
+    let cau = OpenpgpCaUninit::new(c.database.as_deref())?;
+
+    // Handle init calls separately, here.
+    // Setting up an OpenpgpCa instance differs from all other workflows.
+    if let cli::Commands::Ca {
+        cmd: cli::CaCommand::Init { domain, card, name },
+    } = &c.cmd
+    {
+        cau.ca_init_card(domain, card.as_deref(), name.as_deref())?;
+        return Ok(());
+    }
+
+    // the command is not `ca init`, so we should be able to get an OpenpgpCa object now
+    let ca = cau.init_from_db_state()?;
 
     match c.cmd {
         cli::Commands::User { cmd } => match cmd {
@@ -98,8 +111,9 @@ fn main() -> Result<()> {
             }
         },
         cli::Commands::Ca { cmd } => match cmd {
-            cli::CaCommand::Init { domain, name } => {
-                ca.ca_init(&domain, name.as_deref())?;
+            cli::CaCommand::Init { .. } => {
+                // handled separately, above
+                unreachable!()
             }
             cli::CaCommand::Export => {
                 println!("{}", ca.ca_get_pubkey_armored()?);

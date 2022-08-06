@@ -11,7 +11,7 @@ use openpgp_ca_restd::json::{Action, CertResultJson, CertStatus, Certificate};
 use openpgp_ca_restd::restd;
 
 use gnupg_test_wrapper as gnupg;
-use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::ca::OpenpgpCaUninit;
 
 use rocket::futures::prelude::future::{AbortHandle, Abortable};
 
@@ -235,8 +235,8 @@ async fn test_restd() {
     let db = format!("{}/ca.sqlite", home_path);
 
     // -- init OpenPGP CA --
-    let ca = OpenpgpCa::new(Some(&db)).unwrap();
-    ca.ca_init("example.org", None).unwrap();
+    let cau = OpenpgpCaUninit::new(Some(&db)).unwrap();
+    let _ca = cau.ca_init("example.org", None).unwrap();
 
     // -- start restd --
     let abort_handle = start_restd(db);
