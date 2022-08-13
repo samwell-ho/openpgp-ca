@@ -1,10 +1,8 @@
-// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
-// SPDX-License-Identifier: GPL-3.0-or-later
 
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
@@ -55,7 +53,7 @@ pub struct ReturnGoodJson {
     pub upload: Option<Upload>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Action {
     /// This cert can be imported, it is "new" to this CA:
     /// We don't have a cert with this fingerprint yet.
@@ -68,7 +66,7 @@ pub enum Action {
     Update,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Upload {
     /// The UI recommends uploading this cert
     ///
@@ -182,7 +180,7 @@ impl ReturnError {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ReturnStatus {
     BadKeyring,
     NotFound,
@@ -241,7 +239,7 @@ impl CertError {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CertStatus {
     /// The cert failed a policy check, it cannot be used.
     ///
