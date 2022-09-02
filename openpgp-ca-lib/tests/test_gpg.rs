@@ -42,11 +42,11 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     // ---- import keys from OpenPGP CA into GnuPG ----
 
     // get Cert for CA
-    let ca_cert = ca.ca_get_priv_key()?;
+    let ca_cert = ca.ca_get_cert_pub()?;
 
-    // import CA key into GnuPG
+    // import CA cert into GnuPG
     let mut buf = Vec::new();
-    ca_cert.as_tsk().serialize(&mut buf)?;
+    ca_cert.serialize(&mut buf)?;
     gpg.import(&buf);
 
     // import CA users into GnuPG
@@ -122,7 +122,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     gpg_bob.import(ca_key.as_bytes());
 
     // get Cert for CA
-    let ca_cert = ca.ca_get_priv_key()?;
+    let ca_cert = ca.ca_get_cert_pub()?;
 
     let ca_keyid = format!("{:X}", ca_cert.keyid());
 
@@ -262,8 +262,8 @@ fn test_bridge() -> Result<()> {
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    ca1.add_bridge(None, &PathBuf::from(ca_other_file), None, true)?;
-    ca2.add_bridge(None, &PathBuf::from(ca_some_file), None, true)?;
+    ca1.add_bridge(None, &PathBuf::from(ca_other_file), None, false, true)?;
+    ca2.add_bridge(None, &PathBuf::from(ca_some_file), None, false, true)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
@@ -389,10 +389,10 @@ fn test_multi_bridge() -> Result<()> {
     std::fs::write(&ca3_file, pub_ca3).expect("Unable to write file");
 
     // ca1 certifies ca2
-    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, true)?;
+    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, false, true)?;
 
     // ca2 certifies ca3
-    ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, true)?;
+    ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, false, true)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
@@ -501,6 +501,9 @@ fn test_scoping() -> Result<()> {
 
     let ca3 = ca3u.ca_init("other.org", None)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
+    let ca3_file = format!("{}/ca3.pubkey", home_path);
+    let pub_ca3 = ca3.ca_get_pubkey_armored()?;
+    std::fs::write(&ca3_file, pub_ca3).expect("Unable to write file");
 
     // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---
     let ca2_file = format!("{}/ca2.pubkey", home_path);
@@ -508,16 +511,20 @@ fn test_scoping() -> Result<()> {
     std::fs::write(&ca2_file, pub_ca2).expect("Unable to write file");
 
     // ca1 certifies ca2
-    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, true)?;
+    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, false, true)?;
 
-    // create unscoped trust signature from beta.org CA to other.org CA
+    // create unscoped trust signature from ca2 (beta.org) to ca3 (other.org)
     // ---- openpgp-ca@beta.org ---tsign---> openpgp-ca@other.org ----
-    let tsigned_ca3 = Pgp::tsign(ca3.ca_get_priv_key()?, &ca2.ca_get_priv_key()?, None)?;
+    // let tsigned_ca3 = Pgp::tsign(ca3.ca_get_priv_key()?, &ca2.ca_get_priv_key()?, None)?;
+    ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, true, true)?;
+    let bridges2 = ca2.bridges_get()?;
+    assert_eq!(bridges2.len(), 1);
+    let tsigned_ca3 = ca2.db().cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
     // get Cert for ca1
-    let ca1_cert = ca1.ca_get_priv_key().expect("failed to get CA1 cert");
+    let ca1_cert = ca1.ca_get_cert_pub().expect("failed to get CA1 cert");
 
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)
@@ -528,7 +535,7 @@ fn test_scoping() -> Result<()> {
     // import CA certs into GnuPG
     gpg.import(Pgp::cert_to_armored(&ca1_cert)?.as_bytes());
     gpg.import(ca2_cert.as_bytes());
-    gpg.import(Pgp::cert_to_armored(&tsigned_ca3)?.as_bytes());
+    gpg.import(tsigned_ca3.as_bytes());
 
     // import CA1 users into GnuPG
     let certs1 = ca1.user_certs_get_all()?;

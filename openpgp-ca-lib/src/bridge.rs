@@ -30,6 +30,7 @@ pub fn bridge_new(
     remote_cert_file: &Path,
     remote_email: Option<&str>,
     remote_scope: Option<&str>,
+    unscoped: bool,
 ) -> Result<(models::Bridge, Fingerprint)> {
     let remote_ca_cert = Cert::from_file(remote_cert_file).context("Failed to read key")?;
 
@@ -89,10 +90,12 @@ pub fn bridge_new(
 
     let regex = domain_to_regex(scope)?;
 
+    let scope_regexes = if unscoped { vec![] } else { vec![regex] };
+
     // Make trust signature on the remote CA cert, to set up the bridge
     let bridged = oca
         .secret()
-        .bridge_to_remote_ca(remote_ca_cert, vec![regex])?;
+        .bridge_to_remote_ca(remote_ca_cert, scope_regexes)?;
 
     // store new bridge in DB
     let db_cert = oca.db().cert_add(

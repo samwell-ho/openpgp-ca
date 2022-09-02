@@ -270,16 +270,6 @@ impl OpenpgpCa {
         &self.ca_secret
     }
 
-    /// Getting private key material is not possible for all backends and
-    /// may result in panics.
-    ///
-    /// This fn is only intended for internal integration tests!\
-    ///
-    /// FIXME: different visibility?
-    pub fn ca_get_priv_key(&self) -> Result<Cert> {
-        self.ca_secret.ca_get_priv_key()
-    }
-
     pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
         self.ca_secret.ca_generate_revocations(output)
     }
@@ -771,11 +761,13 @@ impl OpenpgpCa {
         email: Option<&str>,
         key_file: &Path,
         scope: Option<&str>,
+        unscoped: bool,
         commit: bool,
     ) -> Result<()> {
         if commit {
             self.db.transaction::<_, anyhow::Error, _>(|| {
-                let (bridge, fingerprint) = bridge::bridge_new(self, key_file, email, scope)?;
+                let (bridge, fingerprint) =
+                    bridge::bridge_new(self, key_file, email, scope, unscoped)?;
 
                 println!("Signed OpenPGP key for {} as bridge.\n", bridge.email);
                 println!("The fingerprint of the remote CA key is");

@@ -14,9 +14,9 @@ use openpgp::packet::signature::subpacket::SubpacketTag;
 use openpgp::packet::signature::{subpacket::*, SignatureBuilder};
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
-use openpgp::serialize::Serialize;
 use openpgp::KeyHandle;
 use openpgp::{Cert, Fingerprint, KeyID};
+use rusqlite::Connection;
 use sequoia_openpgp as openpgp;
 
 use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
@@ -652,10 +652,13 @@ fn test_import_signed_cert() -> Result<()> {
     let ca = cau.ca_init("example.org", None)?;
 
     // import CA key into GnuPG
-    let ca_cert = ca.ca_get_priv_key()?;
-    let mut buf = Vec::new();
-    ca_cert.as_tsk().serialize(&mut buf)?;
-    gpg.import(&buf);
+    let sqlite = Connection::open(db)?;
+    //   grab CA key directly from sqlite db for this test
+    let ca_private: String = sqlite
+        .query_row("SELECT priv_cert FROM cacerts", &[], |row| row.get(0))
+        .unwrap();
+
+    gpg.import(ca_private.as_bytes());
 
     // set up, sign Alice key with gnupg
     gpg.create_user("Alice <alice@example.org>");

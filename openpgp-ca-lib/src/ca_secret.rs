@@ -64,17 +64,6 @@ pub trait CaSec {
         -> Result<Cert>;
 
     fn bridge_revoke(&self, remote_ca_cert: &Cert) -> Result<(Signature, Cert)>;
-
-    /// Get a sequoia `Cert` object for the CA from the database.
-    ///
-    /// This returns a full version of the CA Cert, including private key
-    /// material.
-    ///
-    /// This is the OpenPGP Cert of the CA.
-    ///
-    /// CAUTION: getting the private key is not possible for OpenPGP cards,
-    /// this fn should only be used for tests.
-    fn ca_get_priv_key(&self) -> Result<Cert>;
 }
 
 impl DbCa {
@@ -126,6 +115,21 @@ impl DbCa {
             .into_iter()
             .map(|s: KeyPair| Box::new(s) as Box<dyn sequoia_openpgp::crypto::Signer>)
             .collect())
+    }
+
+    /// Get a sequoia `Cert` object for the CA from the database.
+    ///
+    /// This returns a full version of the CA Cert, including private key
+    /// material.
+    ///
+    /// This is the OpenPGP Cert of the CA.
+    ///
+    /// CAUTION: getting the private key is not possible for OpenPGP cards,
+    /// this fn should only be used for tests.
+    fn ca_get_priv_key(&self) -> Result<Cert> {
+        let (_, cert) = self.db().get_ca()?;
+
+        Pgp::to_cert(cert.priv_cert.as_bytes())
     }
 }
 
@@ -401,12 +405,6 @@ adversaries."#;
             ))
         }
     }
-
-    fn ca_get_priv_key(&self) -> Result<Cert> {
-        let (_, cert) = self.db().get_ca()?;
-
-        Pgp::to_cert(cert.priv_cert.as_bytes())
-    }
 }
 
 /// an OpenPGP card backend for a CA instance
@@ -554,10 +552,6 @@ impl CaSec for CardCa {
     }
 
     fn bridge_revoke(&self, remote_ca_cert: &Cert) -> Result<(Signature, Cert)> {
-        todo!()
-    }
-
-    fn ca_get_priv_key(&self) -> Result<Cert> {
         todo!()
     }
 }
