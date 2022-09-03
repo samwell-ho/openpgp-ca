@@ -3,7 +3,7 @@
 
 [package]
 name = "openpgp-ca"
-version = "0.11.2"
+version = "0.12.0-pre"
 description = "OpenPGP CA is a tool for managing and certifying OpenPGP keys"
 authors = ["Heiko Schaefer <heiko@schaefer.name>"]
 license = "GPL-3.0-or-later"
@@ -22,4 +22,4 @@ path = "src/bin.rs"
 clap = { version = "3", features = ["derive"] }
 anyhow = "1.0"
 
-openpgp-ca-lib = { path = "../openpgp-ca-lib", version = "0.11.3" }
+openpgp-ca-lib = { path = "../openpgp-ca-lib", version = "0.12.0-pre" }
