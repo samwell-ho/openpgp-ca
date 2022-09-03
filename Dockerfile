@@ -4,11 +4,12 @@
 # Stage 0: build OpenPGP CA binaries
 FROM rust:buster as builder
 
-# Sequoia dependencies
+# Sequoia, OpenPGP CA dependencies
 # https://gitlab.com/sequoia-pgp/sequoia#debian
 RUN DEBIAN_FRONTEND=noninteractive apt-get -q update && \
     apt-get -q -y --no-install-recommends install \
-    git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev
+    git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev \
+    libpcsclite-dev
 
 # Build OpenPGP CA
 ADD ./ /opt/openpgp-ca/
@@ -21,7 +22,8 @@ FROM debian:buster-slim as base
 # Sequoia dependencies
 RUN DEBIAN_FRONTEND=noninteractive apt-get -q update && \
     apt-get -q -y --no-install-recommends install \
-    nettle-dev libssl-dev capnproto libsqlite3-dev && \
+    nettle-dev libssl-dev capnproto libsqlite3-dev \
+    libpcsclite-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # OpenPGP CA database file

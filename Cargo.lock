@@ -197,6 +197,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
+name = "blanket"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b04ce3d2372d05d1ef4ea3fdf427da6ae3c17ca06d688a107b5344836276bc3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -288,7 +299,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4aedb84272dbe89af497cf81375129abda4fc0a9e7c5d317498c15cc30c0d27"
 dependencies = [
- "nom",
+ "nom 5.1.2",
 ]
 
 [[package]]
@@ -1005,6 +1016,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hex-slice"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5491a308e0214554f07a81d8944abe45f552871c12e3c3c6e7e5d354039a6c4c"
+
+[[package]]
 name = "hkdf"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1141,6 +1158,15 @@ name = "ipnet"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879d54834c8c76457ef4293a689b2a8c59b076067ad77b15efafbb05f92a592b"
+
+[[package]]
+name = "iso7816-tlv"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "395d8e0ae63eb5016fbcf4a72864155880e34bce0158206fcfa7218efdd52e82"
+dependencies = [
+ "untrusted",
+]
 
 [[package]]
 name = "itertools"
@@ -1336,6 +1362,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 
 [[package]]
+name = "minimal-lexical"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
 name = "miniz_oxide"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1450,6 +1482,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nom"
+version = "7.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8903e5a29a317527874d0402f867152a3d21c908bb0b933e416c65e301d4c36"
+dependencies = [
+ "memchr",
+ "minimal-lexical",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1519,6 +1561,9 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "gnupg-test-wrapper",
+ "openpgp-card",
+ "openpgp-card-pcsc",
+ "openpgp-card-sequoia",
  "openpgp-keylist",
  "sequoia-net",
  "sequoia-openpgp",
@@ -1544,6 +1589,47 @@ dependencies = [
  "serde_json",
  "structopt",
  "tokio",
+]
+
+[[package]]
+name = "openpgp-card"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c821855d394b22482c4b8b0cb7ede19f6cbdc7d3eff073a3cbe87601f547c4f9"
+dependencies = [
+ "blanket",
+ "chrono",
+ "hex-slice",
+ "log",
+ "nom 7.1.1",
+ "thiserror",
+]
+
+[[package]]
+name = "openpgp-card-pcsc"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ced2ca281675f58341162043963f9fe2067381b23ca934cfa7e2b1fa36d721a"
+dependencies = [
+ "iso7816-tlv",
+ "log",
+ "openpgp-card",
+ "pcsc",
+]
+
+[[package]]
+name = "openpgp-card-sequoia"
+version = "0.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1296eccdf5026651625d1f80fb613b66ec1d2d24478dfa2381f388592883d14"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "log",
+ "nettle",
+ "openpgp-card",
+ "sequoia-openpgp",
+ "thiserror",
 ]
 
 [[package]]
@@ -1630,6 +1716,25 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-sys",
+]
+
+[[package]]
+name = "pcsc"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e29e4de78a433aeecd06fb5bd55a0f9fde11dc85a14c22d482972c7edc4fdc4"
+dependencies = [
+ "bitflags",
+ "pcsc-sys",
+]
+
+[[package]]
+name = "pcsc-sys"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1b7bfecba2c0f1b5efb0e7caf7533ab1c295024165bcbb066231f60d33e23ea"
+dependencies = [
+ "pkg-config",
 ]
 
 [[package]]
@@ -2762,6 +2867,12 @@ dependencies = [
  "generic-array",
  "subtle",
 ]
+
+[[package]]
+name = "untrusted"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "url"

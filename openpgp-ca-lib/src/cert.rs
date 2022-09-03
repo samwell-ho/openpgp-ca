@@ -1,10 +1,8 @@
-// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
-// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::{CertificationStatus, OpenpgpCa};
 use crate::db::models;
@@ -43,7 +41,7 @@ pub fn user_new(
     let tsigned_ca = Pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
     // Store tsig for the CA cert
-    oca.secret().ca_import_tsig(tsigned_ca.as_bytes())?;
+    oca.db().ca_import_tsig(tsigned_ca.as_bytes())?;
 
     // Store new user cert in DB
     let user_cert = Pgp::cert_to_armored(&user_certified)?;

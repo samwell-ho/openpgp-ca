@@ -1,10 +1,8 @@
-// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
-// SPDX-License-Identifier: GPL-3.0-or-later
 
 use sequoia_openpgp::armor;
 use sequoia_openpgp::cert;
@@ -339,6 +337,28 @@ impl Pgp {
         let signed = signee.insert_packets(sigs)?;
 
         Ok(signed)
+    }
+
+    /// Merge new CA tsigs from `import` into `ca_cert`.
+    /// Return merged Cert as TSK (if available).
+    pub(crate) fn merge_in_tsigs(ca_cert: Cert, import: Cert) -> Result<Cert> {
+        // The imported cert must have the same Fingerprint as the CA cert
+        if ca_cert.fingerprint() != import.fingerprint() {
+            return Err(anyhow::anyhow!(
+                "The imported cert has an unexpected Fingerprint",
+            ));
+        }
+
+        // Get the third party tsig(s) from the imported cert
+        let tsigs = Pgp::get_trust_sigs(&import)?;
+
+        // add tsig(s) to our "own" version of the CA key
+        let mut packets: Vec<Packet> = Vec::new();
+        tsigs.iter().for_each(|s| packets.push(s.clone().into()));
+
+        ca_cert
+            .insert_packets(packets)
+            .context("Merging tsigs into CA Key failed")
     }
 
     /// Get all valid, certification capable keys (with secret key material)

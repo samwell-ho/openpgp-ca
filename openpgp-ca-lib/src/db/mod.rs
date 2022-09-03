@@ -1,10 +1,8 @@
-// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
-// SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Context, Result};
 use diesel::prelude::*;
@@ -234,6 +232,28 @@ impl OcaDb {
             .context("Error updating CaCert")?;
 
         Ok(())
+    }
+
+    /// Add trust-signature(s) from a user Cert to the CA's Cert.
+    ///
+    /// This receives the CA's public key (optionally armored), finds any trust-signatures on
+    /// it and merges those into "our" local copy of the CA key.
+    pub(crate) fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
+        let (_, mut ca_cert) = self
+            .get_ca()
+            .context("Failed to load CA cert from database")?;
+        let ca = Pgp::to_cert(ca_cert.priv_cert.as_bytes())?;
+
+        let cert_import = Pgp::to_cert(cert)?;
+
+        let joined = Pgp::merge_in_tsigs(ca, cert_import)?;
+
+        // update in DB
+        ca_cert.priv_cert =
+            Pgp::cert_to_armored_private_key(&joined).context("Failed to re-armor CA Cert")?;
+
+        self.cacert_update(&ca_cert)
+            .context("Update of CA Cert in DB failed")
     }
 
     pub fn users_sorted_by_name(&self) -> Result<Vec<User>> {

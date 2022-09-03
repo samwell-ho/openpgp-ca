@@ -1,10 +1,8 @@
-// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
-// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! OpenPGP CA as a library
 //!
@@ -31,7 +29,7 @@
 //! ```
 
 use crate::bridge;
-use crate::ca_secret::CaSec;
+use crate::ca_secret::{CaSec, CardCa};
 use crate::cert;
 use crate::db::models;
 use crate::db::OcaDb;
@@ -146,17 +144,71 @@ impl OpenpgpCaUninit {
     }
 
     pub fn ca_init(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
-        self.ca_init_card(domainname, None, name)
+        self.ca_init_card(domainname, None, None, name)
     }
 
     pub fn ca_init_card(
         self,
         domainname: &str,
         card: Option<&str>,
+        pubkey: Option<&Path>,
         name: Option<&str>,
     ) -> Result<OpenpgpCa> {
-        if let Some(_ident) = card {
-            unimplemented!();
+        if let Some(card_ident) = card {
+            // Open Smart Card
+            let mut card = openpgp_card_pcsc::PcscBackend::open_by_ident(card_ident, None)?;
+            let mut pgp = openpgp_card::OpenPgp::new(&mut card);
+            let mut open = openpgp_card_sequoia::card::Open::new(pgp.transaction()?)?;
+
+            let fps = open.fingerprints()?;
+            let sig = fps
+                .signature()
+                .context(format!("No Signing key on card {}", card_ident))?;
+
+            let sig_fp = sig.to_string();
+
+            let crd = open.cardholder_related_data()?;
+
+            // FIXME: API to get name in String form!
+            let cardholder_name = crd.name();
+
+            // FIXME: check that name conforms to a prescribed format,
+            // to make sure the token is the right one? Return proper error.
+            assert_eq!(cardholder_name, "OpenPGP CA");
+
+            println!();
+            println!(
+                "Opened card {}\nFound signing key {}.\nCardholder: {:?}",
+                card_ident, sig_fp, cardholder_name
+            );
+            let cert = if let Some(pubkey) = pubkey {
+                std::fs::read(pubkey)?
+            } else {
+                unimplemented!() // error out
+            };
+            let ca_cert = Pgp::to_cert(&cert).context("ca_init_card: Couldn't process CA cert.")?;
+
+            // FIXME: make sure that the CA public key contains a User ID!
+            // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
+
+            let pubkey = Pgp::cert_to_armored(ca_cert)
+                .context("Failed to transform CA cert to armored pubkey")?;
+
+            // CA pubkey and card signature key slot must match
+            if ca_cert.fingerprint().to_hex() != sig_fp {
+                println!(
+                    "Signature key slot on card {} doesn't match public key {}.",
+                    sig_fp,
+                    ca_cert.fingerprint().to_hex()
+                );
+                unimplemented!();
+            }
+
+            let pin = "123456"; // FIXME: ask user, immediately test against card!
+
+            self.db.transaction(|| {
+                CardCa::ca_init(&self.db, domainname, card_ident, pin, &pubkey, &sig_fp)
+            })?;
         } else {
             self.db.transaction(|| self.ca.ca_init(domainname, name))?;
         };
@@ -170,15 +222,36 @@ impl OpenpgpCaUninit {
     }
     /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
     pub fn init_from_db_state(self) -> Result<OpenpgpCa> {
-        // FIXME: look at database state!
-        // FIXME: ->  pick softkey/card backend
         // FIXME: ->  handle uninitialized (-> error?)
 
-        Ok(OpenpgpCa {
-            db: self.db,
-            ca: self.ca.clone(),
-            ca_secret: self.ca,
-        })
+        // check database state of this CA
+        let (ca, _) = self.db.get_ca()?;
+
+        let oca = if let Some(card) = ca.card {
+            // card backend
+
+            let c: Vec<_> = card.split('/').collect();
+            assert_eq!(c.len(), 2); // FIXME
+
+            let ident = c[0];
+            let pin = c[1];
+            let ca_secret = Rc::new(CardCa::new(ident, pin, self.db.clone())?);
+
+            OpenpgpCa {
+                db: self.db,
+                ca: self.ca,
+                ca_secret,
+            }
+        } else {
+            // softkey backend
+            OpenpgpCa {
+                db: self.db,
+                ca: self.ca.clone(),
+                ca_secret: self.ca,
+            }
+        };
+
+        Ok(oca)
     }
 }
 
@@ -212,8 +285,7 @@ impl OpenpgpCa {
     }
 
     pub fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
-        self.db()
-            .transaction(|| self.ca_secret.ca_import_tsig(cert))
+        self.db().transaction(|| self.db.ca_import_tsig(cert))
     }
 
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
@@ -260,6 +332,11 @@ impl OpenpgpCa {
         let created: DateTime<Utc> = created.into();
 
         println!("    CA Domain: {}", ca.domainname);
+        if let Some(card) = ca.card {
+            if let Some(ident) = card.split('/').next() {
+                println!(" OpenPGP card: {}", ident);
+            }
+        }
         println!("  Fingerprint: {}", cert.fingerprint());
         println!("Creation time: {}", created.format("%F %T %Z"));
 

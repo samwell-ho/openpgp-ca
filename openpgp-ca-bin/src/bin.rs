@@ -27,10 +27,19 @@ fn main() -> Result<()> {
     // Handle init calls separately, here.
     // Setting up an OpenpgpCa instance differs from all other workflows.
     if let cli::Commands::Ca {
-        cmd: cli::CaCommand::Init { domain, card, name },
+        cmd:
+            cli::CaCommand::Init {
+                domain,
+                card,
+                pubkey,
+                name,
+            },
     } = &c.cmd
     {
-        cau.ca_init_card(domain, card.as_deref(), name.as_deref())?;
+        // FIXME: in card case, optionally handle setup of keys on card?
+        // Or just write documentation on how to setup with opgpcard?
+
+        cau.ca_init_card(domain, card.as_deref(), pubkey.as_deref(), name.as_deref())?;
         return Ok(());
     }
 

@@ -74,6 +74,9 @@ pub enum CaCommand {
         #[clap(short = 'c', long = "card", help = "OpenPGP card ident")]
         card: Option<String>,
 
+        #[clap(short = 'p', long = "public", help = "CA public key File")]
+        pubkey: Option<PathBuf>,
+
         #[clap(short = 'n', long = "name", help = "Descriptive User Name")]
         name: Option<String>,
     },

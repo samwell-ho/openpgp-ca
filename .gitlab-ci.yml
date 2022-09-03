@@ -20,7 +20,7 @@ cargo-test:
   before_script:
     - mkdir -p /run/user/$UID
     - apt update -y -qq
-    - apt install -y -qq --no-install-recommends  git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev ca-certificates valgrind strace python3-dev python3-setuptools python3-cffi python3-pytest gnupg
+    - apt install -y -qq --no-install-recommends  git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev ca-certificates valgrind strace python3-dev python3-setuptools python3-cffi python3-pytest gnupg libpcsclite-dev
     - apt clean
   script:
   - cargo test
@@ -34,7 +34,7 @@ cargo-clippy:
   before_script:
     - mkdir -p /run/user/$UID
     - apt update -y -qq
-    - apt install -y -qq --no-install-recommends  git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev ca-certificates valgrind strace python3-dev python3-setuptools python3-cffi python3-pytest gnupg
+    - apt install -y -qq --no-install-recommends  git rustc cargo clang make pkg-config nettle-dev libssl-dev capnproto libsqlite3-dev ca-certificates valgrind strace python3-dev python3-setuptools python3-cffi python3-pytest gnupg libpcsclite-dev
     - apt clean
   script:
     - rustup component add clippy

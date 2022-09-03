@@ -37,6 +37,10 @@ openpgp-keylist = "0.2"
 sequoia-openpgp = "1.8"
 sequoia-net = "0.24"
 
+openpgp-card = "0.2"
+openpgp-card-pcsc = "0.2"
+openpgp-card-sequoia = "0.0.15"
+
 # for tests
 [dev-dependencies]
 gnupg-test-wrapper = { path = "../gnupg-test-wrapper" }

@@ -20,7 +20,7 @@ pub struct Ca {
 #[table_name = "cas"]
 pub struct NewCa<'a> {
     pub domainname: &'a str,
-    pub card: Option<&'a str>,
+    pub card: Option<&'a str>, // "card ident/pin"
 }
 
 #[derive(Queryable, Debug, Associations, Clone, AsChangeset, Identifiable)]
@@ -28,7 +28,7 @@ pub struct NewCa<'a> {
 pub struct Cacert {
     pub id: i32,
     pub fingerprint: String,
-    pub priv_cert: String, // this field should be named priv_key
+    pub priv_cert: String, // bad name (priv key if softkey, pub key if card backed)
     // https://docs.diesel.rs/diesel/associations/index.html
     pub ca_id: i32,
 }

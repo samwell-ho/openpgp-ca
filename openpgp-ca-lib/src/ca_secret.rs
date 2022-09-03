@@ -1,13 +1,11 @@
-// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
-// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::ca::DbCa;
-use crate::db::models;
+use crate::db::{models, OcaDb};
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::cert;
@@ -18,27 +16,22 @@ use sequoia_openpgp::serialize::stream::{Message, Signer};
 use sequoia_openpgp::types::{ReasonForRevocation, SignatureType};
 use sequoia_openpgp::{Cert, Packet};
 
-use anyhow::{Context, Result};
+use openpgp_card::OpenPgp;
+use openpgp_card_pcsc::PcscBackend;
+use openpgp_card_sequoia::card::Open;
+
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 
-use sequoia_openpgp::packet::signature::SignatureBuilder;
+use sequoia_openpgp::crypto::KeyPair;
 use std::io::Write;
 use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 /// Abstraction of operations that need private key material
 pub trait CaSec {
-    /// Initialize OpenPGP CA Admin database entry.
-    ///
-    /// This generates a new OpenPGP Key for the Admin role and stores the
-    /// private Key in the OpenPGP CA database.
-    ///
-    /// `domainname` is the domain that this CA Admin is in charge of,
-    /// `name` is a descriptive name for the CA Admin
-    ///
-    /// Only one CA Admin can be configured per database.
-    fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()>;
-
     /// Generate a set of revocation certificates for the CA key.
     ///
     /// This outputs a set of revocations with creation dates spaced
@@ -51,14 +44,6 @@ pub trait CaSec {
     /// revocation certificates
     fn ca_generate_revocations(&self, output: PathBuf) -> Result<()>;
 
-    /// Add trust-signature(s) from CA users to the CA's Cert.
-    ///
-    /// This receives the CA's public key (optionally armored), finds any trust-signatures on
-    /// it and merges those into "our" local copy of the CA key.
-    ///
-    /// FIXME: should this be in ca_public?
-    fn ca_import_tsig(&self, cert: &[u8]) -> Result<()>;
-
     /// Generate a detached signature with the CA key, for 'data'
     fn sign_detached(&self, data: &[u8]) -> Result<String>;
 
@@ -68,6 +53,12 @@ pub trait CaSec {
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
     ) -> Result<Cert>;
+
+    /// Get a list of certification-capable Signers for this backend.
+    ///
+    /// FIXME: turn this interface upside down, to:
+    /// "make a bunch of signatures with all of the signers"?
+    // fn certification_signers(&self) -> Result<Vec<Box<dyn sequoia_openpgp::crypto::Signer + '_>>>;
 
     fn bridge_to_remote_ca(&self, remote_ca_cert: Cert, scope_regexes: Vec<String>)
         -> Result<Cert>;
@@ -86,10 +77,17 @@ pub trait CaSec {
     fn ca_get_priv_key(&self) -> Result<Cert>;
 }
 
-/// Implementation of CaSec based on a DbCa backend that contains the
-/// private key material for the CA.
-impl CaSec for DbCa {
-    fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
+impl DbCa {
+    /// Initialize OpenPGP CA Admin database entry.
+    ///
+    /// This generates a new OpenPGP Key for the Admin role and stores the
+    /// private Key in the OpenPGP CA database.
+    ///
+    /// `domainname` is the domain that this CA Admin is in charge of,
+    /// `name` is a descriptive name for the CA Admin
+    ///
+    /// Only one CA Admin can be configured per database.
+    pub(crate) fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
         if self.db().is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA has already been initialized",));
         }
@@ -103,20 +101,37 @@ impl CaSec for DbCa {
 
         let name = match name {
             Some(name) => Some(name),
-            _ => Some("OpenPGP CA"),
+            None => Some("OpenPGP CA"),
         };
 
         let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
 
-        let ca_key = &Pgp::cert_to_armored_private_key(&cert)?;
+        let ca_key = Pgp::cert_to_armored_private_key(&cert)?;
 
         self.db().ca_insert(
-            models::NewCa { domainname },
-            ca_key,
+            models::NewCa {
+                domainname,
+                card: None,
+            },
+            &ca_key,
             &cert.fingerprint().to_hex(),
         )
     }
 
+    fn certification_signers(&self) -> Result<Vec<Box<dyn sequoia_openpgp::crypto::Signer>>> {
+        let ca_cert = self.ca_get_priv_key()?;
+        let ca_keys = Pgp::get_cert_keys(&ca_cert, None);
+
+        Ok(ca_keys
+            .into_iter()
+            .map(|s: KeyPair| Box::new(s) as Box<dyn sequoia_openpgp::crypto::Signer>)
+            .collect())
+    }
+}
+
+/// Implementation of CaSec based on a DbCa backend that contains the
+/// private key material for the CA.
+impl CaSec for DbCa {
     fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
         let ca = self.ca_get_priv_key()?;
 
@@ -211,43 +226,6 @@ adversaries."#;
         Ok(())
     }
 
-    fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
-        let ca_cert = self.ca_get_priv_key()?;
-
-        let cert_import = Pgp::to_cert(cert)?;
-
-        // The imported cert must have the same Fingerprint as the CA cert
-        if ca_cert.fingerprint() != cert_import.fingerprint() {
-            return Err(anyhow::anyhow!(
-                "The imported cert has an unexpected Fingerprint",
-            ));
-        }
-
-        // Get the third party tsig(s) from the imported cert
-        let tsigs = Pgp::get_trust_sigs(&cert_import)?;
-
-        // add tsig(s) to our "own" version of the CA key
-        let mut packets: Vec<Packet> = Vec::new();
-        tsigs.iter().for_each(|s| packets.push(s.clone().into()));
-
-        let signed = ca_cert
-            .insert_packets(packets)
-            .context("Merging tsigs into CA Key failed")?;
-
-        // update in DB
-        let (_, mut cacert) = self
-            .db()
-            .get_ca()
-            .context("Failed to load CA cert from database")?;
-
-        cacert.priv_cert =
-            Pgp::cert_to_armored_private_key(&signed).context("Failed to re-armor CA Cert")?;
-
-        self.db()
-            .cacert_update(&cacert)
-            .context("Update of CA Cert in DB failed")
-    }
-
     fn sign_detached(&self, data: &[u8]) -> Result<String> {
         let ca_cert = self.ca_get_priv_key()?;
 
@@ -291,7 +269,6 @@ adversaries."#;
         duration_days: Option<u64>,
     ) -> Result<Cert> {
         let ca_cert = self.ca_get_priv_key()?;
-        let mut ca_keys = Pgp::get_cert_keys(&ca_cert, None);
 
         // Collect certifications by the CA
         let mut packets: Vec<Packet> = Vec::new();
@@ -303,35 +280,34 @@ adversaries."#;
             .map(|u| u.userid());
 
         for userid in userids {
-            for signer in &mut ca_keys {
+            // make certification
+            let mut sb = signature::SignatureBuilder::new(SignatureType::GenericCertification);
+
+            // If an expiration setting for the certifications has been
+            // provided, apply it to the signatures
+            if let Some(days) = duration_days {
+                // The signature should be valid for the specified
+                // number of `days`
+                sb = sb.set_signature_validity_period(Duration::from_secs(
+                    Pgp::SECONDS_IN_DAY * days,
+                ))?;
+            }
+
+            // Include 'Signer's UserID' packet
+            // (https://tools.ietf.org/html/rfc4880#section-5.2.3.22)
+            // to make it easier to find the CA key via WKD
+            if let Some(uid) = ca_cert.userids().next() {
+                sb = sb.set_signers_user_id(uid.userid().value())?;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "ERROR: No User ID in CA cert. This should never happen."
+                ));
+            }
+
+            for mut signer in self.certification_signers()?.into_iter() {
                 // make certification
-                let mut sb = signature::SignatureBuilder::new(SignatureType::GenericCertification);
-
-                // If an expiration setting for the certifications has been
-                // provided, apply it to the signatures
-                if let Some(days) = duration_days {
-                    // The signature should be valid for the specified
-                    // number of `days`
-                    sb = sb.set_signature_validity_period(Duration::from_secs(
-                        Pgp::SECONDS_IN_DAY * days,
-                    ))?;
-                }
-
-                // Include 'Signer's UserID' packet
-                // (https://tools.ietf.org/html/rfc4880#section-5.2.3.22)
-                // to make it easier to find the CA key via WKD
-                if let Some(uid) = ca_cert.userids().next() {
-                    sb = sb.set_signers_user_id(uid.userid().value())?;
-                } else {
-                    return Err(anyhow::anyhow!(
-                        "ERROR: No User ID in CA cert. \
-                        This should never happen."
-                    ));
-                }
-
-                let sig = userid.bind(signer, cert, sb)?;
-
-                // Collect certifications
+                let sig = userid.bind(&mut *signer, cert, sb.clone())?;
+                // collect in packets
                 packets.push(sig.into());
             }
         }
@@ -359,8 +335,9 @@ adversaries."#;
 
             // Create one tsig for each signer
             for signer in &mut ca_keys {
-                let mut builder = SignatureBuilder::new(SignatureType::GenericCertification)
-                    .set_trust_signature(255, 120)?;
+                let mut builder =
+                    signature::SignatureBuilder::new(SignatureType::GenericCertification)
+                        .set_trust_signature(255, 120)?;
 
                 // add all regexes
                 for regex in &scope_regexes {
@@ -429,5 +406,158 @@ adversaries."#;
         let (_, cert) = self.db().get_ca()?;
 
         Pgp::to_cert(cert.priv_cert.as_bytes())
+    }
+}
+
+/// an OpenPGP card backend for a CA instance
+pub(crate) struct CardCa {
+    ident: String,
+    pin: String,
+
+    db: Rc<OcaDb>,
+    card: Arc<Mutex<PcscBackend>>,
+}
+
+impl CardCa {
+    pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> Result<Self> {
+        let card = PcscBackend::open_by_ident(ident, None)?;
+
+        let card = Arc::new(Mutex::new(card));
+
+        Ok(Self {
+            ident: ident.to_string(),
+            pin: pin.to_string(),
+            db,
+            card,
+        })
+    }
+
+    pub(crate) fn ca_init(
+        db: &Rc<OcaDb>,
+        domainname: &str,
+        card_ident: &str,
+        pin: &str,
+        pubkey: &str,
+        fingerprint: &str,
+    ) -> Result<()> {
+        let card = Some(format!("{}/{}", card_ident, pin));
+
+        db.ca_insert(
+            models::NewCa {
+                domainname,
+                card: card.as_deref(),
+            },
+            pubkey,
+            fingerprint,
+        )
+    }
+
+    pub(crate) fn get_ca_cert(&self) -> Result<Cert> {
+        let (_, cacert) = self.db.get_ca()?;
+
+        Pgp::to_cert(cacert.priv_cert.as_bytes())
+    }
+
+    fn sign_a_thing(
+        &self,
+        op: &mut (dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) + Send + Sync),
+    ) -> Result<()> {
+        let mut card = self.card.lock().unwrap();
+
+        let mut pgp = OpenPgp::new(&mut *card);
+        let mut open = Open::new(pgp.transaction()?)?;
+
+        // FIXME: verifying PIN before each signing operation. Check if this is needed?
+        open.verify_user_for_signing(self.pin.as_bytes())?;
+        let mut sign = open.signing_card().unwrap();
+        let mut signer = sign.signer(&|| println!("Touch confirmation needed for signing"))?;
+
+        op(&mut signer as &mut dyn sequoia_openpgp::crypto::Signer);
+
+        Ok(())
+    }
+}
+
+impl CaSec for CardCa {
+    fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
+        todo!()
+    }
+
+    fn sign_detached(&self, data: &[u8]) -> Result<String> {
+        todo!()
+    }
+
+    fn sign_user_ids(
+        &self,
+        cert: &Cert,
+        uids_certify: &[&UserID],
+        duration_days: Option<u64>,
+    ) -> Result<Cert> {
+        let ca_cert = self.get_ca_cert()?; // pubkey (must include CA User ID!)
+
+        // Collect certifications by the CA
+        let mut packets: Vec<Packet> = Vec::new();
+
+        let userids = cert
+            .userids()
+            // sign only userids that are in "uids_certify"
+            .filter(|u| uids_certify.contains(&u.userid()))
+            .map(|u| u.userid());
+
+        for userid in userids {
+            // FIXME: make certification with card!
+            let mut sb = signature::SignatureBuilder::new(SignatureType::GenericCertification);
+
+            // If an expiration setting for the certifications has been
+            // provided, apply it to the signatures
+            if let Some(days) = duration_days {
+                // The signature should be valid for the specified
+                // number of `days`
+                sb = sb.set_signature_validity_period(Duration::from_secs(
+                    Pgp::SECONDS_IN_DAY * days,
+                ))?;
+            }
+
+            // Include 'Signer's UserID' packet
+            // (https://tools.ietf.org/html/rfc4880#section-5.2.3.22)
+            // to make it easier to find the CA key via WKD
+            if let Some(uid) = ca_cert.userids().next() {
+                sb = sb.set_signers_user_id(uid.userid().value())?;
+            } else {
+                println!("ERROR: No User ID in CA cert. This should never happen.");
+                // FIXME: temporarily disabled error for initial testing of CardCa
+
+                // return Err(anyhow::anyhow!(
+                //     "ERROR: No User ID in CA cert. \
+                //         This should never happen."
+                // ));
+            }
+
+            self.sign_a_thing(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+                let sig = userid.bind(signer, cert, sb.clone()).unwrap();
+
+                // collect in packets
+                packets.push(sig.into());
+            })?;
+        }
+
+        // Insert all newly created certifications into the user cert
+        cert.clone().insert_packets(packets)
+    }
+
+    fn bridge_to_remote_ca(
+        &self,
+        remote_ca_cert: Cert,
+        scope_regexes: Vec<String>,
+    ) -> Result<Cert> {
+        todo!()
+    }
+
+    fn bridge_revoke(&self, remote_ca_cert: &Cert) -> Result<(Signature, Cert)> {
+        todo!()
+    }
+
+    fn ca_get_priv_key(&self) -> Result<Cert> {
+        todo!()
     }
 }
