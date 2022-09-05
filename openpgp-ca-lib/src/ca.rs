@@ -143,18 +143,27 @@ impl OpenpgpCaUninit {
         Ok(Self { db, ca: dbca })
     }
 
+    /// Init with softkey backend
     pub fn ca_init(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
-        self.ca_init_card(domainname, None, None, name)
+        self.db.transaction(|| self.ca.ca_init(domainname, name))?;
+
+        self.init_from_db_state()
     }
 
+    /// Init with OpenPGP card backend
     pub fn ca_init_card(
         self,
         domainname: &str,
-        card: Option<&str>,
+        card_ident: &str,
         pubkey: Option<&Path>,
-        name: Option<&str>,
     ) -> Result<OpenpgpCa> {
-        if let Some(card_ident) = card {
+        // Open a separate scope for database-access.
+        //
+        // Without this block, init_from_db_state() [below] gets stuck while trying to clone
+        // the internal Rc<OcaDb> (FIXME: understand why this happens?!)
+        {
+            // FIXME: make sure the database is uninitialized at this point
+
             // Open Smart Card
             let mut card = openpgp_card_pcsc::PcscBackend::open_by_ident(card_ident, None)?;
             let mut pgp = openpgp_card::OpenPgp::new(&mut card);
@@ -209,17 +218,11 @@ impl OpenpgpCaUninit {
             self.db.transaction(|| {
                 CardCa::ca_init(&self.db, domainname, card_ident, pin, &pubkey, &sig_fp)
             })?;
-        } else {
-            self.db.transaction(|| self.ca.ca_init(domainname, name))?;
-        };
+        }
 
-        let ca = self.init_from_db_state()?;
-
-        println!("Created OpenPGP CA instance\n");
-        ca.ca_show()?;
-
-        Ok(ca)
+        self.init_from_db_state()
     }
+
     /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
     pub fn init_from_db_state(self) -> Result<OpenpgpCa> {
         // FIXME: ->  handle uninitialized (-> error?)

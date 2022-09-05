@@ -65,20 +65,28 @@ pub enum Commands {
 }
 
 #[derive(Subcommand)]
+pub enum Backend {
+    Card {
+        /// OpenPGP card ident
+        ident: String,
+
+        #[clap(short = 'p', long = "public", help = "CA public key File")]
+        pubkey: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum CaCommand {
     /// Create CA
     Init {
         #[clap(help = "CA domain name")]
         domain: String,
 
-        #[clap(short = 'c', long = "card", help = "OpenPGP card ident")]
-        card: Option<String>,
-
-        #[clap(short = 'p', long = "public", help = "CA public key File")]
-        pubkey: Option<PathBuf>,
-
         #[clap(short = 'n', long = "name", help = "Descriptive User Name")]
         name: Option<String>,
+
+        #[clap(subcommand)]
+        backend: Option<Backend>,
     },
     /// Export CA public key
     Export,

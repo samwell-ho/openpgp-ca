@@ -30,20 +30,28 @@ fn main() -> Result<()> {
         cmd:
             cli::CaCommand::Init {
                 domain,
-                card,
-                pubkey,
                 name,
+                backend,
             },
     } = &c.cmd
     {
         // FIXME: in card case, optionally handle setup of keys on card?
         // Or just write documentation on how to setup with opgpcard?
 
-        cau.ca_init_card(domain, card.as_deref(), pubkey.as_deref(), name.as_deref())?;
+        let ca = match backend {
+            None => cau.ca_init(domain, name.as_deref()),
+            Some(cli::Backend::Card { ident, pubkey }) => {
+                cau.ca_init_card(domain, ident, pubkey.as_deref())
+            }
+        }?;
+
+        println!("Created OpenPGP CA instance\n");
+        ca.ca_show()?;
+
         return Ok(());
     }
 
-    // the command is not `ca init`, so we should be able to get an OpenpgpCa object now
+    // the CLI command was not `ca init`, so we should be able to get an OpenpgpCa object now
     let ca = cau.init_from_db_state()?;
 
     match c.cmd {
