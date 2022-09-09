@@ -143,9 +143,30 @@ impl OpenpgpCaUninit {
         Ok(Self { db, ca: dbca })
     }
 
-    /// Init with softkey backend
+    /// Init CA with softkey backend.
+    ///
+    /// This generates a new OpenPGP Key for the Admin role and stores the
+    /// private Key in the OpenPGP CA database.
+    ///
+    /// `domainname` is the domain that this CA Admin is in charge of,
+    /// `name` is a descriptive name for the CA Admin
     pub fn ca_init(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
-        self.db.transaction(|| self.ca.ca_init(domainname, name))?;
+        // domainname syntax check
+        use addr::parser::DomainName;
+        use addr::psl::List;
+        if List.parse_domain_name(domainname).is_err() {
+            return Err(anyhow::anyhow!("Invalid domainname: '{}'", domainname));
+        }
+
+        let name = match name {
+            Some(name) => Some(name),
+            None => Some("OpenPGP CA"),
+        };
+
+        let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
+
+        self.db
+            .transaction(|| self.ca.ca_init_softkey(domainname, &cert))?;
 
         self.init_from_db_state()
     }
@@ -162,7 +183,10 @@ impl OpenpgpCaUninit {
         // Without this block, init_from_db_state() [below] gets stuck while trying to clone
         // the internal Rc<OcaDb> (FIXME: understand why this happens?!)
         {
-            // FIXME: make sure the database is uninitialized at this point
+            // The CA database must be uninitialized!
+            if self.db.is_ca_initialized()? {
+                return Err(anyhow::anyhow!("CA database is already initialized"));
+            }
 
             // Open Smart Card
             let mut card = openpgp_card_pcsc::PcscBackend::open_by_ident(card_ident, None)?;

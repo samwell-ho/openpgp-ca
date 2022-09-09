@@ -341,34 +341,15 @@ adversaries."#;
 
 impl DbCa {
     /// Initialize OpenPGP CA Admin database entry.
-    ///
-    /// This generates a new OpenPGP Key for the Admin role and stores the
-    /// private Key in the OpenPGP CA database.
-    ///
-    /// `domainname` is the domain that this CA Admin is in charge of,
-    /// `name` is a descriptive name for the CA Admin
+    /// Takes a `cert` with private key material and initializes a softkey-based CA.
     ///
     /// Only one CA Admin can be configured per database.
-    pub(crate) fn ca_init(&self, domainname: &str, name: Option<&str>) -> Result<()> {
+    pub(crate) fn ca_init_softkey(&self, domainname: &str, cert: &Cert) -> Result<()> {
         if self.db().is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA has already been initialized",));
         }
 
-        // domainname syntax check
-        use addr::parser::DomainName;
-        use addr::psl::List;
-        if List.parse_domain_name(domainname).is_err() {
-            return Err(anyhow::anyhow!("Invalid domainname: '{}'", domainname));
-        }
-
-        let name = match name {
-            Some(name) => Some(name),
-            None => Some("OpenPGP CA"),
-        };
-
-        let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
-
-        let ca_key = Pgp::cert_to_armored_private_key(&cert)?;
+        let ca_key = Pgp::cert_to_armored_private_key(cert)?;
 
         self.db().ca_insert(
             models::NewCa {
