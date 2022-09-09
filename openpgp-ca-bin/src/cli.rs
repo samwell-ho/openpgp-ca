@@ -67,11 +67,32 @@ pub enum Commands {
 #[derive(Subcommand)]
 pub enum Backend {
     Card {
-        /// OpenPGP card ident
+        #[clap(long = "ident", help = "OpenPGP card ident")]
         ident: String,
 
         #[clap(short = 'p', long = "public", help = "CA public key File")]
         pubkey: Option<PathBuf>,
+
+        #[clap(
+            short = 'g',
+            long = "generate",
+            help = "Generate a new OpenPGP CA key on the host computer, import it to the card, and print it to stdout"
+        )]
+        generate: bool, // FIXME: algo as (optional?) value
+
+        #[clap(
+            short = 'o',
+            long = "generate-on-card",
+            help = "Generate a new OpenPGP CA key on the card, and print a public key representation to stdout"
+        )]
+        on_card: bool, // FIXME: algo as (optional?) value
+
+        #[clap(
+            short = 'P',
+            long = "pinpad",
+            help = "Enforce use of pinpad for PIN entry"
+        )]
+        pinpad: bool,
     },
 }
 

@@ -4,7 +4,7 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{CommandFactory, FromArgMatches};
 
 use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
@@ -35,17 +35,77 @@ fn main() -> Result<()> {
             },
     } = &c.cmd
     {
-        // FIXME: in card case, optionally handle setup of keys on card?
-        // Or just write documentation on how to setup with opgpcard?
-
         let ca = match backend {
             None => cau.ca_init(domain, name.as_deref()),
-            Some(cli::Backend::Card { ident, pubkey }) => {
-                cau.ca_init_card(domain, ident, pubkey.as_deref())
+            Some(cli::Backend::Card {
+                ident,
+                pubkey,
+                generate,
+                on_card,
+                pinpad,
+            }) => {
+                // FIXME: move all business logic from here to openpgp-ca-lib, later
+
+                if *pinpad {
+                    // FIXME:
+                    // - extend syntax in database backend field: don't store PIN in pinpad mode
+                    // - use pinpad for changing user PIN to its new value
+                    // - use pinpad for signing operations
+
+                    unimplemented!("pinpad mode is not implemented yet");
+                }
+
+                // Handle different setup modes
+                if *generate {
+                    // 1) generate key in CA, import to card, print encrypted private key+PW
+
+                    // // check that card has no keys on it
+                    // if !card::check_card_empty(ident)? {
+                    //     return Err(anyhow!("The OpenPGP card contains key material, please reset it before use with OpenPGP CA."));
+                    // }
+
+                    // let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
+
+                    unimplemented!()
+                } else if *on_card {
+                    // 2) generate key on card, make public key, print it (also: stored in DB)
+                    let (ca, user_pin) = cau.ca_init_generate_on_card(ident, domain)?;
+
+                    println!();
+                    println!(
+                        "NOTE: The User PIN for this OpenPGP card has been set to {}",
+                        user_pin
+                    );
+                    println!();
+
+                    // FIXME: Show sample opgpcard command CLI call to change Admin PIN in CA Docs.
+                    // Explain difference between Gnuk and other cards:
+                    // - Gnuk Admin PIN is now by default same as new User PIN.
+                    // - Other cards have Admin PIN `12345678` after ca_init_generate_on_card().
+
+                    Ok(ca)
+                } else if pubkey.is_some() {
+                    // 3) import existing card/key pair for init
+                    let cert = if let Some(pubkey) = pubkey {
+                        std::fs::read(pubkey)?
+                    } else {
+                        unimplemented!() // error out
+                    };
+
+                    unimplemented!()
+
+                    // let ca_cert =
+                    //     Pgp::to_cert(&cert).context("ca_init_card: Couldn't process CA cert.")?;
+                    //
+                    // cau.ca_init_card(ident, pin, domain, &ca_cert)
+                } else {
+                    // user didn't indicate how to initialize
+                    Err(anyhow!("A mode of card initialization must be selected"))
+                }
             }
         }?;
 
-        println!("Created OpenPGP CA instance\n");
+        println!("Created OpenPGP CA instance:");
         ca.ca_show()?;
 
         return Ok(());

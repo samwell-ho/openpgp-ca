@@ -28,7 +28,6 @@
 //! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false).unwrap();
 //! ```
 
-use crate::bridge;
 use crate::ca_secret::{CaSec, CardCa};
 use crate::cert;
 use crate::db::models;
@@ -37,6 +36,7 @@ use crate::export;
 use crate::pgp::Pgp;
 use crate::revocation;
 use crate::update;
+use crate::{bridge, card};
 
 use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
@@ -143,6 +143,18 @@ impl OpenpgpCaUninit {
         Ok(Self { db, ca: dbca })
     }
 
+    /// Check if domainname is legal according to Mozilla's Public Suffix List
+    fn check_domainname(domainname: &str) -> Result<()> {
+        // domainname syntax check
+        use addr::parser::DomainName;
+        use addr::psl::List;
+        if List.parse_domain_name(domainname).is_err() {
+            return Err(anyhow::anyhow!("Invalid domainname: '{}'", domainname));
+        }
+
+        Ok(())
+    }
+
     /// Init CA with softkey backend.
     ///
     /// This generates a new OpenPGP Key for the Admin role and stores the
@@ -151,18 +163,7 @@ impl OpenpgpCaUninit {
     /// `domainname` is the domain that this CA Admin is in charge of,
     /// `name` is a descriptive name for the CA Admin
     pub fn ca_init(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
-        // domainname syntax check
-        use addr::parser::DomainName;
-        use addr::psl::List;
-        if List.parse_domain_name(domainname).is_err() {
-            return Err(anyhow::anyhow!("Invalid domainname: '{}'", domainname));
-        }
-
-        let name = match name {
-            Some(name) => Some(name),
-            None => Some("OpenPGP CA"),
-        };
-
+        Self::check_domainname(domainname)?;
         let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
 
         self.db
@@ -171,13 +172,46 @@ impl OpenpgpCaUninit {
         self.init_from_db_state()
     }
 
-    /// Init with OpenPGP card backend
-    pub fn ca_init_card(
+    /// Init CA with OpenPGP card backend. Generate key material on the card.
+    ///
+    /// This assumes that:
+    /// - all key slots on the card are currently empty
+    /// - the PINs are set to their default values (User PIN is '123456', Admin PIN is '12345678')
+    ///
+    /// The User PIN is changed to a new, random 8-digit value.
+    /// This User PIN is persisted in the CA database, and printed to stdout.
+    ///
+    /// The user is encouraged to change the Admin PIN to a different setting.
+    pub fn ca_init_generate_on_card(
         self,
-        domainname: &str,
+        ident: &str,
+        domain: &str,
+    ) -> Result<(OpenpgpCa, String)> {
+        // The CA database must be uninitialized!
+        if self.db.is_ca_initialized()? {
+            return Err(anyhow::anyhow!("CA database is already initialized"));
+        }
+
+        // Generate key material on card, get the public key,
+        // initialize the CA with these artifacts.
+        let (ca_cert, user_pin) =
+            card::generate_on_card(ident, format!("OpenPGP CA <openpgp-ca@{}>", domain))?;
+
+        let ca = self.ca_init_card(ident, &user_pin, domain, &ca_cert)?;
+
+        Ok((ca, user_pin))
+    }
+
+    /// Init with OpenPGP card backend
+    fn ca_init_card(
+        self,
         card_ident: &str,
-        pubkey: Option<&Path>,
+        pin: &str,
+        domainname: &str,
+        ca_cert: &Cert,
     ) -> Result<OpenpgpCa> {
+        Self::check_domainname(domainname)?;
+
         // Open a separate scope for database-access.
         //
         // Without this block, init_from_db_state() [below] gets stuck while trying to clone
@@ -214,12 +248,6 @@ impl OpenpgpCaUninit {
                 "Opened card {}\nFound signing key {}.\nCardholder: {:?}",
                 card_ident, sig_fp, cardholder_name
             );
-            let cert = if let Some(pubkey) = pubkey {
-                std::fs::read(pubkey)?
-            } else {
-                unimplemented!() // error out
-            };
-            let ca_cert = Pgp::to_cert(&cert).context("ca_init_card: Couldn't process CA cert.")?;
 
             // FIXME: make sure that the CA public key contains a User ID!
             // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
@@ -236,8 +264,6 @@ impl OpenpgpCaUninit {
                 );
                 unimplemented!();
             }
-
-            let pin = "123456"; // FIXME: ask user, immediately test against card!
 
             self.db.transaction(|| {
                 CardCa::ca_init(&self.db, domainname, card_ident, pin, &pubkey, &sig_fp)

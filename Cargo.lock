@@ -1580,6 +1580,8 @@ dependencies = [
  "openpgp-card-pcsc",
  "openpgp-card-sequoia",
  "openpgp-keylist",
+ "rand 0.8.5",
+ "rpassword",
  "rusqlite",
  "sequoia-net",
  "sequoia-openpgp",
@@ -1635,9 +1637,9 @@ dependencies = [
 
 [[package]]
 name = "openpgp-card-sequoia"
-version = "0.0.15"
+version = "0.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1296eccdf5026651625d1f80fb613b66ec1d2d24478dfa2381f388592883d14"
+checksum = "825c0ffc53051eb4b5233a74b969e1265c0f41b392dfac08bb88bf495ec21573"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2191,6 +2193,16 @@ dependencies = [
  "time 0.3.11",
  "tokio",
  "uncased",
+]
+
+[[package]]
+name = "rpassword"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26b763cb66df1c928432cc35053f8bd4cec3335d8559fc16010017d16b3c1680"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]

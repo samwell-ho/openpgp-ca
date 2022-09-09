@@ -62,6 +62,11 @@ impl Pgp {
     /// `name` is an optional additional identifier that is added to the
     /// UserID, if it is supplied.
     pub(crate) fn make_ca_cert(domain: &str, name: Option<&str>) -> Result<(Cert, Signature)> {
+        let name = match name {
+            Some(name) => Some(name),
+            None => Some("OpenPGP CA"),
+        };
+
         // Generate key for a new CA
         let (ca_key, revocation) = cert::CertBuilder::new()
             // RHEL7 [eol 2026] is shipped with GnuPG 2.0.x, which doesn't

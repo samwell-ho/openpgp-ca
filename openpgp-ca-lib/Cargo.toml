@@ -32,6 +32,8 @@ addr = "0.14"
 
 sha2 = "0.9"
 
+rand = "0.8"
+
 openpgp-keylist = "0.2"
 
 sequoia-openpgp = "1.8"
@@ -39,7 +41,9 @@ sequoia-net = "0.24"
 
 openpgp-card = "0.2"
 openpgp-card-pcsc = "0.2"
-openpgp-card-sequoia = "0.0.15"
+openpgp-card-sequoia = "0.0.17"
+
+rpassword = "7" # only temporarily import for testing
 
 # for tests
 [dev-dependencies]

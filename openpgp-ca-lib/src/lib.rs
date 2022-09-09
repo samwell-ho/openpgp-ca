@@ -19,6 +19,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 mod bridge;
 pub mod ca;
 mod ca_secret;
+pub mod card;
 mod cert;
 pub mod db;
 mod export;
