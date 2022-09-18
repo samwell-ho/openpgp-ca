@@ -41,7 +41,7 @@ sequoia-net = "0.24"
 
 openpgp-card = "0.2"
 openpgp-card-pcsc = "0.2"
-openpgp-card-sequoia = "0.0.17"
+openpgp-card-sequoia = "0.0.18"
 
 rpassword = "7" # only temporarily import for testing
 

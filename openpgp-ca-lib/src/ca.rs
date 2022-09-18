@@ -234,10 +234,7 @@ impl OpenpgpCaUninit {
 
             let sig_fp = sig.to_string();
 
-            let crd = open.cardholder_related_data()?;
-
-            // FIXME: API to get name in String form!
-            let cardholder_name = crd.name();
+            let cardholder_name = open.cardholder_name()?;
 
             // FIXME: check that name conforms to a prescribed format,
             // to make sure the token is the right one? Return proper error.
