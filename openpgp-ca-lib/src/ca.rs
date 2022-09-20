@@ -39,6 +39,7 @@ use crate::update;
 use crate::{bridge, card};
 
 use sequoia_openpgp::packet::{Signature, UserID};
+use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
 
 use anyhow::{Context, Result};
@@ -200,6 +201,19 @@ impl OpenpgpCaUninit {
         let ca = self.ca_init_card(ident, &user_pin, domain, &ca_cert)?;
 
         Ok((ca, user_pin))
+    }
+
+    /// Import the CA's public key and use it with a pre-initialized OpenPGP card.
+    pub fn ca_init_import_existing_card(
+        self,
+        card_ident: &str,
+        pin: &str,
+        domain: &str,
+        ca_cert: &[u8],
+    ) -> Result<OpenpgpCa> {
+        let ca_cert = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
+
+        self.ca_init_card(card_ident, pin, domain, &ca_cert)
     }
 
     /// Init with OpenPGP card backend

@@ -86,18 +86,16 @@ fn main() -> Result<()> {
                     Ok(ca)
                 } else if pubkey.is_some() {
                     // 3) import existing card/key pair for init
-                    let cert = if let Some(pubkey) = pubkey {
-                        std::fs::read(pubkey)?
+                    if let Some(pubkey) = pubkey {
+                        let ca_cert = std::fs::read(pubkey)?;
+
+                        // FIXME: this card is already initialized, ask for User PIN
+                        let pin = "123456";
+
+                        cau.ca_init_import_existing_card(ident, pin, domain, &ca_cert)
                     } else {
                         unimplemented!() // error out
-                    };
-
-                    unimplemented!()
-
-                    // let ca_cert =
-                    //     Pgp::to_cert(&cert).context("ca_init_card: Couldn't process CA cert.")?;
-                    //
-                    // cau.ca_init_card(ident, pin, domain, &ca_cert)
+                    }
                 } else {
                     // user didn't indicate how to initialize
                     Err(anyhow!("A mode of card initialization must be selected"))
