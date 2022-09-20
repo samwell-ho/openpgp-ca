@@ -772,13 +772,17 @@ impl OpenpgpCa {
     /// storage.
     pub fn update_from_wkd(&self) -> Result<()> {
         for c in self.user_certs_get_all()? {
-            self.db().transaction::<_, anyhow::Error, _>(|| {
-                let updated = update::update_from_wkd(self, &c)?;
-                if updated {
+            match self.db().transaction(|| update::update_from_wkd(self, &c)) {
+                Ok(true) => {
                     println!("Got update for cert {}", c.fingerprint);
                 }
-                Ok(())
-            })?;
+                Ok(false) => {
+                    println!("No changes for cert {}", c.fingerprint);
+                }
+                Err(e) => {
+                    eprintln!("Failed to update cert {}: {}", c.fingerprint, e);
+                }
+            }
         }
         Ok(())
     }
@@ -786,9 +790,16 @@ impl OpenpgpCa {
     /// Update all certs from keyserver
     pub fn update_from_keyserver(&self) -> Result<()> {
         for c in self.user_certs_get_all()? {
-            let updated = self.update_from_hagrid(&c)?;
-            if updated {
-                println!("Got update for cert {}", c.fingerprint);
+            match self.update_from_hagrid(&c) {
+                Ok(true) => {
+                    println!("Got update for cert {}", c.fingerprint);
+                }
+                Ok(false) => {
+                    println!("No changes for cert {}", c.fingerprint);
+                }
+                Err(e) => {
+                    eprintln!("Failed to update cert {}: {}", c.fingerprint, e);
+                }
             }
         }
         Ok(())
