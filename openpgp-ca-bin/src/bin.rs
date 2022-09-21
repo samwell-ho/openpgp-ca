@@ -56,20 +56,20 @@ fn main() -> Result<()> {
                 }
 
                 // Handle different setup modes
-                if *generate {
-                    // 1) generate key in CA, import to card, print encrypted private key+PW
+                if *generate || *on_card {
+                    let (ca, user_pin) = if *generate {
+                        // 1) generate key in CA, import to card, print encrypted private key+PW
+                        let (ca, key, user_pin) =
+                            cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
 
-                    // // check that card has no keys on it
-                    // if !card::check_card_empty(ident)? {
-                    //     return Err(anyhow!("The OpenPGP card contains key material, please reset it before use with OpenPGP CA."));
-                    // }
+                        println!();
+                        println!("Generated new CA key:\n\n{}", key);
 
-                    // let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
-
-                    unimplemented!()
-                } else if *on_card {
-                    // 2) generate key on card, make public key, print it (also: stored in DB)
-                    let (ca, user_pin) = cau.ca_init_generate_on_card(ident, domain)?;
+                        (ca, user_pin)
+                    } else {
+                        // 2) generate key on card, make public key, print it (also: stored in DB)
+                        cau.ca_init_generate_on_card(ident, domain, name.as_deref())?
+                    };
 
                     println!();
                     println!(
@@ -77,11 +77,6 @@ fn main() -> Result<()> {
                         user_pin
                     );
                     println!();
-
-                    // FIXME: Show sample opgpcard command CLI call to change Admin PIN in CA Docs.
-                    // Explain difference between Gnuk and other cards:
-                    // - Gnuk Admin PIN is now by default same as new User PIN.
-                    // - Other cards have Admin PIN `12345678` after ca_init_generate_on_card().
 
                     Ok(ca)
                 } else if pubkey.is_some() {

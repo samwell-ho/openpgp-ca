@@ -187,11 +187,14 @@ impl OpenpgpCaUninit {
         self,
         ident: &str,
         domain: &str,
+        name: Option<&str>,
     ) -> Result<(OpenpgpCa, String)> {
         // The CA database must be uninitialized!
         if self.db.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
         }
+
+        // FIXME: use name
 
         // Generate key material on card, get the public key,
         // initialize the CA with these artifacts.
@@ -201,6 +204,32 @@ impl OpenpgpCaUninit {
         let ca = self.ca_init_card(ident, &user_pin, domain, &ca_cert)?;
 
         Ok((ca, user_pin))
+    }
+
+    pub fn ca_init_generate_on_host(
+        self,
+        ident: &str,
+        domain: &str,
+        name: Option<&str>,
+    ) -> Result<(OpenpgpCa, String, String)> {
+        // The CA database must be uninitialized!
+        if self.db.is_ca_initialized()? {
+            return Err(anyhow::anyhow!("CA database is already initialized"));
+        }
+
+        // Generate a new CA private key
+        let (ca_key, _) = Pgp::make_ca_cert(domain, name)?;
+
+        // Import key material to card.
+        let user_pin = card::import_to_card(ident, &ca_key)?;
+
+        // Private key material will get stripped implicitly by ca_init_card()
+        let ca = self.ca_init_card(ident, &user_pin, domain, &ca_key)?;
+
+        // return private key (unencrypted)
+        let key = Pgp::cert_to_armored_private_key(&ca_key)?;
+
+        Ok((ca, key, user_pin))
     }
 
     /// Import the CA's public key and use it with a pre-initialized OpenPGP card.
