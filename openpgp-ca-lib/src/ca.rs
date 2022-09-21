@@ -194,12 +194,13 @@ impl OpenpgpCaUninit {
             return Err(anyhow::anyhow!("CA database is already initialized"));
         }
 
-        // FIXME: use name
+        let email = format!("openpgp-ca@{}", domain);
+        let uid = Pgp::ca_user_id(&email, name);
+        let uid = String::from_utf8_lossy(uid.value()).to_string();
 
         // Generate key material on card, get the public key,
         // initialize the CA with these artifacts.
-        let (ca_cert, user_pin) =
-            card::generate_on_card(ident, format!("OpenPGP CA <openpgp-ca@{}>", domain))?;
+        let (ca_cert, user_pin) = card::generate_on_card(ident, uid)?;
 
         let ca = self.ca_init_card(ident, &user_pin, domain, &ca_cert)?;
 

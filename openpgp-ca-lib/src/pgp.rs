@@ -45,6 +45,15 @@ impl Pgp {
         config.to_scheme().generate()
     }
 
+    pub(crate) fn ca_user_id(email: &str, name: Option<&str>) -> UserID {
+        let name = match name {
+            Some(name) => Some(name),
+            None => Some("OpenPGP CA"),
+        };
+
+        Self::user_id(email, name)
+    }
+
     fn user_id(email: &str, name: Option<&str>) -> UserID {
         if let Some(name) = name {
             UserID::from(format!("{} <{}>", name, email))
@@ -62,11 +71,6 @@ impl Pgp {
     /// `name` is an optional additional identifier that is added to the
     /// UserID, if it is supplied.
     pub(crate) fn make_ca_cert(domain: &str, name: Option<&str>) -> Result<(Cert, Signature)> {
-        let name = match name {
-            Some(name) => Some(name),
-            None => Some("OpenPGP CA"),
-        };
-
         // Generate key for a new CA
         let (ca_key, revocation) = cert::CertBuilder::new()
             // RHEL7 [eol 2026] is shipped with GnuPG 2.0.x, which doesn't
@@ -87,7 +91,7 @@ impl Pgp {
 
         // Generate a userid and a binding signature
         let email = format!("openpgp-ca@{}", domain);
-        let userid = Self::user_id(&email, name);
+        let userid = Self::ca_user_id(&email, name);
 
         let direct_key_sig = ca_key
             .primary_key()
