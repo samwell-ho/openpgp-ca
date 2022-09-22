@@ -4,9 +4,10 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::{CommandFactory, FromArgMatches};
 
+use crate::cli::CardInitMode;
 use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
 
 mod cli;
@@ -39,13 +40,9 @@ fn main() -> Result<()> {
             None => cau.ca_init(domain, name.as_deref()),
             Some(cli::Backend::Card {
                 ident,
-                pubkey,
-                generate,
-                on_card,
+                initmode,
                 pinpad,
             }) => {
-                // FIXME: move all business logic from here to openpgp-ca-lib, later
-
                 if *pinpad {
                     // FIXME:
                     // - extend syntax in database backend field: don't store PIN in pinpad mode
@@ -56,44 +53,41 @@ fn main() -> Result<()> {
                 }
 
                 // Handle different setup modes
-                if *generate || *on_card {
-                    let (ca, user_pin) = if *generate {
-                        // 1) generate key in CA, import to card, print encrypted private key+PW
-                        let (ca, key, user_pin) =
-                            cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
+                match initmode {
+                    CardInitMode::OnHost {} | CardInitMode::OnCard {} => {
+                        let (ca, user_pin) = if let CardInitMode::OnHost {} = initmode {
+                            // 1) generate key in CA, import to card, print encrypted private key+PW
+                            let (ca, key, user_pin) =
+                                cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
+
+                            println!();
+                            println!("Generated new CA key:\n\n{}", key);
+
+                            (ca, user_pin)
+                        } else {
+                            // 2) generate key on card, make public key, print it (also: stored in DB)
+                            cau.ca_init_generate_on_card(ident, domain, name.as_deref())?
+                        };
 
                         println!();
-                        println!("Generated new CA key:\n\n{}", key);
+                        println!(
+                            "NOTE: The User PIN for this OpenPGP card has been set to {}",
+                            user_pin
+                        );
+                        println!();
 
-                        (ca, user_pin)
-                    } else {
-                        // 2) generate key on card, make public key, print it (also: stored in DB)
-                        cau.ca_init_generate_on_card(ident, domain, name.as_deref())?
-                    };
+                        Ok(ca)
+                    }
+                    CardInitMode::Import { public: pubkey } => {
+                        // 3) import existing card/key pair for init
 
-                    println!();
-                    println!(
-                        "NOTE: The User PIN for this OpenPGP card has been set to {}",
-                        user_pin
-                    );
-                    println!();
-
-                    Ok(ca)
-                } else if pubkey.is_some() {
-                    // 3) import existing card/key pair for init
-                    if let Some(pubkey) = pubkey {
                         let ca_cert = std::fs::read(pubkey)?;
 
-                        // FIXME: this card is already initialized, ask for User PIN
+                        // FIXME: this card is already initialized, ask for User PIN?
                         let pin = "123456";
 
                         cau.ca_init_import_existing_card(ident, pin, domain, &ca_cert)
-                    } else {
-                        unimplemented!() // error out
                     }
-                } else {
-                    // user didn't indicate how to initialize
-                    Err(anyhow!("A mode of card initialization must be selected"))
                 }
             }
         }?;

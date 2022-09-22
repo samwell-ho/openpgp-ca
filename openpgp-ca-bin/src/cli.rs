@@ -63,29 +63,34 @@ pub enum Commands {
     //    /// Manage key-profiles
     //    KeyProfile {}
 }
+#[derive(Subcommand)]
+pub enum CardInitMode {
+    /// Generate a new OpenPGP CA key on the host computer, import it to the card.
+    ///
+    /// This will print the generated OpenPGP CA private key to stdout, the operator need to
+    /// safekeep that key.
+    OnHost {},
+
+    /// Generate a new OpenPGP CA key on the card.
+    /// Caution: the private key material can not be backed up, or copied to a second card,
+    /// in this mode!
+    OnCard {},
+
+    /// Initialize OpenPGP from an OpenPGP card with pre-loaded keys, and a matching public key file.
+    Import {
+        /// CA public key File
+        public: PathBuf,
+    },
+}
 
 #[derive(Subcommand)]
 pub enum Backend {
     Card {
-        #[clap(long = "ident", help = "OpenPGP card ident")]
+        /// OpenPGP card ident
         ident: String,
 
-        #[clap(short = 'p', long = "public", help = "CA public key File")]
-        pubkey: Option<PathBuf>,
-
-        #[clap(
-            short = 'g',
-            long = "generate",
-            help = "Generate a new OpenPGP CA key on the host computer, import it to the card, and print it to stdout"
-        )]
-        generate: bool, // FIXME: algo as (optional?) value
-
-        #[clap(
-            short = 'o',
-            long = "generate-on-card",
-            help = "Generate a new OpenPGP CA key on the card, and print a public key representation to stdout"
-        )]
-        on_card: bool, // FIXME: algo as (optional?) value
+        #[clap(subcommand)]
+        initmode: CardInitMode,
 
         #[clap(
             short = 'P',
