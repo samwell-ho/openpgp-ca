@@ -284,12 +284,6 @@ impl OpenpgpCaUninit {
             // to make sure the token is the right one? Return proper error.
             assert_eq!(cardholder_name, "OpenPGP CA");
 
-            println!();
-            println!(
-                "Opened card {}\nFound signing key {}.\nCardholder: {:?}",
-                card_ident, sig_fp, cardholder_name
-            );
-
             // FIXME: make sure that the CA public key contains a User ID!
             // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
 
