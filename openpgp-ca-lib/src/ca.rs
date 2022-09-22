@@ -243,6 +243,9 @@ impl OpenpgpCaUninit {
     ) -> Result<OpenpgpCa> {
         let ca_cert = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
 
+        // Check if user-supplied PIN is accepted by the card
+        card::verify_user_pin(card_ident, pin)?;
+
         self.ca_init_card(card_ident, pin, domain, &ca_cert)
     }
 
@@ -280,9 +283,12 @@ impl OpenpgpCaUninit {
 
             let cardholder_name = open.cardholder_name()?;
 
-            // FIXME: check that name conforms to a prescribed format,
-            // to make sure the token is the right one? Return proper error.
-            assert_eq!(cardholder_name, "OpenPGP CA");
+            // Check that cardholder name is set to "OpenPGP CA".
+            if cardholder_name != "OpenPGP CA" {
+                return Err(anyhow::anyhow!(
+                    "Unexpected cardholder name on OpenPGP card (expecting 'OpenPGP CA')"
+                ));
+            }
 
             // FIXME: make sure that the CA public key contains a User ID!
             // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
@@ -292,12 +298,11 @@ impl OpenpgpCaUninit {
 
             // CA pubkey and card signature key slot must match
             if ca_cert.fingerprint().to_hex() != sig_fp {
-                println!(
+                return Err(anyhow::anyhow!(format!(
                     "Signature key slot on card {} doesn't match public key {}.",
                     sig_fp,
                     ca_cert.fingerprint().to_hex()
-                );
-                unimplemented!();
+                )));
             }
 
             self.db.transaction(|| {
@@ -410,13 +415,17 @@ impl OpenpgpCa {
         let created: DateTime<Utc> = created.into();
 
         println!("    CA Domain: {}", ca.domainname);
-        if let Some(card) = ca.card {
-            if let Some(ident) = card.split('/').next() {
-                println!(" OpenPGP card: {}", ident);
-            }
-        }
         println!("  Fingerprint: {}", cert.fingerprint());
         println!("Creation time: {}", created.format("%F %T %Z"));
+
+        if let Some(card) = ca.card {
+            let c: Vec<_> = card.split('/').collect();
+            if c.len() == 2 {
+                println!();
+                println!(" OpenPGP card: {}", c[0]);
+                println!("     User PIN: {}", c[1]);
+            }
+        }
 
         Ok(())
     }

@@ -161,3 +161,14 @@ fn random_user_pin() -> String {
     let i: u64 = rng.gen_range(0..=99_999_999);
     format!("{:08}", i)
 }
+
+/// Test if the card accepts `pin` as User PIN
+pub(crate) fn verify_user_pin(ident: &str, pin: &str) -> Result<()> {
+    let mut card = PcscBackend::open_by_ident(ident, None)?;
+    let mut pgp = OpenPgp::new(&mut card);
+    let mut open = Open::new(pgp.transaction()?)?;
+
+    open.verify_user(pin.as_bytes())?;
+
+    Ok(())
+}

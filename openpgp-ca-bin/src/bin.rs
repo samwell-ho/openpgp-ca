@@ -78,15 +78,20 @@ fn main() -> Result<()> {
 
                         Ok(ca)
                     }
-                    CardInitMode::Import { public: pubkey } => {
+                    CardInitMode::Import { public } => {
                         // 3) import existing card/key pair for init
 
-                        let ca_cert = std::fs::read(pubkey)?;
+                        let ca_cert = std::fs::read(public)?;
 
-                        // FIXME: this card is already initialized, ask for User PIN?
-                        let pin = "123456";
+                        // This card is already initialized, ask for User PIN
+                        let pin = rpassword::prompt_password(format!(
+                            "Enter User PIN for OpenPGP card {}: ",
+                            ident
+                        ))?;
 
-                        cau.ca_init_import_existing_card(ident, pin, domain, &ca_cert)
+                        println!();
+
+                        cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
                     }
                 }
             }
