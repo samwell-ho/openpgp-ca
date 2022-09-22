@@ -179,8 +179,7 @@ impl OpenpgpCaUninit {
     /// - all key slots on the card are currently empty
     /// - the PINs are set to their default values (User PIN is '123456', Admin PIN is '12345678')
     ///
-    /// The User PIN is changed to a new, random 8-digit value.
-    /// This User PIN is persisted in the CA database, and printed to stdout.
+    /// The User PIN is changed to a new, random 8-digit value and persisted in the CA database.
     ///
     /// The user is encouraged to change the Admin PIN to a different setting.
     pub fn ca_init_generate_on_card(
@@ -188,7 +187,7 @@ impl OpenpgpCaUninit {
         ident: &str,
         domain: &str,
         name: Option<&str>,
-    ) -> Result<(OpenpgpCa, String)> {
+    ) -> Result<OpenpgpCa> {
         // The CA database must be uninitialized!
         if self.db.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
@@ -202,9 +201,7 @@ impl OpenpgpCaUninit {
         // initialize the CA with these artifacts.
         let (ca_cert, user_pin) = card::generate_on_card(ident, uid)?;
 
-        let ca = self.ca_init_card(ident, &user_pin, domain, &ca_cert)?;
-
-        Ok((ca, user_pin))
+        self.ca_init_card(ident, &user_pin, domain, &ca_cert)
     }
 
     pub fn ca_init_generate_on_host(
@@ -212,7 +209,7 @@ impl OpenpgpCaUninit {
         ident: &str,
         domain: &str,
         name: Option<&str>,
-    ) -> Result<(OpenpgpCa, String, String)> {
+    ) -> Result<(OpenpgpCa, String)> {
         // The CA database must be uninitialized!
         if self.db.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
@@ -230,23 +227,27 @@ impl OpenpgpCaUninit {
         // return private key (unencrypted)
         let key = Pgp::cert_to_armored_private_key(&ca_key)?;
 
-        Ok((ca, key, user_pin))
+        Ok((ca, key))
     }
 
     /// Import the CA's public key and use it with a pre-initialized OpenPGP card.
     pub fn ca_init_import_existing_card(
         self,
         card_ident: &str,
-        pin: &str,
+        user_pin: &str,
         domain: &str,
         ca_cert: &[u8],
     ) -> Result<OpenpgpCa> {
         let ca_cert = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
 
         // Check if user-supplied PIN is accepted by the card
-        card::verify_user_pin(card_ident, pin)?;
+        card::verify_user_pin(card_ident, user_pin)?;
 
-        self.ca_init_card(card_ident, pin, domain, &ca_cert)
+        // FIXME: is there a reason to add more sanity checks if the cert and the keys on the card
+        // really correspond?
+        // (could perform crypto operations on the card and test against cert?)
+
+        self.ca_init_card(card_ident, user_pin, domain, &ca_cert)
     }
 
     /// Init with OpenPGP card backend
@@ -421,9 +422,7 @@ impl OpenpgpCa {
         if let Some(card) = ca.card {
             let c: Vec<_> = card.split('/').collect();
             if c.len() == 2 {
-                println!();
-                println!(" OpenPGP card: {}", c[0]);
-                println!("     User PIN: {}", c[1]);
+                println!("   CA Backend: OpenPGP card {} [User PIN {}]", c[0], c[1]);
             }
         }
 

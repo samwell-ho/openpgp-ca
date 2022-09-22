@@ -55,31 +55,21 @@ fn main() -> Result<()> {
                 // Handle different setup modes
                 match initmode {
                     CardInitMode::OnHost {} | CardInitMode::OnCard {} => {
-                        let (ca, user_pin) = if let CardInitMode::OnHost {} = initmode {
-                            // 1) generate key in CA, import to card, print encrypted private key+PW
-                            let (ca, key, user_pin) =
+                        if let CardInitMode::OnHost {} = initmode {
+                            // 1) generate key in CA, import to card, print private key
+                            let (ca, key) =
                                 cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
 
-                            println!();
                             println!("Generated new CA key:\n\n{}", key);
 
-                            (ca, user_pin)
+                            Ok(ca)
                         } else {
-                            // 2) generate key on card, make public key, print it (also: stored in DB)
-                            cau.ca_init_generate_on_card(ident, domain, name.as_deref())?
-                        };
-
-                        println!();
-                        println!(
-                            "NOTE: The User PIN for this OpenPGP card has been set to {}",
-                            user_pin
-                        );
-                        println!();
-
-                        Ok(ca)
+                            // 2) generate key on card, make public key (and store it in DB)
+                            cau.ca_init_generate_on_card(ident, domain, name.as_deref())
+                        }
                     }
                     CardInitMode::Import { public } => {
-                        // 3) import existing card/key pair for init
+                        // 3) import existing card/pubkey pair for init
 
                         let ca_cert = std::fs::read(public)?;
 
@@ -88,7 +78,6 @@ fn main() -> Result<()> {
                             "Enter User PIN for OpenPGP card {}: ",
                             ident
                         ))?;
-
                         println!();
 
                         cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
@@ -97,7 +86,7 @@ fn main() -> Result<()> {
             }
         }?;
 
-        println!("Created OpenPGP CA instance:");
+        println!("Initialized OpenPGP CA instance:\n");
         ca.ca_show()?;
 
         return Ok(());

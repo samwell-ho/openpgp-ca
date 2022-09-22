@@ -61,7 +61,6 @@ pub(crate) fn generate_on_card(ident: &str, user_id: String) -> Result<(Cert, St
         .admin_card()
         .ok_or_else(|| anyhow!("Couldn't get admin access"))
     {
-        println!(" Generate subkey for Signing");
         let (pkm, ts) = admin.generate_key_simple(KeyType::Signing, algo)?;
         admin.set_name("OpenPGP CA")?;
 
@@ -127,11 +126,9 @@ pub(crate) fn import_to_card(ident: &str, key: &Cert) -> Result<String> {
                 let sig = certifier.pop().unwrap();
                 let dec = sq_util::subkey_by_type(key, &policy, KeyType::Decryption)?;
 
-                println!("Uploading {} as signing key", sig.fingerprint());
                 admin.upload_key(sig, KeyType::Signing, None)?;
 
                 if let Some(dec) = dec {
-                    println!("Uploading {} as decryption key", dec.fingerprint());
                     admin.upload_key(dec, KeyType::Decryption, None)?;
                 }
 
