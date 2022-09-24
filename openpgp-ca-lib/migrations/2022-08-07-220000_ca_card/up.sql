@@ -7,5 +7,5 @@
 
 -- Extend "cas" table: add columns for additional field "card"
 ALTER TABLE cas
--- contains card identifier (and PIN? (FIXME)), if the CA uses a card-backend
-  ADD COLUMN card VARCHAR;
+-- contains backend configuration, if the CA is not softkey-based
+  ADD COLUMN backend VARCHAR;

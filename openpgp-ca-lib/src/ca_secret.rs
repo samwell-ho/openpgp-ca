@@ -4,7 +4,7 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use crate::ca::DbCa;
+use crate::ca::{Backend, Card, DbCa};
 use crate::db::{models, OcaDb};
 use crate::pgp::Pgp;
 
@@ -354,7 +354,7 @@ impl DbCa {
         self.db().ca_insert(
             models::NewCa {
                 domainname,
-                card: None,
+                backend: None,
             },
             &ca_key,
             &cert.fingerprint().to_hex(),
@@ -454,12 +454,15 @@ impl CardCa {
     ) -> Result<()> {
         // FIXME: missing logic from DbCa::ca_init()? (e.g. domain name syntax check)
 
-        let card = Some(format!("{}/{}", card_ident, pin));
+        let backend = Backend::Card(Card {
+            ident: card_ident.to_string(),
+            user_pin: pin.to_string(),
+        });
 
         db.ca_insert(
             models::NewCa {
                 domainname,
-                card: card.as_deref(),
+                backend: backend.to_config().as_deref(),
             },
             pubkey,
             fingerprint,

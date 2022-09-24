@@ -21,7 +21,7 @@ table! {
     cas (id) {
         id -> Integer,
         domainname -> Text,
-        card -> Nullable<Text>,
+        backend -> Nullable<Text>,
     }
 }
 

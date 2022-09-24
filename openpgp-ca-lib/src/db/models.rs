@@ -13,14 +13,14 @@ use crate::db::schema::*;
 pub struct Ca {
     pub id: i32,
     pub domainname: String,
-    pub card: Option<String>,
+    pub backend: Option<String>,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "cas"]
 pub struct NewCa<'a> {
     pub domainname: &'a str,
-    pub card: Option<&'a str>, // "card ident/pin"
+    pub backend: Option<&'a str>, // backend configuration, if not softkey
 }
 
 #[derive(Queryable, Debug, Associations, Clone, AsChangeset, Identifiable)]

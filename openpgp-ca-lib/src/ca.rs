@@ -42,16 +42,89 @@ use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::offset::Utc;
 use chrono::DateTime;
 
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Formatter;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::SystemTime;
+
+#[derive(PartialEq)]
+pub(crate) enum Backend {
+    Softkey,
+    Card(Card),
+}
+
+impl Backend {
+    pub(crate) fn from_config(backend: Option<&str>) -> Result<Self> {
+        if let Some(backend) = backend {
+            if let Some((bt, conf)) = backend.split_once(';') {
+                match bt {
+                    BACKEND_TYPE_CARD => Ok(Backend::Card(Card::from_config(conf)?)),
+                    _ => Err(anyhow!("Unsupported backend type: '{}'", bt)),
+                }
+            } else {
+                Err(anyhow!(
+                    "Unexpected backend configuration format: '{}'",
+                    backend
+                ))
+            }
+        } else {
+            Ok(Backend::Softkey)
+        }
+    }
+
+    pub(crate) fn to_config(&self) -> Option<String> {
+        match self {
+            Backend::Softkey => None,
+            Backend::Card(c) => Some(format!("{};{}", BACKEND_TYPE_CARD, c.to_config())),
+        }
+    }
+}
+
+impl std::fmt::Display for Backend {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Backend::Softkey => write!(f, "Softkey"),
+            Backend::Card(c) => write!(f, "OpenPGP card {}", c),
+        }
+    }
+}
+
+const BACKEND_TYPE_CARD: &str = "card";
+
+#[derive(PartialEq)]
+pub(crate) struct Card {
+    pub(crate) ident: String,
+    pub(crate) user_pin: String,
+}
+
+impl Card {
+    pub(crate) fn from_config(conf: &str) -> Result<Self> {
+        let c: Vec<_> = conf.split('/').collect();
+        assert_eq!(c.len(), 2); // FIXME
+
+        let ident = c[0].to_string();
+        let user_pin = c[1].to_string();
+
+        Ok(Card { ident, user_pin })
+    }
+
+    pub(crate) fn to_config(&self) -> String {
+        format!("{}/{}", self.ident, self.user_pin)
+    }
+}
+
+impl std::fmt::Display for Card {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} [User PIN {}]", self.ident, self.user_pin)
+    }
+}
 
 /// a DB backend for a CA instance
 pub(crate) struct DbCa {
@@ -321,31 +394,22 @@ impl OpenpgpCaUninit {
         // check database state of this CA
         let (ca, _) = self.db.get_ca()?;
 
-        let oca = if let Some(card) = ca.card {
-            // card backend
-
-            let c: Vec<_> = card.split('/').collect();
-            assert_eq!(c.len(), 2); // FIXME
-
-            let ident = c[0];
-            let pin = c[1];
-            let ca_secret = Rc::new(CardCa::new(ident, pin, self.db.clone())?);
-
-            OpenpgpCa {
-                db: self.db,
-                ca: self.ca,
-                ca_secret,
-            }
-        } else {
-            // softkey backend
-            OpenpgpCa {
+        match Backend::from_config(ca.backend.as_deref())? {
+            Backend::Softkey => Ok(OpenpgpCa {
                 db: self.db,
                 ca: self.ca.clone(),
                 ca_secret: self.ca,
-            }
-        };
+            }),
+            Backend::Card(card) => {
+                let ca_secret = Rc::new(CardCa::new(&card.ident, &card.user_pin, self.db.clone())?);
 
-        Ok(oca)
+                Ok(OpenpgpCa {
+                    db: self.db,
+                    ca: self.ca,
+                    ca_secret,
+                })
+            }
+        }
     }
 }
 
@@ -419,11 +483,9 @@ impl OpenpgpCa {
         println!("  Fingerprint: {}", cert.fingerprint());
         println!("Creation time: {}", created.format("%F %T %Z"));
 
-        if let Some(card) = ca.card {
-            let c: Vec<_> = card.split('/').collect();
-            if c.len() == 2 {
-                println!("   CA Backend: OpenPGP card {} [User PIN {}]", c[0], c[1]);
-            }
+        let backend = Backend::from_config(ca.backend.as_deref())?;
+        if backend != Backend::Softkey {
+            println!("   CA Backend: {}", backend);
         }
 
         Ok(())
