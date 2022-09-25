@@ -5,15 +5,160 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use anyhow::{anyhow, Result};
+use std::io::Write;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+
+use sequoia_openpgp::packet::UserID;
+use sequoia_openpgp::policy::StandardPolicy;
+use sequoia_openpgp::serialize::stream::{Armorer, Message, Signer};
+use sequoia_openpgp::Cert;
+
 use openpgp_card::algorithm::AlgoSimple;
 use openpgp_card::{KeyType, OpenPgp};
-
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::card::Open;
 use openpgp_card_sequoia::sq_util;
 use openpgp_card_sequoia::util::{make_cert, public_key_material_to_key};
-use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::Cert;
+
+use crate::backend::{Backend, Card, CertificationBackend};
+use crate::ca_secret::CaSec;
+use crate::db::{models, OcaDb};
+use crate::pgp::Pgp;
+
+/// an OpenPGP card backend for a CA instance
+pub(crate) struct CardCa {
+    pin: String,
+
+    db: Rc<OcaDb>,
+    card: Arc<Mutex<PcscBackend>>,
+}
+
+impl CertificationBackend for CardCa {
+    fn certify(
+        &self,
+        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        let mut card = self.card.lock().unwrap();
+
+        let mut pgp = OpenPgp::new(&mut *card);
+        let mut open = Open::new(pgp.transaction()?)?;
+
+        // FIXME: verifying PIN before each signing operation. Check if this is needed?
+        open.verify_user_for_signing(self.pin.as_bytes())?;
+
+        let mut sign = open
+            .signing_card()
+            .ok_or_else(|| anyhow!("Unexpected: can't get card in signing mode"))?;
+        let mut signer = sign.signer(&|| println!("Touch confirmation needed for signing"))?;
+
+        op(&mut signer as &mut dyn sequoia_openpgp::crypto::Signer)?;
+
+        Ok(())
+    }
+}
+
+impl CardCa {
+    pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> anyhow::Result<Self> {
+        let card = PcscBackend::open_by_ident(ident, None)?;
+
+        let card = Arc::new(Mutex::new(card));
+
+        Ok(Self {
+            pin: pin.to_string(),
+            db,
+            card,
+        })
+    }
+
+    pub(crate) fn ca_init(
+        db: &Rc<OcaDb>,
+        domainname: &str,
+        card_ident: &str,
+        pin: &str,
+        pubkey: &str,
+        fingerprint: &str,
+    ) -> anyhow::Result<()> {
+        // FIXME: missing logic from DbCa::ca_init()? (e.g. domain name syntax check)
+
+        let backend = Backend::Card(Card {
+            ident: card_ident.to_string(),
+            user_pin: pin.to_string(),
+        });
+
+        db.ca_insert(
+            models::NewCa {
+                domainname,
+                backend: backend.to_config().as_deref(),
+            },
+            pubkey,
+            fingerprint,
+        )
+    }
+
+    // FIXME: code duplication, remove!
+    fn ca_userid(&self) -> anyhow::Result<UserID> {
+        let cert = self.get_ca_cert()?;
+        let uids: Vec<_> = cert.userids().collect();
+
+        if uids.len() != 1 {
+            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
+        }
+
+        Ok(uids[0].userid().clone())
+    }
+}
+
+impl CaSec for CardCa {
+    // FIXME: this function is implemented here, because apparently it can't be implemented based
+    // on the CertificationBackend trait:
+    // Making a detached signature seems to require an owned crypto::Signer of a concrete type.
+    fn sign_detached(&self, data: &[u8]) -> anyhow::Result<String> {
+        let mut card = self.card.lock().unwrap();
+
+        let mut pgp = OpenPgp::new(&mut *card);
+        let mut open = Open::new(pgp.transaction()?)?;
+
+        // FIXME: verifying PIN before each signing operation. Check if this is needed?
+        open.verify_user_for_signing(self.pin.as_bytes())?;
+
+        let mut sign = open
+            .signing_card()
+            .ok_or_else(|| anyhow!("Unexpected: can't get card in signing mode"))?;
+        let signer = sign.signer(&|| println!("Touch confirmation needed for signing"))?;
+
+        let mut sink = vec![];
+        {
+            let message = Message::new(&mut sink);
+            let message = Armorer::new(message).build()?;
+
+            let mut signer = Signer::new(message, signer).detached().build()?;
+
+            // Write the data directly to the `Signer`.
+            signer.write_all(data)?;
+            signer.finalize()?;
+        }
+
+        Ok(std::str::from_utf8(&sink)?.to_string())
+    }
+
+    fn get_ca_cert(&self) -> anyhow::Result<Cert> {
+        let (_, cacert) = self.db.get_ca()?;
+
+        Pgp::to_cert(cacert.priv_cert.as_bytes())
+    }
+
+    // FIXME: code duplication, remove!
+    fn ca_email(&self) -> anyhow::Result<String> {
+        let email = self.ca_userid()?.email()?;
+
+        if let Some(email) = email {
+            Ok(email)
+        } else {
+            Err(anyhow::anyhow!("CA user_id has no email"))
+        }
+    }
+}
 
 // The default Admin PIN for a factory reset card.
 // We assume that we start unconfigured cards for setting up card-based CAs,

@@ -4,8 +4,9 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use crate::ca::{Backend, Card, DbCa};
-use crate::db::{models, OcaDb};
+use crate::backend::CertificationBackend;
+use crate::ca::DbCa;
+use crate::db::models;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::cert;
@@ -16,70 +17,12 @@ use sequoia_openpgp::serialize::stream::{Message, Signer};
 use sequoia_openpgp::types::{ReasonForRevocation, SignatureType};
 use sequoia_openpgp::{Cert, Packet};
 
-use openpgp_card::OpenPgp;
-use openpgp_card_pcsc::PcscBackend;
-use openpgp_card_sequoia::card::Open;
-
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 
 use std::io::Write;
 use std::path::PathBuf;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
-
-/// Backend-specific implementation of certification operations
-pub trait CertificationBackend {
-    /// `op` should only use the Signer once.
-    ///
-    /// Some backends (e.g. OpenPGP card) may not allow more than one signing operation in one go.
-    /// (cards can be configured to require presentation of PIN before each signing operation)
-    fn certify(
-        &self,
-        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
-    ) -> Result<()>;
-}
-
-impl CertificationBackend for DbCa {
-    fn certify(
-        &self,
-        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
-    ) -> Result<()> {
-        let ca_cert = self.ca_get_priv_key()?;
-        let ca_keys = Pgp::get_cert_keys(&ca_cert, None);
-
-        for mut s in ca_keys {
-            op(&mut s as &mut dyn sequoia_openpgp::crypto::Signer)?;
-        }
-
-        Ok(())
-    }
-}
-
-impl CertificationBackend for CardCa {
-    fn certify(
-        &self,
-        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
-    ) -> Result<()> {
-        let mut card = self.card.lock().unwrap();
-
-        let mut pgp = OpenPgp::new(&mut *card);
-        let mut open = Open::new(pgp.transaction()?)?;
-
-        // FIXME: verifying PIN before each signing operation. Check if this is needed?
-        open.verify_user_for_signing(self.pin.as_bytes())?;
-
-        let mut sign = open
-            .signing_card()
-            .ok_or_else(|| anyhow!("Unexpected: can't get card in signing mode"))?;
-        let mut signer = sign.signer(&|| println!("Touch confirmation needed for signing"))?;
-
-        op(&mut signer as &mut dyn sequoia_openpgp::crypto::Signer)?;
-
-        Ok(())
-    }
-}
 
 /// Abstraction of operations that need private key material
 pub trait CaSec: CertificationBackend {
@@ -370,7 +313,7 @@ impl DbCa {
     ///
     /// CAUTION: getting the private key is not possible for OpenPGP cards,
     /// this fn should only be used for tests.
-    fn ca_get_priv_key(&self) -> Result<Cert> {
+    pub(crate) fn ca_get_priv_key(&self) -> Result<Cert> {
         let (_, cert) = self.db().get_ca()?;
 
         Pgp::to_cert(cert.priv_cert.as_bytes())
@@ -420,115 +363,5 @@ impl CaSec for DbCa {
 
     fn ca_email(&self) -> Result<String> {
         self.ca_email()
-    }
-}
-
-/// an OpenPGP card backend for a CA instance
-pub(crate) struct CardCa {
-    pin: String,
-
-    db: Rc<OcaDb>,
-    card: Arc<Mutex<PcscBackend>>,
-}
-
-impl CardCa {
-    pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> Result<Self> {
-        let card = PcscBackend::open_by_ident(ident, None)?;
-
-        let card = Arc::new(Mutex::new(card));
-
-        Ok(Self {
-            pin: pin.to_string(),
-            db,
-            card,
-        })
-    }
-
-    pub(crate) fn ca_init(
-        db: &Rc<OcaDb>,
-        domainname: &str,
-        card_ident: &str,
-        pin: &str,
-        pubkey: &str,
-        fingerprint: &str,
-    ) -> Result<()> {
-        // FIXME: missing logic from DbCa::ca_init()? (e.g. domain name syntax check)
-
-        let backend = Backend::Card(Card {
-            ident: card_ident.to_string(),
-            user_pin: pin.to_string(),
-        });
-
-        db.ca_insert(
-            models::NewCa {
-                domainname,
-                backend: backend.to_config().as_deref(),
-            },
-            pubkey,
-            fingerprint,
-        )
-    }
-
-    // FIXME: code duplication, remove!
-    fn ca_userid(&self) -> Result<UserID> {
-        let cert = self.get_ca_cert()?;
-        let uids: Vec<_> = cert.userids().collect();
-
-        if uids.len() != 1 {
-            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
-        }
-
-        Ok(uids[0].userid().clone())
-    }
-}
-
-impl CaSec for CardCa {
-    // FIXME: this function is implemented here, because apparently it can't be implemented based
-    // on the CertificationBackend trait:
-    // Making a detached signature seems to require an owned crypto::Signer of a concrete type.
-    fn sign_detached(&self, data: &[u8]) -> Result<String> {
-        let mut card = self.card.lock().unwrap();
-
-        let mut pgp = OpenPgp::new(&mut *card);
-        let mut open = Open::new(pgp.transaction()?)?;
-
-        // FIXME: verifying PIN before each signing operation. Check if this is needed?
-        open.verify_user_for_signing(self.pin.as_bytes())?;
-
-        let mut sign = open
-            .signing_card()
-            .ok_or_else(|| anyhow!("Unexpected: can't get card in signing mode"))?;
-        let signer = sign.signer(&|| println!("Touch confirmation needed for signing"))?;
-
-        let mut sink = vec![];
-        {
-            let message = Message::new(&mut sink);
-            let message = Armorer::new(message).build()?;
-
-            let mut signer = Signer::new(message, signer).detached().build()?;
-
-            // Write the data directly to the `Signer`.
-            signer.write_all(data)?;
-            signer.finalize()?;
-        }
-
-        Ok(std::str::from_utf8(&sink)?.to_string())
-    }
-
-    fn get_ca_cert(&self) -> Result<Cert> {
-        let (_, cacert) = self.db.get_ca()?;
-
-        Pgp::to_cert(cacert.priv_cert.as_bytes())
-    }
-
-    // FIXME: code duplication, remove!
-    fn ca_email(&self) -> Result<String> {
-        let email = self.ca_userid()?.email()?;
-
-        if let Some(email) = email {
-            Ok(email)
-        } else {
-            Err(anyhow::anyhow!("CA user_id has no email"))
-        }
     }
 }

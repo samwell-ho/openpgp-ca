@@ -16,10 +16,10 @@ extern crate diesel_migrations;
 /// The version of this crate.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+mod backend;
 mod bridge;
 pub mod ca;
 mod ca_secret;
-pub mod card;
 mod cert;
 pub mod db;
 mod export;
