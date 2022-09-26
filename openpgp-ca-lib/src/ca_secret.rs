@@ -9,13 +9,11 @@ use crate::ca::DbCa;
 use crate::db::models;
 use crate::pgp::Pgp;
 
-use sequoia_openpgp::cert;
 use sequoia_openpgp::cert::CertRevocationBuilder;
-use sequoia_openpgp::packet::{signature, Signature, UserID};
-use sequoia_openpgp::serialize::stream::Armorer;
-use sequoia_openpgp::serialize::stream::{Message, Signer};
+use sequoia_openpgp::packet::{signature::SignatureBuilder, Signature, UserID};
+use sequoia_openpgp::serialize::Serialize;
 use sequoia_openpgp::types::{ReasonForRevocation, SignatureType};
-use sequoia_openpgp::{Cert, Packet};
+use sequoia_openpgp::{armor, cert, Cert, Packet};
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -135,7 +133,28 @@ adversaries."#;
     }
 
     /// Generate a detached signature with the CA key, for 'data'
-    fn sign_detached(&self, data: &[u8]) -> Result<String>;
+    fn sign_detached(&self, data: &[u8]) -> Result<String> {
+        // FIXME: check if the key we're planning to sign with is marked 'signing' capable, or
+        // if it's only certification capable. If not, error out.
+        //
+        // (This may happen with the OpenPGP card backend, e.g. when importing a key with a primary
+        // that is only certification capable)
+
+        let mut sink = vec![];
+
+        self.certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+            let sig = SignatureBuilder::new(SignatureType::Binary).sign_message(signer, data)?;
+            let p = Packet::Signature(sig);
+
+            let mut writer = armor::Writer::new(&mut sink, armor::Kind::Message)?;
+            p.export(&mut writer)?;
+            writer.finalize()?;
+
+            Ok(())
+        })?;
+
+        Ok(std::str::from_utf8(&sink)?.to_string())
+    }
 
     /// CA certifies a specified list of User IDs of a cert.
     ///
@@ -160,7 +179,7 @@ adversaries."#;
 
         for userid in userids {
             // make certification
-            let mut sb = signature::SignatureBuilder::new(SignatureType::GenericCertification);
+            let mut sb = SignatureBuilder::new(SignatureType::GenericCertification);
 
             // If an expiration setting for the certifications has been
             // provided, apply it to the signatures
@@ -210,7 +229,7 @@ adversaries."#;
 
             let mut packets: Vec<Packet> = Vec::new();
 
-            let mut builder = signature::SignatureBuilder::new(SignatureType::GenericCertification)
+            let mut builder = SignatureBuilder::new(SignatureType::GenericCertification)
                 .set_trust_signature(255, 120)?;
 
             // add all regexes
@@ -323,38 +342,6 @@ impl DbCa {
 /// Implementation of CaSec based on a DbCa backend that contains the
 /// private key material for the CA.
 impl CaSec for DbCa {
-    fn sign_detached(&self, data: &[u8]) -> Result<String> {
-        let ca_cert = self.ca_get_priv_key()?;
-
-        let signing_keypair = ca_cert
-            .keys()
-            .secret()
-            .with_policy(Pgp::SP, None)
-            .supported()
-            .alive()
-            .revoked(false)
-            .for_signing()
-            .next()
-            .unwrap()
-            .key()
-            .clone()
-            .into_keypair()?;
-
-        let mut sink = vec![];
-        {
-            let message = Message::new(&mut sink);
-            let message = Armorer::new(message).build()?;
-
-            let mut signer = Signer::new(message, signing_keypair).detached().build()?;
-
-            // Write the data directly to the `Signer`.
-            signer.write_all(data)?;
-            signer.finalize()?;
-        }
-
-        Ok(std::str::from_utf8(&sink)?.to_string())
-    }
-
     fn get_ca_cert(&self) -> Result<Cert> {
         let (_, cacert) = self.db().get_ca()?;
 

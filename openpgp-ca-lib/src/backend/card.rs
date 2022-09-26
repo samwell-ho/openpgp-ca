@@ -5,13 +5,11 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use anyhow::{anyhow, Result};
-use std::io::Write;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::serialize::stream::{Armorer, Message, Signer};
 use sequoia_openpgp::Cert;
 
 use openpgp_card::algorithm::AlgoSimple;
@@ -110,38 +108,6 @@ impl CardCa {
 }
 
 impl CaSec for CardCa {
-    // FIXME: this function is implemented here, because apparently it can't be implemented based
-    // on the CertificationBackend trait:
-    // Making a detached signature seems to require an owned crypto::Signer of a concrete type.
-    fn sign_detached(&self, data: &[u8]) -> anyhow::Result<String> {
-        let mut card = self.card.lock().unwrap();
-
-        let mut pgp = OpenPgp::new(&mut *card);
-        let mut open = Open::new(pgp.transaction()?)?;
-
-        // FIXME: verifying PIN before each signing operation. Check if this is needed?
-        open.verify_user_for_signing(self.pin.as_bytes())?;
-
-        let mut sign = open
-            .signing_card()
-            .ok_or_else(|| anyhow!("Unexpected: can't get card in signing mode"))?;
-        let signer = sign.signer(&|| println!("Touch confirmation needed for signing"))?;
-
-        let mut sink = vec![];
-        {
-            let message = Message::new(&mut sink);
-            let message = Armorer::new(message).build()?;
-
-            let mut signer = Signer::new(message, signer).detached().build()?;
-
-            // Write the data directly to the `Signer`.
-            signer.write_all(data)?;
-            signer.finalize()?;
-        }
-
-        Ok(std::str::from_utf8(&sink)?.to_string())
-    }
-
     fn get_ca_cert(&self) -> anyhow::Result<Cert> {
         let (_, cacert) = self.db.get_ca()?;
 
