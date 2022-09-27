@@ -5,6 +5,7 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use anyhow::{anyhow, Result};
+use std::ops::DerefMut;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -38,7 +39,7 @@ impl CertificationBackend for CardCa {
     ) -> anyhow::Result<()> {
         let mut card = self.card.lock().unwrap();
 
-        let mut pgp = OpenPgp::new(&mut *card);
+        let mut pgp = OpenPgp::new(card.deref_mut());
         let mut open = Open::new(pgp.transaction()?)?;
 
         // FIXME: verifying PIN before each signing operation. Check if this is needed?
