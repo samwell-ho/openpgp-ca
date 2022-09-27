@@ -251,9 +251,9 @@ impl OpenpgpCaUninit {
             }
 
             // Open Smart Card
-            let mut card = openpgp_card_pcsc::PcscBackend::open_by_ident(card_ident, None)?;
-            let mut pgp = openpgp_card::OpenPgp::new(&mut card);
-            let mut open = openpgp_card_sequoia::card::Open::new(pgp.transaction()?)?;
+            let card = openpgp_card_pcsc::PcscBackend::open_by_ident(card_ident, None)?;
+            let mut card = openpgp_card_sequoia::card::Card::new(card);
+            let mut open = card.transaction()?;
 
             let fps = open.fingerprints()?;
             let sig = fps

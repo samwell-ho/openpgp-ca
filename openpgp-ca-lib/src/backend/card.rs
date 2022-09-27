@@ -12,14 +12,14 @@ use std::sync::{Arc, Mutex};
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::Cert;
 
-use openpgp_card::algorithm::AlgoSimple;
-use openpgp_card::{KeyType, OpenPgp};
+use openpgp_card::{algorithm::AlgoSimple, KeyType};
 use openpgp_card_pcsc::PcscBackend;
-use openpgp_card_sequoia::card::Open;
+use openpgp_card_sequoia::card::{Card, Open};
 use openpgp_card_sequoia::sq_util;
 use openpgp_card_sequoia::util::{make_cert, public_key_material_to_key};
 
-use crate::backend::{Backend, Card, CertificationBackend};
+use crate::backend;
+use crate::backend::{Backend, CertificationBackend};
 use crate::ca_secret::CaSec;
 use crate::db::{models, OcaDb};
 use crate::pgp::Pgp;
@@ -29,7 +29,7 @@ pub(crate) struct CardCa {
     pin: String,
 
     db: Rc<OcaDb>,
-    card: Arc<Mutex<PcscBackend>>,
+    card: Arc<Mutex<Card>>,
 }
 
 impl CertificationBackend for CardCa {
@@ -39,8 +39,8 @@ impl CertificationBackend for CardCa {
     ) -> anyhow::Result<()> {
         let mut card = self.card.lock().unwrap();
 
-        let mut pgp = OpenPgp::new(card.deref_mut());
-        let mut open = Open::new(pgp.transaction()?)?;
+        let card = card.deref_mut();
+        let mut open = card.transaction()?;
 
         // FIXME: verifying PIN before each signing operation. Check if this is needed?
         open.verify_user_for_signing(self.pin.as_bytes())?;
@@ -58,7 +58,8 @@ impl CertificationBackend for CardCa {
 
 impl CardCa {
     pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> anyhow::Result<Self> {
-        let card = PcscBackend::open_by_ident(ident, None)?;
+        let cb = PcscBackend::open_by_ident(ident, None)?;
+        let card = Card::new(cb);
 
         let card = Arc::new(Mutex::new(card));
 
@@ -79,7 +80,7 @@ impl CardCa {
     ) -> anyhow::Result<()> {
         // FIXME: missing logic from DbCa::ca_init()? (e.g. domain name syntax check)
 
-        let backend = Backend::Card(Card {
+        let backend = Backend::Card(backend::Card {
             ident: card_ident.to_string(),
             user_pin: pin.to_string(),
         });
@@ -124,9 +125,9 @@ fn check_card_empty(open: &Open) -> Result<bool> {
 /// Expects Admin PIN to be set to the default value of `12345678`.
 /// During card setup, this fn resets the User PIN to a new, random, 8 digit value.
 pub(crate) fn generate_on_card(ident: &str, user_id: String) -> Result<(Cert, String)> {
-    let mut card = PcscBackend::open_by_ident(ident, None)?;
-    let mut pgp = OpenPgp::new(&mut card);
-    let mut open = Open::new(pgp.transaction()?)?;
+    let cb = PcscBackend::open_by_ident(ident, None)?;
+    let mut card = Card::new(cb);
+    let mut open = card.transaction()?;
 
     // check that card has no keys on it
     if !check_card_empty(&open)? {
@@ -183,9 +184,9 @@ pub(crate) fn generate_on_card(ident: &str, user_id: String) -> Result<(Cert, St
 
 /// Returns newly set User PIN
 pub(crate) fn import_to_card(ident: &str, key: &Cert) -> Result<String> {
-    let mut card = PcscBackend::open_by_ident(ident, None)?;
-    let mut pgp = OpenPgp::new(&mut card);
-    let mut open = Open::new(pgp.transaction()?)?;
+    let cb = PcscBackend::open_by_ident(ident, None)?;
+    let mut card = Card::new(cb);
+    let mut open = card.transaction()?;
 
     // check that card has no keys on it
     if !check_card_empty(&open)? {
@@ -249,9 +250,9 @@ fn random_user_pin() -> String {
 
 /// Test if the card accepts `pin` as User PIN
 pub(crate) fn verify_user_pin(ident: &str, pin: &str) -> Result<()> {
-    let mut card = PcscBackend::open_by_ident(ident, None)?;
-    let mut pgp = OpenPgp::new(&mut card);
-    let mut open = Open::new(pgp.transaction()?)?;
+    let cb = PcscBackend::open_by_ident(ident, None)?;
+    let mut card = Card::new(cb);
+    let mut open = card.transaction()?;
 
     open.verify_user(pin.as_bytes())?;
 
