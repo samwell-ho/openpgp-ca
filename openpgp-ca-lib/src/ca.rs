@@ -75,28 +75,6 @@ impl DbCa {
         let cert = Pgp::to_cert(cacert.priv_cert.as_bytes())?;
         Ok(cert.strip_secret_key_material())
     }
-
-    fn ca_userid(&self) -> Result<UserID> {
-        let cert = self.ca_get_cert_pub()?;
-        let uids: Vec<_> = cert.userids().collect();
-
-        if uids.len() != 1 {
-            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
-        }
-
-        Ok(uids[0].userid().clone())
-    }
-
-    /// Get the email of this CA
-    pub fn ca_email(&self) -> Result<String> {
-        let email = self.ca_userid()?.email()?;
-
-        if let Some(email) = email {
-            Ok(email)
-        } else {
-            Err(anyhow::anyhow!("CA user_id has no email"))
-        }
-    }
 }
 
 /// A CA instance that has a database, but is (possibly) not initialized and doesn't

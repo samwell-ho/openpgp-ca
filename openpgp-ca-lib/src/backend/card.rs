@@ -8,7 +8,6 @@ use anyhow::{anyhow, Result};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::Cert;
 
@@ -93,18 +92,6 @@ impl CardCa {
             fingerprint,
         )
     }
-
-    // FIXME: code duplication, remove!
-    fn ca_userid(&self) -> anyhow::Result<UserID> {
-        let cert = self.get_ca_cert()?;
-        let uids: Vec<_> = cert.userids().collect();
-
-        if uids.len() != 1 {
-            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
-        }
-
-        Ok(uids[0].userid().clone())
-    }
 }
 
 impl CaSec for CardCa {
@@ -112,17 +99,6 @@ impl CaSec for CardCa {
         let (_, cacert) = self.db.get_ca()?;
 
         Pgp::to_cert(cacert.priv_cert.as_bytes())
-    }
-
-    // FIXME: code duplication, remove!
-    fn ca_email(&self) -> anyhow::Result<String> {
-        let email = self.ca_userid()?.email()?;
-
-        if let Some(email) = email {
-            Ok(email)
-        } else {
-            Err(anyhow::anyhow!("CA user_id has no email"))
-        }
     }
 }
 

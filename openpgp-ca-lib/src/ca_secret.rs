@@ -166,7 +166,7 @@ adversaries."#;
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
     ) -> Result<Cert> {
-        let ca_cert = self.get_ca_cert()?; // pubkey (must include CA User ID!)
+        let ca_cert = self.get_ca_cert()?; // CA cert (must include CA User ID)
 
         // Collect certifications by the CA
         let mut packets: Vec<Packet> = Vec::new();
@@ -298,7 +298,28 @@ adversaries."#;
     /// Get Cert for this CA (may contain private key material, depending on the backend)
     fn get_ca_cert(&self) -> Result<Cert>;
 
-    fn ca_email(&self) -> Result<String>;
+    /// Get the User ID of this CA
+    fn ca_userid(&self) -> Result<UserID> {
+        let cert = self.get_ca_cert()?;
+        let uids: Vec<_> = cert.userids().collect();
+
+        if uids.len() != 1 {
+            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
+        }
+
+        Ok(uids[0].userid().clone())
+    }
+
+    /// Get the email of this CA
+    fn ca_email(&self) -> anyhow::Result<String> {
+        let email = self.ca_userid()?.email()?;
+
+        if let Some(email) = email {
+            Ok(email)
+        } else {
+            Err(anyhow::anyhow!("CA user_id has no email"))
+        }
+    }
 }
 
 impl DbCa {
@@ -346,9 +367,5 @@ impl CaSec for DbCa {
         let (_, cacert) = self.db().get_ca()?;
 
         Pgp::to_cert(cacert.priv_cert.as_bytes())
-    }
-
-    fn ca_email(&self) -> Result<String> {
-        self.ca_email()
     }
 }
