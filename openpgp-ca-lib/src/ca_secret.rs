@@ -5,8 +5,6 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use crate::backend::CertificationBackend;
-use crate::ca::DbCa;
-use crate::db::models;
 use crate::pgp::Pgp;
 
 use sequoia_openpgp::cert::CertRevocationBuilder;
@@ -319,53 +317,5 @@ adversaries."#;
         } else {
             Err(anyhow::anyhow!("CA user_id has no email"))
         }
-    }
-}
-
-impl DbCa {
-    /// Initialize OpenPGP CA Admin database entry.
-    /// Takes a `cert` with private key material and initializes a softkey-based CA.
-    ///
-    /// Only one CA Admin can be configured per database.
-    pub(crate) fn ca_init_softkey(&self, domainname: &str, cert: &Cert) -> Result<()> {
-        if self.db().is_ca_initialized()? {
-            return Err(anyhow::anyhow!("CA has already been initialized",));
-        }
-
-        let ca_key = Pgp::cert_to_armored_private_key(cert)?;
-
-        self.db().ca_insert(
-            models::NewCa {
-                domainname,
-                backend: None,
-            },
-            &ca_key,
-            &cert.fingerprint().to_hex(),
-        )
-    }
-
-    /// Get a sequoia `Cert` object for the CA from the database.
-    ///
-    /// This returns a full version of the CA Cert, including private key
-    /// material.
-    ///
-    /// This is the OpenPGP Cert of the CA.
-    ///
-    /// CAUTION: getting the private key is not possible for OpenPGP cards,
-    /// this fn should only be used for tests.
-    pub(crate) fn ca_get_priv_key(&self) -> Result<Cert> {
-        let (_, cert) = self.db().get_ca()?;
-
-        Pgp::to_cert(cert.priv_cert.as_bytes())
-    }
-}
-
-/// Implementation of CaSec based on a DbCa backend that contains the
-/// private key material for the CA.
-impl CaSec for DbCa {
-    fn get_ca_cert(&self) -> Result<Cert> {
-        let (_, cacert) = self.db().get_ca()?;
-
-        Pgp::to_cert(cacert.priv_cert.as_bytes())
     }
 }

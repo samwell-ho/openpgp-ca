@@ -11,10 +11,8 @@
 use anyhow::anyhow;
 use std::fmt::Formatter;
 
-use crate::ca::DbCa;
-use crate::pgp::Pgp;
-
-pub mod card;
+pub(crate) mod card;
+pub(crate) mod softkey;
 
 #[derive(PartialEq)]
 pub(crate) enum Backend {
@@ -98,20 +96,4 @@ pub trait CertificationBackend {
         &self,
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> anyhow::Result<()>,
     ) -> anyhow::Result<()>;
-}
-
-impl CertificationBackend for DbCa {
-    fn certify(
-        &self,
-        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> anyhow::Result<()>,
-    ) -> anyhow::Result<()> {
-        let ca_cert = self.ca_get_priv_key()?;
-        let ca_keys = Pgp::get_cert_keys(&ca_cert, None);
-
-        for mut s in ca_keys {
-            op(&mut s as &mut dyn sequoia_openpgp::crypto::Signer)?;
-        }
-
-        Ok(())
-    }
 }
