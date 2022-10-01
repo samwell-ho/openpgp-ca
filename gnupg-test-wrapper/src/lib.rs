@@ -8,17 +8,16 @@
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-
 use std::fmt;
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use csv::StringRecord;
 use expectrl::{session::Session, Eof};
-use std::time::Duration;
 
 /// A simple wrapper for GnuPG, for use in OpenPGP CA integration tests.
 ///

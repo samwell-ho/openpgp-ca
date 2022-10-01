@@ -8,24 +8,23 @@
 
 use core::time::Duration;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::error::Error;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::time::SystemTime;
 
+use openpgp_ca_lib::ca::OpenpgpCa;
+use openpgp_ca_lib::pgp::Pgp;
 use sequoia_openpgp::cert::ValidCert;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::types::{HashAlgorithm, PublicKeyAlgorithm, RevocationStatus};
 use sequoia_openpgp::{Cert, Message, Packet};
 
-use openpgp_ca_lib::ca::OpenpgpCa;
-use openpgp_ca_lib::pgp::Pgp;
-
 use crate::cert_info::CertInfo;
 use crate::json::*;
 use crate::restd;
 use crate::util::{is_email_in_domain, split_emails, user_id_filter};
-use std::convert::TryInto;
 
 const STANDARD_POLICY: &StandardPolicy = &StandardPolicy::new();
 

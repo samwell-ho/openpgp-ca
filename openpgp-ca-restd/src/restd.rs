@@ -7,16 +7,16 @@
 //! REST Interface for OpenPGP CA.
 //! This is an experimental API for use at FSFE.
 
+use std::convert::TryInto;
+
 use once_cell::sync::OnceCell;
+use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
+use openpgp_ca_lib::db::models;
+use openpgp_ca_lib::pgp::Pgp;
 use rocket::http::Status;
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
 use rocket::Build;
-use std::convert::TryInto;
-
-use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
-use openpgp_ca_lib::db::models;
-use openpgp_ca_lib::pgp::Pgp;
 
 use crate::cert_info::CertInfo;
 use crate::json::*;

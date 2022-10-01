@@ -6,16 +6,15 @@
 // SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ca::OpenpgpCa;
-use crate::db::models;
-use crate::pgp::Pgp;
-
+use anyhow::Result;
 use sequoia_net::wkd;
 use sequoia_net::Policy;
 use sequoia_openpgp::{Fingerprint, KeyID};
-
-use anyhow::Result;
 use tokio::runtime::Runtime;
+
+use crate::ca::OpenpgpCa;
+use crate::db::models;
+use crate::pgp::Pgp;
 
 /// Update a cert in the OpenPGP CA database via wkd.
 ///

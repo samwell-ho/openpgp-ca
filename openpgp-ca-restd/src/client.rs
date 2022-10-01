@@ -9,10 +9,10 @@
 //! Very basic client wrapper for the OpenPGP CA restd,
 //! intended for use in integration tests.
 
+use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::{Response, StatusCode};
 
 use crate::json::{CertResultJson, Certificate, ReturnError, ReturnGoodJson};
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
 pub struct Client {
     client: reqwest::Client,

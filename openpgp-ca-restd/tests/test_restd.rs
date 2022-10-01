@@ -4,13 +4,11 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
+use gnupg_test_wrapper as gnupg;
+use openpgp_ca_lib::ca::OpenpgpCaUninit;
 use openpgp_ca_restd::client::Client;
 use openpgp_ca_restd::json::{Action, CertResultJson, CertStatus, Certificate};
 use openpgp_ca_restd::restd;
-
-use gnupg_test_wrapper as gnupg;
-use openpgp_ca_lib::ca::OpenpgpCaUninit;
-
 use rocket::futures::prelude::future::{AbortHandle, Abortable};
 
 const ALICE_CERT: &str = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----

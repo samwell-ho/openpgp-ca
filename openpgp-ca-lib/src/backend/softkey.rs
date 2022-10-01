@@ -5,7 +5,6 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use anyhow::Result;
-
 use sequoia_openpgp::cert::Cert;
 
 use crate::backend::CertificationBackend;

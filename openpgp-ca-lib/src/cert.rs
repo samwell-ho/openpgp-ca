@@ -4,18 +4,17 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use crate::ca::{CertificationStatus, OpenpgpCa};
-use crate::db::models;
-use crate::pgp::Pgp;
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, SystemTime};
 
+use anyhow::{Context, Result};
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
 
-use anyhow::{Context, Result};
-
-use std::collections::{HashMap, HashSet};
-use std::time::{Duration, SystemTime};
+use crate::ca::{CertificationStatus, OpenpgpCa};
+use crate::db::models;
+use crate::pgp::Pgp;
 
 pub fn user_new(
     oca: &OpenpgpCa,

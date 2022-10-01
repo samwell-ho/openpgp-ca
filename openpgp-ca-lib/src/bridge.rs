@@ -6,9 +6,9 @@
 // SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use anyhow::{Context, Result};
 use std::path::Path;
 
+use anyhow::{Context, Result};
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::{Cert, Fingerprint};
 

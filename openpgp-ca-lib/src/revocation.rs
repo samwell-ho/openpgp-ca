@@ -6,15 +6,14 @@
 // SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ca::OpenpgpCa;
-use crate::db::models;
-use crate::pgp::Pgp;
-
+use anyhow::{Context, Result};
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::KeyHandle;
 use sequoia_openpgp::{Cert, Packet};
 
-use anyhow::{Context, Result};
+use crate::ca::OpenpgpCa;
+use crate::db::models;
+use crate::pgp::Pgp;
 
 /// Check if the CA database has a variant of the revocation
 /// certificate 'revocation' (according to Signature::normalized_eq()).

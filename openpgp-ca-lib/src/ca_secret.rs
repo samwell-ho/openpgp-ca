@@ -4,21 +4,20 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use crate::backend::CertificationBackend;
-use crate::pgp::Pgp;
+use std::io::Write;
+use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
 
+use anyhow::Result;
+use chrono::{DateTime, Utc};
 use sequoia_openpgp::cert::CertRevocationBuilder;
 use sequoia_openpgp::packet::{signature::SignatureBuilder, Signature, UserID};
 use sequoia_openpgp::serialize::Serialize;
 use sequoia_openpgp::types::{ReasonForRevocation, SignatureType};
 use sequoia_openpgp::{armor, cert, Cert, Packet};
 
-use anyhow::Result;
-use chrono::{DateTime, Utc};
-
-use std::io::Write;
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use crate::backend::CertificationBackend;
+use crate::pgp::Pgp;
 
 /// Abstraction of operations that need private key material
 pub trait CaSec: CertificationBackend {

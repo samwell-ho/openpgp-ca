@@ -4,10 +4,15 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
+use std::time::SystemTime;
+
+use anyhow::{Context, Result};
+use chbs::probability::Probability;
 use sequoia_openpgp::armor;
 use sequoia_openpgp::cert;
 use sequoia_openpgp::cert::amalgamation::key::ValidKeyAmalgamation;
 use sequoia_openpgp::cert::amalgamation::{ValidAmalgamation, ValidateAmalgamation};
+use sequoia_openpgp::cert::prelude::ComponentAmalgamation;
 use sequoia_openpgp::cert::{CertParser, CipherSuite};
 use sequoia_openpgp::crypto::KeyPair;
 use sequoia_openpgp::packet::{signature, Signature, UserID};
@@ -16,12 +21,6 @@ use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::serialize::{Serialize, SerializeInto};
 use sequoia_openpgp::types::{KeyFlags, RevocationStatus, SignatureType};
 use sequoia_openpgp::{Cert, Fingerprint, KeyHandle, Packet};
-
-use std::time::SystemTime;
-
-use anyhow::{Context, Result};
-use chbs::probability::Probability;
-use sequoia_openpgp::cert::prelude::ComponentAmalgamation;
 use sha2::Digest;
 
 const CA_KEY_NOTATION: &str = "openpgp-ca@notations.sequoia-pgp.org";

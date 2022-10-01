@@ -4,11 +4,12 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use anyhow::{Context, Result};
+use gnupg_test_wrapper as gnupg;
 use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::packet::signature::subpacket::SubpacketTag;
 use openpgp::packet::signature::{subpacket::*, SignatureBuilder};
@@ -16,15 +17,12 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::KeyHandle;
 use openpgp::{Cert, Fingerprint, KeyID};
-use rusqlite::Connection;
-use sequoia_openpgp as openpgp;
-
 use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
 use openpgp_ca_lib::pgp::Pgp;
+use rusqlite::Connection;
 use sequoia_net::Policy;
+use sequoia_openpgp as openpgp;
 use sequoia_openpgp::cert::CertBuilder;
-
-use gnupg_test_wrapper as gnupg;
 
 #[test]
 /// Creates a CA (with a custom name) and a user.

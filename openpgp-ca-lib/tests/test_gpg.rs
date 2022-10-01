@@ -4,16 +4,14 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use openpgp::serialize::Serialize;
-use sequoia_openpgp as openpgp;
-
-use openpgp_ca_lib::ca::OpenpgpCaUninit;
-use openpgp_ca_lib::pgp::Pgp;
-
-use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+use anyhow::{Context, Result};
 use gnupg_test_wrapper as gnupg;
+use openpgp::serialize::Serialize;
+use openpgp_ca_lib::ca::OpenpgpCaUninit;
+use openpgp_ca_lib::pgp::Pgp;
+use sequoia_openpgp as openpgp;
 
 #[test]
 /// Create a new CA. Create user certs for Alice and Bob in OpenPGP CA.

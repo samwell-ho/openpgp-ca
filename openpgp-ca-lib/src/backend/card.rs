@@ -4,19 +4,18 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use anyhow::{anyhow, Result};
 use std::ops::DerefMut;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::Cert;
-
+use anyhow::{anyhow, Result};
 use openpgp_card::{algorithm::AlgoSimple, KeyType};
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::card::{Card, Open};
 use openpgp_card_sequoia::sq_util;
 use openpgp_card_sequoia::util::{make_cert, public_key_material_to_key};
+use sequoia_openpgp::policy::StandardPolicy;
+use sequoia_openpgp::Cert;
 
 use crate::backend;
 use crate::backend::{Backend, CertificationBackend};

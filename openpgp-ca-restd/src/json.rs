@@ -4,12 +4,12 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
+use openpgp_ca_lib::db::models;
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::cert_info::CertInfo;
-use openpgp_ca_lib::db::models;
 
 /// A container for return-data about one Cert.
 ///

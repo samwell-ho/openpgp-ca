@@ -7,7 +7,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::Result;
-
 use openpgp::Cert;
 use sequoia_openpgp as openpgp;
 use sequoia_openpgp::packet::UserID;

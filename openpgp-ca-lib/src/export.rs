@@ -6,17 +6,16 @@
 // SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ca::OpenpgpCa;
-use crate::pgp::Pgp;
-
-use openpgp_keylist::{Key, Keylist, Metadata};
-
-use anyhow::{Context, Result};
-
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+
+use anyhow::{Context, Result};
+use openpgp_keylist::{Key, Keylist, Metadata};
+
+use crate::ca::OpenpgpCa;
+use crate::pgp::Pgp;
 
 // export filename of keylist
 const KEYLIST_FILE: &str = "keylist.json";

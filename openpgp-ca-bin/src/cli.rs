@@ -4,8 +4,9 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use clap::{AppSettings, Parser, Subcommand};
 use std::path::PathBuf;
+
+use clap::{AppSettings, Parser, Subcommand};
 
 #[derive(Parser)]
 #[clap(

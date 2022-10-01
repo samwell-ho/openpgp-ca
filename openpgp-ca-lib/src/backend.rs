@@ -8,8 +8,9 @@
 //!
 //! The backend configuration of a CA instanceis persisted in the CA database in `ca.backend`.
 
-use anyhow::anyhow;
 use std::fmt::Formatter;
+
+use anyhow::anyhow;
 
 pub(crate) mod card;
 pub(crate) mod softkey;

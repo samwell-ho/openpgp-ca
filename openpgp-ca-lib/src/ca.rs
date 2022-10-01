@@ -28,6 +28,20 @@
 //! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false).unwrap();
 //! ```
 
+use std::collections::HashMap;
+use std::env;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::str::FromStr;
+use std::time::SystemTime;
+
+use anyhow::{Context, Result};
+use chrono::offset::Utc;
+use chrono::DateTime;
+use sequoia_openpgp::packet::{Signature, UserID};
+use sequoia_openpgp::parse::Parse;
+use sequoia_openpgp::Cert;
+
 use crate::backend::card::CardCa;
 use crate::backend::{card, Backend};
 use crate::bridge;
@@ -39,21 +53,6 @@ use crate::export;
 use crate::pgp::Pgp;
 use crate::revocation;
 use crate::update;
-
-use sequoia_openpgp::packet::{Signature, UserID};
-use sequoia_openpgp::parse::Parse;
-use sequoia_openpgp::Cert;
-
-use anyhow::{Context, Result};
-use chrono::offset::Utc;
-use chrono::DateTime;
-
-use std::collections::HashMap;
-use std::env;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::str::FromStr;
-use std::time::SystemTime;
 
 /// a DB backend for a CA instance
 pub(crate) struct DbCa {

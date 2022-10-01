@@ -6,19 +6,18 @@
 // SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
+use std::time::SystemTime;
 
 use anyhow::Context;
-
+use chrono::{DateTime, Utc};
 use sequoia_openpgp::cert::amalgamation::key::ErasedKeyAmalgamation;
 use sequoia_openpgp::cert::amalgamation::{ComponentAmalgamation, ValidateAmalgamation};
 use sequoia_openpgp::packet::key;
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::Cert;
-use std::convert::{TryFrom, TryInto};
-use std::time::SystemTime;
+use serde::{Deserialize, Serialize};
 
 const POLICY: &StandardPolicy = &StandardPolicy::new();
 
