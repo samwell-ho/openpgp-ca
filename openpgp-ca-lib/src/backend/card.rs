@@ -34,8 +34,8 @@ pub(crate) struct CardCa {
 impl CertificationBackend for CardCa {
     fn certify(
         &self,
-        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> anyhow::Result<()>,
-    ) -> anyhow::Result<()> {
+        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
+    ) -> Result<()> {
         let mut card = self.card.lock().unwrap();
 
         let card = card.deref_mut();
@@ -56,7 +56,7 @@ impl CertificationBackend for CardCa {
 }
 
 impl CardCa {
-    pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> anyhow::Result<Self> {
+    pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> Result<Self> {
         let cb = PcscBackend::open_by_ident(ident, None)?;
         let card = Card::new(cb);
 
@@ -76,7 +76,7 @@ impl CardCa {
         pin: &str,
         pubkey: &str,
         fingerprint: &str,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         // FIXME: missing logic from DbCa::ca_init()? (e.g. domain name syntax check)
 
         let backend = Backend::Card(backend::Card {
@@ -96,7 +96,7 @@ impl CardCa {
 }
 
 impl CaSec for CardCa {
-    fn get_ca_cert(&self) -> anyhow::Result<Cert> {
+    fn get_ca_cert(&self) -> Result<Cert> {
         let (_, cacert) = self.db.get_ca()?;
 
         Pgp::to_cert(cacert.priv_cert.as_bytes())

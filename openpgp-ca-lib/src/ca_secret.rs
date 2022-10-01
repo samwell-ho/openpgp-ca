@@ -308,7 +308,7 @@ adversaries."#;
     }
 
     /// Get the email of this CA
-    fn ca_email(&self) -> anyhow::Result<String> {
+    fn ca_email(&self) -> Result<String> {
         let email = self.ca_userid()?.email()?;
 
         if let Some(email) = email {

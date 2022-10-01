@@ -49,8 +49,8 @@ impl CaSec for DbCa {
 impl CertificationBackend for DbCa {
     fn certify(
         &self,
-        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> anyhow::Result<()>,
-    ) -> anyhow::Result<()> {
+        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
+    ) -> Result<()> {
         let ca_cert = self.get_ca_cert()?; // contains private key material for DbCa
         let ca_keys = Pgp::get_cert_keys(&ca_cert, None);
 
