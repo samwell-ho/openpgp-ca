@@ -27,8 +27,8 @@ cargo-test:
 
 cargo-fmt:
   script:
-    - rustup component add rustfmt
-    - cargo fmt -- --check
+    - rustup toolchain install nightly && rustup component add --toolchain nightly rustfmt
+    - cargo +nightly fmt -- --check
 
 cargo-clippy:
   before_script:
