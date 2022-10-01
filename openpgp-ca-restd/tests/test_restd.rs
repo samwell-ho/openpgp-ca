@@ -4,7 +4,6 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use gnupg_test_wrapper as gnupg;
 use openpgp_ca_lib::ca::OpenpgpCaUninit;
 use openpgp_ca_restd::client::Client;
 use openpgp_ca_restd::json::{Action, CertResultJson, CertStatus, Certificate};
@@ -224,7 +223,7 @@ async fn test_restd() {
     // Running multiple restd-tests in parallel leads to errors when
     // multiple rocket daemons try to bind to the same tcp port.
 
-    let ctx = gnupg::make_context().unwrap();
+    let ctx = gnupg_test_wrapper::make_context().unwrap();
     // ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());

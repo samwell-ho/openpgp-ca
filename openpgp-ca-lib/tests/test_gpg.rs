@@ -7,11 +7,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use gnupg_test_wrapper as gnupg;
-use openpgp::serialize::Serialize;
 use openpgp_ca_lib::ca::OpenpgpCaUninit;
 use openpgp_ca_lib::pgp::Pgp;
-use sequoia_openpgp as openpgp;
+use sequoia_openpgp::serialize::Serialize;
 
 #[test]
 /// Create a new CA. Create user certs for Alice and Bob in OpenPGP CA.
@@ -21,7 +19,7 @@ use sequoia_openpgp as openpgp;
 ///
 /// Check that gnupg considers Bob and the CA admin as "full"ly trusted.
 fn test_alice_authenticates_bob_centralized() -> Result<()> {
-    let gpg = gnupg::make_context()?;
+    let gpg = gnupg_test_wrapper::make_context()?;
 
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
@@ -99,10 +97,10 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
 /// Expect gnupg in Alice's instance to consider both the CA Admin key and
 /// Bob and "full"ly trusted.
 fn test_alice_authenticates_bob_decentralized() -> Result<()> {
-    let gpg_alice = gnupg::make_context()?;
-    let gpg_bob = gnupg::make_context()?;
+    let gpg_alice = gnupg_test_wrapper::make_context()?;
+    let gpg_bob = gnupg_test_wrapper::make_context()?;
 
-    let gpg_ca = gnupg::make_context()?;
+    let gpg_ca = gnupg_test_wrapper::make_context()?;
 
     let home_path_ca = String::from(gpg_ca.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path_ca);
@@ -215,7 +213,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
 /// However, users of CA1 will not, because their trust of keys that CA2
 /// signed is scoped to the main domain of CA2's organization.
 fn test_bridge() -> Result<()> {
-    let gpg = gnupg::make_context()?;
+    let gpg = gnupg_test_wrapper::make_context()?;
 
     // don't delete home dir (for manual inspection)
     // gpg.leak_tempdir();
@@ -350,7 +348,7 @@ fn test_bridge() -> Result<()> {
 /// expected outcome: alice has "full" trust for openpgp-ca@alpha.org and openpgp-ca@beta.org,
 /// but no trust for openpgp-ca@gamma.org and carol@gamma.org
 fn test_multi_bridge() -> Result<()> {
-    let gpg = gnupg::make_context()?;
+    let gpg = gnupg_test_wrapper::make_context()?;
 
     // don't delete home dir (for manual inspection)
     // gpg.leak_tempdir();
@@ -476,7 +474,7 @@ fn test_multi_bridge() -> Result<()> {
 ///     ---tsign---> openpgp-ca@other.org
 ///       ---sign--> bob@beta.org
 fn test_scoping() -> Result<()> {
-    let gpg = gnupg::make_context()?;
+    let gpg = gnupg_test_wrapper::make_context()?;
 
     // don't delete home dir (for manual inspection)
     // gpg.leak_tempdir();

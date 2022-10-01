@@ -7,9 +7,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::Result;
-use openpgp::Cert;
-use sequoia_openpgp as openpgp;
 use sequoia_openpgp::packet::UserID;
+use sequoia_openpgp::Cert;
 
 pub fn is_email_in_domain(email: &str, domain: &str) -> Result<bool> {
     let split: Vec<_> = email.split('@').collect();
