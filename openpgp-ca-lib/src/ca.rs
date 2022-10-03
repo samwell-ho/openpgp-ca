@@ -20,12 +20,16 @@
 //! let openpgp_ca_uninit = OpenpgpCaUninit::new(Some(db_filename)).expect("Failed to set up CA");
 //!
 //! // initialize the CA Admin (with domainname and a symbolic name)
-//! let openpgp_ca = openpgp_ca_uninit.ca_init("example.org", Some("Example Org OpenPGP CA Key")).unwrap();
+//! let openpgp_ca = openpgp_ca_uninit
+//!     .ca_init("example.org", Some("Example Org OpenPGP CA Key"))
+//!     .unwrap();
 //!
 //! // create a new user, with all signatures
 //! // (the private key is printed to stdout and needs to be manually
 //! // processed from there)
-//! openpgp_ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false).unwrap();
+//! openpgp_ca
+//!     .user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)
+//!     .unwrap();
 //! ```
 
 use std::collections::HashMap;
