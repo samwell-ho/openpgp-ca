@@ -394,9 +394,7 @@ impl OpenpgpCa {
         println!("Creation time: {}", created.format("%F %T %Z"));
 
         let backend = Backend::from_config(ca.backend.as_deref())?;
-        if backend != Backend::Softkey {
-            println!("   CA Backend: {}", backend);
-        }
+        println!("   CA Backend: {}", backend);
 
         Ok(())
     }
