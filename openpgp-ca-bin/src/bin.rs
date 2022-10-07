@@ -37,12 +37,12 @@ fn main() -> Result<()> {
     } = &c.cmd
     {
         let ca = match backend {
-            None => cau.ca_init(domain, name.as_deref()),
-            Some(cli::Backend::Card {
+            cli::Backend::Softkey => cau.ca_init(domain, name.as_deref()),
+            cli::Backend::Card {
                 ident,
                 initmode,
                 pinpad,
-            }) => {
+            } => {
                 if *pinpad {
                     // FIXME:
                     // - extend syntax in database backend field: don't store PIN in pinpad mode

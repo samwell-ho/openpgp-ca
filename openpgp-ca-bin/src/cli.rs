@@ -86,6 +86,8 @@ pub enum CardInitMode {
 
 #[derive(Subcommand)]
 pub enum Backend {
+    Softkey,
+
     Card {
         /// OpenPGP card ident
         ident: String,
@@ -113,7 +115,7 @@ pub enum CaCommand {
         name: Option<String>,
 
         #[clap(subcommand)]
-        backend: Option<Backend>,
+        backend: Backend,
     },
     /// Export CA public key
     Export,
