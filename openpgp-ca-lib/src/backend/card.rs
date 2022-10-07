@@ -42,6 +42,29 @@ impl CertificationBackend for CardCa {
         let mut open = card.transaction()?;
 
         // FIXME: verifying PIN before each signing operation. Check if this is needed?
+        open.verify_user(self.pin.as_bytes())?;
+
+        let mut user = open
+            .user_card()
+            .ok_or_else(|| anyhow!("Unexpected: can't get card in signing mode"))?;
+        let mut signer =
+            user.authenticator(&|| println!("Touch confirmation needed for signing"))?;
+
+        op(&mut signer as &mut dyn sequoia_openpgp::crypto::Signer)?;
+
+        Ok(())
+    }
+
+    fn sign(
+        &self,
+        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
+    ) -> Result<()> {
+        let mut card = self.card.lock().unwrap();
+
+        let card = card.deref_mut();
+        let mut open = card.transaction()?;
+
+        // FIXME: verifying PIN before each signing operation. Check if this is needed?
         open.verify_user_for_signing(self.pin.as_bytes())?;
 
         let mut sign = open

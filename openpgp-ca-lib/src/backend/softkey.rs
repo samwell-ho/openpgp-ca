@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use sequoia_openpgp::cert::Cert;
+use sequoia_openpgp::crypto::Signer;
 
 use crate::backend::CertificationBackend;
 use crate::ca::DbCa;
@@ -57,6 +58,29 @@ impl CertificationBackend for DbCa {
         for mut s in ca_keys {
             op(&mut s as &mut dyn sequoia_openpgp::crypto::Signer)?;
         }
+
+        Ok(())
+    }
+
+    fn sign(&self, op: &mut dyn FnMut(&mut dyn Signer) -> Result<()>) -> Result<()> {
+        let ca_cert = self.get_ca_cert()?; // contains private key material for DbCa
+
+        // FIXME: this assumes there is exactly one signing capable subkey
+        let mut signing_keypair = ca_cert
+            .keys()
+            .secret()
+            .with_policy(Pgp::SP, None)
+            .supported()
+            .alive()
+            .revoked(false)
+            .for_signing()
+            .next()
+            .unwrap()
+            .key()
+            .clone()
+            .into_keypair()?;
+
+        op(&mut signing_keypair as &mut dyn sequoia_openpgp::crypto::Signer)?;
 
         Ok(())
     }
