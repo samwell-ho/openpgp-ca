@@ -87,13 +87,26 @@ impl std::fmt::Display for Card {
     }
 }
 
-/// Backend-specific implementation of certification operations
+/// Backend-specific implementation of certification and signing operations
 pub trait CertificationBackend {
+    /// Make a certification signature.
+    ///
     /// `op` should only use the Signer once.
     ///
     /// Some backends (e.g. OpenPGP card) may not allow more than one signing operation in one go.
     /// (cards can be configured to require presentation of PIN before each signing operation)
     fn certify(
+        &self,
+        op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()>;
+
+    /// Make a regular signature.
+    ///
+    /// `op` should only use the Signer once.
+    ///
+    /// Some backends (e.g. OpenPGP card) may not allow more than one signing operation in one go.
+    /// (cards can be configured to require presentation of PIN before each signing operation)
+    fn sign(
         &self,
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> anyhow::Result<()>,
     ) -> anyhow::Result<()>;

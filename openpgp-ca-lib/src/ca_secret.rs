@@ -139,7 +139,7 @@ adversaries."#;
 
         let mut sink = vec![];
 
-        self.certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+        self.sign(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
             let sig = SignatureBuilder::new(SignatureType::Binary).sign_message(signer, data)?;
             let p = Packet::Signature(sig);
 
