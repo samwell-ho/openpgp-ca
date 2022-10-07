@@ -131,12 +131,6 @@ adversaries."#;
 
     /// Generate a detached signature with the CA key, for 'data'
     fn sign_detached(&self, data: &[u8]) -> Result<String> {
-        // FIXME: check if the key we're planning to sign with is marked 'signing' capable, or
-        // if it's only certification capable. If not, error out.
-        //
-        // (This may happen with the OpenPGP card backend, e.g. when importing a key with a primary
-        // that is only certification capable)
-
         let mut sink = vec![];
 
         self.sign(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {

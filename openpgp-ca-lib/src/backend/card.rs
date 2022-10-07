@@ -4,6 +4,7 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
+use std::convert::TryFrom;
 use std::ops::DerefMut;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -13,9 +14,13 @@ use openpgp_card::{algorithm::AlgoSimple, KeyType};
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::card::{Card, Open};
 use openpgp_card_sequoia::sq_util;
-use openpgp_card_sequoia::util::{make_cert, public_key_material_to_key};
+use openpgp_card_sequoia::util::public_key_material_to_key;
+use sequoia_openpgp::packet::key::{KeyRole, PrimaryRole, SubordinateRole};
+use sequoia_openpgp::packet::prelude::SignatureBuilder;
+use sequoia_openpgp::packet::{signature, Signature, UserID};
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::Cert;
+use sequoia_openpgp::types::{KeyFlags, SignatureType};
+use sequoia_openpgp::{Cert, Packet};
 
 use crate::backend;
 use crate::backend::{Backend, CertificationBackend};
@@ -146,7 +151,11 @@ fn check_card_empty(open: &Open) -> Result<bool> {
 ///
 /// Expects Admin PIN to be set to the default value of `12345678`.
 /// During card setup, this fn resets the User PIN to a new, random, 8 digit value.
-pub(crate) fn generate_on_card(ident: &str, user_id: String) -> Result<(Cert, String)> {
+pub(crate) fn generate_on_card(
+    ident: &str,
+    domain: &str,
+    user_id: String,
+) -> Result<(Cert, String)> {
     let cb = PcscBackend::open_by_ident(ident, None)?;
     let mut card = Card::new(cb);
     let mut open = card.transaction()?;
@@ -177,6 +186,10 @@ pub(crate) fn generate_on_card(ident: &str, user_id: String) -> Result<(Cert, St
 
         let key_sig = public_key_material_to_key(&pkm, KeyType::Signing, &ts, None, None)?;
 
+        let (pkm, ts) = admin.generate_key_simple(KeyType::Authentication, algo)?;
+
+        let key_aut = public_key_material_to_key(&pkm, KeyType::Authentication, &ts, None, None)?;
+
         // change User PIN
         //
         // NOTE: This is done after key generation because Gnuk doesn't allow PIN changes
@@ -187,16 +200,103 @@ pub(crate) fn generate_on_card(ident: &str, user_id: String) -> Result<(Cert, St
 
         admin.reset_user_pin(new_user_pin.as_bytes())?;
 
-        let cert = make_cert(
-            &mut open,
-            key_sig,
-            None,
-            None,
-            Some(new_user_pin.as_bytes()),
-            &|| println!("Enter User PIN on card reader pinpad."),
-            &|| println!("Need touch confirmation for signing."),
-            &[user_id],
-        )?;
+        // Custom Certificate generation: we use the auth slot as the certification capable primary
+        // key, and the signing key from the sig slot.
+
+        let cert = {
+            let mut pp = vec![];
+
+            // helper: use the card's auth slot to perform a certification operation
+            let mut certify_on_card =
+                |op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>| {
+                    // Allow user operations on the card
+
+                    let pw1 = new_user_pin.as_bytes();
+
+                    open.verify_user(pw1)?;
+
+                    // FIXME: implement pin pad handling
+                    // open.verify_user_pinpad(&|| {
+                    //     println!("Enter User PIN on card reader pinpad.")
+                    // })?;
+
+                    if let Some(mut user) = open.user_card() {
+                        // Card-backed signer for bindings
+                        let mut card_signer = user
+                            .authenticator_from_public(key_aut.clone(), &|| {
+                                println!("Need touch confirmation for signing.")
+                            });
+
+                        // Make signature, return it
+                        let s = op(&mut card_signer)?;
+                        Ok(s)
+                    } else {
+                        Err(anyhow!("Failed to open card for signing"))
+                    }
+                };
+
+            // 1) use the auth key as primary key
+            let pri = PrimaryRole::convert_key(key_aut.clone());
+            pp.push(Packet::from(pri));
+
+            // 1a) add a direct key signature
+            let s = certify_on_card(&mut |signer| {
+                SignatureBuilder::new(SignatureType::DirectKey)
+                    .set_key_flags(
+                        // Flags for primary key
+                        KeyFlags::empty().set_certification(),
+                    )?
+                    .sign_direct_key(signer, key_aut.role_as_primary())
+            })?;
+            pp.push(s.into());
+
+            // 2) add sig subkey
+            let sub_sig = SubordinateRole::convert_key(key_sig);
+            pp.push(Packet::from(sub_sig.clone()));
+
+            // Temporary version of the cert
+            let cert = Cert::try_from(pp.clone())?;
+
+            // 3) make, certify binding -> add
+            let s = certify_on_card(&mut |signer| {
+                sub_sig.bind(
+                    signer,
+                    &cert,
+                    SignatureBuilder::new(SignatureType::SubkeyBinding)
+                        .set_key_flags(KeyFlags::empty().set_signing())?,
+                )
+            })?;
+            pp.push(s.into());
+
+            // 4) add `user_id`.
+            let uid: UserID = user_id.into();
+            pp.push(uid.clone().into());
+
+            // Temporary version of the cert
+            let cert = Cert::try_from(pp.clone())?;
+
+            // 5) make, sign userid binding -> add
+            let s = certify_on_card(&mut |signer| {
+                uid.bind(
+                    signer,
+                    &cert,
+                    SignatureBuilder::new(SignatureType::PositiveCertification)
+                        .set_key_flags(
+                            // Flags for primary key
+                            KeyFlags::empty().set_certification(),
+                        )?
+                        .add_notation(
+                            crate::pgp::CA_KEY_NOTATION,
+                            (format!("domain={}", domain)).as_bytes(),
+                            signature::subpacket::NotationDataFlags::empty().set_human_readable(),
+                            false,
+                        )?,
+                )
+            })?;
+            pp.push(s.into());
+
+            Cert::try_from(pp)
+        }?;
 
         Ok((cert, new_user_pin))
     } else {
@@ -234,13 +334,17 @@ pub(crate) fn import_to_card(ident: &str, key: &Cert) -> Result<String> {
 
         match certifier.len() {
             1 => {
-                let sig = certifier.pop().unwrap();
+                let cert = certifier.pop().unwrap();
                 let dec = sq_util::subkey_by_type(key, &policy, KeyType::Decryption)?;
+                let sig = sq_util::subkey_by_type(key, &policy, KeyType::Signing)?;
 
-                admin.upload_key(sig, KeyType::Signing, None)?;
+                admin.upload_key(cert, KeyType::Authentication, None)?;
 
                 if let Some(dec) = dec {
                     admin.upload_key(dec, KeyType::Decryption, None)?;
+                }
+                if let Some(sig) = sig {
+                    admin.upload_key(sig, KeyType::Signing, None)?;
                 }
 
                 admin.set_name("OpenPGP CA")?;

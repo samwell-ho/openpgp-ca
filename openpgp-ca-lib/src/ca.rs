@@ -182,7 +182,7 @@ impl OpenpgpCaUninit {
 
         // Generate key material on card, get the public key,
         // initialize the CA with these artifacts.
-        let (ca_cert, user_pin) = card::generate_on_card(ident, uid)?;
+        let (ca_cert, user_pin) = card::generate_on_card(ident, domain, uid)?;
 
         self.ca_init_card(ident, &user_pin, domain, &ca_cert)
     }
@@ -259,11 +259,11 @@ impl OpenpgpCaUninit {
             let mut open = card.transaction()?;
 
             let fps = open.fingerprints()?;
-            let sig = fps
-                .signature()
+            let auth = fps
+                .authentication()
                 .context(format!("No Signing key on card {}", card_ident))?;
 
-            let sig_fp = sig.to_string();
+            let auth_fp = auth.to_string();
 
             let cardholder_name = open.cardholder_name()?;
 
@@ -280,17 +280,17 @@ impl OpenpgpCaUninit {
             let pubkey = Pgp::cert_to_armored(ca_cert)
                 .context("Failed to transform CA cert to armored pubkey")?;
 
-            // CA pubkey and card signature key slot must match
-            if ca_cert.fingerprint().to_hex() != sig_fp {
+            // CA pubkey and card auth key slot must match
+            if ca_cert.fingerprint().to_hex() != auth_fp {
                 return Err(anyhow::anyhow!(format!(
-                    "Signature key slot on card {} doesn't match public key {}.",
-                    sig_fp,
+                    "Auth key slot on card {} doesn't match primary (cert) fingerprint {}.",
+                    auth_fp,
                     ca_cert.fingerprint().to_hex()
                 )));
             }
 
             self.db.transaction(|| {
-                CardCa::ca_init(&self.db, domainname, card_ident, pin, &pubkey, &sig_fp)
+                CardCa::ca_init(&self.db, domainname, card_ident, pin, &pubkey, &auth_fp)
             })?;
         }
 

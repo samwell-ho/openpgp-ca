@@ -23,7 +23,7 @@ use sequoia_openpgp::types::{KeyFlags, RevocationStatus, SignatureType};
 use sequoia_openpgp::{Cert, Fingerprint, KeyHandle, Packet};
 use sha2::Digest;
 
-const CA_KEY_NOTATION: &str = "openpgp-ca@notations.sequoia-pgp.org";
+pub(crate) const CA_KEY_NOTATION: &str = "openpgp-ca@notations.sequoia-pgp.org";
 
 pub struct Pgp {}
 
