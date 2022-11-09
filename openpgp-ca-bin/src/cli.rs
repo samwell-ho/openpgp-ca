@@ -64,36 +64,43 @@ pub enum Commands {
     //    /// Manage key-profiles
     //    KeyProfile {}
 }
-#[derive(Subcommand)]
-pub enum CardInitMode {
-    /// Generate a new OpenPGP CA key on the host computer, import it to the card.
-    ///
-    /// This will print the generated OpenPGP CA private key to stdout, the operator need to
-    /// safekeep that key.
-    OnHost {},
-
-    /// Generate a new OpenPGP CA key on the card.
-    /// Caution: the private key material can not be backed up, or copied to a second card,
-    /// in this mode!
-    OnCard {},
-
-    /// Initialize OpenPGP from an OpenPGP card with pre-loaded keys, and a matching public key file.
-    Import {
-        /// CA public key File
-        public: PathBuf,
-    },
-}
 
 #[derive(Subcommand)]
 pub enum Backend {
+    /// Generate a new OpenPGP CA and store it locally in the CA database, for direct use.
     Softkey,
 
+    /// Generate a new OpenPGP CA on an OpenPGP smart card.
+    ///
+    /// By default, this will generate the new key on the host computer, and print the generated
+    /// OpenPGP CA private key to stdout, the operator needs to safe-keep that private key.
+    ///
+    /// Optionally, the key can be generated directly on the card.
     Card {
         /// OpenPGP card ident
         ident: String,
 
-        #[clap(subcommand)]
-        initmode: CardInitMode,
+        /// Generate a new OpenPGP CA key on the card.
+        /// Caution: the private key material can not be backed up, or copied to a second card,
+        /// in this mode!
+        #[clap(long = "on-card", help = "Generate private key on the card")]
+        on_card: bool,
+
+        #[clap(
+            short = 'P',
+            long = "pinpad",
+            help = "Enforce use of pinpad for PIN entry"
+        )]
+        pinpad: bool,
+    },
+
+    /// Initialize OpenPGP from an OpenPGP card with pre-loaded keys, and a matching public key file.
+    CardImport {
+        /// OpenPGP card ident
+        ident: String,
+
+        /// CA public key File
+        public: PathBuf,
 
         #[clap(
             short = 'P',

@@ -8,8 +8,6 @@ use anyhow::Result;
 use clap::{CommandFactory, FromArgMatches};
 use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
 
-use crate::cli::CardInitMode;
-
 mod cli;
 
 fn main() -> Result<()> {
@@ -40,7 +38,7 @@ fn main() -> Result<()> {
             cli::Backend::Softkey => cau.ca_init(domain, name.as_deref()),
             cli::Backend::Card {
                 ident,
-                initmode,
+                on_card,
                 pinpad,
             } => {
                 if *pinpad {
@@ -52,37 +50,44 @@ fn main() -> Result<()> {
                     unimplemented!("pinpad mode is not implemented yet");
                 }
 
-                // Handle different setup modes
-                match initmode {
-                    CardInitMode::OnHost {} | CardInitMode::OnCard {} => {
-                        if let CardInitMode::OnHost {} = initmode {
-                            // 1) generate key in CA, import to card, print private key
-                            let (ca, key) =
-                                cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
+                if !on_card {
+                    // 1) generate key in CA, import to card, print private key
+                    let (ca, key) = cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
 
-                            println!("Generated new CA key:\n\n{}", key);
+                    println!("Generated new CA key:\n\n{}", key);
 
-                            Ok(ca)
-                        } else {
-                            // 2) generate key on card, make public key (and store it in DB)
-                            cau.ca_init_generate_on_card(ident, domain, name.as_deref())
-                        }
-                    }
-                    CardInitMode::Import { public } => {
-                        // 3) import existing card/pubkey pair for init
-
-                        let ca_cert = std::fs::read(public)?;
-
-                        // This card is already initialized, ask for User PIN
-                        let pin = rpassword::prompt_password(format!(
-                            "Enter User PIN for OpenPGP card {}: ",
-                            ident
-                        ))?;
-                        println!();
-
-                        cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
-                    }
+                    Ok(ca)
+                } else {
+                    // 2) generate key on card, make public key (and store it in DB)
+                    cau.ca_init_generate_on_card(ident, domain, name.as_deref())
                 }
+            }
+            cli::Backend::CardImport {
+                ident,
+                public,
+                pinpad,
+            } => {
+                if *pinpad {
+                    // FIXME:
+                    // - extend syntax in database backend field: don't store user PIN there
+                    // - use pinpad for changing user PIN to its new value
+                    // - use pinpad for signing operations
+
+                    unimplemented!("pinpad mode is not implemented yet");
+                }
+
+                // import existing card/pubkey pair for init
+
+                let ca_cert = std::fs::read(public)?;
+
+                // This card is already initialized, ask for User PIN
+                let pin = rpassword::prompt_password(format!(
+                    "Enter User PIN for OpenPGP card {}: ",
+                    ident
+                ))?;
+                println!();
+
+                cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
             }
         }?;
 
