@@ -199,6 +199,7 @@ fn validate_and_strip_user_ids(
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
     let ci = cert.try_into().map_err(|e| {
         ReturnBadJson::new(
@@ -248,6 +249,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
 
 // `signed_by` is true, if the provided keyring has been signed
 // by this cert. If so, upload will be recommended to the UI.
+#[allow(clippy::result_large_err)]
 fn process_cert(
     cert: &Cert,
     signed_by: bool,

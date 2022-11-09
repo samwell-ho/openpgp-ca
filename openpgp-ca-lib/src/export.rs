@@ -129,7 +129,7 @@ pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
     use sequoia_net::wkd;
 
     let ca_cert = oca.ca_get_cert_pub()?;
-    wkd::insert(&path, domain, None, &ca_cert)?;
+    wkd::insert(path, domain, None, &ca_cert)?;
 
     for cert in oca.user_certs_get_all()? {
         // Don't export to WKD if the cert is marked "delisted"
@@ -137,7 +137,7 @@ pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
             let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
 
             if Pgp::cert_has_uid_in_domain(&c, domain)? {
-                wkd::insert(&path, domain, None, &c)?;
+                wkd::insert(path, domain, None, &c)?;
             }
         }
     }
