@@ -13,8 +13,8 @@ use anyhow::{anyhow, Result};
 use openpgp_card::{algorithm::AlgoSimple, KeyType};
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::card::{Card, Open};
-use openpgp_card_sequoia::sq_util;
 use openpgp_card_sequoia::util::public_key_material_to_key;
+use openpgp_card_sequoia::{sq_util, PublicKey};
 use sequoia_openpgp::packet::key::{KeyRole, PrimaryRole, SubordinateRole};
 use sequoia_openpgp::packet::prelude::SignatureBuilder;
 use sequoia_openpgp::packet::{signature, Signature, UserID};
@@ -221,48 +221,54 @@ pub(crate) fn generate_on_card(
             }
 
             // helper: use the card's auth slot to perform a certification operation
-            let mut certify_on_card =
-                |op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>| {
-                    // Allow user operations on the card
+            fn certify_on_card(
+                user_pin: String,
+                open: &mut Open,
+                auth_pubkey: PublicKey,
+                op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>,
+            ) -> Result<Signature> {
+                // Allow user operations on the card
+                let pw1 = user_pin.as_bytes();
+                open.verify_user(pw1)?;
 
-                    let pw1 = new_user_pin.as_bytes();
+                // FIXME: implement pin pad handling
+                // open.verify_user_pinpad(&|| {
+                //     println!("Enter User PIN on card reader pinpad.")
+                // })?;
 
-                    open.verify_user(pw1)?;
+                if let Some(mut user) = open.user_card() {
+                    // Card-backed signer for bindings
+                    let mut card_signer = user.authenticator_from_public(auth_pubkey, &|| {
+                        println!("Need touch confirmation for signing.")
+                    });
 
-                    // FIXME: implement pin pad handling
-                    // open.verify_user_pinpad(&|| {
-                    //     println!("Enter User PIN on card reader pinpad.")
-                    // })?;
-
-                    if let Some(mut user) = open.user_card() {
-                        // Card-backed signer for bindings
-                        let mut card_signer = user
-                            .authenticator_from_public(key_aut.clone(), &|| {
-                                println!("Need touch confirmation for signing.")
-                            });
-
-                        // Make signature, return it
-                        let s = op(&mut card_signer)?;
-                        Ok(s)
-                    } else {
-                        Err(anyhow!("Failed to open card for signing"))
-                    }
-                };
+                    // Make signature, return it
+                    let s = op(&mut card_signer)?;
+                    Ok(s)
+                } else {
+                    Err(anyhow!("Failed to open card for signing"))
+                }
+            }
 
             // 1) use the auth key as primary key
             let pri = PrimaryRole::convert_key(key_aut.clone());
             pp.push(Packet::from(pri));
 
             // 1a) add a direct key signature
-            let s = certify_on_card(&mut |signer| {
-                let sb = SignatureBuilder::new(SignatureType::DirectKey).set_key_flags(
-                    // Flags for primary key
-                    KeyFlags::empty().set_certification(),
-                )?;
-                let sb = set_signer_metadata(sb)?;
+            let s = certify_on_card(
+                new_user_pin.clone(),
+                &mut open,
+                key_aut.clone(),
+                &mut |signer| {
+                    let sb = SignatureBuilder::new(SignatureType::DirectKey).set_key_flags(
+                        // Flags for primary key
+                        KeyFlags::empty().set_certification(),
+                    )?;
+                    let sb = set_signer_metadata(sb)?;
 
-                sb.sign_direct_key(signer, key_aut.role_as_primary())
-            })?;
+                    sb.sign_direct_key(signer, key_aut.role_as_primary())
+                },
+            )?;
             pp.push(s.into());
 
             // 2) add sig subkey
@@ -273,14 +279,19 @@ pub(crate) fn generate_on_card(
             let cert = Cert::try_from(pp.clone())?;
 
             // 3) make, certify binding -> add
-            let s = certify_on_card(&mut |signer| {
-                sub_sig.bind(
-                    signer,
-                    &cert,
-                    SignatureBuilder::new(SignatureType::SubkeyBinding)
-                        .set_key_flags(KeyFlags::empty().set_signing())?,
-                )
-            })?;
+            let s = certify_on_card(
+                new_user_pin.clone(),
+                &mut open,
+                key_aut.clone(),
+                &mut |signer| {
+                    sub_sig.bind(
+                        signer,
+                        &cert,
+                        SignatureBuilder::new(SignatureType::SubkeyBinding)
+                            .set_key_flags(KeyFlags::empty().set_signing())?,
+                    )
+                },
+            )?;
             pp.push(s.into());
 
             // 4) add `user_id`.
@@ -291,22 +302,27 @@ pub(crate) fn generate_on_card(
             let cert = Cert::try_from(pp.clone())?;
 
             // 5) make, sign userid binding -> add
-            let s = certify_on_card(&mut |signer| {
-                let sb = SignatureBuilder::new(SignatureType::PositiveCertification)
-                    .set_key_flags(
-                        // Flags for primary key
-                        KeyFlags::empty().set_certification(),
-                    )?
-                    .add_notation(
-                        crate::pgp::CA_KEY_NOTATION,
-                        (format!("domain={}", domain)).as_bytes(),
-                        signature::subpacket::NotationDataFlags::empty().set_human_readable(),
-                        false,
-                    )?;
-                let sb = set_signer_metadata(sb)?;
+            let s = certify_on_card(
+                new_user_pin.clone(),
+                &mut open,
+                key_aut.clone(),
+                &mut |signer| {
+                    let sb = SignatureBuilder::new(SignatureType::PositiveCertification)
+                        .set_key_flags(
+                            // Flags for primary key
+                            KeyFlags::empty().set_certification(),
+                        )?
+                        .add_notation(
+                            crate::pgp::CA_KEY_NOTATION,
+                            (format!("domain={}", domain)).as_bytes(),
+                            signature::subpacket::NotationDataFlags::empty().set_human_readable(),
+                            false,
+                        )?;
+                    let sb = set_signer_metadata(sb)?;
 
-                uid.bind(signer, &cert, sb)
-            })?;
+                    uid.bind(signer, &cert, sb)
+                },
+            )?;
             pp.push(s.into());
 
             Cert::try_from(pp)
