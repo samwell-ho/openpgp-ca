@@ -169,8 +169,10 @@ pub(crate) fn generate_on_card(
         ));
     }
 
-    // FIXME: make dynamic? (we want to use rsa4k by default, but Gnuk can't generate rsa4k)
-    let algo = Some(AlgoSimple::Curve25519);
+    // Use RSA4k by default. This works on e.g. Yk5 (but Gnuk can't generate rsa4k)
+    let algo = Some(AlgoSimple::RSA4k);
+    println!("Generating key material on the card, this might take a while.");
+    println!();
 
     // We assume that the default Admin PIN is currently valid
     if open.verify_admin(PW3_DEFAULT.as_bytes()).is_err() {
