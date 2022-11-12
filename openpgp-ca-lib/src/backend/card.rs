@@ -19,7 +19,9 @@ use sequoia_openpgp::packet::key::{KeyRole, PrimaryRole, SubordinateRole};
 use sequoia_openpgp::packet::prelude::SignatureBuilder;
 use sequoia_openpgp::packet::{signature, Signature, UserID};
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::types::{KeyFlags, SignatureType};
+use sequoia_openpgp::types::{
+    Features, HashAlgorithm, KeyFlags, SignatureType, SymmetricAlgorithm,
+};
 use sequoia_openpgp::{Cert, Packet};
 
 use crate::backend;
@@ -206,6 +208,18 @@ pub(crate) fn generate_on_card(
         let cert = {
             let mut pp = vec![];
 
+            fn set_signer_metadata(sb: SignatureBuilder) -> Result<SignatureBuilder> {
+                sb.set_features(Features::sequoia())?
+                    .set_preferred_hash_algorithms(vec![
+                        HashAlgorithm::SHA512,
+                        HashAlgorithm::SHA256,
+                    ])?
+                    .set_preferred_symmetric_algorithms(vec![
+                        SymmetricAlgorithm::AES256,
+                        SymmetricAlgorithm::AES128,
+                    ])
+            }
+
             // helper: use the card's auth slot to perform a certification operation
             let mut certify_on_card =
                 |op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>| {
@@ -241,12 +255,13 @@ pub(crate) fn generate_on_card(
 
             // 1a) add a direct key signature
             let s = certify_on_card(&mut |signer| {
-                SignatureBuilder::new(SignatureType::DirectKey)
-                    .set_key_flags(
-                        // Flags for primary key
-                        KeyFlags::empty().set_certification(),
-                    )?
-                    .sign_direct_key(signer, key_aut.role_as_primary())
+                let sb = SignatureBuilder::new(SignatureType::DirectKey).set_key_flags(
+                    // Flags for primary key
+                    KeyFlags::empty().set_certification(),
+                )?;
+                let sb = set_signer_metadata(sb)?;
+
+                sb.sign_direct_key(signer, key_aut.role_as_primary())
             })?;
             pp.push(s.into());
 
@@ -277,21 +292,20 @@ pub(crate) fn generate_on_card(
 
             // 5) make, sign userid binding -> add
             let s = certify_on_card(&mut |signer| {
-                uid.bind(
-                    signer,
-                    &cert,
-                    SignatureBuilder::new(SignatureType::PositiveCertification)
-                        .set_key_flags(
-                            // Flags for primary key
-                            KeyFlags::empty().set_certification(),
-                        )?
-                        .add_notation(
-                            crate::pgp::CA_KEY_NOTATION,
-                            (format!("domain={}", domain)).as_bytes(),
-                            signature::subpacket::NotationDataFlags::empty().set_human_readable(),
-                            false,
-                        )?,
-                )
+                let sb = SignatureBuilder::new(SignatureType::PositiveCertification)
+                    .set_key_flags(
+                        // Flags for primary key
+                        KeyFlags::empty().set_certification(),
+                    )?
+                    .add_notation(
+                        crate::pgp::CA_KEY_NOTATION,
+                        (format!("domain={}", domain)).as_bytes(),
+                        signature::subpacket::NotationDataFlags::empty().set_human_readable(),
+                        false,
+                    )?;
+                let sb = set_signer_metadata(sb)?;
+
+                uid.bind(signer, &cert, sb)
             })?;
             pp.push(s.into());
 
