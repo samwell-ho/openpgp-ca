@@ -250,11 +250,41 @@ pub(crate) fn generate_on_card(
                 }
             }
 
+            // helper: use the card's sig slot to perform a signing operation
+            fn sign_on_card(
+                user_pin: String,
+                open: &mut Open,
+                sig_pubkey: PublicKey,
+                op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>,
+            ) -> Result<Signature> {
+                // Allow user operations on the card
+                let pw1 = user_pin.as_bytes();
+                open.verify_user_for_signing(pw1)?;
+
+                // FIXME: implement pin pad handling
+                // open.verify_user_pinpad(&|| {
+                //     println!("Enter User PIN on card reader pinpad.")
+                // })?;
+
+                if let Some(mut sign) = open.signing_card() {
+                    // Card-backed signer for bindings
+                    let mut card_signer = sign.signer_from_public(sig_pubkey, &|| {
+                        println!("Need touch confirmation for signing.")
+                    });
+
+                    // Make signature, return it
+                    let s = op(&mut card_signer)?;
+                    Ok(s)
+                } else {
+                    Err(anyhow!("Failed to open card for signing"))
+                }
+            }
+
             // 1) use the auth key as primary key
             let pri = PrimaryRole::convert_key(key_aut.clone());
             pp.push(Packet::from(pri));
 
-            // 1a) add a direct key signature
+            // 2) make direct key signature
             let s = certify_on_card(
                 new_user_pin.clone(),
                 &mut open,
@@ -271,37 +301,14 @@ pub(crate) fn generate_on_card(
             )?;
             pp.push(s.into());
 
-            // 2) add sig subkey
-            let sub_sig = SubordinateRole::convert_key(key_sig);
-            pp.push(Packet::from(sub_sig.clone()));
-
-            // Temporary version of the cert
-            let cert = Cert::try_from(pp.clone())?;
-
-            // 3) make, certify binding -> add
-            let s = certify_on_card(
-                new_user_pin.clone(),
-                &mut open,
-                key_aut.clone(),
-                &mut |signer| {
-                    sub_sig.bind(
-                        signer,
-                        &cert,
-                        SignatureBuilder::new(SignatureType::SubkeyBinding)
-                            .set_key_flags(KeyFlags::empty().set_signing())?,
-                    )
-                },
-            )?;
-            pp.push(s.into());
-
-            // 4) add `user_id`.
+            // 3) add `user_id`.
             let uid: UserID = user_id.into();
             pp.push(uid.clone().into());
 
             // Temporary version of the cert
             let cert = Cert::try_from(pp.clone())?;
 
-            // 5) make, sign userid binding -> add
+            // 4) make, sign userid binding -> add
             let s = certify_on_card(
                 new_user_pin.clone(),
                 &mut open,
@@ -321,6 +328,42 @@ pub(crate) fn generate_on_card(
                     let sb = set_signer_metadata(sb)?;
 
                     uid.bind(signer, &cert, sb)
+                },
+            )?;
+            pp.push(s.into());
+
+            // Temporary version of the cert
+            let cert = Cert::try_from(pp.clone())?;
+
+            // 5) backsig
+            let sub_sig = SubordinateRole::convert_key(key_sig.clone());
+
+            let bs = sign_on_card(new_user_pin.clone(), &mut open, key_sig, &mut |signer| {
+                let sb = SignatureBuilder::new(SignatureType::PrimaryKeyBinding)
+                    // GnuPG wants at least a 512-bit hash for P521 keys.
+                    .set_hash_algo(HashAlgorithm::SHA512)
+                    .set_reference_time(None);
+
+                sb.sign_primary_key_binding(&mut *signer, &cert.primary_key(), &sub_sig)
+            })?;
+
+            // Temporary version of the cert
+            let cert = Cert::try_from(pp.clone())?;
+
+            // 6) add sig subkey
+            pp.push(Packet::from(sub_sig.clone()));
+
+            // 7) make, certify subkey binding -> add
+            let s = certify_on_card(
+                new_user_pin.clone(),
+                &mut open,
+                key_aut.clone(),
+                &mut |signer| {
+                    let sb = SignatureBuilder::new(SignatureType::SubkeyBinding)
+                        .set_key_flags(KeyFlags::empty().set_signing())?
+                        .set_embedded_signature(bs.clone())?;
+
+                    sub_sig.bind(signer, &cert, sb)
                 },
             )?;
             pp.push(s.into());
