@@ -17,7 +17,7 @@ use openpgp_card_sequoia::util::public_key_material_to_key;
 use openpgp_card_sequoia::{sq_util, PublicKey};
 use sequoia_openpgp::packet::key::{KeyRole, PrimaryRole, SubordinateRole};
 use sequoia_openpgp::packet::prelude::SignatureBuilder;
-use sequoia_openpgp::packet::{signature, Signature, UserID};
+use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::types::{
     Features, HashAlgorithm, KeyFlags, SignatureType, SymmetricAlgorithm,
@@ -295,6 +295,7 @@ pub(crate) fn generate_on_card(
                         KeyFlags::empty().set_certification(),
                     )?;
                     let sb = set_signer_metadata(sb)?;
+                    let sb = Pgp::add_ca_domain_notation(sb, domain)?;
 
                     sb.sign_direct_key(signer, key_aut.role_as_primary())
                 },
@@ -318,14 +319,9 @@ pub(crate) fn generate_on_card(
                         .set_key_flags(
                             // Flags for primary key
                             KeyFlags::empty().set_certification(),
-                        )?
-                        .add_notation(
-                            crate::pgp::CA_KEY_NOTATION,
-                            (format!("domain={}", domain)).as_bytes(),
-                            signature::subpacket::NotationDataFlags::empty().set_human_readable(),
-                            false,
                         )?;
                     let sb = set_signer_metadata(sb)?;
+                    let sb = Pgp::add_ca_domain_notation(sb, domain)?;
 
                     uid.bind(signer, &cert, sb)
                 },

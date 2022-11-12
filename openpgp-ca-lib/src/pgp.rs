@@ -15,6 +15,7 @@ use sequoia_openpgp::cert::amalgamation::{ValidAmalgamation, ValidateAmalgamatio
 use sequoia_openpgp::cert::prelude::ComponentAmalgamation;
 use sequoia_openpgp::cert::{CertParser, CipherSuite};
 use sequoia_openpgp::crypto::KeyPair;
+use sequoia_openpgp::packet::signature::SignatureBuilder;
 use sequoia_openpgp::packet::{signature, Signature, UserID};
 use sequoia_openpgp::parse::{PacketParser, Parse};
 use sequoia_openpgp::policy::StandardPolicy;
@@ -61,6 +62,19 @@ impl Pgp {
         }
     }
 
+    /// notation: "openpgp-ca:domain=domain1;domain2"
+    pub(crate) fn add_ca_domain_notation(
+        sb: SignatureBuilder,
+        domain: &str,
+    ) -> Result<SignatureBuilder> {
+        sb.add_notation(
+            crate::pgp::CA_KEY_NOTATION,
+            (format!("domain={}", domain)).as_bytes(),
+            signature::subpacket::NotationDataFlags::empty().set_human_readable(),
+            false,
+        )
+    }
+
     /// Generate a new CA key (and a revocation).
     ///
     /// `domain` is the domainname for the CA (such as `example.org`).
@@ -96,16 +110,12 @@ impl Pgp {
             .primary_key()
             .with_policy(Self::SP, None)?
             .binding_signature();
+
         let builder = signature::SignatureBuilder::from(direct_key_sig.clone())
             .set_type(SignatureType::PositiveCertification)
-            .set_key_flags(KeyFlags::empty().set_certification())?
-            // notation: "openpgp-ca:domain=domain1;domain2"
-            .add_notation(
-                CA_KEY_NOTATION,
-                (format!("domain={}", domain)).as_bytes(),
-                signature::subpacket::NotationDataFlags::empty().set_human_readable(),
-                false,
-            )?;
+            .set_key_flags(KeyFlags::empty().set_certification())?;
+        let builder = Self::add_ca_domain_notation(builder, domain)?;
+
         let binding = userid.bind(&mut keypair, &ca_key, builder)?;
 
         // Merge the User ID and binding signature into the Cert.
