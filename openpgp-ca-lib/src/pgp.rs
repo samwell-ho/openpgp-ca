@@ -4,6 +4,7 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
+use std::convert::TryInto;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
@@ -85,7 +86,7 @@ impl Pgp {
     /// UserID, if it is supplied.
     pub(crate) fn make_ca_cert(domain: &str, name: Option<&str>) -> Result<(Cert, Signature)> {
         // Generate key for a new CA
-        let (ca_key, revocation) = cert::CertBuilder::new()
+        let (mut ca_key, revocation) = cert::CertBuilder::new()
             // RHEL7 [eol 2026] is shipped with GnuPG 2.0.x, which doesn't
             // support ECC
             .set_cipher_suite(CipherSuite::RSA4k)
@@ -94,13 +95,46 @@ impl Pgp {
             // .set_validity_period()
             .generate()?;
 
-        // Get keypair for the CA primary key
+        // Get keypair for the CA primary key, as a Signer
         let mut keypair = ca_key
             .primary_key()
             .key()
             .clone()
             .parts_into_secret()?
             .into_keypair()?;
+
+        // Get a copy of the current DKS
+        let dks = ca_key
+            .with_policy(Self::SP, None)?
+            .direct_key_signature()
+            .cloned();
+
+        // Remove DKS from cert
+        ca_key = ca_key
+            .into_packets()
+            .filter(|p| match p {
+                Packet::Signature(s) => s.typ() != SignatureType::DirectKey,
+                _ => true,
+            })
+            .collect::<Vec<_>>()
+            .try_into()?;
+
+        // Add notation to DKS
+        if let Ok(sig) = dks {
+            let sb = SignatureBuilder::from(sig);
+            let sb = Self::add_ca_domain_notation(sb, domain)?;
+
+            let s = sb
+                // Update the direct key signature.
+                .sign_direct_key(&mut keypair, None)?;
+
+            let p: Packet = s.into();
+            (ca_key, _) = ca_key.insert_packets2(vec![p])?;
+        } else {
+            return Err(anyhow::anyhow!(
+                "Unexpected missing DirectKey Signature in make_ca_cert()"
+            ));
+        }
 
         // Generate a userid and a binding signature
         let email = format!("openpgp-ca@{}", domain);
@@ -114,7 +148,6 @@ impl Pgp {
         let builder = signature::SignatureBuilder::from(direct_key_sig.clone())
             .set_type(SignatureType::PositiveCertification)
             .set_key_flags(KeyFlags::empty().set_certification())?;
-        let builder = Self::add_ca_domain_notation(builder, domain)?;
 
         let binding = userid.bind(&mut keypair, &ca_key, builder)?;
 
