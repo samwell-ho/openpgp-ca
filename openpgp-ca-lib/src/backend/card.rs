@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{anyhow, Result};
 use openpgp_card::{algorithm::AlgoSimple, KeyType};
 use openpgp_card_pcsc::PcscBackend;
-use openpgp_card_sequoia::card::{Card, Open};
+use openpgp_card_sequoia::card::{Admin, Card, Open};
 use openpgp_card_sequoia::util::public_key_material_to_key;
 use openpgp_card_sequoia::{sq_util, PublicKey};
 use sequoia_openpgp::packet::key::{KeyRole, PrimaryRole, SubordinateRole};
@@ -171,7 +171,17 @@ pub(crate) fn generate_on_card(
 
     // Use RSA4k by default. This works on e.g. Yk5 (but Gnuk can't generate rsa4k)
     let algo = Some(AlgoSimple::RSA4k);
-    println!("Generating key material on the card, this might take a while.");
+
+    // Print information about algorithm and possible slowness.
+    println!(
+        "Generating {}key material on the card, this might take a while.",
+        // Printable algo name (with trailing space, if not 'None')
+        if let Some(algo) = algo {
+            format!("{:?} ", algo)
+        } else {
+            "".to_string()
+        }
+    );
     println!();
 
     // We assume that the default Admin PIN is currently valid
@@ -194,15 +204,11 @@ pub(crate) fn generate_on_card(
 
         let key_aut = public_key_material_to_key(&pkm, KeyType::Authentication, &ts, None, None)?;
 
-        // change User PIN
+        // Change User and Admin PIN
         //
         // NOTE: This is done after key generation because Gnuk doesn't allow PIN changes
         // when the card contains no keys.
-        //
-        // NOTE: with Gnuk, this PIN also serves as the new Admin PIN, by default!
-        let new_user_pin = random_user_pin();
-
-        admin.reset_user_pin(new_user_pin.as_bytes())?;
+        let new_pin = set_user_and_admin_pin(&mut admin, PW3_DEFAULT)?;
 
         // Custom Certificate generation: we use the auth slot as the certification capable primary
         // key, and the signing key from the sig slot.
@@ -224,7 +230,7 @@ pub(crate) fn generate_on_card(
 
             // helper: use the card's auth slot to perform a certification operation
             fn certify_on_card(
-                user_pin: String,
+                user_pin: &str,
                 open: &mut Open,
                 auth_pubkey: PublicKey,
                 op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>,
@@ -254,7 +260,7 @@ pub(crate) fn generate_on_card(
 
             // helper: use the card's sig slot to perform a signing operation
             fn sign_on_card(
-                user_pin: String,
+                user_pin: &str,
                 open: &mut Open,
                 sig_pubkey: PublicKey,
                 op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>,
@@ -287,21 +293,16 @@ pub(crate) fn generate_on_card(
             pp.push(Packet::from(pri));
 
             // 2) make direct key signature
-            let s = certify_on_card(
-                new_user_pin.clone(),
-                &mut open,
-                key_aut.clone(),
-                &mut |signer| {
-                    let sb = SignatureBuilder::new(SignatureType::DirectKey).set_key_flags(
-                        // Flags for primary key
-                        KeyFlags::empty().set_certification(),
-                    )?;
-                    let sb = set_signer_metadata(sb)?;
-                    let sb = Pgp::add_ca_domain_notation(sb, domain)?;
+            let s = certify_on_card(&new_pin, &mut open, key_aut.clone(), &mut |signer| {
+                let sb = SignatureBuilder::new(SignatureType::DirectKey).set_key_flags(
+                    // Flags for primary key
+                    KeyFlags::empty().set_certification(),
+                )?;
+                let sb = set_signer_metadata(sb)?;
+                let sb = Pgp::add_ca_domain_notation(sb, domain)?;
 
-                    sb.sign_direct_key(signer, key_aut.role_as_primary())
-                },
-            )?;
+                sb.sign_direct_key(signer, key_aut.role_as_primary())
+            })?;
             pp.push(s.into());
 
             // 3) add `user_id`.
@@ -312,22 +313,17 @@ pub(crate) fn generate_on_card(
             let cert = Cert::try_from(pp.clone())?;
 
             // 4) make, sign userid binding -> add
-            let s = certify_on_card(
-                new_user_pin.clone(),
-                &mut open,
-                key_aut.clone(),
-                &mut |signer| {
-                    let sb = SignatureBuilder::new(SignatureType::PositiveCertification)
-                        .set_key_flags(
-                            // Flags for primary key
-                            KeyFlags::empty().set_certification(),
-                        )?;
-                    let sb = set_signer_metadata(sb)?;
-                    let sb = Pgp::add_ca_domain_notation(sb, domain)?;
+            let s = certify_on_card(&new_pin, &mut open, key_aut.clone(), &mut |signer| {
+                let sb = SignatureBuilder::new(SignatureType::PositiveCertification)
+                    .set_key_flags(
+                        // Flags for primary key
+                        KeyFlags::empty().set_certification(),
+                    )?;
+                let sb = set_signer_metadata(sb)?;
+                let sb = Pgp::add_ca_domain_notation(sb, domain)?;
 
-                    uid.bind(signer, &cert, sb)
-                },
-            )?;
+                uid.bind(signer, &cert, sb)
+            })?;
             pp.push(s.into());
 
             // Temporary version of the cert
@@ -336,7 +332,7 @@ pub(crate) fn generate_on_card(
             // 5) backsig
             let sub_sig = SubordinateRole::convert_key(key_sig.clone());
 
-            let bs = sign_on_card(new_user_pin.clone(), &mut open, key_sig, &mut |signer| {
+            let bs = sign_on_card(&new_pin, &mut open, key_sig, &mut |signer| {
                 let sb = SignatureBuilder::new(SignatureType::PrimaryKeyBinding)
                     // GnuPG wants at least a 512-bit hash for P521 keys.
                     .set_hash_algo(HashAlgorithm::SHA512)
@@ -352,24 +348,19 @@ pub(crate) fn generate_on_card(
             pp.push(Packet::from(sub_sig.clone()));
 
             // 7) make, certify subkey binding -> add
-            let s = certify_on_card(
-                new_user_pin.clone(),
-                &mut open,
-                key_aut.clone(),
-                &mut |signer| {
-                    let sb = SignatureBuilder::new(SignatureType::SubkeyBinding)
-                        .set_key_flags(KeyFlags::empty().set_signing())?
-                        .set_embedded_signature(bs.clone())?;
+            let s = certify_on_card(&new_pin, &mut open, key_aut.clone(), &mut |signer| {
+                let sb = SignatureBuilder::new(SignatureType::SubkeyBinding)
+                    .set_key_flags(KeyFlags::empty().set_signing())?
+                    .set_embedded_signature(bs.clone())?;
 
-                    sub_sig.bind(signer, &cert, sb)
-                },
-            )?;
+                sub_sig.bind(signer, &cert, sb)
+            })?;
             pp.push(s.into());
 
             Cert::try_from(pp)
         }?;
 
-        Ok((cert, new_user_pin))
+        Ok((cert, new_pin))
     } else {
         Err(anyhow!("Failed to open card in admin mode."))
     }
@@ -420,10 +411,8 @@ pub(crate) fn import_to_card(ident: &str, key: &Cert) -> Result<String> {
 
                 admin.set_name("OpenPGP CA")?;
 
-                let new_user_pin = random_user_pin();
-                admin.reset_user_pin(new_user_pin.as_bytes())?;
-
-                Ok(new_user_pin)
+                let new_pin = set_user_and_admin_pin(&mut admin, PW3_DEFAULT)?;
+                Ok(new_pin)
             }
             0 => Err(anyhow::anyhow!("No certification capable key found in key")),
 
@@ -436,7 +425,31 @@ pub(crate) fn import_to_card(ident: &str, key: &Cert) -> Result<String> {
     }
 }
 
-/// Generate a random 8 digit String to use as User PIN
+/// Given the current `admin_pin`, set both the User and Admin PIN to a new random 8-digit value
+/// (the new PIN gets returned)
+fn set_user_and_admin_pin(admin: &mut Admin, admin_pin: &str) -> Result<String> {
+    // Generate new 8-digit random PIN
+    let new_pin = random_user_pin();
+
+    // Set Admin PIN to new_pin.
+    // (This undoes the previous Admin PIN verification, at least on some cards)
+    admin
+        .as_open()
+        .change_admin_pin(admin_pin.as_bytes(), new_pin.as_bytes())?;
+
+    // Re-Verify with new Admin PIN (otherwise admin access privileges are missing)
+    admin.as_open().verify_admin(new_pin.as_bytes())?;
+
+    // Set new User PIN
+    admin.reset_user_pin(new_pin.as_bytes())?;
+
+    // Note: on Gnuk, the User and Admin PIN are now "separated" (changing one doesn't
+    // implicitly change the other anymore). However, they are set to the same value.
+
+    Ok(new_pin)
+}
+
+/// Generate a random 8 digit String to use as User/Admin PIN
 fn random_user_pin() -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();
