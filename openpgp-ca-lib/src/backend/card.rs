@@ -140,7 +140,7 @@ const PW3_DEFAULT: &str = "12345678";
 
 /// Check if the card `ident` is empty.
 /// The card is considered empty when fingerprints for all three keyslots are unset.
-fn check_card_empty(open: &Open) -> Result<bool> {
+pub(crate) fn check_card_empty(open: &Open) -> Result<bool> {
     let fps = open.fingerprints()?;
     if fps.signature().is_some() || fps.decryption().is_some() || fps.authentication().is_some() {
         Ok(false)

@@ -42,6 +42,8 @@ use std::time::SystemTime;
 use anyhow::{Context, Result};
 use chrono::offset::Utc;
 use chrono::DateTime;
+use openpgp_card_pcsc::PcscBackend;
+use openpgp_card_sequoia::card::Card;
 use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
@@ -125,6 +127,14 @@ impl OpenpgpCaUninit {
         let dbca = Rc::new(DbCa::new(db.clone()));
 
         Ok(Self { db, ca: dbca })
+    }
+
+    pub fn is_card_empty(ident: &str) -> Result<bool> {
+        let cb = PcscBackend::open_by_ident(ident, None)?;
+        let mut card = Card::new(cb);
+        let open = card.transaction()?;
+
+        card::check_card_empty(&open)
     }
 
     /// Check if domainname is legal according to Mozilla's Public Suffix List
@@ -231,6 +241,29 @@ impl OpenpgpCaUninit {
         // (could perform crypto operations on the card and test against cert?)
 
         self.ca_init_card(card_ident, user_pin, domain, &ca_cert)
+    }
+
+    /// Import CA private key onto a blank OpenPGP card.
+    pub fn ca_init_import_private_to_card(
+        self,
+        card_ident: &str,
+        domain: &str,
+        ca_cert: &[u8],
+    ) -> Result<OpenpgpCa> {
+        let ca_key = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
+        if !ca_key.is_tsk() {
+            return Err(anyhow::anyhow!(
+                "No private key material found in file, while importing to empty OpenPGP card."
+            ));
+        }
+
+        // FIXME: handle password protected key file?
+
+        // Import key material to card.
+        let user_pin = card::import_to_card(card_ident, &ca_key)?;
+
+        // Private key material will get stripped implicitly by ca_init_card()
+        self.ca_init_card(card_ident, &user_pin, domain, &ca_key)
     }
 
     /// Init with OpenPGP card backend

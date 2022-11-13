@@ -94,13 +94,17 @@ pub enum Backend {
         pinpad: bool,
     },
 
-    /// Initialize OpenPGP from an OpenPGP card with pre-loaded keys, and a matching public key file.
+    /// Initialize card-based OpenPGP CA instance from an existing key.
+    ///
+    /// This command supports two modes of operation:
+    /// 1) with an OpenPGP card with pre-loaded CA keys, and a matching public key, or
+    /// 2) with a blank OpenPGP card, from a CA private key.
     CardImport {
         /// OpenPGP card ident
         ident: String,
 
-        /// CA public key File
-        public: PathBuf,
+        /// CA public key (or private key) file
+        ca_key_file: PathBuf,
 
         #[clap(
             short = 'P',

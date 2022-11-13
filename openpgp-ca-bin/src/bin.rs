@@ -64,7 +64,7 @@ fn main() -> Result<()> {
             }
             cli::Backend::CardImport {
                 ident,
-                public,
+                ca_key_file: public,
                 pinpad,
             } => {
                 if *pinpad {
@@ -76,18 +76,26 @@ fn main() -> Result<()> {
                     unimplemented!("pinpad mode is not implemented yet");
                 }
 
-                // import existing card/pubkey pair for init
-
                 let ca_cert = std::fs::read(public)?;
 
-                // This card is already initialized, ask for User PIN
-                let pin = rpassword::prompt_password(format!(
-                    "Enter User PIN for OpenPGP card {}: ",
-                    ident
-                ))?;
-                println!();
+                if OpenpgpCaUninit::is_card_empty(ident)? {
+                    // Initialize CA onto a blank card, from private CA key file
+                    cau.ca_init_import_private_to_card(ident, domain, &ca_cert)
+                } else {
+                    // Initialize CA from existing card and pubkey file
+                    println!("Trying to initialize CA with OpenPGP card {}.", ident);
+                    println!("This card already contains key material.");
+                    println!();
 
-                cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
+                    // This card is already initialized, ask for User PIN
+                    let pin = rpassword::prompt_password(format!(
+                        "Enter User PIN for OpenPGP card {}: ",
+                        ident
+                    ))?;
+                    println!();
+
+                    cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
+                }
             }
         }?;
 
