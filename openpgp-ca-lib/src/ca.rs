@@ -21,7 +21,7 @@
 //!
 //! // initialize the CA Admin (with domainname and a symbolic name)
 //! let openpgp_ca = openpgp_ca_uninit
-//!     .ca_init("example.org", Some("Example Org OpenPGP CA Key"))
+//!     .ca_init_softkey("example.org", Some("Example Org OpenPGP CA Key"))
 //!     .unwrap();
 //!
 //! // create a new user, with all signatures
@@ -146,7 +146,7 @@ impl OpenpgpCaUninit {
     ///
     /// `domainname` is the domain that this CA Admin is in charge of,
     /// `name` is a descriptive name for the CA Admin
-    pub fn ca_init(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
+    pub fn ca_init_softkey(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
         Self::check_domainname(domainname)?;
         let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
 

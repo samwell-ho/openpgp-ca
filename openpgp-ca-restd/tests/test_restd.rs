@@ -231,7 +231,7 @@ async fn test_restd() {
 
     // -- init OpenPGP CA --
     let cau = OpenpgpCaUninit::new(Some(&db)).unwrap();
-    let _ca = cau.ca_init("example.org", None).unwrap();
+    let _ca = cau.ca_init_softkey("example.org", None).unwrap();
 
     // -- start restd --
     let abort_handle = start_restd(db);

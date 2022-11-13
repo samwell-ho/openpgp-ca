@@ -34,7 +34,7 @@ fn test_ca() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
+    let ca = cau.ca_init_softkey("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -82,7 +82,7 @@ fn test_expiring_certification() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", Some("Example Org OpenPGP CA Key"))?;
+    let ca = cau.ca_init_softkey("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
@@ -160,7 +160,7 @@ fn test_update_cert_key() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // import key as new user
     gpg.create_user("Alice <alice@example.org>");
@@ -240,7 +240,7 @@ fn test_ca_import() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // import key as new user
     gpg.create_user("Alice <alice@example.org>");
@@ -302,7 +302,7 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -339,7 +339,7 @@ fn test_ca_export_wkd() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
     ca.user_new(
@@ -425,7 +425,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init("sequoia-pgp.org", None)?;
+    let ca = cau.ca_init_softkey("sequoia-pgp.org", None)?;
 
     ca.cert_import_new(
         justus_key.as_bytes(),
@@ -468,7 +468,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // gpg: make key for Alice
     gpg.create_user("Alice <alice@example.org>");
@@ -535,7 +535,7 @@ fn test_ca_signatures() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // create/import alice, CA signs alice's key
     gpg.create_user("Alice <alice@example.org>");
@@ -605,7 +605,7 @@ fn test_apply_revocation() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -643,7 +643,7 @@ fn test_import_signed_cert() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // import CA key into GnuPG
     let sqlite = Connection::open(db)?;
@@ -727,7 +727,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // create Alice
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -850,7 +850,7 @@ fn test_create_user_with_pw() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, true, false)?;
@@ -880,7 +880,7 @@ fn test_refresh() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
@@ -961,7 +961,7 @@ fn test_wkd_delist() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path);
 
     let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // make CA users
     ca.user_new(Some("Alice"), &["alice@example.org"], None, true, false)?;
@@ -1025,7 +1025,7 @@ fn test_ca_re_certify() -> Result<()> {
     let ca1u = OpenpgpCaUninit::new(Some(&db1))?;
 
     // make first/old CA
-    let ca1 = ca1u.ca_init("example.org", Some("example.org CA old"))?;
+    let ca1 = ca1u.ca_init_softkey("example.org", Some("example.org CA old"))?;
 
     // make CA user (certified by the CA)
     ca1.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -1042,7 +1042,7 @@ fn test_ca_re_certify() -> Result<()> {
     // make "new" CA
     let db2 = format!("{}/ca2.sqlite", home_path);
     let ca2u = OpenpgpCaUninit::new(Some(&db2))?;
-    let ca2 = ca2u.ca_init("example.org", Some("example.org CA new"))?;
+    let ca2 = ca2u.ca_init_softkey("example.org", Some("example.org CA new"))?;
 
     // import certs from old CA, without certifying anything
     for cert in ca1.user_certs_get_all()? {

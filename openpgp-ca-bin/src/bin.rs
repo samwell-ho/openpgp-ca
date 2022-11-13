@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     } = &c.cmd
     {
         let ca = match backend {
-            cli::Backend::Softkey => cau.ca_init(domain, name.as_deref()),
+            cli::Backend::Softkey => cau.ca_init_softkey(domain, name.as_deref()),
             cli::Backend::Card {
                 ident,
                 on_card,

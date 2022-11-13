@@ -29,7 +29,7 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     // make CA users
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -109,7 +109,7 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let cau = OpenpgpCaUninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init("example.org", None)?;
+    let ca = cau.ca_init_softkey("example.org", None)?;
 
     let ca_key = ca.ca_get_pubkey_armored()?;
 
@@ -229,7 +229,7 @@ fn test_bridge() -> Result<()> {
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    let ca1 = ca1u.ca_init("some.org", None)?;
+    let ca1 = ca1u.ca_init_softkey("some.org", None)?;
 
     // make CA user
     assert!(ca1
@@ -239,7 +239,7 @@ fn test_bridge() -> Result<()> {
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    let ca2 = ca2u.ca_init("other.org", None)?;
+    let ca2 = ca2u.ca_init_softkey("other.org", None)?;
 
     // make CA user
     ca2.user_new(Some("Bob"), &["bob@other.org"], None, false, false)?;
@@ -365,12 +365,12 @@ fn test_multi_bridge() -> Result<()> {
 
     // ---- populate OpenPGP CA instances ----
 
-    let ca1 = ca1u.ca_init("alpha.org", None)?;
+    let ca1 = ca1u.ca_init_softkey("alpha.org", None)?;
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    let ca2 = ca2u.ca_init("beta.org", None)?;
+    let ca2 = ca2u.ca_init_softkey("beta.org", None)?;
 
-    let ca3 = ca3u.ca_init("gamma.org", None)?;
+    let ca3 = ca3u.ca_init_softkey("gamma.org", None)?;
     ca3.user_new(Some("Carol"), &["carol@gamma.org"], None, false, false)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
 
@@ -490,12 +490,12 @@ fn test_scoping() -> Result<()> {
     let ca3u = OpenpgpCaUninit::new(Some(&db3))?;
 
     // ---- populate OpenPGP CA instances ----
-    let ca1 = ca1u.ca_init("alpha.org", None)?;
+    let ca1 = ca1u.ca_init_softkey("alpha.org", None)?;
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    let ca2 = ca2u.ca_init("beta.org", None)?;
+    let ca2 = ca2u.ca_init_softkey("beta.org", None)?;
 
-    let ca3 = ca3u.ca_init("other.org", None)?;
+    let ca3 = ca3u.ca_init_softkey("other.org", None)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
     let ca3_file = format!("{}/ca3.pubkey", home_path);
     let pub_ca3 = ca3.ca_get_pubkey_armored()?;
