@@ -38,8 +38,11 @@ fn main() -> Result<()> {
             cli::Backend::Softkey => cau.ca_init_softkey(domain, name.as_deref()),
             cli::Backend::Card {
                 ident,
-                on_card,
                 pinpad,
+                from_card,
+                import,
+                generate_on_card,
+                public_key,
             } => {
                 if *pinpad {
                     // FIXME:
@@ -50,51 +53,55 @@ fn main() -> Result<()> {
                     unimplemented!("pinpad mode is not implemented yet");
                 }
 
-                if !on_card {
-                    // 1) generate key in CA, import to card, print private key
-                    let (ca, key) = cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
+                match (from_card, import, generate_on_card) {
+                    (false, None, false) => {
+                        // Generate key in CA, import to card, print private key
 
-                    println!("Generated new CA key:\n\n{}", key);
+                        let (ca, key) =
+                            cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
 
-                    Ok(ca)
-                } else {
-                    // 2) generate key on card, make public key (and store it in DB)
-                    cau.ca_init_generate_on_card(ident, domain, name.as_deref())
-                }
-            }
-            cli::Backend::CardImport {
-                ident,
-                ca_key_file: public,
-                pinpad,
-            } => {
-                if *pinpad {
-                    // FIXME:
-                    // - extend syntax in database backend field: don't store user PIN there
-                    // - use pinpad for changing user PIN to its new value
-                    // - use pinpad for signing operations
+                        println!("Generated new CA key:\n\n{}", key);
 
-                    unimplemented!("pinpad mode is not implemented yet");
-                }
+                        Ok(ca)
+                    }
 
-                let ca_cert = std::fs::read(public)?;
+                    (true, None, false) => {
+                        // Initialize CA from existing card and pubkey file
+                        // NOTE: unwrap is ok because clap requires "public_key" if "from_card"
 
-                if OpenpgpCaUninit::is_card_empty(ident)? {
-                    // Initialize CA onto a blank card, from private CA key file
-                    cau.ca_init_import_private_to_card(ident, domain, &ca_cert)
-                } else {
-                    // Initialize CA from existing card and pubkey file
-                    println!("Trying to initialize CA with OpenPGP card {}.", ident);
-                    println!("This card already contains key material.");
-                    println!();
+                        let ca_cert = std::fs::read(public_key.as_ref().unwrap())?;
 
-                    // This card is already initialized, ask for User PIN
-                    let pin = rpassword::prompt_password(format!(
-                        "Enter User PIN for OpenPGP card {}: ",
-                        ident
-                    ))?;
-                    println!();
+                        println!("Trying to initialize CA with OpenPGP card {}.", ident);
+                        println!("This card already contains key material.");
+                        println!();
 
-                    cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
+                        // This card is already initialized, ask for User PIN
+                        let pin = rpassword::prompt_password(format!(
+                            "Enter User PIN for OpenPGP card {}: ",
+                            ident
+                        ))?;
+                        println!();
+
+                        cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
+                    }
+                    (false, Some(import), false) => {
+                        // Initialize CA onto a blank card, from private CA key file
+
+                        let ca_cert = std::fs::read(import)?;
+                        cau.ca_init_import_private_to_card(ident, domain, &ca_cert)
+                    }
+                    (false, None, true) => {
+                        // Generate key on card, make public key (and store it in DB)
+
+                        // FIXME: add interactive confirmation
+                        // "Are you sure? -> no way to backup, maybe randomness is bad?"
+
+                        cau.ca_init_generate_on_card(ident, domain, name.as_deref())
+                    }
+                    _ => {
+                        // Clap should enforce that this is unreachable (with the group "mode")
+                        unreachable!()
+                    }
                 }
             }
         }?;

@@ -70,41 +70,54 @@ pub enum Backend {
     /// Generate a new OpenPGP CA and store it locally in the CA database, for direct use.
     Softkey,
 
-    /// Generate a new OpenPGP CA on an OpenPGP smart card.
+    /// Initialize an OpenPGP CA instance that is backed by an OpenPGP smart card.
     ///
-    /// By default, this will generate the new key on the host computer, and print the generated
-    /// OpenPGP CA private key to stdout, the operator needs to safe-keep that private key.
-    ///
-    /// Optionally, the key can be generated directly on the card.
+    /// By default, this generates a new CA key on the host computer and imports that key to
+    /// the OpenPGP card. (The generated OpenPGP CA private key is printed to stdout.
+    /// The operator needs to safe-keep that private key).
     Card {
         /// OpenPGP card ident
         ident: String,
 
-        /// Generate a new OpenPGP CA key on the card.
-        /// Caution: the private key material can not be backed up, or copied to a second card,
-        /// in this mode!
-        #[clap(long = "on-card", help = "Generate private key on the card")]
-        on_card: bool,
+        /// Initialize an OpenPGP CA instance from an already set up OpenPGP card, and the
+        /// corresponding CA public key.
+        ///
+        /// Expects an OpenPGP card with pre-loaded CA keys, and a matching public key.
+        #[clap(
+            group = "mode",
+            long = "from-card",
+            requires = "public-key",
+            help = "Initialize CA from an initialized OpenPGP card and a public key file."
+        )]
+        from_card: bool,
+
+        /// Import an existing OpenPGP CA key to a blank OpenPGP card.
+        #[clap(
+            group = "mode",
+            long = "import",
+            help = "Import an existing CA private key to a blank OpenPGP card"
+        )]
+        import: Option<PathBuf>,
 
         #[clap(
-            short = 'P',
-            long = "pinpad",
-            help = "Enforce use of pinpad for PIN entry"
+            long = "public-key",
+            help = "CA public key file (when initializing from a pre-configured card)."
         )]
-        pinpad: bool,
-    },
+        public_key: Option<PathBuf>,
 
-    /// Initialize card-based OpenPGP CA instance from an existing key.
-    ///
-    /// This command supports two modes of operation:
-    /// 1) with an OpenPGP card with pre-loaded CA keys, and a matching public key, or
-    /// 2) with a blank OpenPGP card, from a CA private key.
-    CardImport {
-        /// OpenPGP card ident
-        ident: String,
-
-        /// CA public key (or private key) file
-        ca_key_file: PathBuf,
+        /// Generate a new OpenPGP CA key on the card.
+        ///
+        /// Caution: the private key material can not be backed up, or copied to a second card,
+        /// in this mode!
+        ///
+        /// Note: depending on the OpenPGP card implementation, the quality of randomness used
+        /// to generate the private key material could be sub-par.
+        #[clap(
+            group = "mode",
+            long = "generate-on-card",
+            help = "Generate private key on the card"
+        )]
+        generate_on_card: bool,
 
         #[clap(
             short = 'P',
@@ -119,7 +132,7 @@ pub enum Backend {
 pub enum CaCommand {
     /// Create CA
     Init {
-        #[clap(help = "CA domain name")]
+        #[clap(long = "domain", help = "CA domain name")]
         domain: String,
 
         #[clap(short = 'n', long = "name", help = "Descriptive User Name")]
