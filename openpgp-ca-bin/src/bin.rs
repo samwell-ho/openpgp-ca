@@ -95,10 +95,23 @@ fn main() -> Result<()> {
                     (false, None, true) => {
                         // Generate key on card, make public key (and store it in DB)
 
-                        // FIXME: add interactive confirmation
-                        // "Are you sure? -> no way to backup, maybe randomness is bad?"
+                        println!("Generate new OpenPGP CA key on card {}.", ident);
+                        println!();
+                        println!("Note:");
+                        println!("1) The private CA key will only exist on the card (you can't make a backup)");
+                        println!("2) The your OpenPGP card generates could be worse than your host computer's");
+                        println!();
 
-                        cau.ca_init_generate_on_card(ident, domain, name.as_deref())
+                        let mut line = String::new();
+                        println!("Are you sure? (type 'yes' to continue)");
+                        std::io::stdin().read_line(&mut line)?;
+                        println!();
+
+                        if line.trim().to_ascii_lowercase() == "yes" {
+                            cau.ca_init_generate_on_card(ident, domain, name.as_deref())
+                        } else {
+                            Err(anyhow::anyhow!("Aborted CA initialization."))
+                        }
                     }
                     _ => {
                         // Clap should enforce that this is unreachable (with the group "mode")
