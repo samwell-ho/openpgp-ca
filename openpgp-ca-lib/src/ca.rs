@@ -936,14 +936,14 @@ impl OpenpgpCa {
     /// Export all user keys (that have a userid in `domain`) and the CA key
     /// into a wkd directory structure
     ///
-    /// https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08
+    /// <https://tools.ietf.org/html/draft-koch-openpgp-webkey-service-08>
     pub fn export_wkd(&self, domain: &str, path: &Path) -> Result<()> {
         export::wkd_export(self, domain, path)
     }
 
     /// Export the contents of a CA in Keylist format.
     ///
-    /// https://code.firstlook.media/keylist-rfc-explainer
+    /// <https://code.firstlook.media/keylist-rfc-explainer>
     ///
     /// `path`: filesystem path into which the exported keylist and signature
     /// files will be written.
@@ -1007,7 +1007,7 @@ impl OpenpgpCa {
     }
 
     /// Pull updates for a cert from the hagrid keyserver
-    /// (https://keys.openpgp.org/) and merge any updates into our local
+    /// (<https://keys.openpgp.org/>) and merge any updates into our local
     /// storage for this cert.
     ///
     /// Returns "true" if updated data was received, false if not.
