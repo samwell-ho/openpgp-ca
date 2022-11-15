@@ -71,8 +71,10 @@ fn main() -> Result<()> {
 
                         let ca_cert = std::fs::read(public_key.as_ref().unwrap())?;
 
-                        println!("Trying to initialize CA with OpenPGP card {}.", ident);
-                        println!("This card already contains key material.");
+                        println!(
+                            "Trying to initialize CA with pre-configured OpenPGP card {}.",
+                            ident
+                        );
                         println!();
 
                         // This card is already initialized, ask for User PIN
