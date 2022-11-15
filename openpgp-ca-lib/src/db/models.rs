@@ -10,7 +10,7 @@
 use crate::db::schema::*;
 
 #[derive(Queryable, Debug, Clone, AsChangeset, Identifiable)]
-pub struct Ca {
+pub(crate) struct Ca {
     pub id: i32,
     pub domainname: String,
     pub backend: Option<String>,
@@ -18,14 +18,14 @@ pub struct Ca {
 
 #[derive(Insertable, Debug)]
 #[table_name = "cas"]
-pub struct NewCa<'a> {
+pub(crate) struct NewCa<'a> {
     pub domainname: &'a str,
     pub backend: Option<&'a str>, // backend configuration, if not softkey
 }
 
 #[derive(Queryable, Debug, Associations, Clone, AsChangeset, Identifiable)]
 #[belongs_to(Ca)]
-pub struct Cacert {
+pub(crate) struct Cacert {
     pub id: i32,
     pub fingerprint: String,
     pub priv_cert: String, // bad name (priv key if softkey, pub key if card backed)
@@ -35,7 +35,7 @@ pub struct Cacert {
 
 #[derive(Insertable)]
 #[table_name = "cacerts"]
-pub struct NewCacert<'a> {
+pub(crate) struct NewCacert<'a> {
     pub fingerprint: &'a str,
     pub priv_cert: String,
     pub ca_id: i32,
@@ -52,7 +52,7 @@ pub struct User {
 
 #[derive(Insertable, Debug)]
 #[table_name = "users"]
-pub struct NewUser<'a> {
+pub(crate) struct NewUser<'a> {
     pub name: Option<&'a str>,
     pub ca_id: i32,
 }
@@ -70,7 +70,7 @@ pub struct Cert {
 
 #[derive(Insertable, Debug)]
 #[table_name = "certs"]
-pub struct NewCert<'a> {
+pub(crate) struct NewCert<'a> {
     pub fingerprint: &'a str,
     pub pub_cert: &'a str,
     pub user_id: Option<i32>,
@@ -89,7 +89,7 @@ pub struct CertEmail {
 
 #[derive(Insertable, Debug)]
 #[table_name = "certs_emails"]
-pub struct NewCertEmail {
+pub(crate) struct NewCertEmail {
     pub addr: String,
     pub cert_id: i32,
 }
@@ -107,7 +107,7 @@ pub struct Revocation {
 
 #[derive(Insertable, Debug)]
 #[table_name = "revocations"]
-pub struct NewRevocation<'a> {
+pub(crate) struct NewRevocation<'a> {
     pub hash: &'a str,
     pub revocation: &'a str,
     pub published: bool,
@@ -125,7 +125,7 @@ pub struct Bridge {
 
 #[derive(Insertable, Debug)]
 #[table_name = "bridges"]
-pub struct NewBridge<'a> {
+pub(crate) struct NewBridge<'a> {
     pub email: &'a str,
     pub scope: &'a str,
     pub cert_id: i32,
