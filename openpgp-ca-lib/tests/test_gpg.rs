@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use openpgp_ca_lib::ca::OpenpgpCaUninit;
-use openpgp_ca_lib::pgp::Pgp;
+use openpgp_ca_lib::pgp;
 use sequoia_openpgp::serialize::Serialize;
 
 #[test]
@@ -511,7 +511,7 @@ fn test_scoping() -> Result<()> {
 
     // create unscoped trust signature from ca2 (beta.org) to ca3 (other.org)
     // ---- openpgp-ca@beta.org ---tsign---> openpgp-ca@other.org ----
-    // let tsigned_ca3 = Pgp::tsign(ca3.ca_get_priv_key()?, &ca2.ca_get_priv_key()?, None)?;
+    // let tsigned_ca3 = pgp::tsign(ca3.ca_get_priv_key()?, &ca2.ca_get_priv_key()?, None)?;
     ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, true, true)?;
     let bridges2 = ca2.bridges_get()?;
     assert_eq!(bridges2.len(), 1);
@@ -529,7 +529,7 @@ fn test_scoping() -> Result<()> {
     let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
 
     // import CA certs into GnuPG
-    gpg.import(Pgp::cert_to_armored(&ca1_cert)?.as_bytes());
+    gpg.import(pgp::cert_to_armored(&ca1_cert)?.as_bytes());
     gpg.import(ca2_cert.as_bytes());
     gpg.import(tsigned_ca3.as_bytes());
 

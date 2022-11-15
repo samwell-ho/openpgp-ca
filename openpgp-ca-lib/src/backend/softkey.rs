@@ -12,7 +12,7 @@ use crate::backend::CertificationBackend;
 use crate::ca::DbCa;
 use crate::ca_secret::CaSec;
 use crate::db::models;
-use crate::pgp::Pgp;
+use crate::pgp;
 
 impl DbCa {
     /// Initialize OpenPGP CA Admin database entry.
@@ -24,7 +24,7 @@ impl DbCa {
             return Err(anyhow::anyhow!("CA has already been initialized",));
         }
 
-        let ca_key = Pgp::cert_to_armored_private_key(cert)?;
+        let ca_key = pgp::cert_to_armored_private_key(cert)?;
 
         self.db().ca_insert(
             models::NewCa {
@@ -43,7 +43,7 @@ impl CaSec for DbCa {
     fn get_ca_cert(&self) -> Result<Cert> {
         let (_, cacert) = self.db().get_ca()?;
 
-        Pgp::to_cert(cacert.priv_cert.as_bytes())
+        pgp::to_cert(cacert.priv_cert.as_bytes())
     }
 }
 
@@ -53,7 +53,7 @@ impl CertificationBackend for DbCa {
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
     ) -> Result<()> {
         let ca_cert = self.get_ca_cert()?; // contains private key material for DbCa
-        let ca_keys = Pgp::get_cert_keys(&ca_cert, None);
+        let ca_keys = pgp::get_cert_keys(&ca_cert, None);
 
         for mut s in ca_keys {
             op(&mut s as &mut dyn sequoia_openpgp::crypto::Signer)?;
@@ -69,7 +69,7 @@ impl CertificationBackend for DbCa {
         let mut signing_keypair = ca_cert
             .keys()
             .secret()
-            .with_policy(Pgp::SP, None)
+            .with_policy(pgp::SP, None)
             .supported()
             .alive()
             .revoked(false)

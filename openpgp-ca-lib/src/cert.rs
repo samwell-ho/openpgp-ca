@@ -14,7 +14,7 @@ use sequoia_openpgp::Cert;
 
 use crate::ca::{CertificationStatus, OpenpgpCa};
 use crate::db::models;
-use crate::pgp::Pgp;
+use crate::pgp;
 
 pub fn user_new(
     oca: &OpenpgpCa,
@@ -26,7 +26,7 @@ pub fn user_new(
 ) -> Result<()> {
     // Generate new user key
     let (user_key, user_revoc, pass) =
-        Pgp::make_user_cert(emails, name, password).context("make_user_cert failed")?;
+        pgp::make_user_cert(emails, name, password).context("make_user_cert failed")?;
 
     // CA certifies user cert
     let user_certified = sign_cert_emails(oca, &user_key, Some(emails), duration_days)
@@ -35,16 +35,16 @@ pub fn user_new(
     // User tsigns CA cert
     let ca_cert = oca.ca_get_cert_pub()?;
     let tsigned_ca =
-        Pgp::tsign(ca_cert, &user_key, pass.as_deref()).context("tsign for CA cert failed")?;
+        pgp::tsign(ca_cert, &user_key, pass.as_deref()).context("tsign for CA cert failed")?;
 
-    let tsigned_ca = Pgp::cert_to_armored_private_key(&tsigned_ca)?;
+    let tsigned_ca = pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
     // Store tsig for the CA cert
     oca.db().ca_import_tsig(tsigned_ca.as_bytes())?;
 
     // Store new user cert in DB
-    let user_cert = Pgp::cert_to_armored(&user_certified)?;
-    let user_revoc = Pgp::revoc_to_armored(&user_revoc, None)?;
+    let user_cert = pgp::cert_to_armored(&user_certified)?;
+    let user_revoc = pgp::revoc_to_armored(&user_revoc, None)?;
 
     oca.db()
         .user_add(
@@ -56,7 +56,7 @@ pub fn user_new(
         .context("Failed to insert new user into DB")?;
 
     // the private key needs to be handed over to the user -> print it
-    let private = Pgp::cert_to_armored_private_key(&user_certified)?;
+    let private = pgp::cert_to_armored_private_key(&user_certified)?;
 
     if output_format_minimal {
         // short format (convenient for use with the 'pass' tool)
@@ -92,7 +92,7 @@ pub fn cert_import_new(
     duration_days: Option<u64>,
 ) -> Result<()> {
     let user_cert =
-        Pgp::to_cert(user_cert).context("cert_import_new: Couldn't process user cert.")?;
+        pgp::to_cert(user_cert).context("cert_import_new: Couldn't process user cert.")?;
 
     let fp = user_cert.fingerprint().to_hex();
 
@@ -134,13 +134,13 @@ pub fn cert_import_new(
 
     // Insert new user cert into DB
     let pub_cert =
-        Pgp::cert_to_armored(&certified).context("cert_import_new: Couldn't re-armor key")?;
+        pgp::cert_to_armored(&certified).context("cert_import_new: Couldn't re-armor key")?;
 
     // (filter revocations through Sequoia, to get (re-)armored representations)
-    let rev_sig: Result<Vec<_>> = revoc_certs.iter().map(|r| Pgp::to_signature(r)).collect();
+    let rev_sig: Result<Vec<_>> = revoc_certs.iter().map(|r| pgp::to_signature(r)).collect();
     let rev_armored: Result<Vec<_>> = rev_sig?
         .iter()
-        .map(|s| Pgp::revoc_to_armored(s, None))
+        .map(|s| pgp::revoc_to_armored(s, None))
         .collect();
 
     oca.db()
@@ -151,7 +151,7 @@ pub fn cert_import_new(
 }
 
 pub fn cert_import_update(oca: &OpenpgpCa, cert: &[u8]) -> Result<()> {
-    let cert_new = Pgp::to_cert(cert).context("cert_import_update: couldn't process cert")?;
+    let cert_new = pgp::to_cert(cert).context("cert_import_update: couldn't process cert")?;
 
     let fp = cert_new.fingerprint().to_hex();
 
@@ -161,10 +161,10 @@ pub fn cert_import_update(oca: &OpenpgpCa, cert: &[u8]) -> Result<()> {
         .context("cert_import_update(): get_cert() check by fingerprint failed")?
     {
         // merge existing and new public key
-        let cert_old = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
+        let cert_old = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         let updated = cert_old.merge_public(cert_new)?;
-        let armored = Pgp::cert_to_armored(&updated)?;
+        let armored = pgp::cert_to_armored(&updated)?;
 
         db_cert.pub_cert = armored;
         oca.db().cert_update(&db_cert)
@@ -192,7 +192,7 @@ fn add_certifications(
 
         // update cert in db
         let mut cert_update = db_cert;
-        cert_update.pub_cert = Pgp::cert_to_armored(&certified)?;
+        cert_update.pub_cert = pgp::cert_to_armored(&certified)?;
         oca.db().cert_update(&cert_update)?;
     }
 
@@ -205,7 +205,7 @@ pub fn certs_refresh_ca_certifications(
     validity_days: u64,
 ) -> Result<()> {
     let threshold_time =
-        SystemTime::now() + Duration::from_secs(threshold_days * Pgp::SECONDS_IN_DAY);
+        SystemTime::now() + Duration::from_secs(threshold_days * pgp::SECONDS_IN_DAY);
 
     let ca = oca.ca_get_cert_pub()?;
 
@@ -216,13 +216,13 @@ pub fn certs_refresh_ca_certifications(
         // ignore "inactive" Certs
         .filter(|c| !c.inactive)
     {
-        let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
+        let c = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         let mut re_certify = Vec::new();
 
         for uid in c.userids() {
             // find valid certifications by the CA on this uid
-            let ca_certifications = Pgp::valid_certifications_by(&uid, &c, ca.clone());
+            let ca_certifications = pgp::valid_certifications_by(&uid, &c, ca.clone());
 
             let sig_valid_past_threshold = |sig: &Signature| {
                 if let Some(expiration) = sig.signature_expiration_time() {
@@ -262,18 +262,18 @@ pub fn certs_re_certify(oca: &OpenpgpCa, cert_old: Cert, validity_days: u64) -> 
     {
         let ca_new = oca.ca_get_cert_pub()?;
 
-        let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
+        let c = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         let mut re_certify = Vec::new();
 
         for uid in c.userids() {
             // find valid certifications by the old CA on this uid
-            let ca_certifications = Pgp::valid_certifications_by(&uid, &c, cert_old.clone());
+            let ca_certifications = pgp::valid_certifications_by(&uid, &c, cert_old.clone());
 
             // A new certification is created if any certification by old_cert exists
             if !ca_certifications.is_empty() {
                 // Only certify if there is not yet any certification by the current CA key
-                if Pgp::valid_certifications_by(&uid, &c, ca_new.clone()).is_empty() {
+                if pgp::valid_certifications_by(&uid, &c, ca_new.clone()).is_empty() {
                     // A new certification for this uid should be created
                     re_certify.push(uid.userid());
                 }
@@ -304,14 +304,14 @@ pub fn certs_expired(
     let certs = oca.user_certs_get_all().context("couldn't load certs")?;
 
     for db_cert in certs {
-        let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
+        let c = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
         // Notify only certs that are alive now, but not alive at
         // 'expiry_test'.
-        if c.with_policy(Pgp::SP, None)?.alive().is_ok()
-            && c.with_policy(Pgp::SP, expiry_test)?.alive().is_err()
+        if c.with_policy(pgp::SP, None)?.alive().is_ok()
+            && c.with_policy(pgp::SP, expiry_test)?.alive().is_err()
         {
-            res.insert(db_cert, Pgp::get_expiry(&c)?);
+            res.insert(db_cert, pgp::get_expiry(&c)?);
         }
     }
 
@@ -319,14 +319,14 @@ pub fn certs_expired(
 }
 
 pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<CertificationStatus> {
-    let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
+    let c = pgp::to_cert(cert.pub_cert.as_bytes())?;
     let ca = oca.ca_get_cert_pub()?;
 
     let mut certified = vec![];
     let mut uncertified = vec![];
 
     for uid in c.userids() {
-        if Pgp::valid_certifications_by(&uid, &c, ca.clone()).is_empty() {
+        if pgp::valid_certifications_by(&uid, &c, ca.clone()).is_empty() {
             uncertified.push(uid.userid().clone());
         } else {
             certified.push(uid.userid().clone());
@@ -341,9 +341,9 @@ pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<Certifi
 
 pub fn cert_check_tsig_on_ca(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let ca = oca.ca_get_cert_pub()?;
-    let tsigs = Pgp::get_trust_sigs(&ca)?;
+    let tsigs = pgp::get_trust_sigs(&ca)?;
 
-    let user_cert = Pgp::to_cert(cert.pub_cert.as_bytes())?;
+    let user_cert = pgp::to_cert(cert.pub_cert.as_bytes())?;
 
     Ok(tsigs.iter().any(|t| {
         t.issuer_fingerprints()
@@ -377,7 +377,7 @@ fn sign_cert_emails(
         // if yes, don't add another one.
         if !uid
             .clone()
-            .with_policy(Pgp::SP, None)?
+            .with_policy(pgp::SP, None)?
             .certifications()
             .any(|s| s.issuer_fingerprints().any(|fp| fp == &fp_ca))
         {

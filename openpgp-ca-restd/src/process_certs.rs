@@ -15,7 +15,7 @@ use std::str::FromStr;
 use std::time::SystemTime;
 
 use openpgp_ca_lib::ca::OpenpgpCa;
-use openpgp_ca_lib::pgp::Pgp;
+use openpgp_ca_lib::pgp;
 use sequoia_openpgp::cert::ValidCert;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::types::{HashAlgorithm, PublicKeyAlgorithm, RevocationStatus};
@@ -223,7 +223,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
     }
 
     // reject unreasonably big certificates
-    if let Ok(armored) = Pgp::cert_to_armored(cert) {
+    if let Ok(armored) = pgp::cert_to_armored(cert) {
         let len = armored.len();
         if len > restd::CERT_SIZE_LIMIT {
             return Err(ReturnBadJson::new(
@@ -303,7 +303,7 @@ fn process_cert(
     let merged = match cert_in_ca_db {
         None => cert.clone(),
         Some(ref c) => {
-            let db_cert = Pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
+            let db_cert = pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
                     format!("process_cert: Error un-armoring cert from CA DB: {:?}", e),
@@ -376,7 +376,7 @@ fn process_cert(
         })
         .map_err(|ce| ReturnBadJson::new(ce, None))?;
 
-    let armored = Pgp::cert_to_armored(&norm).map_err(|e|
+    let armored = pgp::cert_to_armored(&norm).map_err(|e|
         // this should probably never happen?
         ReturnBadJson::new(
             CertError::new(
@@ -515,7 +515,7 @@ fn unpack_certring(certring: &str) -> Result<(Vec<Cert>, Option<usize>), Box<dyn
         // 1) a signed message that contains a certring (?)
         if let Some(l) = msg.body() {
             // we expect the literal to contain an armored keyring
-            let certs = Pgp::armored_keyring_to_certs(&l.body())?;
+            let certs = pgp::armored_keyring_to_certs(&l.body())?;
 
             if let Some(Packet::Signature(s)) = msg
                 .descendants()
@@ -538,7 +538,7 @@ fn unpack_certring(certring: &str) -> Result<(Vec<Cert>, Option<usize>), Box<dyn
         Err(anyhow::anyhow!("No Literal found in Message").into())
     } else {
         // 2) a plain keyring (unsigned)
-        Ok((Pgp::armored_keyring_to_certs(&certring)?, None))
+        Ok((pgp::armored_keyring_to_certs(&certring)?, None))
     }
 }
 

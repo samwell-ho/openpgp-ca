@@ -17,7 +17,7 @@ use sequoia_openpgp::types::{ReasonForRevocation, SignatureType};
 use sequoia_openpgp::{armor, cert, Cert, Packet};
 
 use crate::backend::CertificationBackend;
-use crate::pgp::Pgp;
+use crate::pgp;
 
 /// Abstraction of operations that need private key material
 pub trait CaSec: CertificationBackend {
@@ -64,7 +64,7 @@ adversaries."#;
         writeln!(
             &mut file,
             "For reference, the certificate of your CA is\n\n{}\n",
-            Pgp::cert_to_armored(&ca_pub)?
+            pgp::cert_to_armored(&ca_pub)?
         )?;
 
         writeln!(
@@ -97,7 +97,7 @@ adversaries."#;
                 writeln!(
                     &mut file,
                     "{}\n",
-                    &Pgp::revoc_to_armored(&hard, Some(header))?
+                    &pgp::revoc_to_armored(&hard, Some(header))?
                 )?;
 
                 Ok(())
@@ -119,7 +119,7 @@ adversaries."#;
                 writeln!(
                     &mut file,
                     "{}\n",
-                    &Pgp::revoc_to_armored(&soft, Some(header))?
+                    &pgp::revoc_to_armored(&soft, Some(header))?
                 )?;
 
                 Ok(())
@@ -178,7 +178,7 @@ adversaries."#;
                 // The signature should be valid for the specified
                 // number of `days`
                 sb = sb.set_signature_validity_period(Duration::from_secs(
-                    Pgp::SECONDS_IN_DAY * days,
+                    pgp::SECONDS_IN_DAY * days,
                 ))?;
             }
 

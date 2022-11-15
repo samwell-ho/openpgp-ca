@@ -12,7 +12,7 @@ use std::convert::TryInto;
 use once_cell::sync::OnceCell;
 use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
 use openpgp_ca_lib::db::models;
-use openpgp_ca_lib::pgp::Pgp;
+use openpgp_ca_lib::pgp;
 use rocket::http::Status;
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
@@ -96,7 +96,7 @@ fn certs_by_email(
         })?;
 
         for c in certs {
-            let cert = Pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
+            let cert = pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!(
@@ -143,7 +143,7 @@ fn cert_by_fp(fp: String) -> Result<Json<Option<ReturnGoodJson>>, BadRequest<Jso
         if let Some(c) = c {
             let certificate = load_certificate_data(ca, &c)?;
 
-            let cert = Pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
+            let cert = pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!("cert_by_fp: error during armored_to_cert '{:?}'", e),
@@ -313,7 +313,7 @@ fn check_expiring(days: u64) -> Result<Json<Vec<CertInfo>>, BadRequest<Json<Retu
         let mut res = vec![];
 
         for cert in expired.keys() {
-            let cert = Pgp::to_cert(cert.pub_cert.as_bytes()).map_err(|e| {
+            let cert = pgp::to_cert(cert.pub_cert.as_bytes()).map_err(|e| {
                 ReturnError::new(
                     ReturnStatus::InternalError,
                     format!("check_expiring: Error in armored_to_cert '{:?}'", e),

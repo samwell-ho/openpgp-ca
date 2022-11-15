@@ -10,13 +10,13 @@ use anyhow::{Context, Result};
 use diesel::prelude::*;
 use diesel::result::Error;
 
-use crate::pgp::Pgp;
-
 pub mod models;
 mod schema;
 
 use models::*;
 use schema::*;
+
+use crate::pgp;
 
 pub struct OcaDb {
     conn: SqliteConnection,
@@ -244,15 +244,15 @@ impl OcaDb {
         let (_, mut ca_cert) = self
             .get_ca()
             .context("Failed to load CA cert from database")?;
-        let ca = Pgp::to_cert(ca_cert.priv_cert.as_bytes())?;
+        let ca = pgp::to_cert(ca_cert.priv_cert.as_bytes())?;
 
-        let cert_import = Pgp::to_cert(cert)?;
+        let cert_import = pgp::to_cert(cert)?;
 
-        let joined = Pgp::merge_in_tsigs(ca, cert_import)?;
+        let joined = pgp::merge_in_tsigs(ca, cert_import)?;
 
         // update in DB
         ca_cert.priv_cert =
-            Pgp::cert_to_armored_private_key(&joined).context("Failed to re-armor CA Cert")?;
+            pgp::cert_to_armored_private_key(&joined).context("Failed to re-armor CA Cert")?;
 
         self.cacert_update(&ca_cert)
             .context("Update of CA Cert in DB failed")
@@ -303,7 +303,7 @@ impl OcaDb {
 
         // Revocations
         for revocation in revocation_certs {
-            let hash = &Pgp::revocation_to_hash(revocation.as_bytes())?;
+            let hash = &pgp::revocation_to_hash(revocation.as_bytes())?;
             self.revocation_insert(NewRevocation {
                 hash,
                 revocation,
@@ -409,7 +409,7 @@ impl OcaDb {
     }
 
     pub(crate) fn revocation_add(&self, revocation: &str, cert: &Cert) -> Result<Revocation> {
-        let hash = &Pgp::revocation_to_hash(revocation.as_bytes())?;
+        let hash = &pgp::revocation_to_hash(revocation.as_bytes())?;
 
         self.revocation_insert(NewRevocation {
             hash,
@@ -421,7 +421,7 @@ impl OcaDb {
 
     /// Check if this exact revocation (bitwise) already exists in the DB
     pub(crate) fn revocation_exists(&self, revocation: &[u8]) -> Result<bool> {
-        let hash = &Pgp::revocation_to_hash(revocation)?;
+        let hash = &pgp::revocation_to_hash(revocation)?;
         Ok(self.revocation_by_hash(hash)?.is_some())
     }
 

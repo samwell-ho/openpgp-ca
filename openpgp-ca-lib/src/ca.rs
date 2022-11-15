@@ -56,7 +56,7 @@ use crate::cert;
 use crate::db::models;
 use crate::db::OcaDb;
 use crate::export;
-use crate::pgp::Pgp;
+use crate::pgp;
 use crate::revocation;
 use crate::update;
 
@@ -77,7 +77,7 @@ impl DbCa {
     pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
         let (_, cacert) = self.db().get_ca()?;
 
-        let cert = Pgp::to_cert(cacert.priv_cert.as_bytes())?;
+        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
         Ok(cert.strip_secret_key_material())
     }
 }
@@ -158,7 +158,7 @@ impl OpenpgpCaUninit {
     /// `name` is a descriptive name for the CA Admin
     pub fn ca_init_softkey(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
         Self::check_domainname(domainname)?;
-        let (cert, _) = Pgp::make_ca_cert(domainname, name)?;
+        let (cert, _) = pgp::make_ca_cert(domainname, name)?;
 
         self.db
             .transaction(|| self.ca.ca_init_softkey(domainname, &cert))?;
@@ -187,7 +187,7 @@ impl OpenpgpCaUninit {
         }
 
         let email = format!("openpgp-ca@{}", domain);
-        let uid = Pgp::ca_user_id(&email, name);
+        let uid = pgp::ca_user_id(&email, name);
         let uid = String::from_utf8_lossy(uid.value()).to_string();
 
         // Generate key material on card, get the public key,
@@ -209,7 +209,7 @@ impl OpenpgpCaUninit {
         }
 
         // Generate a new CA private key
-        let (ca_key, _) = Pgp::make_ca_cert(domain, name)?;
+        let (ca_key, _) = pgp::make_ca_cert(domain, name)?;
 
         // Import key material to card.
         let user_pin = card::import_to_card(ident, &ca_key)?;
@@ -218,7 +218,7 @@ impl OpenpgpCaUninit {
         let ca = self.ca_init_card(ident, &user_pin, domain, &ca_key)?;
 
         // return private key (unencrypted)
-        let key = Pgp::cert_to_armored_private_key(&ca_key)?;
+        let key = pgp::cert_to_armored_private_key(&ca_key)?;
 
         Ok((ca, key))
     }
@@ -310,7 +310,7 @@ impl OpenpgpCaUninit {
             // FIXME: make sure that the CA public key contains a User ID!
             // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
 
-            let pubkey = Pgp::cert_to_armored(ca_cert)
+            let pubkey = pgp::cert_to_armored(ca_cert)
                 .context("Failed to transform CA cert to armored pubkey")?;
 
             // CA pubkey and card auth key slot must match
@@ -387,7 +387,7 @@ impl OpenpgpCa {
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
         let cert = self.ca_get_cert_pub()?;
         let ca_pub =
-            Pgp::cert_to_armored(&cert).context("Failed to transform CA key to armored pubkey")?;
+            pgp::cert_to_armored(&cert).context("Failed to transform CA key to armored pubkey")?;
 
         Ok(ca_pub)
     }
@@ -448,7 +448,7 @@ impl OpenpgpCa {
     /// This can be useful after CA key rotation: when the CA has a new key, `ca_re_certify` issues
     /// fresh certifications for all previously CA-certified user certs.
     pub fn ca_re_certify(&self, cert_old: &[u8], validity_days: u64) -> Result<()> {
-        let cert_old = Pgp::to_cert(cert_old)?;
+        let cert_old = pgp::to_cert(cert_old)?;
 
         self.db()
             .transaction(|| cert::certs_re_certify(self, cert_old, validity_days))
@@ -566,7 +566,7 @@ impl OpenpgpCa {
     /// The fingerprint parameter is normalized (e.g. if it contains
     /// spaces, they will be filtered out).
     pub fn cert_get_by_fingerprint(&self, fingerprint: &str) -> Result<Option<models::Cert>> {
-        self.db.cert_by_fp(&Pgp::normalize_fp(fingerprint)?)
+        self.db.cert_by_fp(&pgp::normalize_fp(fingerprint)?)
     }
 
     /// Get a list of all Certs for one User
@@ -706,9 +706,9 @@ impl OpenpgpCa {
                     println!(" Has trust-signed this CA");
                 }
 
-                let c = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
+                let c = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
-                if let Some(exp) = Pgp::get_expiry(&c)? {
+                if let Some(exp) = pgp::get_expiry(&c)? {
                     let datetime: DateTime<Utc> = exp.into();
                     println!(" Expiration {}", datetime.format("%d/%m/%Y"));
                 } else {
@@ -720,7 +720,7 @@ impl OpenpgpCa {
                     println!(" {} revocations available", revs.len());
                 }
 
-                if Pgp::is_possibly_revoked(&c) {
+                if pgp::is_possibly_revoked(&c) {
                     println!(" This certificate has (possibly) been REVOKED");
                 }
                 println!();
@@ -777,7 +777,7 @@ impl OpenpgpCa {
     pub fn revocation_details(
         revocation: &models::Revocation,
     ) -> Result<(String, Option<SystemTime>)> {
-        let rev = Pgp::to_signature(revocation.revocation.as_bytes())?;
+        let rev = pgp::to_signature(revocation.revocation.as_bytes())?;
 
         let creation = rev.signature_creation_time();
 
@@ -791,7 +791,7 @@ impl OpenpgpCa {
 
     /// Get an armored representation of a revocation certificate
     pub fn revoc_to_armored(sig: &Signature) -> Result<String> {
-        Pgp::revoc_to_armored(sig, None)
+        pgp::revoc_to_armored(sig, None)
     }
 
     pub fn print_revocations(&self, email: &str) -> Result<()> {
@@ -885,7 +885,7 @@ impl OpenpgpCa {
             println!();
 
             let key = std::fs::read(key_file)?;
-            Pgp::print_cert_info(&key)?;
+            pgp::print_cert_info(&key)?;
 
             println!();
             println!(

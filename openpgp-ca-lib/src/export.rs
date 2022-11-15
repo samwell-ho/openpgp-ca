@@ -15,7 +15,7 @@ use anyhow::{Context, Result};
 use openpgp_keylist::{Key, Keylist, Metadata};
 
 use crate::ca::OpenpgpCa;
-use crate::pgp::Pgp;
+use crate::pgp;
 
 // export filename of keylist
 const KEYLIST_FILE: &str = "keylist.json";
@@ -37,10 +37,10 @@ pub fn print_certring(oca: &OpenpgpCa, email_filter: Option<String>) -> Result<(
     }
 
     for cert in certs {
-        c.push(Pgp::to_cert(cert.pub_cert.as_bytes())?);
+        c.push(pgp::to_cert(cert.pub_cert.as_bytes())?);
     }
 
-    println!("{}", Pgp::certs_to_armored(&c)?);
+    println!("{}", pgp::certs_to_armored(&c)?);
 
     Ok(())
 }
@@ -59,7 +59,7 @@ pub fn export_certs_as_files(
 
         std::fs::write(
             path_append(path, &format!("{}.asc", &oca.get_ca_email()?))?,
-            Pgp::certs_to_armored(&[ca_cert])?,
+            pgp::certs_to_armored(&[ca_cert])?,
         )?;
     }
 
@@ -80,12 +80,12 @@ pub fn export_certs_as_files(
         if !certs.is_empty() {
             let mut c: Vec<_> = vec![];
             for cert in certs {
-                c.push(Pgp::to_cert(cert.pub_cert.as_bytes())?);
+                c.push(pgp::to_cert(cert.pub_cert.as_bytes())?);
             }
 
             std::fs::write(
                 path_append(path, &format!("{}.asc", email))?,
-                Pgp::certs_to_armored(&c)?,
+                pgp::certs_to_armored(&c)?,
             )?;
         }
     }
@@ -134,9 +134,9 @@ pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
     for cert in oca.user_certs_get_all()? {
         // Don't export to WKD if the cert is marked "delisted"
         if !cert.delisted {
-            let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
+            let c = pgp::to_cert(cert.pub_cert.as_bytes())?;
 
-            if Pgp::cert_has_uid_in_domain(&c, domain)? {
+            if pgp::cert_has_uid_in_domain(&c, domain)? {
                 wkd::insert(path, domain, None, &c)?;
             }
         }

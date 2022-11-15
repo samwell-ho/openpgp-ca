@@ -28,7 +28,7 @@ use crate::backend;
 use crate::backend::{Backend, CertificationBackend};
 use crate::ca_secret::CaSec;
 use crate::db::{models, OcaDb};
-use crate::pgp::Pgp;
+use crate::pgp;
 
 /// an OpenPGP card backend for a CA instance
 pub(crate) struct CardCa {
@@ -129,7 +129,7 @@ impl CaSec for CardCa {
     fn get_ca_cert(&self) -> Result<Cert> {
         let (_, cacert) = self.db.get_ca()?;
 
-        Pgp::to_cert(cacert.priv_cert.as_bytes())
+        pgp::to_cert(cacert.priv_cert.as_bytes())
     }
 }
 
@@ -299,7 +299,7 @@ pub(crate) fn generate_on_card(
                     KeyFlags::empty().set_certification(),
                 )?;
                 let sb = set_signer_metadata(sb)?;
-                let sb = Pgp::add_ca_domain_notation(sb, domain)?;
+                let sb = pgp::add_ca_domain_notation(sb, domain)?;
 
                 sb.sign_direct_key(signer, key_aut.role_as_primary())
             })?;
@@ -320,7 +320,7 @@ pub(crate) fn generate_on_card(
                         KeyFlags::empty().set_certification(),
                     )?;
                 let sb = set_signer_metadata(sb)?;
-                let sb = Pgp::add_ca_domain_notation(sb, domain)?;
+                let sb = pgp::add_ca_domain_notation(sb, domain)?;
 
                 uid.bind(signer, &cert, sb)
             })?;

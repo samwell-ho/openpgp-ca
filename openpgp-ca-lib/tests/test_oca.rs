@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
-use openpgp_ca_lib::pgp::Pgp;
+use openpgp_ca_lib::pgp;
 use rusqlite::Connection;
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::cert::CertBuilder;
@@ -102,7 +102,7 @@ fn test_expiring_certification() -> Result<()> {
 
     let cert = &certs[0];
 
-    let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
+    let c = pgp::to_cert(cert.pub_cert.as_bytes())?;
 
     // alice should have one user id
     assert_eq!(c.userids().len(), 1);
@@ -183,7 +183,7 @@ fn test_update_cert_key() -> Result<()> {
     let alice = &certs[0];
 
     // check that expiry is ~2y
-    let cert = Pgp::to_cert(alice.pub_cert.as_bytes())?;
+    let cert = pgp::to_cert(alice.pub_cert.as_bytes())?;
 
     cert.with_policy(&policy, in_one_year)?.alive()?;
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_err());
@@ -213,7 +213,7 @@ fn test_update_cert_key() -> Result<()> {
     assert_eq!(certs.len(), 1);
 
     // check that expiry is not ~2y but ~5y
-    let cert = Pgp::to_cert(certs[0].pub_cert.as_bytes())?;
+    let cert = pgp::to_cert(certs[0].pub_cert.as_bytes())?;
 
     assert!(cert.with_policy(&policy, in_three_years)?.alive().is_ok());
     assert!(cert.with_policy(&policy, in_six_years)?.alive().is_err());
@@ -411,14 +411,14 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
         let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(sequoia_net::Policy::Encrypted)?;
         hagrid.get(&KeyID::from(j)).await
     })?;
-    let justus_key = Pgp::cert_to_armored(&justus)?;
+    let justus_key = pgp::cert_to_armored(&justus)?;
 
     let n: Fingerprint = "8F17777118A33DDA9BA48E62AACB3243630052D9".parse()?;
     let neal: Cert = rt.block_on(async move {
         let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(sequoia_net::Policy::Encrypted)?;
         hagrid.get(&KeyID::from(n)).await
     })?;
-    let neal_key = Pgp::cert_to_armored(&neal)?;
+    let neal_key = pgp::cert_to_armored(&neal)?;
 
     // -- import keys into CA
 
@@ -673,7 +673,7 @@ fn test_import_signed_cert() -> Result<()> {
     assert_eq!(certs.len(), 1);
 
     let alice = &certs[0];
-    let cert = Pgp::to_cert(alice.pub_cert.as_bytes())?;
+    let cert = pgp::to_cert(alice.pub_cert.as_bytes())?;
 
     assert_eq!(cert.userids().len(), 1);
 
@@ -904,7 +904,7 @@ fn test_refresh() -> Result<()> {
     let certs = ca.user_certs_get_all()?;
     for cert in certs {
         let u = ca.cert_get_users(&cert)?.unwrap();
-        let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
+        let c = pgp::to_cert(cert.pub_cert.as_bytes())?;
 
         // get all certifications from the CA
         assert_eq!(c.userids().len(), 1);
@@ -1037,7 +1037,7 @@ fn test_ca_re_certify() -> Result<()> {
         .add_storage_encryption_subkey()
         .generate()?;
 
-    ca1.cert_import_new(Pgp::cert_to_armored(&bob)?.as_bytes(), &[], None, &[], None)?;
+    ca1.cert_import_new(pgp::cert_to_armored(&bob)?.as_bytes(), &[], None, &[], None)?;
 
     // make "new" CA
     let db2 = format!("{}/ca2.sqlite", home_path);
@@ -1056,10 +1056,10 @@ fn test_ca_re_certify() -> Result<()> {
     let ca_cert = ca2.ca_get_cert_pub()?;
 
     for cert in certs.iter().map(|c| {
-        Pgp::to_cert(c.pub_cert.as_bytes()).expect("pub_cert should be convertible to a Cert")
+        pgp::to_cert(c.pub_cert.as_bytes()).expect("pub_cert should be convertible to a Cert")
     }) {
         for uid in cert.userids() {
-            let ca_certifications = Pgp::valid_certifications_by(&uid, &cert, ca_cert.clone());
+            let ca_certifications = pgp::valid_certifications_by(&uid, &cert, ca_cert.clone());
             assert!(ca_certifications.is_empty());
         }
     }
@@ -1076,16 +1076,16 @@ fn test_ca_re_certify() -> Result<()> {
     // FIXME: this relies on stable ordering of the certs, which is probably not guaranteed
 
     // assert that alice's userid is certified by the new CA
-    let cert = Pgp::to_cert(certs[0].pub_cert.as_bytes())?;
+    let cert = pgp::to_cert(certs[0].pub_cert.as_bytes())?;
     for uid in cert.userids() {
-        let ca_certifications = Pgp::valid_certifications_by(&uid, &cert, ca_new_cert.clone());
+        let ca_certifications = pgp::valid_certifications_by(&uid, &cert, ca_new_cert.clone());
         assert_eq!(ca_certifications.len(), 1);
     }
 
     // assert that bob's userid is NOT certified by the new CA
-    let cert = Pgp::to_cert(certs[1].pub_cert.as_bytes())?;
+    let cert = pgp::to_cert(certs[1].pub_cert.as_bytes())?;
     for uid in cert.userids() {
-        let ca_certifications = Pgp::valid_certifications_by(&uid, &cert, ca_new_cert.clone());
+        let ca_certifications = pgp::valid_certifications_by(&uid, &cert, ca_new_cert.clone());
         assert_eq!(ca_certifications.len(), 0);
     }
 

@@ -14,7 +14,7 @@ use sequoia_openpgp::{Cert, Fingerprint};
 
 use crate::ca::OpenpgpCa;
 use crate::db::models;
-use crate::pgp::Pgp;
+use crate::pgp;
 
 /// Create a new Bridge (between this OpenPGP CA and a remote OpenPGP
 /// CA instance)
@@ -99,7 +99,7 @@ pub fn bridge_new(
 
     // store new bridge in DB
     let db_cert = oca.db().cert_add(
-        &Pgp::cert_to_armored(&bridged)?,
+        &pgp::cert_to_armored(&bridged)?,
         &bridged.fingerprint().to_hex(),
         None,
     )?;
@@ -118,7 +118,7 @@ pub fn bridge_new(
 pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
     if let Some(bridge) = oca.db().bridge_by_email(email)? {
         if let Some(mut db_cert) = oca.db().cert_by_id(bridge.cert_id)? {
-            let bridge_cert = Pgp::to_cert(db_cert.pub_cert.as_bytes())?;
+            let bridge_cert = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
             // Generate revocation for the bridge
             let (revocation, revoked) = oca.secret().bridge_revoke(&bridge_cert)?;
@@ -128,11 +128,11 @@ pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
             println!(
                 "Revocation for the bridge to {}:\n{}",
                 email,
-                Pgp::revoc_to_armored(&revocation, None)?
+                pgp::revoc_to_armored(&revocation, None)?
             );
 
             // Save updated cert (including the revocation) to DB
-            db_cert.pub_cert = Pgp::cert_to_armored(&revoked)?;
+            db_cert.pub_cert = pgp::cert_to_armored(&revoked)?;
             oca.db().cert_update(&db_cert)
         } else {
             Err(anyhow::anyhow!("No cert found for bridge"))

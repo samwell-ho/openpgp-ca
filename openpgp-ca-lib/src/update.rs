@@ -14,7 +14,7 @@ use tokio::runtime::Runtime;
 
 use crate::ca::OpenpgpCa;
 use crate::db::models;
-use crate::pgp::Pgp;
+use crate::pgp;
 
 /// Update a cert in the OpenPGP CA database via wkd.
 ///
@@ -28,7 +28,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let emails = oca.emails_get(cert)?;
 
     // Collect all updates for 'cert' in 'merge'
-    let orig = Pgp::to_cert(cert.pub_cert.as_bytes())?;
+    let orig = pgp::to_cert(cert.pub_cert.as_bytes())?;
     let mut merged = orig.clone();
 
     for email in emails {
@@ -50,7 +50,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
 
     if merged != orig {
         let mut db_update = cert.clone();
-        db_update.pub_cert = Pgp::cert_to_armored(&merged)?;
+        db_update.pub_cert = pgp::cert_to_armored(&merged)?;
 
         oca.db().cert_update(&db_update)?;
 
@@ -65,7 +65,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
 pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
     let fp = (cert.fingerprint).parse::<Fingerprint>()?;
 
-    let c = Pgp::to_cert(cert.pub_cert.as_bytes())?;
+    let c = pgp::to_cert(cert.pub_cert.as_bytes())?;
 
     // get key from hagrid
     let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(Policy::Encrypted)?;
@@ -79,7 +79,7 @@ pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> 
         if merged != c {
             // Store merged cert in DB
             let mut db_update = cert.clone();
-            db_update.pub_cert = Pgp::cert_to_armored(&merged)?;
+            db_update.pub_cert = pgp::cert_to_armored(&merged)?;
 
             oca.db().cert_update(&db_update)?;
 
