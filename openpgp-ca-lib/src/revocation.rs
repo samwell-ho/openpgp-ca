@@ -11,9 +11,9 @@ use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::KeyHandle;
 use sequoia_openpgp::{Cert, Packet};
 
-use crate::ca::OpenpgpCa;
 use crate::db::models;
 use crate::pgp;
+use crate::OpenpgpCa;
 
 /// Check if the CA database has a variant of the revocation
 /// certificate 'revocation' (according to Signature::normalized_eq()).

@@ -7,8 +7,8 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use openpgp_ca_lib::ca::OpenpgpCaUninit;
 use openpgp_ca_lib::pgp;
+use openpgp_ca_lib::OpenpgpCaUninit;
 use sequoia_openpgp::serialize::Serialize;
 
 #[test]

@@ -4,7 +4,7 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use openpgp_ca_lib::ca::OpenpgpCaUninit;
+use openpgp_ca_lib::OpenpgpCaUninit;
 use openpgp_ca_restd::client::Client;
 use openpgp_ca_restd::json::{Action, CertResultJson, CertStatus, Certificate};
 use openpgp_ca_restd::restd;

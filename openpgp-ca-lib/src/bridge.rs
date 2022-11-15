@@ -12,9 +12,9 @@ use anyhow::{Context, Result};
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::{Cert, Fingerprint};
 
-use crate::ca::OpenpgpCa;
 use crate::db::models;
 use crate::pgp;
+use crate::OpenpgpCa;
 
 /// Create a new Bridge (between this OpenPGP CA and a remote OpenPGP
 /// CA instance)

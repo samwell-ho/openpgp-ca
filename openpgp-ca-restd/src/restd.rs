@@ -10,9 +10,9 @@
 use std::convert::TryInto;
 
 use once_cell::sync::OnceCell;
-use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
 use openpgp_ca_lib::db::models;
 use openpgp_ca_lib::pgp;
+use openpgp_ca_lib::{OpenpgpCa, OpenpgpCaUninit};
 use rocket::http::Status;
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;

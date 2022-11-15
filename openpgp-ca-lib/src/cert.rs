@@ -12,9 +12,9 @@ use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
 
-use crate::ca::{CertificationStatus, OpenpgpCa};
 use crate::db::models;
 use crate::pgp;
+use crate::{CertificationStatus, OpenpgpCa};
 
 pub fn user_new(
     oca: &OpenpgpCa,

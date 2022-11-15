@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
 use openpgp_ca_lib::pgp;
+use openpgp_ca_lib::{OpenpgpCa, OpenpgpCaUninit};
 use rusqlite::Connection;
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::cert::CertBuilder;

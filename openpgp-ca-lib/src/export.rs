@@ -14,8 +14,8 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use openpgp_keylist::{Key, Keylist, Metadata};
 
-use crate::ca::OpenpgpCa;
 use crate::pgp;
+use crate::OpenpgpCa;
 
 // export filename of keylist
 const KEYLIST_FILE: &str = "keylist.json";

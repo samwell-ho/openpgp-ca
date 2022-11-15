@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use clap::{CommandFactory, FromArgMatches};
-use openpgp_ca_lib::ca::{OpenpgpCa, OpenpgpCaUninit};
+use openpgp_ca_lib::{OpenpgpCa, OpenpgpCaUninit};
 
 mod cli;
 

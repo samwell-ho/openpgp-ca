@@ -14,8 +14,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::time::SystemTime;
 
-use openpgp_ca_lib::ca::OpenpgpCa;
 use openpgp_ca_lib::pgp;
+use openpgp_ca_lib::OpenpgpCa;
 use sequoia_openpgp::cert::ValidCert;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::types::{HashAlgorithm, PublicKeyAlgorithm, RevocationStatus};

@@ -12,9 +12,9 @@ use sequoia_net::Policy;
 use sequoia_openpgp::{Fingerprint, KeyID};
 use tokio::runtime::Runtime;
 
-use crate::ca::OpenpgpCa;
 use crate::db::models;
 use crate::pgp;
+use crate::OpenpgpCa;
 
 /// Update a cert in the OpenPGP CA database via wkd.
 ///

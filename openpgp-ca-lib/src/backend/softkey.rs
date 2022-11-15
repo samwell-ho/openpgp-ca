@@ -9,10 +9,10 @@ use sequoia_openpgp::cert::Cert;
 use sequoia_openpgp::crypto::Signer;
 
 use crate::backend::CertificationBackend;
-use crate::ca::DbCa;
 use crate::ca_secret::CaSec;
 use crate::db::models;
 use crate::pgp;
+use crate::DbCa;
 
 impl DbCa {
     /// Initialize OpenPGP CA Admin database entry.
