@@ -1653,9 +1653,9 @@ dependencies = [
 
 [[package]]
 name = "openpgp-card"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61ac4cf6c2da444dba58275a90e797e620f046b643fdd88e75fc636c96578c04"
+checksum = "5e4ca9441e57f78bba17d8c2a5df618fba221b235c4f5fd9fc6c24cc85e0f776"
 dependencies = [
  "blanket",
  "chrono",
@@ -1679,9 +1679,9 @@ dependencies = [
 
 [[package]]
 name = "openpgp-card-sequoia"
-version = "0.0.20"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18e48e08e734e44630d96465a663a56ed9530b09dcec2a3c163d171a143bf3d2"
+checksum = "2431f538e74f6968e42a3af1f2dca700556efc844a6accbd529caa74bf03447f"
 dependencies = [
  "anyhow",
  "chrono",

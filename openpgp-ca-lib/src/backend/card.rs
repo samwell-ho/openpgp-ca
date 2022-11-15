@@ -12,9 +12,9 @@ use std::sync::{Arc, Mutex};
 use anyhow::{anyhow, Result};
 use openpgp_card::{algorithm::AlgoSimple, KeyType};
 use openpgp_card_pcsc::PcscBackend;
-use openpgp_card_sequoia::card::{Admin, Card, Open};
+use openpgp_card_sequoia::state::{Admin, Open, Transaction};
 use openpgp_card_sequoia::util::public_key_material_to_key;
-use openpgp_card_sequoia::{sq_util, PublicKey};
+use openpgp_card_sequoia::{sq_util, Card, PublicKey};
 use sequoia_openpgp::packet::key::{KeyRole, PrimaryRole, SubordinateRole};
 use sequoia_openpgp::packet::prelude::SignatureBuilder;
 use sequoia_openpgp::packet::{Signature, UserID};
@@ -35,7 +35,7 @@ pub(crate) struct CardCa {
     pin: String,
 
     db: Rc<OcaDb>,
-    card: Arc<Mutex<Card>>,
+    card: Arc<Mutex<Card<Open>>>,
 }
 
 impl CertificationBackend for CardCa {
@@ -87,8 +87,8 @@ impl CertificationBackend for CardCa {
 
 impl CardCa {
     pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> Result<Self> {
-        let cb = PcscBackend::open_by_ident(ident, None)?;
-        let card = Card::new(cb);
+        let backend = PcscBackend::open_by_ident(ident, None)?;
+        let card: Card<Open> = backend.into();
 
         let card = Arc::new(Mutex::new(card));
 
@@ -140,7 +140,7 @@ const PW3_DEFAULT: &str = "12345678";
 
 /// Check if the card `ident` is empty.
 /// The card is considered empty when fingerprints for all three keyslots are unset.
-pub(crate) fn check_card_empty(open: &Open) -> Result<bool> {
+pub(crate) fn check_card_empty(open: &Card<Transaction>) -> Result<bool> {
     let fps = open.fingerprints()?;
     if fps.signature().is_some() || fps.decryption().is_some() || fps.authentication().is_some() {
         Ok(false)
@@ -158,12 +158,12 @@ pub(crate) fn generate_on_card(
     domain: &str,
     user_id: String,
 ) -> Result<(Cert, String)> {
-    let cb = PcscBackend::open_by_ident(ident, None)?;
-    let mut card = Card::new(cb);
-    let mut open = card.transaction()?;
+    let backend = PcscBackend::open_by_ident(ident, None)?;
+    let mut card: Card<Open> = backend.into();
+    let mut transaction = card.transaction()?;
 
     // check that card has no keys on it
-    if !check_card_empty(&open)? {
+    if !check_card_empty(&transaction)? {
         return Err(anyhow!(
             "The OpenPGP card contains key material, please reset it before use with OpenPGP CA."
         ));
@@ -185,13 +185,13 @@ pub(crate) fn generate_on_card(
     println!();
 
     // We assume that the default Admin PIN is currently valid
-    if open.verify_admin(PW3_DEFAULT.as_bytes()).is_err() {
+    if transaction.verify_admin(PW3_DEFAULT.as_bytes()).is_err() {
         return Err(anyhow!(
             "Failed to get Admin access to the card with the default PIN."
         ));
     };
 
-    if let Ok(mut admin) = open
+    if let Ok(mut admin) = transaction
         .admin_card()
         .ok_or_else(|| anyhow!("Couldn't get admin access"))
     {
@@ -231,20 +231,20 @@ pub(crate) fn generate_on_card(
             // helper: use the card's auth slot to perform a certification operation
             fn certify_on_card(
                 user_pin: &str,
-                open: &mut Open,
+                card: &mut Card<Transaction>,
                 auth_pubkey: PublicKey,
                 op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>,
             ) -> Result<Signature> {
                 // Allow user operations on the card
                 let pw1 = user_pin.as_bytes();
-                open.verify_user(pw1)?;
+                card.verify_user(pw1)?;
 
                 // FIXME: implement pin pad handling
                 // open.verify_user_pinpad(&|| {
                 //     println!("Enter User PIN on card reader pinpad.")
                 // })?;
 
-                if let Some(mut user) = open.user_card() {
+                if let Some(mut user) = card.user_card() {
                     // Card-backed signer for bindings
                     let mut card_signer = user.authenticator_from_public(auth_pubkey, &|| {
                         println!("Need touch confirmation for signing.")
@@ -261,20 +261,20 @@ pub(crate) fn generate_on_card(
             // helper: use the card's sig slot to perform a signing operation
             fn sign_on_card(
                 user_pin: &str,
-                open: &mut Open,
+                card: &mut Card<Transaction>,
                 sig_pubkey: PublicKey,
                 op: &mut dyn Fn(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<Signature>,
             ) -> Result<Signature> {
                 // Allow user operations on the card
                 let pw1 = user_pin.as_bytes();
-                open.verify_user_for_signing(pw1)?;
+                card.verify_user_for_signing(pw1)?;
 
                 // FIXME: implement pin pad handling
                 // open.verify_user_pinpad(&|| {
                 //     println!("Enter User PIN on card reader pinpad.")
                 // })?;
 
-                if let Some(mut sign) = open.signing_card() {
+                if let Some(mut sign) = card.signing_card() {
                     // Card-backed signer for bindings
                     let mut card_signer = sign.signer_from_public(sig_pubkey, &|| {
                         println!("Need touch confirmation for signing.")
@@ -293,7 +293,7 @@ pub(crate) fn generate_on_card(
             pp.push(Packet::from(pri));
 
             // 2) make direct key signature
-            let s = certify_on_card(&new_pin, &mut open, key_aut.clone(), &mut |signer| {
+            let s = certify_on_card(&new_pin, &mut transaction, key_aut.clone(), &mut |signer| {
                 let sb = SignatureBuilder::new(SignatureType::DirectKey).set_key_flags(
                     // Flags for primary key
                     KeyFlags::empty().set_certification(),
@@ -313,7 +313,7 @@ pub(crate) fn generate_on_card(
             let cert = Cert::try_from(pp.clone())?;
 
             // 4) make, sign userid binding -> add
-            let s = certify_on_card(&new_pin, &mut open, key_aut.clone(), &mut |signer| {
+            let s = certify_on_card(&new_pin, &mut transaction, key_aut.clone(), &mut |signer| {
                 let sb = SignatureBuilder::new(SignatureType::PositiveCertification)
                     .set_key_flags(
                         // Flags for primary key
@@ -332,7 +332,7 @@ pub(crate) fn generate_on_card(
             // 5) backsig
             let sub_sig = SubordinateRole::convert_key(key_sig.clone());
 
-            let bs = sign_on_card(&new_pin, &mut open, key_sig, &mut |signer| {
+            let bs = sign_on_card(&new_pin, &mut transaction, key_sig, &mut |signer| {
                 let sb = SignatureBuilder::new(SignatureType::PrimaryKeyBinding)
                     // GnuPG wants at least a 512-bit hash for P521 keys.
                     .set_hash_algo(HashAlgorithm::SHA512)
@@ -348,7 +348,7 @@ pub(crate) fn generate_on_card(
             pp.push(Packet::from(sub_sig.clone()));
 
             // 7) make, certify subkey binding -> add
-            let s = certify_on_card(&new_pin, &mut open, key_aut.clone(), &mut |signer| {
+            let s = certify_on_card(&new_pin, &mut transaction, key_aut.clone(), &mut |signer| {
                 let sb = SignatureBuilder::new(SignatureType::SubkeyBinding)
                     .set_key_flags(KeyFlags::empty().set_signing())?
                     .set_embedded_signature(bs.clone())?;
@@ -368,20 +368,20 @@ pub(crate) fn generate_on_card(
 
 /// Returns newly set User PIN
 pub(crate) fn import_to_card(ident: &str, key: &Cert) -> Result<String> {
-    let cb = PcscBackend::open_by_ident(ident, None)?;
-    let mut card = Card::new(cb);
-    let mut open = card.transaction()?;
+    let backend = PcscBackend::open_by_ident(ident, None)?;
+    let mut card: Card<Open> = backend.into();
+    let mut transaction = card.transaction()?;
 
     // check that card has no keys on it
-    if !check_card_empty(&open)? {
+    if !check_card_empty(&transaction)? {
         return Err(anyhow!(
             "The OpenPGP card contains key material, please reset it before use with OpenPGP CA."
         ));
     }
 
-    open.verify_admin(PW3_DEFAULT.as_bytes())?;
+    transaction.verify_admin(PW3_DEFAULT.as_bytes())?;
 
-    if let Ok(mut admin) = open
+    if let Ok(mut admin) = transaction
         .admin_card()
         .ok_or_else(|| anyhow!("Couldn't get admin access"))
     {
@@ -427,21 +427,20 @@ pub(crate) fn import_to_card(ident: &str, key: &Cert) -> Result<String> {
 
 /// Given the current `admin_pin`, set both the User and Admin PIN to a new random 8-digit value
 /// (the new PIN gets returned)
-fn set_user_and_admin_pin(admin: &mut Admin, admin_pin: &str) -> Result<String> {
+fn set_user_and_admin_pin(card: &mut Card<Admin>, admin_pin: &str) -> Result<String> {
     // Generate new 8-digit random PIN
     let new_pin = random_user_pin();
 
     // Set Admin PIN to new_pin.
     // (This undoes the previous Admin PIN verification, at least on some cards)
-    admin
-        .as_open()
+    card.as_open()
         .change_admin_pin(admin_pin.as_bytes(), new_pin.as_bytes())?;
 
     // Re-Verify with new Admin PIN (otherwise admin access privileges are missing)
-    admin.as_open().verify_admin(new_pin.as_bytes())?;
+    card.as_open().verify_admin(new_pin.as_bytes())?;
 
     // Set new User PIN
-    admin.reset_user_pin(new_pin.as_bytes())?;
+    card.reset_user_pin(new_pin.as_bytes())?;
 
     // Note: on Gnuk, the User and Admin PIN are now "separated" (changing one doesn't
     // implicitly change the other anymore). However, they are set to the same value.
@@ -460,11 +459,11 @@ fn random_user_pin() -> String {
 
 /// Test if the card accepts `pin` as User PIN
 pub(crate) fn verify_user_pin(ident: &str, pin: &str) -> Result<()> {
-    let cb = PcscBackend::open_by_ident(ident, None)?;
-    let mut card = Card::new(cb);
-    let mut open = card.transaction()?;
+    let backend = PcscBackend::open_by_ident(ident, None)?;
+    let mut card: Card<Open> = backend.into();
+    let mut transaction = card.transaction()?;
 
-    open.verify_user(pin.as_bytes())?;
+    transaction.verify_user(pin.as_bytes())?;
 
     Ok(())
 }

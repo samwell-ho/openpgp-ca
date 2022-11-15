@@ -43,7 +43,7 @@ use anyhow::{Context, Result};
 use chrono::offset::Utc;
 use chrono::DateTime;
 use openpgp_card_pcsc::PcscBackend;
-use openpgp_card_sequoia::card::Card;
+use openpgp_card_sequoia::{state::Open, Card};
 use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
@@ -130,11 +130,11 @@ impl OpenpgpCaUninit {
     }
 
     pub fn is_card_empty(ident: &str) -> Result<bool> {
-        let cb = PcscBackend::open_by_ident(ident, None)?;
-        let mut card = Card::new(cb);
-        let open = card.transaction()?;
+        let backend = PcscBackend::open_by_ident(ident, None)?;
+        let mut card: Card<Open> = backend.into();
+        let transaction = card.transaction()?;
 
-        card::check_card_empty(&open)
+        card::check_card_empty(&transaction)
     }
 
     /// Check if domainname is legal according to Mozilla's Public Suffix List
@@ -287,21 +287,21 @@ impl OpenpgpCaUninit {
             }
 
             // Open Smart Card
-            let card = openpgp_card_pcsc::PcscBackend::open_by_ident(card_ident, None)?;
-            let mut card = openpgp_card_sequoia::card::Card::new(card);
-            let mut open = card.transaction()?;
+            let backend = PcscBackend::open_by_ident(card_ident, None)?;
+            let mut card: Card<Open> = backend.into();
+            let mut transaction = card.transaction()?;
 
-            let fps = open.fingerprints()?;
+            let fps = transaction.fingerprints()?;
             let auth = fps
                 .authentication()
                 .context(format!("No Signing key on card {}", card_ident))?;
 
             let auth_fp = auth.to_string();
 
-            let cardholder_name = open.cardholder_name()?;
+            let cardholder_name = transaction.cardholder_name()?;
 
             // Check that cardholder name is set to "OpenPGP CA".
-            if cardholder_name != "OpenPGP CA" {
+            if cardholder_name.as_deref() != Some("OpenPGP CA") {
                 return Err(anyhow::anyhow!(
                     "Unexpected cardholder name on OpenPGP card (expecting 'OpenPGP CA')"
                 ));
