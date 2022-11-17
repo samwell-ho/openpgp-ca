@@ -316,7 +316,8 @@ impl OpenpgpCaUninit {
             // Check that cardholder name is set to "OpenPGP CA".
             if cardholder_name.as_deref() != Some("OpenPGP CA") {
                 return Err(anyhow::anyhow!(
-                    "Unexpected cardholder name on OpenPGP card (expecting 'OpenPGP CA')"
+                    "Expected cardholder name 'OpenPGP CA' on OpenPGP card, found '{}'.",
+                    cardholder_name.unwrap_or_default()
                 ));
             }
 
