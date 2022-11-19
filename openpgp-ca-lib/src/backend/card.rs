@@ -5,9 +5,8 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use std::convert::TryFrom;
-use std::ops::DerefMut;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::{anyhow, Result};
 use openpgp_card::{algorithm::AlgoSimple, KeyType};
@@ -33,9 +32,11 @@ use crate::pgp;
 /// an OpenPGP card backend for a CA instance
 pub(crate) struct CardCa {
     pin: String,
-
+    ident: String,
     db: Rc<OcaDb>,
-    card: Arc<Mutex<Card<Open>>>,
+
+    // lazily opened card, for caching purposes
+    card: Arc<Mutex<Option<Card<Open>>>>,
 }
 
 impl CertificationBackend for CardCa {
@@ -43,9 +44,8 @@ impl CertificationBackend for CardCa {
         &self,
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
     ) -> Result<()> {
-        let mut card = self.card.lock().unwrap();
-
-        let card = card.deref_mut();
+        let mut card = self.card()?;
+        let card = card.as_mut().unwrap();
         let mut open = card.transaction()?;
 
         // FIXME: verifying PIN before each signing operation. Check if this is needed?
@@ -66,9 +66,8 @@ impl CertificationBackend for CardCa {
         &self,
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
     ) -> Result<()> {
-        let mut card = self.card.lock().unwrap();
-
-        let card = card.deref_mut();
+        let mut card = self.card()?;
+        let card = card.as_mut().unwrap();
         let mut open = card.transaction()?;
 
         // FIXME: verifying PIN before each signing operation. Check if this is needed?
@@ -87,16 +86,26 @@ impl CertificationBackend for CardCa {
 
 impl CardCa {
     pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> Result<Self> {
-        let backend = PcscBackend::open_by_ident(ident, None)?;
-        let card: Card<Open> = backend.into();
-
-        let card = Arc::new(Mutex::new(card));
-
         Ok(Self {
             pin: pin.to_string(),
             db,
-            card,
+            ident: ident.to_string(),
+            card: Arc::new(Mutex::new(None)),
         })
+    }
+
+    fn card(&self) -> Result<MutexGuard<Option<Card<Open>>>> {
+        let mut card = self.card.lock().unwrap();
+        if card.is_none() {
+            // Lazily open the card on first use
+
+            let backend = PcscBackend::open_by_ident(&self.ident, None)?;
+            let c: Card<Open> = backend.into();
+
+            *card = Some(c);
+        }
+
+        Ok(card)
     }
 
     pub(crate) fn ca_init(
