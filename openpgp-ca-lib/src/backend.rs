@@ -68,7 +68,12 @@ pub(crate) struct Card {
 impl Card {
     pub(crate) fn from_config(conf: &str) -> anyhow::Result<Self> {
         let c: Vec<_> = conf.split(';').collect();
-        assert_eq!(c.len(), 2); // FIXME
+        if c.len() != 2 {
+            return Err(anyhow::anyhow!(
+                "Unexpected DB config setting for card backend: '{}'.",
+                conf
+            ));
+        }
 
         let ident = c[0].to_string();
         let user_pin = c[1].to_string();
