@@ -351,8 +351,6 @@ impl OpenpgpCaUninit {
 
     /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
     pub fn init_from_db_state(self) -> Result<OpenpgpCa> {
-        // FIXME: ->  handle uninitialized (-> error?)
-
         // check database state of this CA
         let (ca, _) = self.db.get_ca()?;
 
