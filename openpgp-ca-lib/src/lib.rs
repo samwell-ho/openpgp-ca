@@ -321,8 +321,13 @@ impl OpenpgpCaUninit {
                 ));
             }
 
-            // FIXME: make sure that the CA public key contains a User ID!
+            // Make sure that the CA public key contains a User ID!
             // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
+            if ca_cert.userids().next().is_none() {
+                return Err(anyhow::anyhow!(
+                    "Expect CA certificate to contain at least one User ID, but found none."
+                ));
+            }
 
             let pubkey = pgp::cert_to_armored(ca_cert)
                 .context("Failed to transform CA cert to armored pubkey")?;
