@@ -56,18 +56,18 @@ deploy it to a [Kubernetes cluster](https://openpgp-ca.org/doc/kubernetes/).
 Then you can create an OpenPGP CA instance for your organization:
 
 ```
-$ oca -d example.oca ca init example.org 
+$ oca -d example.oca ca init --domain example.org softkey
 ```
 
 In this initialization step, OpenPGP CA creates an OpenPGP key for your CA.
 The key's User ID is set to `openpgp-ca@example.org` (you should make sure
-that that the CA email address is configured in your email setup to forward 
+that the CA email address is configured in your email setup to forward 
 mail to you).
 
 The parameter `-d <filename>` specifies where OpenPGP CA will store the 
-information in CA. This includes the private OpenPGP key of your CA and the 
-public keys of members of your organization. In this example, we'll use 
-the file `example.oca` as storage for our CA's data.
+information of the CA. In `softkey` mode, this includes the private OpenPGP
+key of your CA and the public keys of members of your organization. In this
+example, we use the file `example.oca` as storage for our CA's data.
 
 
 ## Manage user's keys in your CA
@@ -247,6 +247,92 @@ See the section on how bridges allow for authentication between organizations
 [in our background documentation](https://openpgp-ca.org/background/details/)
 for more details.
 
+# Running a CA backed by an OpenPGP card
+
+As an alternate, advanced mode of operation, you can initialize your CA
+instance to use an
+[OpenPGP card](https://en.wikipedia.org/wiki/OpenPGP_card) device
+(e.g. [Gnuk](https://archive.fosdem.org/2019/schedule/event/gnuk_hardware/),
+Nitrokey, or YubiKey) for all operations that require private key material.
+Compared to softkey-mode, this has the advantage that the private key
+material of your CA is not directly accessible to the computer that runs
+the CA (and thus can't be exfiltrated in case of attack).
+
+To initialize an OpenPGP card for use with OpenPGP CA, the card needs to be
+in a blank state. A freshly bought card will work. To use a card that has
+already been used in a different context, you need to factory reset it first
+(e.g. using the [opgpcard](https://crates.io/crates/openpgp-card-tools) tool:
+`opgpcard factory-reset -c <ident>`).
+
+In the process of setting up a card, OpenPGP CA sets the User PIN to a random
+8-digit number (the Admin PIN is set to the same number). The new PIN is
+printed after initialization of the CA. The PIN is also stored in the CA
+database (the PIN is automatically supplied to the card during regular CA
+operation). The PIN can also be checked in the output of
+`oca -d <database> ca show`.
+
+Currently, the default key type in OpenPGP CA is RSA 4096. Most modern cards
+support such keys.
+
+Once a CA is initialized in card-mode, all CA operations work exactly like
+a CA in softkey-mode does.
+
+## Initializing a new card-backed CA instance
+
+To create a new OpenPGP CA instance that is backed by an OpenPGP card, run:
+
+```
+$ oca -d example.oca ca init --domain example.org card 0123:01234567
+```
+
+Instead of `0123:01234567`, you need to use the identifier of your
+OpenPGP card (one way to find out this identifier for your card is to use
+`opgpcard list`. The identifier consists of the 4-digit
+'manufacturer identification', a colon and the card's 8-digit
+'serial number').
+
+This command generates the CA key material on your host computer and imports
+it onto the OpenPGP card. The private key material for the CA is printed to
+the console, but not otherwise stored.
+
+For a production CA, you will probably want to copy this private key to a
+safe place, and to keep it sufficiently confident. You should consider
+performing this initialization step on an air-gapped system.
+
+Finally, the initialization process shows status information about your
+newly set up CA:
+
+```
+Initialized OpenPGP CA instance:
+
+    CA Domain: example.org
+  Fingerprint: E8A8E047F61B2C3C011F7AA245776DAE2FE0E255
+Creation time: 2022-11-22 13:49:23 UTC
+   CA Backend: OpenPGP card 0123:01234567 [User PIN 14199138]
+```
+
+The last line shows that the card-backend is used for this CA, and the
+newly set User PIN for the card is displayed (the Admin PIN is set to the
+same value).
+
+## Switch from softkey mode CA to card-backed mode
+
+If you have an existing softkey-mode CA and would like to initialize a new CA
+database with its key, you can first export the key into a file:
+
+```
+$ oca -d softkey.oca ca private > ca_key.priv
+```
+
+And then import the key into a fresh card-backed CA instance, like this:
+
+```
+$ oca -d example.oca ca init --domain example.org card 0123:01234567 --import ca_key.priv
+```
+
+(You would usually also want to import your user information, including the
+public keys. The steps for this are currently not covered here.)
+
 # Learn more
 
 To get a deeper understanding of the ideas behind OpenPGP CA, you can read 
@@ -259,6 +345,13 @@ Or you can read our hands on documentation about how to
 End users can read our [client documentation](https://openpgp-ca.org/client/)
 to learn how to take advantage of an existing CA.
 
+
+# Version history
+
+- openpgp-ca 0.12:
+  - Support for OpenPGP card-backed operation was added
+  - The binary program has been renamed `oca`, for brevity
+    (previously the binary was named `openpgp-ca`)
 
 # Get in touch for support
 
