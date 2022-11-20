@@ -125,8 +125,6 @@ impl CardCa {
         pubkey: &str,
         fingerprint: &str,
     ) -> Result<()> {
-        // FIXME: missing logic from DbCa::ca_init()? (e.g. domain name syntax check)
-
         let backend = Backend::Card(backend::Card {
             ident: card_ident.to_string(),
             user_pin: pin.to_string(),
