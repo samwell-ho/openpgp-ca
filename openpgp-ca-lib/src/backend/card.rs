@@ -45,7 +45,9 @@ impl CertificationBackend for CardCa {
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
     ) -> Result<()> {
         let mut card = self.card()?;
-        let card = card.as_mut().unwrap();
+        let card = card
+            .as_mut()
+            .expect("CardCa::card() should always return a Some(_)");
         let mut open = card.transaction()?;
 
         // FIXME: verifying PIN before each signing operation. Check if this is needed?
@@ -67,7 +69,9 @@ impl CertificationBackend for CardCa {
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
     ) -> Result<()> {
         let mut card = self.card()?;
-        let card = card.as_mut().unwrap();
+        let card = card
+            .as_mut()
+            .expect("CardCa::card() should always return a Some(_)");
         let mut open = card.transaction()?;
 
         // FIXME: verifying PIN before each signing operation. Check if this is needed?
@@ -95,7 +99,12 @@ impl CardCa {
     }
 
     fn card(&self) -> Result<MutexGuard<Option<Card<Open>>>> {
-        let mut card = self.card.lock().unwrap();
+        let mut card = self.card.try_lock().map_err(|e| {
+            anyhow::anyhow!(format!(
+                "Couldn't get lock for card in CardCa::card() {}",
+                e
+            ))
+        })?;
         if card.is_none() {
             // Lazily open the card on first use
 
@@ -405,7 +414,9 @@ pub(crate) fn import_to_card(ident: &str, key: &Cert) -> Result<String> {
 
         match certifier.len() {
             1 => {
-                let cert = certifier.pop().unwrap();
+                let cert = certifier
+                    .pop()
+                    .expect("Certifier count matched len()==1, this should never happen");
                 let dec = sq_util::subkey_by_type(key, &policy, KeyType::Decryption)?;
                 let sig = sq_util::subkey_by_type(key, &policy, KeyType::Signing)?;
 
