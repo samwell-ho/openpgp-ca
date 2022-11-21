@@ -142,14 +142,6 @@ impl OpenpgpCaUninit {
         Ok(Self { db, ca: dbca })
     }
 
-    pub fn is_card_empty(ident: &str) -> Result<bool> {
-        let backend = PcscBackend::open_by_ident(ident, None)?;
-        let mut card: Card<Open> = backend.into();
-        let transaction = card.transaction()?;
-
-        card::check_card_empty(&transaction)
-    }
-
     /// Check if domainname is legal according to Mozilla's Public Suffix List
     fn check_domainname(domainname: &str) -> Result<()> {
         // domainname syntax check
