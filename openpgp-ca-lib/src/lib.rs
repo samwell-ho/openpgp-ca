@@ -8,7 +8,7 @@
 //!
 //! Example usage:
 //! ```
-//! # use openpgp_ca_lib::OpenpgpCaUninit;
+//! # use openpgp_ca_lib::Uninit;
 //! # use tempfile;
 //! // all state of an OpenPGP CA instance is persisted in one SQLite database
 //! let db_filename = "/tmp/openpgp-ca.sqlite";
@@ -16,19 +16,21 @@
 //! # let file = tempfile::NamedTempFile::new().unwrap();
 //! # let db_filename = file.path().to_str().unwrap();
 //!
-//! // start a new OpenPGP CA instance (implicitly creates the database file)
-//! let openpgp_ca_uninit = OpenpgpCaUninit::new(Some(db_filename)).expect("Failed to set up CA");
+//! // Set up a new, uninitialized OpenPGP CA database
+//! // (implicitly creates the database file).
+//! let ca_uninit = Uninit::new(Some(db_filename)).expect("Failed to set up CA");
 //!
-//! // initialize the CA Admin (with domainname and a symbolic name)
-//! let openpgp_ca = openpgp_ca_uninit
-//!     .ca_init_softkey("example.org", Some("Example Org OpenPGP CA Key"))
+//! // Initialize the CA, create the CA key (with domain name and descriptive name)
+//! let ca = ca_uninit
+//!     .init_softkey("example.org", Some("Example Org OpenPGP CA Key"))
 //!     .unwrap();
 //!
-//! // create a new user, with all signatures
-//! // (the private key is printed to stdout and needs to be manually
-//! // processed from there)
-//! openpgp_ca
-//!     .user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)
+//! // Create a new user, certified by the CA, and a trust signature by the user
+//! // key on the CA key.
+//! //
+//! // The new private key for the user is printed to stdout and needs to be manually
+//! // processed from there.
+//! ca.user_new(Some(&"Alice"), &["alice@example.org"], None, false, false)
 //!     .unwrap();
 //! ```
 
@@ -49,6 +51,7 @@ pub mod db;
 mod export;
 pub mod pgp;
 mod revocation;
+pub mod types;
 mod update;
 
 use std::collections::HashMap;
@@ -63,7 +66,7 @@ use chrono::offset::Utc;
 use chrono::DateTime;
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::{state::Open, Card};
-use sequoia_openpgp::packet::{Signature, UserID};
+use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
 
@@ -72,6 +75,7 @@ use crate::backend::{card, Backend};
 use crate::ca_secret::CaSec;
 use crate::db::models;
 use crate::db::OcaDb;
+use crate::types::CertificationStatus;
 
 /// a DB backend for a CA instance
 pub(crate) struct DbCa {
@@ -95,30 +99,24 @@ impl DbCa {
     }
 }
 
-/// A CA instance that has a database, but is (possibly) not initialized and doesn't
-/// have a backend for private key operations yet.
-pub struct OpenpgpCaUninit {
+/// A CA instance that has a database, which is (possibly) not initialized yet.
+/// No backend for private key operations is available at this stage.
+pub struct Uninit {
     db: Rc<OcaDb>,
     ca: Rc<DbCa>,
 }
 
-/// OpenpgpCa exposes the functionality of OpenPGP CA as a library
-/// (the command line utility 'openpgp-ca' is built on top of this library)
-pub struct OpenpgpCa {
+/// An initialized OpenPGP CA instance, with a configured backend.
+/// Oca exposes the main functionality of OpenPGP CA.
+pub struct Oca {
     db: Rc<OcaDb>,
 
     ca: Rc<DbCa>,
     ca_secret: Rc<dyn CaSec>,
 }
 
-/// This struct models which User IDs of a Cert have (and which have not) been certified by a CA
-pub struct CertificationStatus {
-    pub certified: Vec<UserID>,
-    pub uncertified: Vec<UserID>,
-}
-
-impl OpenpgpCaUninit {
-    /// Instantiate a new OpenpgpCa object (with db, but without private key backend).
+impl Uninit {
+    /// Instantiate a new Uninit object (with db, but without private key backend).
     ///
     /// This CA may be fully uninitialized and not be linked to a CA key yet.
     ///
@@ -161,7 +159,7 @@ impl OpenpgpCaUninit {
     ///
     /// `domainname` is the domain that this CA Admin is in charge of,
     /// `name` is a descriptive name for the CA Admin
-    pub fn ca_init_softkey(self, domainname: &str, name: Option<&str>) -> Result<OpenpgpCa> {
+    pub fn init_softkey(self, domainname: &str, name: Option<&str>) -> Result<Oca> {
         Self::check_domainname(domainname)?;
         let (cert, _) = pgp::make_ca_cert(domainname, name)?;
 
@@ -180,12 +178,12 @@ impl OpenpgpCaUninit {
     /// The User PIN is changed to a new, random 8-digit value and persisted in the CA database.
     ///
     /// The user is encouraged to change the Admin PIN to a different setting.
-    pub fn ca_init_generate_on_card(
+    pub fn init_card_generate_on_card(
         self,
         ident: &str,
         domain: &str,
         name: Option<&str>,
-    ) -> Result<OpenpgpCa> {
+    ) -> Result<Oca> {
         // The CA database must be uninitialized!
         if self.db.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
@@ -202,12 +200,12 @@ impl OpenpgpCaUninit {
         self.ca_init_card(ident, &user_pin, domain, &ca_cert)
     }
 
-    pub fn ca_init_generate_on_host(
+    pub fn init_card_generate_on_host(
         self,
         ident: &str,
         domain: &str,
         name: Option<&str>,
-    ) -> Result<(OpenpgpCa, String)> {
+    ) -> Result<(Oca, String)> {
         // The CA database must be uninitialized!
         if self.db.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
@@ -229,13 +227,13 @@ impl OpenpgpCaUninit {
     }
 
     /// Import the CA's public key and use it with a pre-initialized OpenPGP card.
-    pub fn ca_init_import_existing_card(
+    pub fn init_card_import_card(
         self,
         card_ident: &str,
         user_pin: &str,
         domain: &str,
         ca_cert: &[u8],
-    ) -> Result<OpenpgpCa> {
+    ) -> Result<Oca> {
         let ca_cert = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
 
         // Check if user-supplied PIN is accepted by the card
@@ -248,13 +246,13 @@ impl OpenpgpCaUninit {
         self.ca_init_card(card_ident, user_pin, domain, &ca_cert)
     }
 
-    /// Import CA private key onto a blank OpenPGP card.
-    pub fn ca_init_import_private_to_card(
+    /// Import existing CA private key onto a blank OpenPGP card.
+    pub fn init_card_import_key(
         self,
         card_ident: &str,
         domain: &str,
         ca_cert: &[u8],
-    ) -> Result<OpenpgpCa> {
+    ) -> Result<Oca> {
         let ca_key = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
         if !ca_key.is_tsk() {
             return Err(anyhow::anyhow!(
@@ -278,7 +276,7 @@ impl OpenpgpCaUninit {
         pin: &str,
         domainname: &str,
         ca_cert: &Cert,
-    ) -> Result<OpenpgpCa> {
+    ) -> Result<Oca> {
         Self::check_domainname(domainname)?;
 
         // Open a separate scope for database-access.
@@ -342,12 +340,12 @@ impl OpenpgpCaUninit {
     }
 
     /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
-    pub fn init_from_db_state(self) -> Result<OpenpgpCa> {
+    fn init_from_db_state(self) -> Result<Oca> {
         // check database state of this CA
         let (ca, _) = self.db.get_ca()?;
 
         match Backend::from_config(ca.backend.as_deref())? {
-            Backend::Softkey => Ok(OpenpgpCa {
+            Backend::Softkey => Ok(Oca {
                 db: self.db,
                 ca: self.ca.clone(),
                 ca_secret: self.ca,
@@ -355,7 +353,7 @@ impl OpenpgpCaUninit {
             Backend::Card(card) => {
                 let ca_secret = Rc::new(CardCa::new(&card.ident, &card.user_pin, self.db.clone())?);
 
-                Ok(OpenpgpCa {
+                Ok(Oca {
                     db: self.db,
                     ca: self.ca,
                     ca_secret,
@@ -365,7 +363,17 @@ impl OpenpgpCaUninit {
     }
 }
 
-impl OpenpgpCa {
+impl Oca {
+    /// Open an initialized Oca instance.
+    ///
+    /// The SQLite backend filename can be configured:
+    /// - explicitly via the db_url parameter, or
+    /// - the environment variable OPENPGP_CA_DB.
+    pub fn open(db_url: Option<&str>) -> Result<Self> {
+        let cau = Uninit::new(db_url)?;
+        cau.init_from_db_state()
+    }
+
     pub fn db(&self) -> &OcaDb {
         &self.db
     }

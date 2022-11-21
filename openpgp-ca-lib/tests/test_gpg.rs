@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use openpgp_ca_lib::pgp;
-use openpgp_ca_lib::OpenpgpCaUninit;
+use openpgp_ca_lib::Uninit;
 use sequoia_openpgp::serialize::Serialize;
 
 #[test]
@@ -26,10 +26,10 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
 
     // ---- use OpenPGP CA to make a set of keys ----
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // make CA users
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -106,10 +106,10 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
     let db = format!("{}/ca.sqlite", home_path_ca);
 
     // ---- init OpenPGP CA key ----
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     let ca_key = ca.ca_get_pubkey_armored()?;
 
@@ -223,13 +223,13 @@ fn test_bridge() -> Result<()> {
     let db1 = format!("{}/ca1.sqlite", home_path);
     let db2 = format!("{}/ca2.sqlite", home_path);
 
-    let ca1u = OpenpgpCaUninit::new(Some(&db1))?;
-    let ca2u = OpenpgpCaUninit::new(Some(&db2))?;
+    let ca1u = Uninit::new(Some(&db1))?;
+    let ca2u = Uninit::new(Some(&db2))?;
 
     // ---- populate first OpenPGP CA instance ----
 
     // make new CA key
-    let ca1 = ca1u.ca_init_softkey("some.org", None)?;
+    let ca1 = ca1u.init_softkey("some.org", None)?;
 
     // make CA user
     assert!(ca1
@@ -239,7 +239,7 @@ fn test_bridge() -> Result<()> {
     // ---- populate second OpenPGP CA instance ----
 
     // make new CA key
-    let ca2 = ca2u.ca_init_softkey("other.org", None)?;
+    let ca2 = ca2u.init_softkey("other.org", None)?;
 
     // make CA user
     ca2.user_new(Some("Bob"), &["bob@other.org"], None, false, false)?;
@@ -359,18 +359,18 @@ fn test_multi_bridge() -> Result<()> {
     let db2 = format!("{}/ca2.sqlite", home_path);
     let db3 = format!("{}/ca3.sqlite", home_path);
 
-    let ca1u = OpenpgpCaUninit::new(Some(&db1))?;
-    let ca2u = OpenpgpCaUninit::new(Some(&db2))?;
-    let ca3u = OpenpgpCaUninit::new(Some(&db3))?;
+    let ca1u = Uninit::new(Some(&db1))?;
+    let ca2u = Uninit::new(Some(&db2))?;
+    let ca3u = Uninit::new(Some(&db3))?;
 
     // ---- populate OpenPGP CA instances ----
 
-    let ca1 = ca1u.ca_init_softkey("alpha.org", None)?;
+    let ca1 = ca1u.init_softkey("alpha.org", None)?;
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    let ca2 = ca2u.ca_init_softkey("beta.org", None)?;
+    let ca2 = ca2u.init_softkey("beta.org", None)?;
 
-    let ca3 = ca3u.ca_init_softkey("gamma.org", None)?;
+    let ca3 = ca3u.init_softkey("gamma.org", None)?;
     ca3.user_new(Some("Carol"), &["carol@gamma.org"], None, false, false)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
 
@@ -485,17 +485,17 @@ fn test_scoping() -> Result<()> {
     let db2 = format!("{}/ca2.sqlite", home_path);
     let db3 = format!("{}/ca3.sqlite", home_path);
 
-    let ca1u = OpenpgpCaUninit::new(Some(&db1))?;
-    let ca2u = OpenpgpCaUninit::new(Some(&db2))?;
-    let ca3u = OpenpgpCaUninit::new(Some(&db3))?;
+    let ca1u = Uninit::new(Some(&db1))?;
+    let ca2u = Uninit::new(Some(&db2))?;
+    let ca3u = Uninit::new(Some(&db3))?;
 
     // ---- populate OpenPGP CA instances ----
-    let ca1 = ca1u.ca_init_softkey("alpha.org", None)?;
+    let ca1 = ca1u.init_softkey("alpha.org", None)?;
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    let ca2 = ca2u.ca_init_softkey("beta.org", None)?;
+    let ca2 = ca2u.init_softkey("beta.org", None)?;
 
-    let ca3 = ca3u.ca_init_softkey("other.org", None)?;
+    let ca3 = ca3u.init_softkey("other.org", None)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
     let ca3_file = format!("{}/ca3.pubkey", home_path);
     let pub_ca3 = ca3.ca_get_pubkey_armored()?;

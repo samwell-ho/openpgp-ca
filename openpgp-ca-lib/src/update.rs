@@ -14,7 +14,7 @@ use tokio::runtime::Runtime;
 
 use crate::db::models;
 use crate::pgp;
-use crate::OpenpgpCa;
+use crate::Oca;
 
 /// Update a cert in the OpenPGP CA database via wkd.
 ///
@@ -22,7 +22,7 @@ use crate::OpenpgpCa;
 /// all certs retrieved in that way, if they have a  matching fingerprint,
 /// the cert data from wkd is merged into the existing cert (failed merges are
 /// ignored silently).
-pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
+pub fn update_from_wkd(oca: &Oca, cert: &models::Cert) -> Result<bool> {
     let rt = Runtime::new()?;
 
     let emails = oca.emails_get(cert)?;
@@ -62,7 +62,7 @@ pub fn update_from_wkd(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
 
 /// Update a cert in the OpenPGP CA database from the "Hagrid" keyserver at
 /// `keys.openpgp.org`
-pub fn update_from_hagrid(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
+pub fn update_from_hagrid(oca: &Oca, cert: &models::Cert) -> Result<bool> {
     let fp = (cert.fingerprint).parse::<Fingerprint>()?;
 
     let c = pgp::to_cert(cert.pub_cert.as_bytes())?;

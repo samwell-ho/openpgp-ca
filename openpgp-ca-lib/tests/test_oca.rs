@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use openpgp_ca_lib::pgp;
-use openpgp_ca_lib::{OpenpgpCa, OpenpgpCaUninit};
+use openpgp_ca_lib::{Oca, Uninit};
 use rusqlite::Connection;
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::cert::CertBuilder;
@@ -31,10 +31,10 @@ fn test_ca() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", Some("Example Org OpenPGP CA Key"))?;
+    let ca = cau.init_softkey("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -79,10 +79,10 @@ fn test_expiring_certification() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", Some("Example Org OpenPGP CA Key"))?;
+    let ca = cau.init_softkey("example.org", Some("Example Org OpenPGP CA Key"))?;
 
     let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
@@ -157,10 +157,10 @@ fn test_update_cert_key() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // import key as new user
     gpg.create_user("Alice <alice@example.org>");
@@ -237,10 +237,10 @@ fn test_ca_import() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // import key as new user
     gpg.create_user("Alice <alice@example.org>");
@@ -299,10 +299,10 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -338,8 +338,8 @@ fn test_ca_export_wkd() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let cau = Uninit::new(Some(&db))?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
     ca.user_new(
@@ -424,8 +424,8 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init_softkey("sequoia-pgp.org", None)?;
+    let cau = Uninit::new(Some(&db))?;
+    let ca = cau.init_softkey("sequoia-pgp.org", None)?;
 
     ca.cert_import_new(
         justus_key.as_bytes(),
@@ -465,10 +465,10 @@ fn test_ca_multiple_revocations() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // gpg: make key for Alice
     gpg.create_user("Alice <alice@example.org>");
@@ -534,8 +534,8 @@ fn test_ca_signatures() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let cau = Uninit::new(Some(&db))?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // create/import alice, CA signs alice's key
     gpg.create_user("Alice <alice@example.org>");
@@ -604,8 +604,8 @@ fn test_apply_revocation() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let cau = Uninit::new(Some(&db))?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -642,8 +642,8 @@ fn test_import_signed_cert() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let cau = Uninit::new(Some(&db))?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // import CA key into GnuPG
     let sqlite = Connection::open(db)?;
@@ -724,10 +724,10 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
+    let cau = Uninit::new(Some(&db))?;
 
     // make new CA key
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // create Alice
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -790,7 +790,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
             .iter()
             .any(|kh| { matches!(kh, KeyHandle::Fingerprint(_)) }));
 
-        OpenpgpCa::revoc_to_armored(&sig).context("couldn't armor revocation cert")?
+        Oca::revoc_to_armored(&sig).context("couldn't armor revocation cert")?
     } else {
         panic!("Error handling Signature Packet");
     };
@@ -849,8 +849,8 @@ fn test_create_user_with_pw() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let cau = Uninit::new(Some(&db))?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, true, false)?;
@@ -879,8 +879,8 @@ fn test_refresh() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let cau = Uninit::new(Some(&db))?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
@@ -960,8 +960,8 @@ fn test_wkd_delist() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db = format!("{}/ca.sqlite", home_path);
 
-    let cau = OpenpgpCaUninit::new(Some(&db))?;
-    let ca = cau.ca_init_softkey("example.org", None)?;
+    let cau = Uninit::new(Some(&db))?;
+    let ca = cau.init_softkey("example.org", None)?;
 
     // make CA users
     ca.user_new(Some("Alice"), &["alice@example.org"], None, true, false)?;
@@ -1022,10 +1022,10 @@ fn test_ca_re_certify() -> Result<()> {
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db1 = format!("{}/ca1.sqlite", home_path);
 
-    let ca1u = OpenpgpCaUninit::new(Some(&db1))?;
+    let ca1u = Uninit::new(Some(&db1))?;
 
     // make first/old CA
-    let ca1 = ca1u.ca_init_softkey("example.org", Some("example.org CA old"))?;
+    let ca1 = ca1u.init_softkey("example.org", Some("example.org CA old"))?;
 
     // make CA user (certified by the CA)
     ca1.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -1041,8 +1041,8 @@ fn test_ca_re_certify() -> Result<()> {
 
     // make "new" CA
     let db2 = format!("{}/ca2.sqlite", home_path);
-    let ca2u = OpenpgpCaUninit::new(Some(&db2))?;
-    let ca2 = ca2u.ca_init_softkey("example.org", Some("example.org CA new"))?;
+    let ca2u = Uninit::new(Some(&db2))?;
+    let ca2 = ca2u.init_softkey("example.org", Some("example.org CA new"))?;
 
     // import certs from old CA, without certifying anything
     for cert in ca1.user_certs_get_all()? {

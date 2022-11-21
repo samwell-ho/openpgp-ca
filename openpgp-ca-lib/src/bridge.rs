@@ -14,7 +14,7 @@ use sequoia_openpgp::{Cert, Fingerprint};
 
 use crate::db::models;
 use crate::pgp;
-use crate::OpenpgpCa;
+use crate::Oca;
 
 /// Create a new Bridge (between this OpenPGP CA and a remote OpenPGP
 /// CA instance)
@@ -26,7 +26,7 @@ use crate::OpenpgpCa;
 /// When `remote_email` or `remote_scope` are not set, they are derived
 /// from the User ID in the key_file
 pub fn bridge_new(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     remote_cert_file: &Path,
     remote_email: Option<&str>,
     remote_scope: Option<&str>,
@@ -115,7 +115,7 @@ pub fn bridge_new(
     Ok((oca.db().bridge_insert(new_bridge)?, bridged.fingerprint()))
 }
 
-pub fn bridge_revoke(oca: &OpenpgpCa, email: &str) -> Result<()> {
+pub fn bridge_revoke(oca: &Oca, email: &str) -> Result<()> {
     if let Some(bridge) = oca.db().bridge_by_email(email)? {
         if let Some(mut db_cert) = oca.db().cert_by_id(bridge.cert_id)? {
             let bridge_cert = pgp::to_cert(db_cert.pub_cert.as_bytes())?;

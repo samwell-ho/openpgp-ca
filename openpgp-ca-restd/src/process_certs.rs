@@ -15,7 +15,7 @@ use std::str::FromStr;
 use std::time::SystemTime;
 
 use openpgp_ca_lib::pgp;
-use openpgp_ca_lib::OpenpgpCa;
+use openpgp_ca_lib::Oca;
 use sequoia_openpgp::cert::ValidCert;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::types::{HashAlgorithm, PublicKeyAlgorithm, RevocationStatus};
@@ -255,7 +255,7 @@ fn process_cert(
     signed_by: bool,
     my_domain: &str,
     certificate: &Certificate,
-    ca: &OpenpgpCa,
+    ca: &Oca,
     persist: bool,
 ) -> Result<ReturnGoodJson, ReturnBadJson> {
     let cert_info = check_cert(cert)?;
@@ -543,7 +543,7 @@ fn unpack_certring(certring: &str) -> Result<(Vec<Cert>, Option<usize>), Box<dyn
 }
 
 pub fn process_certs(
-    ca: &OpenpgpCa,
+    ca: &Oca,
     certificate: &Certificate,
     persist: bool,
 ) -> Result<Vec<CertResultJson>, ReturnError> {

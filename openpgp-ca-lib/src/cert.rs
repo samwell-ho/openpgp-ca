@@ -14,10 +14,11 @@ use sequoia_openpgp::Cert;
 
 use crate::db::models;
 use crate::pgp;
-use crate::{CertificationStatus, OpenpgpCa};
+use crate::types::CertificationStatus;
+use crate::Oca;
 
 pub fn user_new(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     name: Option<&str>,
     emails: &[&str],
     duration_days: Option<u64>,
@@ -84,7 +85,7 @@ pub fn user_new(
 }
 
 pub fn cert_import_new(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     user_cert: &[u8],
     revoc_certs: &[&[u8]],
     name: Option<&str>,
@@ -150,7 +151,7 @@ pub fn cert_import_new(
     Ok(())
 }
 
-pub fn cert_import_update(oca: &OpenpgpCa, cert: &[u8]) -> Result<()> {
+pub fn cert_import_update(oca: &Oca, cert: &[u8]) -> Result<()> {
     let cert_new = pgp::to_cert(cert).context("cert_import_update: couldn't process cert")?;
 
     let fp = cert_new.fingerprint().to_hex();
@@ -178,7 +179,7 @@ pub fn cert_import_update(oca: &OpenpgpCa, cert: &[u8]) -> Result<()> {
 /// Certify the User IDs in `certify` in the Cert `c` (with validity of `validity_days`).
 /// Then update `db_cert` in the database to contain the resulting armored cert.
 fn add_certifications(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     certify: Vec<&UserID>,
     c: &Cert,
     db_cert: models::Cert,
@@ -200,7 +201,7 @@ fn add_certifications(
 }
 
 pub fn certs_refresh_ca_certifications(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     threshold_days: u64,
     validity_days: u64,
 ) -> Result<()> {
@@ -250,7 +251,7 @@ pub fn certs_refresh_ca_certifications(
     Ok(())
 }
 
-pub fn certs_re_certify(oca: &OpenpgpCa, cert_old: Cert, validity_days: u64) -> Result<()> {
+pub fn certs_re_certify(oca: &Oca, cert_old: Cert, validity_days: u64) -> Result<()> {
     // FIXME: de-deduplicate code with certs_refresh_ca_certifications()?
 
     for db_cert in oca
@@ -292,10 +293,7 @@ pub fn certs_re_certify(oca: &OpenpgpCa, cert_old: Cert, validity_days: u64) -> 
 /// The purpose is to have a list of Certs whose users can be notified that
 /// their Certs will expire soon, in case they want to extend the
 /// expiration date.
-pub fn certs_expired(
-    oca: &OpenpgpCa,
-    days: u64,
-) -> Result<HashMap<models::Cert, Option<SystemTime>>> {
+pub fn certs_expired(oca: &Oca, days: u64) -> Result<HashMap<models::Cert, Option<SystemTime>>> {
     let mut res = HashMap::new();
 
     let days = Duration::new(60 * 60 * 24 * days, 0);
@@ -318,7 +316,7 @@ pub fn certs_expired(
     Ok(res)
 }
 
-pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<CertificationStatus> {
+pub fn cert_check_ca_sig(oca: &Oca, cert: &models::Cert) -> Result<CertificationStatus> {
     let c = pgp::to_cert(cert.pub_cert.as_bytes())?;
     let ca = oca.ca_get_cert_pub()?;
 
@@ -339,7 +337,7 @@ pub fn cert_check_ca_sig(oca: &OpenpgpCa, cert: &models::Cert) -> Result<Certifi
     })
 }
 
-pub fn cert_check_tsig_on_ca(oca: &OpenpgpCa, cert: &models::Cert) -> Result<bool> {
+pub fn cert_check_tsig_on_ca(oca: &Oca, cert: &models::Cert) -> Result<bool> {
     let ca = oca.ca_get_cert_pub()?;
     let tsigs = pgp::get_trust_sigs(&ca)?;
 
@@ -356,7 +354,7 @@ pub fn cert_check_tsig_on_ca(oca: &OpenpgpCa, cert: &models::Cert) -> Result<boo
 /// 'emails_filter' (if not None) specifies the subset of User IDs to
 /// certify.
 fn sign_cert_emails(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     cert: &Cert,
     emails_filter: Option<&[&str]>,
     duration_days: Option<u64>,

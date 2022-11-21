@@ -13,12 +13,12 @@ use sequoia_openpgp::{Cert, Packet};
 
 use crate::db::models;
 use crate::pgp;
-use crate::OpenpgpCa;
+use crate::Oca;
 
 /// Check if the CA database has a variant of the revocation
 /// certificate 'revocation' (according to Signature::normalized_eq()).
 fn check_for_equivalent_revocation(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     revocation: &Signature,
     cert: &models::Cert,
 ) -> Result<bool> {
@@ -38,7 +38,7 @@ fn check_for_equivalent_revocation(
 ///
 /// This implicitly searches for a cert that the revocation can be applied to.
 /// If no suitable cert is found, an error is returned.
-pub fn revocation_add(oca: &OpenpgpCa, revocation: &[u8]) -> Result<()> {
+pub fn revocation_add(oca: &Oca, revocation: &[u8]) -> Result<()> {
     // Check if this revocation already exists in db
     if oca.db().revocation_exists(revocation)? {
         return Ok(()); // this revocation is already stored -> do nothing
@@ -105,7 +105,7 @@ fn validate_revocation(cert: &Cert, revocation: &mut Signature) -> Result<bool> 
 ///
 /// (This is used when the revocation has no issuer fingerprint)
 fn search_revocable_cert_by_keyid(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     revoc: &mut Signature,
 ) -> Result<Option<models::Cert>> {
     let revoc_keyhandles = revoc.get_issuers();
@@ -134,7 +134,7 @@ fn search_revocable_cert_by_keyid(
 
 /// Merge a revocation into the cert that it applies to, thus revoking that
 /// cert in the OpenPGP CA database.
-pub fn revocation_apply(oca: &OpenpgpCa, mut db_revoc: models::Revocation) -> Result<()> {
+pub fn revocation_apply(oca: &Oca, mut db_revoc: models::Revocation) -> Result<()> {
     if let Some(mut db_cert) = oca.db().cert_by_id(db_revoc.cert_id)? {
         let sig = pgp::to_signature(db_revoc.revocation.as_bytes())?;
         let c = pgp::to_cert(db_cert.pub_cert.as_bytes())?;

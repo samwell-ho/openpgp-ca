@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use clap::{CommandFactory, FromArgMatches};
-use openpgp_ca_lib::{OpenpgpCa, OpenpgpCaUninit};
+use openpgp_ca_lib::{Oca, Uninit};
 
 mod cli;
 
@@ -20,8 +20,7 @@ fn main() -> Result<()> {
     let cli = cli::Cli::command().version(&*version);
 
     let c = cli::Cli::from_arg_matches(&cli.get_matches())?;
-
-    let cau = OpenpgpCaUninit::new(c.database.as_deref())?;
+    let db = c.database.as_deref();
 
     // Handle init calls separately, here.
     // Setting up an OpenpgpCa instance differs from all other workflows.
@@ -34,8 +33,10 @@ fn main() -> Result<()> {
             },
     } = &c.cmd
     {
+        let cau = Uninit::new(db)?;
+
         let ca = match backend {
-            cli::Backend::Softkey => cau.ca_init_softkey(domain, name.as_deref()),
+            cli::Backend::Softkey => cau.init_softkey(domain, name.as_deref()),
             cli::Backend::Card {
                 ident,
                 pinpad,
@@ -58,7 +59,7 @@ fn main() -> Result<()> {
                         // Generate key in CA, import to card, print private key
 
                         let (ca, key) =
-                            cau.ca_init_generate_on_host(ident, domain, name.as_deref())?;
+                            cau.init_card_generate_on_host(ident, domain, name.as_deref())?;
 
                         println!("Generated new CA key:\n\n{}", key);
 
@@ -84,13 +85,13 @@ fn main() -> Result<()> {
                         ))?;
                         println!();
 
-                        cau.ca_init_import_existing_card(ident, &pin, domain, &ca_cert)
+                        cau.init_card_import_card(ident, &pin, domain, &ca_cert)
                     }
                     (false, Some(import), false) => {
                         // Initialize CA onto a blank card, from private CA key file
 
                         let ca_cert = std::fs::read(import)?;
-                        cau.ca_init_import_private_to_card(ident, domain, &ca_cert)
+                        cau.init_card_import_key(ident, domain, &ca_cert)
                     }
                     (false, None, true) => {
                         // Generate key on card, make public key (and store it in DB)
@@ -108,7 +109,7 @@ fn main() -> Result<()> {
                         println!();
 
                         if line.trim().to_ascii_lowercase() == "yes" {
-                            cau.ca_init_generate_on_card(ident, domain, name.as_deref())
+                            cau.init_card_generate_on_card(ident, domain, name.as_deref())
                         } else {
                             Err(anyhow::anyhow!("Aborted CA initialization."))
                         }
@@ -127,8 +128,9 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // the CLI command was not `ca init`, so we should be able to get an OpenpgpCa object now
-    let ca = cau.init_from_db_state()?;
+    // The CLI command was not `ca init`, so we should be able to directly open the database
+    // as an Oca object
+    let ca = Oca::open(db)?;
 
     match c.cmd {
         cli::Commands::User { cmd } => match cmd {
@@ -149,10 +151,10 @@ fn main() -> Result<()> {
 
             cli::UserCommand::Check { cmd } => match cmd {
                 cli::UserCheckSubcommand::Expiry { days } => {
-                    OpenpgpCa::print_expiry_status(&ca, days)?;
+                    Oca::print_expiry_status(&ca, days)?;
                 }
                 cli::UserCheckSubcommand::Certifications => {
-                    OpenpgpCa::print_certifications_status(&ca)?;
+                    Oca::print_certifications_status(&ca)?;
                 }
             },
             cli::UserCommand::Import {
@@ -194,10 +196,8 @@ fn main() -> Result<()> {
                     ca.print_certring(email)?;
                 }
             }
-            cli::UserCommand::List => OpenpgpCa::print_users(&ca)?,
-            cli::UserCommand::ShowRevocations { email } => {
-                OpenpgpCa::print_revocations(&ca, &email)?
-            }
+            cli::UserCommand::List => Oca::print_users(&ca)?,
+            cli::UserCommand::ShowRevocations { email } => Oca::print_revocations(&ca, &email)?,
             cli::UserCommand::ApplyRevocation { hash } => {
                 let rev = ca.revocation_get_by_hash(&hash)?;
                 ca.revocation_apply(rev)?;

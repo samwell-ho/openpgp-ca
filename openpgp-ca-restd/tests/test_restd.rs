@@ -4,7 +4,7 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use openpgp_ca_lib::OpenpgpCaUninit;
+use openpgp_ca_lib::Uninit;
 use openpgp_ca_restd::client::Client;
 use openpgp_ca_restd::json::{Action, CertResultJson, CertStatus, Certificate};
 use openpgp_ca_restd::restd;
@@ -230,8 +230,8 @@ async fn test_restd() {
     let db = format!("{}/ca.sqlite", home_path);
 
     // -- init OpenPGP CA --
-    let cau = OpenpgpCaUninit::new(Some(&db)).unwrap();
-    let _ca = cau.ca_init_softkey("example.org", None).unwrap();
+    let cau = Uninit::new(Some(&db)).unwrap();
+    let _ca = cau.init_softkey("example.org", None).unwrap();
 
     // -- start restd --
     let abort_handle = start_restd(db);

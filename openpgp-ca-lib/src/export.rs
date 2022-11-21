@@ -15,14 +15,14 @@ use anyhow::{Context, Result};
 use openpgp_keylist::{Key, Keylist, Metadata};
 
 use crate::pgp;
-use crate::OpenpgpCa;
+use crate::Oca;
 
 // export filename of keylist
 const KEYLIST_FILE: &str = "keylist.json";
 
 /// Write all Certs to stdout as one armored certring (or a subset of certs,
 /// filtered by User ID via email)
-pub fn print_certring(oca: &OpenpgpCa, email_filter: Option<String>) -> Result<()> {
+pub fn print_certring(oca: &Oca, email_filter: Option<String>) -> Result<()> {
     // Load all user-certs (optionally filtered by email)
     let certs = match &email_filter {
         Some(email) => oca.certs_by_email(email)?,
@@ -47,11 +47,7 @@ pub fn print_certring(oca: &OpenpgpCa, email_filter: Option<String>) -> Result<(
 
 /// Export Certs to filesystem, as individual files split and named by email.
 /// (Optionally: filter by User ID via list of emails)
-pub fn export_certs_as_files(
-    oca: &OpenpgpCa,
-    email_filter: Option<String>,
-    path: &str,
-) -> Result<()> {
+pub fn export_certs_as_files(oca: &Oca, email_filter: Option<String>, path: &str) -> Result<()> {
     // export CA cert
     if email_filter.is_none() {
         // add CA cert to output
@@ -125,7 +121,7 @@ fn path_append(path: &str, filename: &str) -> Result<PathBuf> {
 
 // --------- wkd
 
-pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
+pub fn wkd_export(oca: &Oca, domain: &str, path: &Path) -> Result<()> {
     use sequoia_net::wkd;
 
     let ca_cert = oca.ca_get_cert_pub()?;
@@ -148,7 +144,7 @@ pub fn wkd_export(oca: &OpenpgpCa, domain: &str, path: &Path) -> Result<()> {
 // --------- keylist
 
 pub fn export_keylist(
-    oca: &OpenpgpCa,
+    oca: &Oca,
     path: PathBuf,
     signature_uri: String,
     overwrite: bool,

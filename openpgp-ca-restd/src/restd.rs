@@ -12,7 +12,7 @@ use std::convert::TryInto;
 use once_cell::sync::OnceCell;
 use openpgp_ca_lib::db::models;
 use openpgp_ca_lib::pgp;
-use openpgp_ca_lib::{OpenpgpCa, OpenpgpCaUninit};
+use openpgp_ca_lib::Oca;
 use rocket::http::Status;
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
@@ -25,10 +25,8 @@ use crate::process_certs::{get_cert_info, get_warnings, process_certs};
 static DB: OnceCell<Option<String>> = OnceCell::new();
 
 thread_local! {
-    static CA: OpenpgpCa = OpenpgpCaUninit::new(DB.get().unwrap().as_deref())
-        .expect("OpenpgpCaUninit new() failed - database problem?")
-        .init_from_db_state()
-        .expect("OpenPGP CA init_from_db_state() failed - database problem?");
+    static CA: Oca = Oca::open(DB.get().unwrap().as_deref())
+        .expect("OpenpgpCaUninit new() failed - database problem?");
 }
 
 // CA certifications are good for 365 days
@@ -42,7 +40,7 @@ pub const CERT_SIZE_LIMIT: usize = 1024 * 1024;
 // const POLICY_BAD_URL: &str = "https://very-bad-cert.example.org";
 
 /// Load all of the associated data for a Cert from the CA database
-fn load_certificate_data(ca: &OpenpgpCa, cert: &models::Cert) -> Result<Certificate, ReturnError> {
+fn load_certificate_data(ca: &Oca, cert: &models::Cert) -> Result<Certificate, ReturnError> {
     let user = ca.cert_get_users(cert).map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
