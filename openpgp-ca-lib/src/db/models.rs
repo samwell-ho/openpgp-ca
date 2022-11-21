@@ -7,6 +7,8 @@
 // temporary workaround for https://github.com/rust-lang/rust-clippy/issues/9014 [2022-07-27]
 #![allow(clippy::extra_unused_lifetimes)]
 
+//! Database model for OpenPGP CA
+
 use crate::db::schema::*;
 
 #[derive(Queryable, Debug, Clone, AsChangeset, Identifiable)]
@@ -41,6 +43,7 @@ pub(crate) struct NewCacert<'a> {
     pub ca_id: i32,
 }
 
+/// A user as modeled in the CA
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset, PartialEq, Eq, Hash)]
 #[belongs_to(Ca)]
 pub struct User {
@@ -57,6 +60,7 @@ pub(crate) struct NewUser<'a> {
     pub ca_id: i32,
 }
 
+/// A user certificate as modeled in the CA (linked to users)
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset, PartialEq, Eq, Hash)]
 #[belongs_to(User)]
 pub struct Cert {
@@ -78,6 +82,7 @@ pub(crate) struct NewCert<'a> {
     pub inactive: bool,
 }
 
+/// Email addresses that are associated with user certificates
 #[derive(Associations, Identifiable, Queryable, Debug, Clone, AsChangeset)]
 #[table_name = "certs_emails"]
 #[belongs_to(Cert)]
@@ -94,6 +99,7 @@ pub(crate) struct NewCertEmail {
     pub cert_id: i32,
 }
 
+/// Revocation certificates (linked to user certificates)
 #[derive(Identifiable, Queryable, Debug, Associations, Clone, AsChangeset)]
 #[belongs_to(Cert)]
 pub struct Revocation {
@@ -114,6 +120,7 @@ pub(crate) struct NewRevocation<'a> {
     pub cert_id: i32,
 }
 
+/// Bridges between this CA and an external CA
 #[derive(Identifiable, Queryable, Clone, AsChangeset, Debug)]
 pub struct Bridge {
     pub id: i32,
