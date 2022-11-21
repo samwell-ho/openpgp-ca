@@ -48,7 +48,7 @@ install the `oca` tool on your machine.
 Currently, you can either
 [build OpenPGP CA on your machine](https://openpgp-ca.org/doc/start/),
 run it as a [container image](https://openpgp-ca.org/doc/docker/) or 
-deploy it to a [kubernetes cluster](https://openpgp-ca.org/doc/kubernetes/).
+deploy it to a [Kubernetes cluster](https://openpgp-ca.org/doc/kubernetes/).
 
 
 ## Initializing your CA
@@ -104,7 +104,7 @@ private key material).
 
 Once Carol has obtained and verified the keys, she can import them into 
 the group's OpenPGP CA instance. The CA will certify user keys 
-(based on Carol's verfication), and based on these certifications, 
+(based on Carol's verification), and based on these certifications, 
 everyone else in the organization can rely on getting the correct keys 
 without having to personally verify every single one. Normally, users will 
 only need to verify the CA's key.
@@ -175,7 +175,7 @@ of other users' keys, they can be certain that they have obtained the correct
 key.
 
 Users never need to manually check fingerprints of group members anymore (or
-sign each others' keys). Instead, they rely on Carol performing the
+sign each other's keys). Instead, they rely on Carol performing the
 verification task for them - and that Carol formalizes the resulting
 knowledge as certifications by the group's CA.
 
@@ -217,7 +217,7 @@ needs to be replaced with the correct fingerprint for your CA's key)
 
 By supplying `example.org` as a domain-restriction, we tell our GnuPG 
 installation to only rely on the CA regarding certifications on identities 
-in your domain `example.org` (depending on the nature of your organization 
+in your domain `example.org` (depending on the nature of your organization, 
 it might be more appropriate to configure an unconstrained trust signature 
 instead). 
 
