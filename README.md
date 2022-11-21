@@ -56,7 +56,7 @@ deploy it to a [kubernetes cluster](https://openpgp-ca.org/doc/kubernetes/).
 Then you can create an OpenPGP CA instance for your organization:
 
 ```
-$ oca -d example.oca ca init example.org 
+$ oca -d example.oca ca init --domain example.org softkey
 ```
 
 In this initialization step, OpenPGP CA creates an OpenPGP key for your CA.
