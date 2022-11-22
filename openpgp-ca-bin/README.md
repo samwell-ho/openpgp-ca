@@ -315,24 +315,6 @@ The last line shows that the card-backend is used for this CA, and the
 newly set User PIN for the card is displayed (the Admin PIN is set to the
 same value).
 
-## Switch from softkey mode CA to card-backed mode
-
-If you have an existing softkey-mode CA and would like to initialize a new CA
-database with its key, you can first export the key into a file:
-
-```
-$ oca -d softkey.oca ca private > ca_key.priv
-```
-
-And then import the key into a fresh card-backed CA instance, like this:
-
-```
-$ oca -d example.oca ca init --domain example.org card 0123:01234567 --import ca_key.priv
-```
-
-(You would usually also want to import your user information, including the
-public keys. The steps for this are currently not covered here.)
-
 # Learn more
 
 To get a deeper understanding of the ideas behind OpenPGP CA, you can read 
