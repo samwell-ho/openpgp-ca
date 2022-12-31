@@ -11,6 +11,9 @@ use openpgp_ca_lib::pgp;
 use openpgp_ca_lib::Uninit;
 use sequoia_openpgp::serialize::Serialize;
 
+#[allow(dead_code)]
+mod gnupg_test_wrapper;
+
 #[test]
 /// Create a new CA. Create user certs for Alice and Bob in OpenPGP CA.
 ///

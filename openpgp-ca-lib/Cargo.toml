@@ -45,6 +45,7 @@ openpgp-card-sequoia = "0.1"
 
 # for tests
 [dev-dependencies]
-gnupg-test-wrapper = { path = "../gnupg-test-wrapper" }
 tempfile = "3.1"
 rusqlite = "0.14" # this version matches dependency-versions for libsqlite3-sys with diesel 1.4
+expectrl = "0.2"
+csv = "1.1"
