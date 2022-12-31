@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -12,8 +12,8 @@ use openpgp_ca_lib::pgp;
 use openpgp_ca_lib::Uninit;
 use sequoia_openpgp::{Cert, Fingerprint, KeyID};
 
-#[allow(dead_code)]
-mod gnupg_test_wrapper;
+mod util;
+use util::gnupg_test_wrapper;
 
 #[test]
 /// create a CA for "example.org" and three users.
@@ -23,6 +23,7 @@ mod gnupg_test_wrapper;
 ///
 /// Expected outcome: the WKD contains three keys (CA + 2x user).
 /// Check that the expected filenames exist in the WKD data.
+#[cfg_attr(not(feature = "softkey"), ignore)]
 fn test_ca_export_wkd() -> Result<()> {
     let gpg = gnupg_test_wrapper::make_context()?;
     // gpg.leak_tempdir();
@@ -86,6 +87,7 @@ fn test_ca_export_wkd() -> Result<()> {
 #[test]
 /// Create a CA and two users. "delist" one user.
 /// Export to WKD. Check that only the other user has been exported.
+#[cfg_attr(not(feature = "softkey"), ignore)]
 fn test_wkd_delist() -> Result<()> {
     let gpg = gnupg_test_wrapper::make_context()?;
 

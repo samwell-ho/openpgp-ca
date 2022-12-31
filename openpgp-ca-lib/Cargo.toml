@@ -18,6 +18,11 @@ edition = "2018"
 name = "openpgp_ca_lib"
 path = "src/lib.rs"
 
+[features]
+default = ["softkey"]
+softkey = []
+card = []
+
 [dependencies]
 diesel = { version = "1.4", features = ["sqlite"] }
 diesel_migrations = "1.4"
