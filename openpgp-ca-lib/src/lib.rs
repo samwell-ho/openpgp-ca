@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -64,6 +64,7 @@ use std::time::SystemTime;
 use anyhow::{Context, Result};
 use chrono::offset::Utc;
 use chrono::DateTime;
+use openpgp_card::algorithm::AlgoSimple;
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::{state::Open, Card};
 use sequoia_openpgp::packet::Signature;
@@ -183,6 +184,7 @@ impl Uninit {
         ident: &str,
         domain: &str,
         name: Option<&str>,
+        algo: Option<AlgoSimple>,
     ) -> Result<Oca> {
         // The CA database must be uninitialized!
         if self.db.is_ca_initialized()? {
@@ -195,7 +197,7 @@ impl Uninit {
 
         // Generate key material on card, get the public key,
         // initialize the CA with these artifacts.
-        let (ca_cert, user_pin) = card::generate_on_card(ident, domain, uid)?;
+        let (ca_cert, user_pin) = card::generate_on_card(ident, domain, uid, algo)?;
 
         self.ca_init_card(ident, &user_pin, domain, &ca_cert)
     }

@@ -109,7 +109,7 @@ fn main() -> Result<()> {
                         println!();
 
                         if line.trim().to_ascii_lowercase() == "yes" {
-                            cau.init_card_generate_on_card(ident, domain, name.as_deref())
+                            cau.init_card_generate_on_card(ident, domain, name.as_deref(), None)
                         } else {
                             Err(anyhow::anyhow!("Aborted CA initialization."))
                         }

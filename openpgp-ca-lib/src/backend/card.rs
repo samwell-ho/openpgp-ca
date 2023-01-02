@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2022-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -173,6 +173,7 @@ pub(crate) fn generate_on_card(
     ident: &str,
     domain: &str,
     user_id: String,
+    algo: Option<AlgoSimple>,
 ) -> Result<(Cert, String)> {
     let backend = PcscBackend::open_by_ident(ident, None)?;
     let mut card: Card<Open> = backend.into();
@@ -185,8 +186,12 @@ pub(crate) fn generate_on_card(
         ));
     }
 
-    // Use RSA4k by default. This works on e.g. Yk5 (but Gnuk can't generate rsa4k)
-    let algo = Some(AlgoSimple::RSA4k);
+    let algo = match algo {
+        Some(a) => Some(a),
+
+        // Use RSA4k by default. This works on e.g. Yk5 (but Gnuk can't generate rsa4k)
+        None => Some(AlgoSimple::RSA4k),
+    };
 
     // Print information about algorithm and possible slowness.
     println!(
