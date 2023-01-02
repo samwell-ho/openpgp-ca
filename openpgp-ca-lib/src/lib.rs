@@ -253,9 +253,9 @@ impl Uninit {
         self,
         card_ident: &str,
         domain: &str,
-        ca_cert: &[u8],
+        ca_key: &[u8],
     ) -> Result<Oca> {
-        let ca_key = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
+        let ca_key = Cert::from_bytes(ca_key).context("Cert::from_bytes failed")?;
         if !ca_key.is_tsk() {
             return Err(anyhow::anyhow!(
                 "No private key material found in file, while importing to empty OpenPGP card."
