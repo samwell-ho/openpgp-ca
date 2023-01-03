@@ -237,6 +237,12 @@ impl OcaDb {
         Ok(())
     }
 
+    /// Replace the content of a Cacert entry.
+    ///
+    /// The assumption is that the new cacert is a modified version of the existing one
+    /// (unchanged primary fingerprint).
+    ///
+    /// However, this is not enforced in this fn.
     pub(crate) fn cacert_update(&self, cacert: &Cacert) -> Result<()> {
         diesel::update(cacert)
             .set(cacert)
