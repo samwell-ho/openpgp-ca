@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -23,7 +23,7 @@ fn main() -> Result<()> {
     let db = c.database.as_deref();
 
     // Handle init calls separately, here.
-    // Setting up an OpenpgpCa instance differs from all other workflows.
+    // Setting up an OpenpgpCa instance differs from most other workflows.
     if let cli::Commands::Ca {
         cmd:
             cli::CaCommand::Init {
@@ -128,8 +128,40 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // The CLI command was not `ca init`, so we should be able to directly open the database
-    // as an Oca object
+    // Handle migrate calls separately, here.
+    // Migrating an OpenpgpCa instance differs from most other workflows.
+    if let cli::Commands::Ca {
+        cmd: cli::CaCommand::Migrate { ident },
+    } = &c.cmd
+    {
+        println!("Migrate OpenPGP CA instance to card {}.", ident);
+        println!();
+        println!("Caution: After migration is performed, the CA private key material will not");
+        println!("be available in the CA database anymore!");
+        println!();
+        println!("Make sure you have a backup of your CA key before continuing!");
+        println!();
+
+        let mut line = String::new();
+        println!("Are you sure? (type 'yes' to continue)");
+        std::io::stdin().read_line(&mut line)?;
+        println!();
+
+        if line.trim().to_ascii_lowercase() == "yes" {
+            let cau = Uninit::new(db)?;
+            let ca = cau.migrate_card_import_key(ident)?;
+
+            println!("Migrated OpenPGP CA instance:\n");
+            ca.ca_show()?;
+        } else {
+            return Err(anyhow::anyhow!("Aborted CA migration."));
+        }
+
+        return Ok(());
+    }
+
+    // The CLI command was not `ca init` or `ca migrate`, so we should be able to directly open
+    // the database as an Oca object
     let ca = Oca::open(db)?;
 
     match c.cmd {
@@ -204,7 +236,7 @@ fn main() -> Result<()> {
             }
         },
         cli::Commands::Ca { cmd } => match cmd {
-            cli::CaCommand::Init { .. } => {
+            cli::CaCommand::Init { .. } | cli::CaCommand::Migrate { .. } => {
                 // handled separately, above
                 unreachable!()
             }

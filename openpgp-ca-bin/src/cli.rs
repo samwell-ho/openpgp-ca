@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -140,6 +140,14 @@ pub enum CaCommand {
 
         #[clap(subcommand)]
         backend: Backend,
+    },
+    /// Migrate a softkey CA instance to an OpenPGP card-backed instance.
+    ///
+    /// (Make sure to make a backup of the CA private key before running migrate!)
+    Migrate {
+        /// OpenPGP card ident
+        #[clap(long = "card")]
+        ident: String,
     },
     /// Export CA public key
     Export,
