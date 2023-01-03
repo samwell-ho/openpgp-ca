@@ -180,6 +180,7 @@ impl OcaDb {
 
                 let ca_certs: Vec<_> = cacerts::table
                     .filter(cacerts::ca_id.eq(ca.id))
+                    .filter(cacerts::active)
                     .load::<Cacert>(&self.conn)
                     .context("Error loading CA Certs")?;
 
@@ -191,7 +192,7 @@ impl OcaDb {
                         // -> there can be more than one "active" cert,
                         // as well as even more "inactive" certs.
                         Err(anyhow::anyhow!(
-                            "More than one ca_cert in DB, this is not yet implemented."
+                            "More than one active cacert in DB, illegal state."
                         ))
                     }
                 }
