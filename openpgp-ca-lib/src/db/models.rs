@@ -27,6 +27,7 @@ pub(crate) struct NewCa<'a> {
 #[belongs_to(Ca)]
 pub(crate) struct Cacert {
     pub id: i32,
+    pub active: bool, // exactly one cacert must be active per ca_id
     pub fingerprint: String,
     pub priv_cert: String, // private key if softkey backend, public key if card backend
     pub backend: Option<String>,
@@ -37,6 +38,7 @@ pub(crate) struct Cacert {
 #[derive(Insertable)]
 #[table_name = "cacerts"]
 pub(crate) struct NewCacert<'a> {
+    pub active: bool,
     pub fingerprint: &'a str,
     pub priv_cert: String,
     pub backend: Option<&'a str>, // backend configuration, if not softkey

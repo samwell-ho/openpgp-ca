@@ -11,6 +11,7 @@ table! {
 table! {
     cacerts (id) {
         id -> Integer,
+        active -> Bool,
         fingerprint -> Text,
         priv_cert -> Text,
         backend -> Nullable<Text>,

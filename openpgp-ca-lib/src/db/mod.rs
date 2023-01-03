@@ -226,6 +226,7 @@ impl OcaDb {
             ca_id: ca.id,
             priv_cert: ca_key.to_string(),
             backend,
+            active: true,
         };
         diesel::insert_into(cacerts::table)
             .values(&ca_cert)
