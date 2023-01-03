@@ -131,12 +131,10 @@ impl CardCa {
         });
 
         db.ca_insert(
-            models::NewCa {
-                domainname,
-                backend: backend.to_config().as_deref(),
-            },
+            models::NewCa { domainname },
             pubkey,
             fingerprint,
+            backend.to_config().as_deref(),
         )
     }
 }

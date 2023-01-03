@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -15,14 +15,12 @@ use crate::db::schema::*;
 pub(crate) struct Ca {
     pub id: i32,
     pub domainname: String,
-    pub backend: Option<String>,
 }
 
 #[derive(Insertable, Debug)]
 #[table_name = "cas"]
 pub(crate) struct NewCa<'a> {
     pub domainname: &'a str,
-    pub backend: Option<&'a str>, // backend configuration, if not softkey
 }
 
 #[derive(Queryable, Debug, Associations, Clone, AsChangeset, Identifiable)]
@@ -30,7 +28,8 @@ pub(crate) struct NewCa<'a> {
 pub(crate) struct Cacert {
     pub id: i32,
     pub fingerprint: String,
-    pub priv_cert: String, // bad name (priv key if softkey, pub key if card backed)
+    pub priv_cert: String, // private key if softkey backend, public key if card backend
+    pub backend: Option<String>,
     // https://docs.diesel.rs/diesel/associations/index.html
     pub ca_id: i32,
 }
@@ -40,6 +39,7 @@ pub(crate) struct Cacert {
 pub(crate) struct NewCacert<'a> {
     pub fingerprint: &'a str,
     pub priv_cert: String,
+    pub backend: Option<&'a str>, // backend configuration, if not softkey
     pub ca_id: i32,
 }
 

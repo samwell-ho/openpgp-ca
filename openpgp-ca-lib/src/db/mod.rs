@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -202,7 +202,13 @@ impl OcaDb {
         }
     }
 
-    pub(crate) fn ca_insert(&self, ca: NewCa, ca_key: &str, fingerprint: &str) -> Result<()> {
+    pub(crate) fn ca_insert(
+        &self,
+        ca: NewCa,
+        ca_key: &str,
+        fingerprint: &str,
+        backend: Option<&str>,
+    ) -> Result<()> {
         diesel::insert_into(cas::table)
             .values(&ca)
             .execute(&self.conn)
@@ -219,6 +225,7 @@ impl OcaDb {
             fingerprint,
             ca_id: ca.id,
             priv_cert: ca_key.to_string(),
+            backend,
         };
         diesel::insert_into(cacerts::table)
             .values(&ca_cert)

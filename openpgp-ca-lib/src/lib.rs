@@ -344,9 +344,9 @@ impl Uninit {
     /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
     fn init_from_db_state(self) -> Result<Oca> {
         // check database state of this CA
-        let (ca, _) = self.db.get_ca()?;
+        let (_ca, ca_cert) = self.db.get_ca()?;
 
-        match Backend::from_config(ca.backend.as_deref())? {
+        match Backend::from_config(ca_cert.backend.as_deref())? {
             Backend::Softkey => Ok(Oca {
                 db: self.db,
                 ca: self.ca.clone(),
@@ -445,7 +445,7 @@ impl Oca {
         println!("  Fingerprint: {}", cert.fingerprint());
         println!("Creation time: {}", created.format("%F %T %Z"));
 
-        let backend = Backend::from_config(ca.backend.as_deref())?;
+        let backend = Backend::from_config(ca_cert.backend.as_deref())?;
         println!("   CA Backend: {}", backend);
 
         Ok(())

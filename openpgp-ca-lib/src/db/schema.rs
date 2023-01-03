@@ -13,6 +13,7 @@ table! {
         id -> Integer,
         fingerprint -> Text,
         priv_cert -> Text,
+        backend -> Nullable<Text>,
         ca_id -> Integer,
     }
 }
@@ -21,7 +22,6 @@ table! {
     cas (id) {
         id -> Integer,
         domainname -> Text,
-        backend -> Nullable<Text>,
     }
 }
 
