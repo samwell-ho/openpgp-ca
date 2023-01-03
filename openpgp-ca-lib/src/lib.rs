@@ -98,6 +98,17 @@ impl DbCa {
         let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
         Ok(cert.strip_secret_key_material())
     }
+
+    /// Get the Cert of the CA (with private key material, if available).
+    ///
+    /// Depending on the backend, the private key material is available in
+    /// the database - or not.
+    pub(crate) fn ca_get_cert_private(&self) -> Result<Cert> {
+        let (_, cacert) = self.db().get_ca()?;
+
+        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
+        Ok(cert)
+    }
 }
 
 /// A CA instance that has a database, which is (possibly) not initialized yet.
@@ -258,7 +269,7 @@ impl Uninit {
         let ca_key = Cert::from_bytes(ca_key).context("Cert::from_bytes failed")?;
         if !ca_key.is_tsk() {
             return Err(anyhow::anyhow!(
-                "No private key material found in file, while importing to empty OpenPGP card."
+                "No private key material found in file. Can't import to OpenPGP card."
             ));
         }
 
@@ -269,6 +280,48 @@ impl Uninit {
 
         // Private key material will get stripped implicitly by ca_init_card()
         self.ca_init_card(card_ident, &user_pin, domain, &ca_key)
+    }
+
+    /// Migrate an existing softkey CA onto a blank OpenPGP card.
+    ///
+    /// Caution: If you want to keep a backup of your CA private key material,
+    /// you need to make it before calling this!
+    ///
+    /// 1. The private CA key material gets imported to the blank OpenPGP card.
+    ///
+    /// 2. The CA is then switched from the softkey backend to the card backend. The CA private
+    /// key material in the database is replaced with the CA public key material.
+    ///
+    /// 3. "VACUUM" is called on the database after removing the CA private key from the database.
+    /// According to SQLite documentation, this will remove any traces of the key material from the
+    /// database (however, no guarantees can be made about the underlying storage!).
+    pub fn migrate_card_import_key(self, card_ident: &str) -> Result<Oca> {
+        let db = self.db.clone();
+
+        let ca = db.transaction(|| {
+            let ca_key = self.ca.ca_get_cert_private()?;
+            if !ca_key.is_tsk() {
+                return Err(anyhow::anyhow!(
+                    "No private key material in CA database. Can't migrate to OpenPGP card."
+                ));
+            }
+
+            // Import key material to card.
+            let user_pin = card::import_to_card(card_ident, &ca_key)?;
+
+            // Switch cacert in db
+            let ca_pub = pgp::cert_to_armored(&ca_key.strip_secret_key_material())?;
+            CardCa::ca_replace_in_place(&self.db, card_ident, &user_pin, &ca_pub)?;
+
+            // Now init from db
+            self.init_from_db_state()
+        })?;
+
+        // Run VACUUM on sqlite.
+        // SQLite guarantees that this removes remaining private key fragments from the database file.
+        ca.db.vacuum()?;
+
+        Ok(ca)
     }
 
     /// Init with OpenPGP card backend

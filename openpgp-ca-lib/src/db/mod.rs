@@ -44,6 +44,21 @@ impl OcaDb {
         self.conn.transaction(f)
     }
 
+    /// Runs the "VACUUM" command on the database, which:
+    /// "rebuilds the database file, repacking it into a minimal amount of disk space".
+    ///
+    /// "Running VACUUM will clean the database of all traces of deleted content, thus
+    /// preventing an adversary from recovering deleted content"
+    ///
+    /// <https://www.sqlite.org/lang_vacuum.html>
+    pub(crate) fn vacuum(&self) -> Result<()> {
+        diesel::sql_query("VACUUM;")
+            .execute(&self.conn)
+            .context("Error while running 'VACUUM;'")?;
+
+        Ok(())
+    }
+
     // --- building block functions ---
 
     fn user_insert(&self, user: NewUser) -> Result<User> {

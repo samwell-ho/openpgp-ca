@@ -6,6 +6,7 @@
 
 use std::convert::TryFrom;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::{anyhow, Result};
@@ -136,6 +137,39 @@ impl CardCa {
             fingerprint,
             backend.to_config().as_deref(),
         )
+    }
+
+    /// Update the active cacert entry with a card-backend configuration
+    /// and replace the private key in the database with the public key.
+    ///
+    /// This fn doesn't check that 'card_ident' contains the expected key material.
+    pub(crate) fn ca_replace_in_place(
+        db: &Rc<OcaDb>,
+        card_ident: &str,
+        pin: &str,
+        pubkey: &str,
+    ) -> Result<()> {
+        let backend = Backend::Card(backend::Card {
+            ident: card_ident.to_string(),
+            user_pin: pin.to_string(),
+        });
+
+        let ca_new = Cert::from_str(pubkey)?;
+
+        let (_, mut cacert) = db.get_ca()?;
+
+        if ca_new.fingerprint().to_string() != cacert.fingerprint {
+            return Err(anyhow::anyhow!(
+                "Can't replace CA cert, new fingerprint {} differs from existing fingerprint {}.",
+                ca_new.fingerprint(),
+                cacert.fingerprint
+            ));
+        }
+
+        cacert.priv_cert = pubkey.to_string();
+        cacert.backend = backend.to_config();
+
+        db.cacert_update(&cacert)
     }
 }
 
