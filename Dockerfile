@@ -1,8 +1,8 @@
-# SPDX-FileCopyrightText: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
+# SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 # SPDX-License-Identifier: CC0-1.0
 
 # Stage 0: build OpenPGP CA binaries
-FROM rust:buster as builder
+FROM rust:bullseye as builder
 
 # Sequoia, OpenPGP CA dependencies
 # https://gitlab.com/sequoia-pgp/sequoia#debian
@@ -17,7 +17,7 @@ RUN cd /opt/openpgp-ca/ && cargo build --release
 
 
 # Stage 1: build base Docker image
-FROM debian:buster-slim as base
+FROM debian:bullseye-slim as base
 
 # Sequoia dependencies
 RUN DEBIAN_FRONTEND=noninteractive apt-get -q update && \
