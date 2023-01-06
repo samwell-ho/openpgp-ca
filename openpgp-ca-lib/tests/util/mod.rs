@@ -8,6 +8,7 @@ use openpgp_ca_lib::Uninit;
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::state::Open;
 use openpgp_card_sequoia::Card;
+use sequoia_openpgp::Fingerprint;
 
 #[allow(dead_code)]
 pub(crate) mod gnupg_test_wrapper;
@@ -19,6 +20,22 @@ pub(crate) fn reset_card(ident: &str) -> anyhow::Result<()> {
 
     let mut card = open.transaction()?;
     card.factory_reset().map_err(|e| anyhow::anyhow!(e))
+}
+
+/// Get the AUT slot fingerprint from the card 'ident'
+#[allow(dead_code)]
+pub(crate) fn card_auth_slot_fingerprint(ident: &str) -> anyhow::Result<Fingerprint> {
+    let backend = PcscBackend::open_by_ident(ident, None)?;
+    let mut open: Card<Open> = backend.into();
+    let card = open.transaction()?;
+
+    let auth_fp = card
+        .fingerprints()?
+        .authentication()
+        .ok_or_else(|| anyhow::anyhow!("No fingerprint in AUT slot"))?
+        .to_spaced_hex();
+
+    auth_fp.parse()
 }
 
 #[allow(dead_code)]

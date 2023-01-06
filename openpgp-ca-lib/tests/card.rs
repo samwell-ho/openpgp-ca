@@ -45,6 +45,12 @@ fn init_on_card() -> Result<()> {
         "CA cert is not signed by Alice"
     );
 
+    assert_eq!(
+        ca.ca_get_cert_pub()?.fingerprint(),
+        util::card_auth_slot_fingerprint(&ident)?,
+        "CA fingerprint in database and AUT fingerprint on card don't match"
+    );
+
     Ok(())
 }
 
@@ -92,6 +98,12 @@ fn init_card_import_key() -> Result<()> {
     assert!(
         ca.cert_check_tsig_on_ca(alice)?,
         "CA cert is not signed by Alice"
+    );
+
+    assert_eq!(
+        ca.ca_get_cert_pub()?.fingerprint(),
+        util::card_auth_slot_fingerprint(&ident)?,
+        "CA fingerprint in database and AUT fingerprint on card don't match"
     );
 
     Ok(())
@@ -154,6 +166,12 @@ fn init_card_import_card() -> Result<()> {
         "CA cert is not signed by Alice"
     );
 
+    assert_eq!(
+        ca.ca_get_cert_pub()?.fingerprint(),
+        util::card_auth_slot_fingerprint(&ident)?,
+        "CA fingerprint in database and AUT fingerprint on card don't match"
+    );
+
     Ok(())
 }
 
@@ -198,6 +216,12 @@ fn card_import_migrate() -> Result<()> {
     assert!(
         ca.cert_check_tsig_on_ca(alice)?,
         "CA cert is not signed by Alice"
+    );
+
+    assert_eq!(
+        ca.ca_get_cert_pub()?.fingerprint(),
+        util::card_auth_slot_fingerprint(&ident)?,
+        "CA fingerprint in database and AUT fingerprint on card don't match"
     );
 
     Ok(())
