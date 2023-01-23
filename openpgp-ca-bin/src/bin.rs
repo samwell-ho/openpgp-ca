@@ -100,7 +100,7 @@ fn main() -> Result<()> {
                         println!();
                         println!("Note:");
                         println!("1) The private CA key will only exist on the card (you can't make a backup)");
-                        println!("2) The your OpenPGP card generates could be worse than your host computer's");
+                        println!("2) The randomness your OpenPGP card generates could be worse than your host computer's");
                         println!();
 
                         let mut line = String::new();
