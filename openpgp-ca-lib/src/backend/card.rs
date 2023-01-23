@@ -56,9 +56,9 @@ impl CertificationBackend for CardCa {
 
         let mut user = open
             .user_card()
-            .ok_or_else(|| anyhow!("Unexpected: can't get card in signing mode"))?;
+            .ok_or_else(|| anyhow!("Unexpected: can't get card in user mode"))?;
         let mut signer =
-            user.authenticator(&|| println!("Touch confirmation needed for signing"))?;
+            user.authenticator(&|| println!("Touch confirmation needed for certification"))?;
 
         op(&mut signer as &mut dyn sequoia_openpgp::crypto::Signer)?;
 
@@ -300,14 +300,14 @@ pub(crate) fn generate_on_card(
                 if let Some(mut user) = card.user_card() {
                     // Card-backed signer for bindings
                     let mut card_signer = user.authenticator_from_public(auth_pubkey, &|| {
-                        println!("Need touch confirmation for signing.")
+                        println!("Need touch confirmation for certification.")
                     });
 
                     // Make signature, return it
                     let s = op(&mut card_signer)?;
                     Ok(s)
                 } else {
-                    Err(anyhow!("Failed to open card for signing"))
+                    Err(anyhow!("Failed to open card for certification"))
                 }
             }
 
