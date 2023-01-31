@@ -78,6 +78,56 @@ use crate::db::models;
 use crate::db::OcaDb;
 use crate::types::CertificationStatus;
 
+// Check the card `card_ident`, confirm that the cardholder name is set to
+// "OpenPGP CA", and that the AUT slot contains the certification key.
+//
+// FIXME: also check the state of SIG and DEC slots?
+fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
+    // Open Smart Card
+    let backend = PcscBackend::open_by_ident(card_ident, None)?;
+    let mut card: Card<Open> = backend.into();
+    let mut transaction = card.transaction()?;
+
+    let fps = transaction.fingerprints()?;
+    let auth = fps
+        .authentication()
+        .context(format!("No Signing key on card {}", card_ident))?;
+
+    let auth_fp = auth.to_string();
+
+    let cardholder_name = transaction.cardholder_name()?;
+
+    // Check that cardholder name is set to "OpenPGP CA".
+    if cardholder_name.as_deref() != Some("OpenPGP CA") {
+        return Err(anyhow::anyhow!(
+            "Expected cardholder name 'OpenPGP CA' on OpenPGP card, found '{}'.",
+            cardholder_name.unwrap_or_default()
+        ));
+    }
+
+    // Make sure that the CA public key contains a User ID!
+    // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
+    if ca_cert.userids().next().is_none() {
+        return Err(anyhow::anyhow!(
+            "Expect CA certificate to contain at least one User ID, but found none."
+        ));
+    }
+
+    let pubkey =
+        pgp::cert_to_armored(ca_cert).context("Failed to transform CA cert to armored pubkey")?;
+
+    // CA pubkey and card auth key slot must match
+    if ca_cert.fingerprint().to_hex() != auth_fp {
+        return Err(anyhow::anyhow!(format!(
+            "Auth key slot on card {} doesn't match primary (cert) fingerprint {}.",
+            auth_fp,
+            ca_cert.fingerprint().to_hex()
+        )));
+    }
+
+    Ok(pubkey)
+}
+
 /// a DB backend for a CA instance
 pub(crate) struct DbCa {
     db: Rc<OcaDb>,
@@ -344,50 +394,17 @@ impl Uninit {
                 return Err(anyhow::anyhow!("CA database is already initialized"));
             }
 
-            // Open Smart Card
-            let backend = PcscBackend::open_by_ident(card_ident, None)?;
-            let mut card: Card<Open> = backend.into();
-            let mut transaction = card.transaction()?;
-
-            let fps = transaction.fingerprints()?;
-            let auth = fps
-                .authentication()
-                .context(format!("No Signing key on card {}", card_ident))?;
-
-            let auth_fp = auth.to_string();
-
-            let cardholder_name = transaction.cardholder_name()?;
-
-            // Check that cardholder name is set to "OpenPGP CA".
-            if cardholder_name.as_deref() != Some("OpenPGP CA") {
-                return Err(anyhow::anyhow!(
-                    "Expected cardholder name 'OpenPGP CA' on OpenPGP card, found '{}'.",
-                    cardholder_name.unwrap_or_default()
-                ));
-            }
-
-            // Make sure that the CA public key contains a User ID!
-            // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
-            if ca_cert.userids().next().is_none() {
-                return Err(anyhow::anyhow!(
-                    "Expect CA certificate to contain at least one User ID, but found none."
-                ));
-            }
-
-            let pubkey = pgp::cert_to_armored(ca_cert)
-                .context("Failed to transform CA cert to armored pubkey")?;
-
-            // CA pubkey and card auth key slot must match
-            if ca_cert.fingerprint().to_hex() != auth_fp {
-                return Err(anyhow::anyhow!(format!(
-                    "Auth key slot on card {} doesn't match primary (cert) fingerprint {}.",
-                    auth_fp,
-                    ca_cert.fingerprint().to_hex()
-                )));
-            }
+            let pubkey = check_if_card_matches(card_ident, ca_cert)?;
 
             self.db.transaction(|| {
-                CardCa::ca_init(&self.db, domainname, card_ident, pin, &pubkey, &auth_fp)
+                CardCa::ca_init(
+                    &self.db,
+                    domainname,
+                    card_ident,
+                    pin,
+                    &pubkey,
+                    &ca_cert.fingerprint().to_hex(),
+                )
             })?;
         }
 
