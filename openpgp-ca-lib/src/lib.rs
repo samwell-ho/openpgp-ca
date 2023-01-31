@@ -450,6 +450,35 @@ impl Oca {
         &self.db
     }
 
+    /// Change which card backs an OpenPGP CA instance
+    /// (e.g. to switch to a replacement for a broken card).
+    pub fn set_card_backend(self, card_ident: &str, user_pin: &str) -> Result<()> {
+        let (_, cacert) = self.db.get_ca()?;
+
+        let b = Backend::from_config(cacert.backend.as_deref())?;
+        match b {
+            Backend::Card(_c) => {
+                // For now, we only allow switches from card-backend to card-backend
+
+                // Check if user-supplied PIN is accepted by the card
+                card::verify_user_pin(card_ident, user_pin)?;
+
+                // Check if the card exists and contains the correct CA key
+                let ca_cert = self.ca_get_cert_pub()?;
+                let _pubkey = check_if_card_matches(card_ident, &ca_cert)?;
+
+                // Update backend configuration in database
+                let ca_pub = pgp::cert_to_armored(&ca_cert)?;
+                CardCa::ca_replace_in_place(&self.db, card_ident, &user_pin, &ca_pub)?;
+
+                Ok(())
+            }
+            Backend::Softkey => Err(anyhow::anyhow!(
+                "Setting card backend from softkey is not supported."
+            )),
+        }
+    }
+
     // -------- CA
 
     /// Get the CaSec implementation to run operations that need CA
