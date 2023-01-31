@@ -129,6 +129,23 @@ pub enum Backend {
 }
 
 #[derive(Subcommand)]
+pub enum SetBackendCommand {
+    // Softkey,
+    /// Use an OpenPGP card as the backend.
+    Card {
+        /// OpenPGP card ident
+        ident: String,
+
+        #[clap(
+            short = 'P',
+            long = "pinpad",
+            help = "Enforce use of pinpad for PIN entry"
+        )]
+        pinpad: bool,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum CaCommand {
     /// Create CA
     Init {
@@ -141,13 +158,21 @@ pub enum CaCommand {
         #[clap(subcommand)]
         backend: Backend,
     },
-    /// Migrate a softkey CA instance to an OpenPGP card-backed instance.
+    /// Migrate a softkey CA instance onto an OpenPGP card.
     ///
     /// (Make sure to make a backup of the CA private key before running migrate!)
     Migrate {
         /// OpenPGP card ident
         #[clap(long = "card")]
         ident: String,
+    },
+    /// Change the backend configuration of an existing CA instance.
+    ///
+    /// For example, you may have two OpenPGP cards that contain your CAs key material.
+    /// If one breaks, you may want to set the backend to use the other.
+    SetBackend {
+        #[clap(subcommand)]
+        backend: SetBackendCommand,
     },
     /// Export CA public key
     Export,

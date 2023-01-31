@@ -240,6 +240,19 @@ fn main() -> Result<()> {
                 // handled separately, above
                 unreachable!()
             }
+            cli::CaCommand::SetBackend { backend } => match backend {
+                cli::SetBackendCommand::Card { ident, pinpad: _ } => {
+                    // This card is already initialized, ask for User PIN
+                    let user_pin = rpassword::prompt_password(format!(
+                        "Enter User PIN for OpenPGP card {}: ",
+                        ident
+                    ))?;
+                    println!();
+
+                    ca.set_card_backend(&ident, &user_pin)?;
+                    println!("CA backend configuration is changed.");
+                }
+            },
             cli::CaCommand::Export => {
                 println!("{}", ca.ca_get_pubkey_armored()?);
             }
