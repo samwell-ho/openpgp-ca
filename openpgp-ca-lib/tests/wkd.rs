@@ -29,7 +29,7 @@ fn test_ca_export_wkd() -> Result<()> {
     // gpg.leak_tempdir();
 
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
+    let db = format!("{home_path}/ca.sqlite");
 
     let cau = Uninit::new(Some(&db))?;
     let ca = cau.init_softkey("example.org", None)?;
@@ -92,7 +92,7 @@ fn test_wkd_delist() -> Result<()> {
     let gpg = gnupg_test_wrapper::make_context()?;
 
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
+    let db = format!("{home_path}/ca.sqlite");
 
     let cau = Uninit::new(Some(&db))?;
     let ca = cau.init_softkey("example.org", None)?;
@@ -176,7 +176,7 @@ fn test_ca_export_wkd_sequoia() -> Result<()> {
 
     // -- import keys into CA
 
-    let db = format!("{}/ca.sqlite", home_path);
+    let db = format!("{home_path}/ca.sqlite");
 
     let cau = Uninit::new(Some(&db))?;
     let ca = cau.init_softkey("sequoia-pgp.org", None)?;

@@ -32,7 +32,7 @@ cargo-clippy:
     - apt clean
   script:
     - rustup component add clippy
-    - cargo clippy --verbose --tests -- -D warnings -Aclippy::uninlined_format_args
+    - cargo clippy --verbose --tests -- -D warnings
 
 cargo-test:
   stage: test

@@ -165,7 +165,7 @@ fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
     let mut card: Card<Open> = backend.into();
     let mut transaction = card.transaction()?;
 
-    card_matches(&mut transaction, ca_cert).context(format!("On card {}", card_ident))
+    card_matches(&mut transaction, ca_cert).context(format!("On card {card_ident}"))
 }
 
 /// a DB backend for a CA instance
@@ -292,7 +292,7 @@ impl Uninit {
             return Err(anyhow::anyhow!("CA database is already initialized"));
         }
 
-        let email = format!("openpgp-ca@{}", domain);
+        let email = format!("openpgp-ca@{domain}");
         let uid = pgp::ca_user_id(&email, name);
         let uid = String::from_utf8_lossy(uid.value()).to_string();
 
@@ -585,7 +585,7 @@ impl Oca {
         println!("Creation time: {}", created.format("%F %T %Z"));
 
         let backend = Backend::from_config(ca_cert.backend.as_deref())?;
-        println!("   CA Backend: {}", backend);
+        println!("   CA Backend: {backend}");
 
         Ok(())
     }
@@ -780,7 +780,7 @@ impl Oca {
                         db_user
                             .name
                             .as_deref()
-                            .map(|s| format!(" ({})", s))
+                            .map(|s| format!(" ({s})"))
                             .unwrap_or_else(|| "".to_string()),
                     );
 
@@ -810,7 +810,7 @@ impl Oca {
         let expiries = self.certs_expired(exp_days)?;
 
         if expiries.is_empty() {
-            println!("No certificates will expire in the next {} days.", exp_days);
+            println!("No certificates will expire in the next {exp_days} days.");
         } else {
             println!(
                 "The following {} certificate{} will expire in the next {} days.",
@@ -846,7 +846,7 @@ impl Oca {
 
                 println!("OpenPGP certificate {}", db_cert.fingerprint);
                 if let Some(name) = &db_user.name {
-                    println!(" User '{}'", name);
+                    println!(" User '{name}'");
                 }
 
                 if !sig_by_ca.certified.is_empty() {
@@ -941,7 +941,7 @@ impl Oca {
 
         if let Some((code, reason)) = rev.reason_for_revocation() {
             let reason = String::from_utf8(reason.to_vec())?;
-            Ok((format!("{} ({})", code, reason), creation))
+            Ok((format!("{code} ({reason})"), creation))
         } else {
             Ok(("Revocation reason unknown".to_string(), creation))
         }
@@ -1028,7 +1028,7 @@ impl Oca {
 
                 println!("Signed OpenPGP key for {} as bridge.\n", bridge.email);
                 println!("The fingerprint of the remote CA key is");
-                println!("{}\n", fingerprint);
+                println!("{fingerprint}\n");
 
                 Ok(())
             })?;

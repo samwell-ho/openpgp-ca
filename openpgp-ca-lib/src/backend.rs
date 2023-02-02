@@ -52,7 +52,7 @@ impl std::fmt::Display for Backend {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Backend::Softkey => write!(f, "Softkey (private key material in CA database)"),
-            Backend::Card(c) => write!(f, "OpenPGP card {}", c),
+            Backend::Card(c) => write!(f, "OpenPGP card {c}"),
         }
     }
 }

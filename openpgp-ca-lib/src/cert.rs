@@ -62,20 +62,20 @@ pub fn user_new(
     if output_format_minimal {
         // short format (convenient for use with the 'pass' tool)
         if let Some(pass) = pass {
-            println!("{}", pass);
+            println!("{pass}");
         }
-        println!("{}", private);
+        println!("{private}");
     } else {
         if let Some(name) = name {
-            eprintln!("Created new user key for {}.\n", name);
+            eprintln!("Created new user key for {name}.\n");
         } else {
             eprintln!("Created new user key.\n");
         }
 
-        println!("{}", private);
+        println!("{private}");
 
         if let Some(pass) = pass {
-            eprintln!("Password for this key: '{}'.\n", pass);
+            eprintln!("Password for this key: '{pass}'.\n");
         } else {
             eprintln!("No password set for this key.\n");
         }

@@ -175,7 +175,7 @@ impl From<&ErasedKeyAmalgamation<'_, key::PublicParts>> for Key {
 
         let flags = if let Some(f) = flags {
             if !f.is_empty() {
-                Some(format!("{:?}", f))
+                Some(format!("{f:?}"))
             } else {
                 None
             }

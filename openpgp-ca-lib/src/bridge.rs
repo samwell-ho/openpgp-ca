@@ -53,8 +53,7 @@ pub fn bridge_new(
             // expect remote email address with localpart "openpgp-ca"
             if split.len() != 2 || split[0] != "openpgp-ca" {
                 return Err(anyhow::anyhow!(format!(
-                    "Unexpected remote email {}",
-                    remote_email
+                    "Unexpected remote email {remote_email}"
                 )));
             }
 
@@ -152,7 +151,7 @@ fn domain_to_regex(domain: &str) -> Result<String> {
         // if valid syntax: transform domain to regex
         let escaped_domain = &domain.split('.').collect::<Vec<_>>().join("\\.");
 
-        Ok(format!("<[^>]+[@.]{}>$", escaped_domain))
+        Ok(format!("<[^>]+[@.]{escaped_domain}>$"))
     } else {
         Err(anyhow::anyhow!("Parameter is not a valid domain name"))
     }

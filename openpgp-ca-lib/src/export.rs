@@ -71,7 +71,7 @@ pub fn export_certs_as_files(oca: &Oca, email_filter: Option<String>, path: &str
     for email in &emails {
         let certs = oca
             .certs_by_email(email)
-            .context(format!("Failed to load certs for email '{}'", email))?;
+            .context(format!("Failed to load certs for email '{email}'"))?;
 
         if !certs.is_empty() {
             let mut c: Vec<_> = vec![];
@@ -80,7 +80,7 @@ pub fn export_certs_as_files(oca: &Oca, email_filter: Option<String>, path: &str
             }
 
             std::fs::write(
-                path_append(path, &format!("{}.asc", email))?,
+                path_append(path, &format!("{email}.asc"))?,
                 pgp::certs_to_armored(&c)?,
             )?;
         }

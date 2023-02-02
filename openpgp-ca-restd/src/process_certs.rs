@@ -108,7 +108,7 @@ pub fn get_cert_info(cert: &Cert) -> Result<CertInfo, ReturnError> {
     cert.try_into().map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
-            format!("Error getting CertInfo from Cert '{:?}'", e),
+            format!("Error getting CertInfo from Cert '{e:?}'"),
         )
     })
 }
@@ -120,7 +120,7 @@ fn cert_policy_check(cert: &Cert) -> Result<ValidCert, CertError> {
             CertStatus::BadCert,
             // restd::POLICY_BAD_URL.to_string(),
             None,
-            format!("Cert invalid according to standard policy: '{:?}'", e),
+            format!("Cert invalid according to standard policy: '{e:?}'"),
         )
     })
 }
@@ -156,10 +156,7 @@ fn validate_and_strip_user_ids(
     {
         return Err(CertError::new(
             CertStatus::CertMissingLocalUserId,
-            format!(
-                "Cert does not contain user_ids matching '{:?}'",
-                user_emails
-            ),
+            format!("Cert does not contain user_ids matching '{user_emails:?}'"),
         ));
     }
 
@@ -194,7 +191,7 @@ fn validate_and_strip_user_ids(
         }
         Err(e) => Err(CertError::new(
             CertStatus::BadEmail,
-            format!("Error with provided email addresses {:?}", e),
+            format!("Error with provided email addresses {e:?}"),
         )),
     }
 }
@@ -205,7 +202,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
         ReturnBadJson::new(
             CertError::new(
                 CertStatus::InternalError,
-                format!["check_cert: CertInfo::from_cert() failed {:?}", e],
+                format!["check_cert: CertInfo::from_cert() failed {e:?}"],
             ),
             None,
         )
@@ -229,7 +226,7 @@ fn check_cert(cert: &Cert) -> Result<CertInfo, ReturnBadJson> {
             return Err(ReturnBadJson::new(
                 CertError::new(
                     CertStatus::CertSizeLimit,
-                    format!("check_cert: User cert is too big ({} bytes)", len),
+                    format!("check_cert: User cert is too big ({len} bytes)"),
                 ),
                 Some(ci),
             ));
@@ -267,10 +264,7 @@ fn process_cert(
     let cert_in_ca_db = ca.cert_get_by_fingerprint(fp).map_err(|e| {
         let ce = CertError::new(
             CertStatus::InternalError,
-            format!(
-                "process_cert: Error during db lookup by fingerprint: {:?}",
-                e
-            ),
+            format!("process_cert: Error during db lookup by fingerprint: {e:?}"),
         );
         ReturnBadJson::new(ce, Some(cert_info.clone()))
     })?;
@@ -291,8 +285,7 @@ fn process_cert(
                 CertStatus::InternalError,
                 format!(
                     "process_cert: changing delisted and inactive is \
-                    not currently allowed via this call {:?}",
-                    certificate
+                    not currently allowed via this call {certificate:?}"
                 ),
             );
             return Err(ReturnBadJson::new(ce, Some(cert_info.clone())));
@@ -306,7 +299,7 @@ fn process_cert(
             let db_cert = pgp::to_cert(c.pub_cert.as_bytes()).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
-                    format!("process_cert: Error un-armoring cert from CA DB: {:?}", e),
+                    format!("process_cert: Error un-armoring cert from CA DB: {e:?}"),
                 );
 
                 ReturnBadJson::new(error, Some(cert_info.clone()))
@@ -317,8 +310,7 @@ fn process_cert(
                     CertStatus::InternalError,
                     format!(
                         "process_cert: Error merging new cert with DB \
-                        cert: {:?}",
-                        e
+                        cert: {e:?}"
                     ),
                 );
 
@@ -368,10 +360,7 @@ fn process_cert(
         .map_err(|e| {
             CertError::new(
                 CertStatus::InternalError,
-                format!(
-                    "process_cert: CertInfo::from_cert() failed for 'norm' {:?}",
-                    e
-                ),
+                format!("process_cert: CertInfo::from_cert() failed for 'norm' {e:?}"),
             )
         })
         .map_err(|ce| ReturnBadJson::new(ce, None))?;
@@ -381,7 +370,7 @@ fn process_cert(
         ReturnBadJson::new(
             CertError::new(
                 CertStatus::InternalError,
-                format!("process_cert: Couldn't re-armor cert {:?}", e),
+                format!("process_cert: Couldn't re-armor cert {e:?}"),
             ),
             Some(cert_info.clone()),
         ))?;
@@ -404,7 +393,7 @@ fn process_cert(
             ca.cert_import_update(armored.as_bytes()).map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
-                    format!("process_cert: Error updating Cert in database: {:?}", e),
+                    format!("process_cert: Error updating Cert in database: {e:?}"),
                 );
 
                 ReturnBadJson::new(error, cert_info.clone())
@@ -416,8 +405,7 @@ fn process_cert(
                         CertStatus::InternalError,
                         format!(
                             "process_cert: Error adding revocation to db: \
-                                {:?}",
-                            e
+                                {e:?}"
                         ),
                     );
                     ReturnBadJson::new(ce, cert_info.clone())
@@ -449,7 +437,7 @@ fn process_cert(
             .map_err(|e| {
                 let error = CertError::new(
                     CertStatus::InternalError,
-                    format!("process_cert: Error importing Cert into db: {:?}", e),
+                    format!("process_cert: Error importing Cert into db: {e:?}"),
                 );
                 ReturnBadJson::new(error, cert_info.clone())
             })?;
@@ -550,10 +538,7 @@ pub fn process_certs(
     let (certs, signer) = unpack_certring(&certificate.cert).map_err(|e| {
         ReturnError::new(
             ReturnStatus::BadKeyring,
-            format!(
-                "process_certs: Error processing user-provided certring:\n{:?}",
-                e
-            ),
+            format!("process_certs: Error processing user-provided certring:\n{e:?}"),
         )
     })?;
 
@@ -561,7 +546,7 @@ pub fn process_certs(
     let my_domain = ca.get_ca_domain().map_err(|e| {
         ReturnError::new(
             ReturnStatus::InternalError,
-            format!("process_certs: Error getting the CA's domain {:?}", e),
+            format!("process_certs: Error getting the CA's domain {e:?}"),
         )
     })?;
 
