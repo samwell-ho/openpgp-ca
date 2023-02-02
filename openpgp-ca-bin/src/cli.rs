@@ -77,7 +77,7 @@ pub enum Backend {
     /// The operator needs to safe-keep that private key).
     Card {
         /// OpenPGP card ident
-        ident: String,
+        ident: Option<String>,
 
         /// Initialize an OpenPGP CA instance from an already set up OpenPGP card, and the
         /// corresponding CA public key.
@@ -134,7 +134,23 @@ pub enum SetBackendCommand {
     /// Use an OpenPGP card as the backend.
     Card {
         /// OpenPGP card ident
-        ident: String,
+        ident: Option<String>,
+
+        #[clap(
+            short = 'P',
+            long = "pinpad",
+            help = "Enforce use of pinpad for PIN entry"
+        )]
+        pinpad: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum MigrateCommand {
+    /// Use an OpenPGP card as the backend.
+    Card {
+        /// OpenPGP card ident
+        ident: Option<String>,
 
         #[clap(
             short = 'P',
@@ -162,9 +178,8 @@ pub enum CaCommand {
     ///
     /// (Make sure to make a backup of the CA private key before running migrate!)
     Migrate {
-        /// OpenPGP card ident
-        #[clap(long = "card")]
-        ident: String,
+        #[clap(subcommand)]
+        backend: MigrateCommand,
     },
     /// Change the backend configuration of an existing CA instance.
     ///
