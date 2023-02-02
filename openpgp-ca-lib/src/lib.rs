@@ -120,7 +120,7 @@ fn card_matches(transaction: &mut Card<Transaction>, ca_cert: &Cert) -> Result<S
     let fps = transaction.fingerprints()?;
     let auth = fps
         .authentication()
-        .context(format!("No AUT key on card"))?;
+        .context("No AUT key on card".to_string())?;
 
     let auth_fp = auth.to_string();
 
@@ -165,7 +165,7 @@ fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
     let mut card: Card<Open> = backend.into();
     let mut transaction = card.transaction()?;
 
-    card_matches(&mut transaction, &ca_cert).context(format!("On card {}", card_ident))
+    card_matches(&mut transaction, ca_cert).context(format!("On card {}", card_ident))
 }
 
 /// a DB backend for a CA instance
@@ -509,7 +509,7 @@ impl Oca {
 
                 // Update backend configuration in database
                 let ca_pub = pgp::cert_to_armored(&ca_cert)?;
-                CardCa::ca_replace_in_place(&self.db, card_ident, &user_pin, &ca_pub)?;
+                CardCa::ca_replace_in_place(&self.db, card_ident, user_pin, &ca_pub)?;
 
                 Ok(())
             }

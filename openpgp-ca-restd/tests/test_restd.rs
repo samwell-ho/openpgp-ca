@@ -208,7 +208,7 @@ D5dmOHEjMKMgIHN5yEm66QCeOQKb9ZCirohcldmh/bXXm0DXapk=
 
 fn start_restd(db: String) -> AbortHandle {
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
-    let _ = Abortable::new(
+    let _abortable = Abortable::new(
         tokio::spawn(restd::run(Some(db)).launch()),
         abort_registration,
     );
