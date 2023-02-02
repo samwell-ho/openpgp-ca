@@ -66,28 +66,57 @@ use chrono::offset::Utc;
 use chrono::DateTime;
 use openpgp_card::algorithm::AlgoSimple;
 use openpgp_card_pcsc::PcscBackend;
+use openpgp_card_sequoia::state::Transaction;
 use openpgp_card_sequoia::{state::Open, Card};
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
 
-use crate::backend::card::CardCa;
+use crate::backend::card::{check_card_empty, CardCa};
 use crate::backend::{card, Backend};
 use crate::ca_secret::CaSec;
 use crate::db::models;
 use crate::db::OcaDb;
 use crate::types::CertificationStatus;
 
-// Check the card `card_ident`, confirm that the cardholder name is set to
-// "OpenPGP CA", and that the AUT slot contains the certification key.
-//
-// FIXME: also check the state of SIG and DEC slots?
-fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
-    // Open Smart Card
-    let backend = PcscBackend::open_by_ident(card_ident, None)?;
-    let mut card: Card<Open> = backend.into();
-    let mut transaction = card.transaction()?;
+/// List of cards that are blank (no fingerprint in any slot)
+pub fn blank_cards() -> Result<Vec<String>> {
+    let mut idents = vec![];
 
+    for backend in PcscBackend::cards(None)? {
+        let mut card: Card<Open> = backend.into();
+        let transaction = card.transaction()?;
+
+        if check_card_empty(&transaction)? {
+            idents.push(transaction.application_identifier()?.ident());
+        }
+    }
+
+    Ok(idents)
+}
+
+/// List of cards that match the CA cert `cert`
+pub fn matching_cards(ca_cert: &[u8]) -> Result<Vec<String>> {
+    let ca_cert = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
+
+    let mut idents = vec![];
+
+    for backend in PcscBackend::cards(None)? {
+        let mut card: Card<Open> = backend.into();
+        let mut transaction = card.transaction()?;
+
+        if card_matches(&mut transaction, &ca_cert).is_ok() {
+            idents.push(transaction.application_identifier()?.ident());
+        }
+    }
+
+    Ok(idents)
+}
+
+/// Does 'ca_cert' match the data on the opened card?
+///
+/// FIXME: also check the state of SIG and DEC slots?
+fn card_matches(transaction: &mut Card<Transaction>, ca_cert: &Cert) -> Result<String> {
     let fps = transaction.fingerprints()?;
     let auth = fps
         .authentication()
@@ -126,6 +155,17 @@ fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
     }
 
     Ok(pubkey)
+}
+
+// Check the card `card_ident`, confirm that the cardholder name is set to
+// "OpenPGP CA", and that the AUT slot contains the certification key.
+fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
+    // Open Smart Card
+    let backend = PcscBackend::open_by_ident(card_ident, None)?;
+    let mut card: Card<Open> = backend.into();
+    let mut transaction = card.transaction()?;
+
+    card_matches(&mut transaction, &ca_cert).context(format!("On card {}", card_ident))
 }
 
 /// a DB backend for a CA instance
