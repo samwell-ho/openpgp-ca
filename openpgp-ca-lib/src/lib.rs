@@ -91,7 +91,7 @@ fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
     let fps = transaction.fingerprints()?;
     let auth = fps
         .authentication()
-        .context(format!("No Signing key on card {}", card_ident))?;
+        .context(format!("No AUT key on card"))?;
 
     let auth_fp = auth.to_string();
 
