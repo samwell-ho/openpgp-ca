@@ -10,6 +10,9 @@ use openpgp_ca_restd::json::{Action, CertResultJson, CertStatus, Certificate};
 use openpgp_ca_restd::restd;
 use rocket::futures::prelude::future::{AbortHandle, Abortable};
 
+#[allow(dead_code)]
+mod gnupg_test_wrapper;
+
 const ALICE_CERT: &str = r#"-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mDMEX419BRYJKwYBBAHaRw8BAQdAnfJuV3EHFAJ31D968YvLlAAu0YqUxySSJ1Lh

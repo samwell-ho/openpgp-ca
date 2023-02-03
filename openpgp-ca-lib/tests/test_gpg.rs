@@ -1,35 +1,52 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
+use std::env;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use openpgp_ca_lib::pgp;
-use openpgp_ca_lib::Uninit;
+use openpgp_ca_lib::{pgp, Oca};
 use sequoia_openpgp::serialize::Serialize;
 
+use crate::gnupg_test_wrapper::Ctx;
+
+mod util;
+use util::gnupg_test_wrapper;
+
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn alice_authenticates_bob_centralized_soft() -> Result<()> {
+    let (gpg, cau) = util::setup_one_uninit()?;
+
+    // make new CA key
+    let ca = cau.init_softkey("example.org", None)?;
+
+    test_alice_authenticates_bob_centralized(gpg, ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn alice_authenticates_bob_centralized_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_alice_authenticates_bob_centralized(gpg, ca)
+}
+
 /// Create a new CA. Create user certs for Alice and Bob in OpenPGP CA.
 ///
 /// Export all keys to a gnupg instance, set ownertrust for Alice to
 /// "ultimate".
 ///
 /// Check that gnupg considers Bob and the CA admin as "full"ly trusted.
-fn test_alice_authenticates_bob_centralized() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
+fn test_alice_authenticates_bob_centralized(gpg: Ctx, ca: Oca) -> Result<()> {
     // ---- use OpenPGP CA to make a set of keys ----
-
-    let cau = Uninit::new(Some(&db))?;
-
-    // make new CA key
-    let ca = cau.init_softkey("example.org", None)?;
 
     // make CA users
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -82,6 +99,28 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_alice_authenticates_bob_decentralized_soft() -> Result<()> {
+    let (_gpg, cau) = util::setup_one_uninit()?;
+
+    // make new CA key
+    let ca = cau.init_softkey("example.org", None)?;
+
+    test_alice_authenticates_bob_decentralized(ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_alice_authenticates_bob_decentralized_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (_gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_alice_authenticates_bob_decentralized(ca)
+}
+
 /// A new CA instance is created. The CA Admin's public key is exported (for
 /// Alice and Bob).
 ///
@@ -96,20 +135,9 @@ fn test_alice_authenticates_bob_centralized() -> Result<()> {
 ///
 /// Expect gnupg in Alice's instance to consider both the CA Admin key and
 /// Bob and "full"ly trusted.
-fn test_alice_authenticates_bob_decentralized() -> Result<()> {
+fn test_alice_authenticates_bob_decentralized(ca: Oca) -> Result<()> {
     let gpg_alice = gnupg_test_wrapper::make_context()?;
     let gpg_bob = gnupg_test_wrapper::make_context()?;
-
-    let gpg_ca = gnupg_test_wrapper::make_context()?;
-
-    let home_path_ca = String::from(gpg_ca.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path_ca);
-
-    // ---- init OpenPGP CA key ----
-    let cau = Uninit::new(Some(&db))?;
-
-    // make new CA key
-    let ca = cau.init_softkey("example.org", None)?;
 
     let ca_key = ca.ca_get_pubkey_armored()?;
 
@@ -198,6 +226,36 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_bridge_soft() -> Result<()> {
+    let (gpg, ca1u, ca2u) = util::setup_two_uninit()?;
+
+    // make new CA key
+    let ca1 = ca1u.init_softkey("some.org", None)?;
+
+    // make new CA key
+    let ca2 = ca2u.init_softkey("other.org", None)?;
+
+    test_bridge(gpg, ca1, ca2)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_bridge_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, ca1u, ca2u) = util::setup_two_uninit()?;
+
+    // CA1 lives on the card
+    let (ca1, _priv) = ca1u.init_card_generate_on_host(&ident, "some.org", None)?;
+
+    // CA2 is a softkey instance
+    let ca2 = ca2u.init_softkey("other.org", None)?;
+
+    test_bridge(gpg, ca1, ca2)
+}
+
 /// Set up two OpenPGP CA instances for the domains "some.org" and "other.org"
 ///
 /// Create users in each CA, set up a bridge between the two OpenPGP CA
@@ -212,24 +270,8 @@ fn test_alice_authenticates_bob_decentralized() -> Result<()> {
 /// Users of CA2 trust Carol, because CA2 signed Carol's key.
 /// However, users of CA1 will not, because their trust of keys that CA2
 /// signed is scoped to the main domain of CA2's organization.
-fn test_bridge() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    // don't delete home dir (for manual inspection)
-    // gpg.leak_tempdir();
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-
-    let db1 = format!("{}/ca1.sqlite", home_path);
-    let db2 = format!("{}/ca2.sqlite", home_path);
-
-    let ca1u = Uninit::new(Some(&db1))?;
-    let ca2u = Uninit::new(Some(&db2))?;
-
+fn test_bridge(gpg: Ctx, ca1: Oca, ca2: Oca) -> Result<()> {
     // ---- populate first OpenPGP CA instance ----
-
-    // make new CA key
-    let ca1 = ca1u.init_softkey("some.org", None)?;
 
     // make CA user
     assert!(ca1
@@ -238,9 +280,6 @@ fn test_bridge() -> Result<()> {
 
     // ---- populate second OpenPGP CA instance ----
 
-    // make new CA key
-    let ca2 = ca2u.init_softkey("other.org", None)?;
-
     // make CA user
     ca2.user_new(Some("Bob"), &["bob@other.org"], None, false, false)?;
 
@@ -248,6 +287,7 @@ fn test_bridge() -> Result<()> {
     ca2.user_new(Some("Carol"), &["carol@third.org"], None, false, false)?;
 
     // ---- setup bridges: scoped trust between one.org and two.org ---
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
 
     let ca_some_file = format!("{}/ca1.pubkey", home_path);
     let ca_other_file = format!("{}/ca2.pubkey", home_path);
@@ -338,6 +378,34 @@ fn test_bridge() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_multi_bridge_soft() -> Result<()> {
+    let (gpg, ca1u, ca2u, ca3u) = util::setup_three_uninit()?;
+
+    // make new CA keys
+    let ca1 = ca1u.init_softkey("alpha.org", None)?;
+    let ca2 = ca2u.init_softkey("beta.org", None)?;
+    let ca3 = ca3u.init_softkey("gamma.org", None)?;
+
+    test_multi_bridge(gpg, ca1, ca2, ca3)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_multi_bridge_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, ca1u, ca2u, ca3u) = util::setup_three_uninit()?;
+
+    // CA3 is card-backed, CA1 and CA2 are softkey instances
+    let ca1 = ca1u.init_softkey("alpha.org", None)?;
+    let ca2 = ca2u.init_softkey("beta.org", None)?;
+    let (ca3, _priv) = ca3u.init_card_generate_on_host(&ident, "gamma.org", None)?;
+
+    test_multi_bridge(gpg, ca1, ca2, ca3)
+}
+
 /// Set up three CA instances, with scoped trust between a+b, and b+c:
 ///
 /// alice@alpha.org ---tsign---> openpgp-ca@alpha.org
@@ -347,34 +415,19 @@ fn test_bridge() -> Result<()> {
 ///
 /// expected outcome: alice has "full" trust for openpgp-ca@alpha.org and openpgp-ca@beta.org,
 /// but no trust for openpgp-ca@gamma.org and carol@gamma.org
-fn test_multi_bridge() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-
+fn test_multi_bridge(gpg: Ctx, ca1: Oca, ca2: Oca, ca3: Oca) -> Result<()> {
     // don't delete home dir (for manual inspection)
     // gpg.leak_tempdir();
 
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-
-    let db1 = format!("{}/ca1.sqlite", home_path);
-    let db2 = format!("{}/ca2.sqlite", home_path);
-    let db3 = format!("{}/ca3.sqlite", home_path);
-
-    let ca1u = Uninit::new(Some(&db1))?;
-    let ca2u = Uninit::new(Some(&db2))?;
-    let ca3u = Uninit::new(Some(&db3))?;
-
     // ---- populate OpenPGP CA instances ----
-
-    let ca1 = ca1u.init_softkey("alpha.org", None)?;
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    let ca2 = ca2u.init_softkey("beta.org", None)?;
-
-    let ca3 = ca3u.init_softkey("gamma.org", None)?;
     ca3.user_new(Some("Carol"), &["carol@gamma.org"], None, false, false)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
 
     // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
+
     let ca2_file = format!("{}/ca2.pubkey", home_path);
     let ca3_file = format!("{}/ca3.pubkey", home_path);
 
@@ -469,33 +522,47 @@ fn test_multi_bridge() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_scoping_soft() -> Result<()> {
+    let (gpg, ca1u, ca2u, ca3u) = util::setup_three_uninit()?;
+
+    // make new CA keys
+    let ca1 = ca1u.init_softkey("alpha.org", None)?;
+    let ca2 = ca2u.init_softkey("beta.org", None)?;
+    let ca3 = ca3u.init_softkey("other.org", None)?;
+
+    test_scoping(gpg, ca1, ca2, ca3)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_scoping_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, ca1u, ca2u, ca3u) = util::setup_three_uninit()?;
+
+    // CA3 is card-backed, CA1 and CA2 are softkey instances
+    let ca1 = ca1u.init_softkey("alpha.org", None)?;
+    let ca2 = ca2u.init_softkey("beta.org", None)?;
+    let (ca3, _priv) = ca3u.init_card_generate_on_host(&ident, "other.org", None)?;
+
+    test_scoping(gpg, ca1, ca2, ca3)
+}
+
 /// alice@alpha.org ---tsign---> openpgp-ca@alpha.org
 ///   ---tsign[scope=beta.org]---> openpgp-ca@beta.org
 ///     ---tsign---> openpgp-ca@other.org
 ///       ---sign--> bob@beta.org
-fn test_scoping() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-
+fn test_scoping(gpg: Ctx, ca1: Oca, ca2: Oca, ca3: Oca) -> Result<()> {
     // don't delete home dir (for manual inspection)
     // gpg.leak_tempdir();
 
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
 
-    let db1 = format!("{}/ca1.sqlite", home_path);
-    let db2 = format!("{}/ca2.sqlite", home_path);
-    let db3 = format!("{}/ca3.sqlite", home_path);
-
-    let ca1u = Uninit::new(Some(&db1))?;
-    let ca2u = Uninit::new(Some(&db2))?;
-    let ca3u = Uninit::new(Some(&db3))?;
-
     // ---- populate OpenPGP CA instances ----
-    let ca1 = ca1u.init_softkey("alpha.org", None)?;
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
-    let ca2 = ca2u.init_softkey("beta.org", None)?;
-
-    let ca3 = ca3u.init_softkey("other.org", None)?;
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
     let ca3_file = format!("{}/ca3.pubkey", home_path);
     let pub_ca3 = ca3.ca_get_pubkey_armored()?;

@@ -18,6 +18,11 @@ edition = "2018"
 name = "openpgp_ca_lib"
 path = "src/lib.rs"
 
+[features]
+default = ["softkey"]
+softkey = []
+card = []
+
 [dependencies]
 diesel = { version = "1.4", features = ["sqlite"] }
 diesel_migrations = "1.4"
@@ -28,16 +33,16 @@ chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1.13.1" }
 
 chbs = "0.1"
-addr = "0.14"
+addr = "0.15"
 
-sha2 = "0.9"
+sha2 = "0.10"
 
 rand = "0.8"
 
 openpgp-keylist = "0.2"
 
 sequoia-openpgp = "1.8"
-sequoia-net = "0.24"
+sequoia-net = "0.25"
 
 openpgp-card = "0.3.3"
 openpgp-card-pcsc = "0.3"
@@ -45,6 +50,7 @@ openpgp-card-sequoia = "0.1"
 
 # for tests
 [dev-dependencies]
-gnupg-test-wrapper = { path = "../gnupg-test-wrapper" }
 tempfile = "3.1"
 rusqlite = "0.14" # this version matches dependency-versions for libsqlite3-sys with diesel 1.4
+expectrl = "0.6"
+csv = "1.1"

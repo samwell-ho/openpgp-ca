@@ -1,16 +1,15 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::env;
+use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use openpgp_ca_lib::pgp;
-use openpgp_ca_lib::{Oca, Uninit};
+use openpgp_ca_lib::{pgp, Oca, Uninit};
 use rusqlite::Connection;
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::cert::CertBuilder;
@@ -18,24 +17,43 @@ use sequoia_openpgp::packet::signature::subpacket::{Subpacket, SubpacketTag, Sub
 use sequoia_openpgp::packet::signature::SignatureBuilder;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::{Cert, Fingerprint, KeyHandle, KeyID, Packet};
+use sequoia_openpgp::{Cert, KeyHandle, Packet};
+
+mod util;
+
+use util::gnupg_test_wrapper;
+
+use crate::util::gnupg_test_wrapper::Ctx;
 
 #[test]
-/// Creates a CA (with a custom name) and a user.
-///
-/// Checks that CA (with custom name) and one user (with one revocation) are
-/// visible via CA API.
-fn test_ca() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_ca_soft() -> Result<()> {
+    let (_gpg, cau) = util::setup_one_uninit()?;
 
     // make new CA key
     let ca = cau.init_softkey("example.org", Some("Example Org OpenPGP CA Key"))?;
 
+    test_ca(ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_ca_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (_gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) =
+        cau.init_card_generate_on_host(&ident, "example.org", Some("Example Org OpenPGP CA Key"))?;
+
+    test_ca(ca)
+}
+
+/// Creates a CA (with a custom name) and a user.
+///
+/// Checks that CA (with custom name) and one user (with one revocation) are
+/// visible via CA API.
+fn test_ca(ca: Oca) -> Result<()> {
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
 
@@ -69,21 +87,34 @@ fn test_ca() -> Result<()> {
 }
 
 #[test]
-/// Creates a CA and a user. The certification for the user is valid for
-/// 365 days only.
-///
-/// Checks that the certification indeed has a limited validity.
-fn test_expiring_certification() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_expiring_certification_soft() -> Result<()> {
+    let (_gpg, cau) = util::setup_one_uninit()?;
 
     // make new CA key
     let ca = cau.init_softkey("example.org", Some("Example Org OpenPGP CA Key"))?;
 
+    test_expiring_certification(ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_expiring_certification_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (_gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) =
+        cau.init_card_generate_on_host(&ident, "example.org", Some("Example Org OpenPGP CA Key"))?;
+
+    test_expiring_certification(ca)
+}
+
+/// Creates a CA and a user. The certification for the user is valid for
+/// 365 days only.
+///
+/// Checks that the certification indeed has a limited validity.
+fn test_expiring_certification(ca: Oca) -> Result<()> {
     let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
 
@@ -132,6 +163,28 @@ fn test_expiring_certification() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_update_cert_key_soft() -> Result<()> {
+    let (gpg, cau) = util::setup_one_uninit()?;
+
+    // make new CA key
+    let ca = cau.init_softkey("example.org", None)?;
+
+    test_update_cert_key(gpg, ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_update_cert_key_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_update_cert_key(gpg, ca)
+}
+
 /// Create a CA, then externally create a user cert and import it.
 /// Check that the expiry of that cert is as expected.
 ///
@@ -142,7 +195,7 @@ fn test_expiring_certification() -> Result<()> {
 /// Check that the updated user cert has the expected expiry duration.
 ///
 /// This test also exercises the OpenpgpCa::certs_expired() function.
-fn test_update_cert_key() -> Result<()> {
+fn test_update_cert_key(gpg: Ctx, ca: Oca) -> Result<()> {
     let policy = StandardPolicy::new();
 
     let now = SystemTime::now();
@@ -151,16 +204,7 @@ fn test_update_cert_key() -> Result<()> {
     let in_six_years = now.checked_add(Duration::from_secs(3600 * 24 * 365 * 6));
 
     // update key with new version, but same fingerprint
-    let gpg = gnupg_test_wrapper::make_context()?;
     //    gpg.leak_tempdir();
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
-
-    // make new CA key
-    let ca = cau.init_softkey("example.org", None)?;
 
     // import key as new user
     gpg.create_user("Alice <alice@example.org>");
@@ -229,18 +273,31 @@ fn test_update_cert_key() -> Result<()> {
 }
 
 #[test]
-fn test_ca_import() -> Result<()> {
-    // update key with new version, but same fingerprint
-    let gpg = gnupg_test_wrapper::make_context()?;
-    //    gpg.leak_tempdir();
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_ca_import_soft() -> Result<()> {
+    let (gpg, cau) = util::setup_one_uninit()?;
 
     // make new CA key
     let ca = cau.init_softkey("example.org", None)?;
+
+    test_ca_import(gpg, ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_ca_import_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_ca_import(gpg, ca)
+}
+
+/// Update CA key with new version, but same fingerprint
+fn test_ca_import(gpg: Ctx, ca: Oca) -> Result<()> {
+    //    gpg.leak_tempdir();
 
     // import key as new user
     gpg.create_user("Alice <alice@example.org>");
@@ -287,22 +344,34 @@ fn test_ca_import() -> Result<()> {
 }
 
 #[test]
-/// Create a new CA and two certs with the same email.
-///
-/// Expected outcome: two independent certs / users got created.
-fn test_ca_insert_duplicate_email() -> Result<()> {
-    // two certs with the same email are considered distinct certs
-    // (e.g. "normal cert" vs "code signing cert")
-
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_ca_insert_duplicate_email_soft() -> Result<()> {
+    let (_gpg, cau) = util::setup_one_uninit()?;
 
     // make new CA key
     let ca = cau.init_softkey("example.org", None)?;
+
+    test_ca_insert_duplicate_email(ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_ca_insert_duplicate_email_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (_gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_ca_insert_duplicate_email(ca)
+}
+
+/// Create a new CA and two certs with the same email.
+///
+/// Expected outcome: two independent certs / users got created.
+fn test_ca_insert_duplicate_email(ca: Oca) -> Result<()> {
+    // two certs with the same email are considered distinct certs
+    // (e.g. "normal cert" vs "code signing cert")
 
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -324,151 +393,34 @@ fn test_ca_insert_duplicate_email() -> Result<()> {
 }
 
 #[test]
-/// create a CA for "example.org" and three users.
-/// two of these users have emails in the "example.org" domain, the third
-/// doesn't.
-/// Export CA to wkd.
-///
-/// Expected outcome: the WKD contains three keys (CA + 2x user).
-/// Check that the expected filenames exist in the WKD data.
-fn test_ca_export_wkd() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-    // gpg.leak_tempdir();
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_ca_multiple_revocations_soft() -> Result<()> {
+    let (gpg, cau) = util::setup_one_uninit()?;
 
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
+    // make new CA key
     let ca = cau.init_softkey("example.org", None)?;
 
-    ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
-    ca.user_new(
-        Some("Bob"),
-        &["bob@example.org", "bob@other.org"],
-        None,
-        false,
-        false,
-    )?;
-    ca.user_new(Some("Carol"), &["carol@other.org"], None, false, false)?;
-
-    let wkd_dir = home_path + "/wkd/";
-    let wkd_path = Path::new(&wkd_dir);
-
-    ca.export_wkd("example.org", wkd_path)?;
-
-    // expect 3 exported keys (carol should not be in the export)
-    let test_path = wkd_path.join(".well-known/openpgpkey/example.org/hu/");
-    let paths = fs::read_dir(test_path)?;
-    assert_eq!(paths.count(), 3);
-
-    // check that both user keys have been written to files
-    let test_path = wkd_path.join(
-        ".well-known/openpgpkey/example.org\
-         /hu/jycbiujnsxs47xrkethgtj69xuunurok",
-    );
-    assert!(test_path.is_file());
-
-    let test_path = wkd_path.join(
-        ".well-known/openpgpkey/example.org\
-         /hu/kei1q4tipxxu1yj79k9kfukdhfy631xe",
-    );
-    assert!(test_path.is_file());
-
-    // check that CA key has been written to file
-    let test_path = wkd_path.join(
-        ".well-known/openpgpkey/example.org\
-         /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t",
-    );
-    assert!(test_path.is_file());
-
-    // check that a policy file been created
-    let test_path = wkd_path.join(
-        ".well-known/openpgpkey/example.org\
-         /policy",
-    );
-    assert!(test_path.is_file());
-
-    Ok(())
+    test_ca_multiple_revocations(gpg, ca)
 }
 
 #[test]
-#[ignore]
-/// Get sequoia-pgp.org keys for Justus and Neal from Hagrid.
-/// Import into a fresh CA instance, then export as WKD.
-fn test_ca_export_wkd_sequoia() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-    //    gpg.leak_tempdir();
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_ca_multiple_revocations_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
 
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
+    let (gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
 
-    // -- get keys from hagrid
-
-    use tokio::runtime::Runtime;
-    let rt = Runtime::new()?;
-
-    let j: Fingerprint = "CBCD8F030588653EEDD7E2659B7DD433F254904A".parse()?;
-    let justus: Cert = rt.block_on(async move {
-        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(sequoia_net::Policy::Encrypted)?;
-        hagrid.get(&KeyID::from(j)).await
-    })?;
-    let justus_key = pgp::cert_to_armored(&justus)?;
-
-    let n: Fingerprint = "8F17777118A33DDA9BA48E62AACB3243630052D9".parse()?;
-    let neal: Cert = rt.block_on(async move {
-        let mut hagrid = sequoia_net::KeyServer::keys_openpgp_org(sequoia_net::Policy::Encrypted)?;
-        hagrid.get(&KeyID::from(n)).await
-    })?;
-    let neal_key = pgp::cert_to_armored(&neal)?;
-
-    // -- import keys into CA
-
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
-    let ca = cau.init_softkey("sequoia-pgp.org", None)?;
-
-    ca.cert_import_new(
-        justus_key.as_bytes(),
-        &[],
-        None,
-        &["justus@sequoia-pgp.org"],
-        None,
-    )?;
-    ca.cert_import_new(
-        neal_key.as_bytes(),
-        &[],
-        None,
-        &["neal@sequoia-pgp.org"],
-        None,
-    )?;
-
-    // -- export as WKD
-
-    let wkd_dir = home_path + "/wkd/";
-    let wkd_path = Path::new(&wkd_dir);
-
-    ca.export_wkd("sequoia-pgp.org", wkd_path)?;
-
-    Ok(())
+    test_ca_multiple_revocations(gpg, ca)
 }
 
-#[test]
 /// Create a CA instance. Externally create a user cert and two revocations.
 /// Import user cert and both revocations.
 ///
 /// Check that CA API shows one cert with two revocations.
-fn test_ca_multiple_revocations() -> Result<()> {
+fn test_ca_multiple_revocations(gpg: Ctx, ca: Oca) -> Result<()> {
     // create two different revocation certificates for one key and import them
-
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
-
-    // make new CA key
-    let ca = cau.init_softkey("example.org", None)?;
 
     // gpg: make key for Alice
     gpg.create_user("Alice <alice@example.org>");
@@ -484,6 +436,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
     )?;
 
     // make two different revocation certificates and import them into the CA
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let revoc_file1 = format!("{}/alice.revoc1", home_path);
     gpg.make_revocation("alice@example.org", &revoc_file1, 1)?;
 
@@ -517,6 +470,28 @@ fn test_ca_multiple_revocations() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_ca_signatures_soft() -> Result<()> {
+    let (gpg, cau) = util::setup_one_uninit()?;
+
+    // make new CA key
+    let ca = cau.init_softkey("example.org", None)?;
+
+    test_ca_signatures(gpg, ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_ca_signatures_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_ca_signatures(gpg, ca)
+}
+
 /// Create new CA. Set up three users:
 /// - Alice is imported, and signed by the CA key
 /// - Bob is imported, but not signed by the CA key
@@ -528,15 +503,7 @@ fn test_ca_multiple_revocations() -> Result<()> {
 /// - Alice is signed but hasn't tsigned the CA,
 /// - Bob is not signed and hasn't tsigned the CA,
 /// - Carol is signed and has tsigned the CA.
-fn test_ca_signatures() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
-    let ca = cau.init_softkey("example.org", None)?;
-
+fn test_ca_signatures(gpg: Ctx, ca: Oca) -> Result<()> {
     // create/import alice, CA signs alice's key
     gpg.create_user("Alice <alice@example.org>");
     let alice_key = gpg.export("alice@example.org");
@@ -594,19 +561,32 @@ fn test_ca_signatures() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_apply_revocation_soft() -> Result<()> {
+    let (_gpg, cau) = util::setup_one_uninit()?;
+
+    // make new CA key
+    let ca = cau.init_softkey("example.org", None)?;
+
+    test_apply_revocation(ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_apply_revocation_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (_gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_apply_revocation(ca)
+}
+
 /// Create a CA and a user. Apply the user's revocation.
 ///
 /// Check that the revocation has been published to the user's cert.
-fn test_apply_revocation() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-    //    gpg.leak_tempdir();
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
-    let ca = cau.init_softkey("example.org", None)?;
-
+fn test_apply_revocation(ca: Oca) -> Result<()> {
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
 
@@ -633,6 +613,9 @@ fn test_apply_revocation() -> Result<()> {
 /// the CA key. Import this already signed key.
 ///
 /// Check that the imported key only has one signature.
+///
+/// NOTE: This test uses the private CA key, we're only running it with
+/// the softkey backend.
 fn test_import_signed_cert() -> Result<()> {
     let policy = StandardPolicy::new();
 
@@ -708,6 +691,28 @@ fn test_import_signed_cert() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_revocation_no_fingerprint_soft() -> Result<()> {
+    let (gpg, cau) = util::setup_one_uninit()?;
+
+    // make new CA key
+    let ca = cau.init_softkey("example.org", None)?;
+
+    test_revocation_no_fingerprint(gpg, ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_revocation_no_fingerprint_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_revocation_no_fingerprint(gpg, ca)
+}
+
 /// Create a new CA, add two users.
 /// Then import a revocation certificate without an issuer_fingerprint.
 /// (The certificate only has a KeyID)
@@ -716,18 +721,8 @@ fn test_import_signed_cert() -> Result<()> {
 ///
 /// Check that the user certs have the expected number of revocations
 /// associated.
-fn test_revocation_no_fingerprint() -> Result<()> {
+fn test_revocation_no_fingerprint(gpg: Ctx, ca: Oca) -> Result<()> {
     // create two different revocation certificates for one key and import them
-
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
-
-    // make new CA key
-    let ca = cau.init_softkey("example.org", None)?;
 
     // create Alice
     ca.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
@@ -738,6 +733,7 @@ fn test_revocation_no_fingerprint() -> Result<()> {
     ca.cert_import_new(bob_key.as_bytes(), &[], None, &[], None)?;
 
     // make a revocation certificate for bob ...
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let revoc_file = format!("{}/bob.revoc", home_path);
     gpg.make_revocation("bob@example.org", &revoc_file, 1)?;
 
@@ -838,20 +834,33 @@ fn test_revocation_no_fingerprint() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_create_user_with_pw_soft() -> Result<()> {
+    let (_gpg, cau) = util::setup_one_uninit()?;
+
+    // make new CA key
+    let ca = cau.init_softkey("example.org", None)?;
+
+    test_create_user_with_pw(ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_create_user_with_pw_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (_gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_create_user_with_pw(ca)
+}
+
 /// Create a CA and a user with password.
 ///
 /// Check that the CA admin key is signed by the user (even with password
 /// encrypted user key)
-fn test_create_user_with_pw() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-    //    gpg.leak_tempdir();
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
-    let ca = cau.init_softkey("example.org", None)?;
-
+fn test_create_user_with_pw(ca: Oca) -> Result<()> {
     // make CA user
     ca.user_new(Some("Alice"), &["alice@example.org"], None, true, false)?;
 
@@ -868,20 +877,33 @@ fn test_create_user_with_pw() -> Result<()> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_refresh_soft() -> Result<()> {
+    let (_gpg, cau) = util::setup_one_uninit()?;
+
+    // make new CA key
+    let ca = cau.init_softkey("example.org", None)?;
+
+    test_refresh(ca)
+}
+
+#[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_refresh_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (_gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) = cau.init_card_generate_on_host(&ident, "example.org", None)?;
+
+    test_refresh(ca)
+}
+
 /// Create a CA and a number of users with certifications by the CA that
 /// expire at different points.
 ///
 /// Run a refresh and check if the results are as expected
-fn test_refresh() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-    //    gpg.leak_tempdir();
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
-
-    let cau = Uninit::new(Some(&db))?;
-    let ca = cau.init_softkey("example.org", None)?;
-
+fn test_refresh(ca: Oca) -> Result<()> {
     let ca_cert = ca.ca_get_cert_pub()?;
     let ca_fp = ca_cert.fingerprint();
 
@@ -952,81 +974,34 @@ fn test_refresh() -> Result<()> {
 }
 
 #[test]
-/// Create a CA and two users. "delist" one user.
-/// Export to WKD. Check that only the other user has been exported.
-fn test_wkd_delist() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
+#[cfg_attr(not(feature = "softkey"), ignore)]
+fn test_ca_re_certify_soft() -> Result<()> {
+    let (gpg, cau) = util::setup_one_uninit()?;
 
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
+    // make new CA key
+    let ca = cau.init_softkey("example.org", Some("example.org CA old"))?;
 
-    let cau = Uninit::new(Some(&db))?;
-    let ca = cau.init_softkey("example.org", None)?;
-
-    // make CA users
-    ca.user_new(Some("Alice"), &["alice@example.org"], None, true, false)?;
-    ca.user_new(Some("Bob"), &["bob@example.org"], None, true, false)?;
-
-    // set bob to "delisted"
-    let cert = ca.certs_by_email("bob@example.org")?;
-    assert_eq!(cert.len(), 1);
-    let mut bob = cert[0].clone();
-    bob.delisted = true;
-    ca.db().cert_update(&bob)?;
-
-    // export to WKD
-    let wkd_dir = home_path + "/wkd/";
-    let wkd_path = Path::new(&wkd_dir);
-
-    ca.export_wkd("example.org", wkd_path)?;
-
-    // expect 3 exported keys (carol should not be in the export)
-    let test_path = wkd_path.join(".well-known/openpgpkey/example.org/hu/");
-    let paths = fs::read_dir(test_path)?;
-    assert_eq!(paths.count(), 2);
-
-    // check that Alice's and the CA's keys have been written to files
-
-    // Alice
-    let test_path = wkd_path.join(
-        ".well-known/openpgpkey/example.org\
-         /hu/kei1q4tipxxu1yj79k9kfukdhfy631xe",
-    );
-    assert!(test_path.is_file());
-
-    // check that CA key has been written to file
-    let test_path = wkd_path.join(
-        ".well-known/openpgpkey/example.org\
-         /hu/ermf4k8pujzwtqqxmskb7355sebj5e4t",
-    );
-    assert!(test_path.is_file());
-
-    // check that a policy file been created
-    let test_path = wkd_path.join(
-        ".well-known/openpgpkey/example.org\
-         /policy",
-    );
-    assert!(test_path.is_file());
-
-    Ok(())
+    test_ca_re_certify(gpg, ca)
 }
 
 #[test]
+#[cfg_attr(not(feature = "card"), ignore)]
+fn test_ca_re_certify_card() -> Result<()> {
+    let ident = env::var("IDENT").expect("IDENT is unset in environment");
+    util::reset_card(&ident)?;
+
+    let (gpg, cau) = util::setup_one_uninit()?;
+    let (ca, _priv) =
+        cau.init_card_generate_on_host(&ident, "example.org", Some("example.org CA old"))?;
+
+    test_ca_re_certify(gpg, ca)
+}
+
 /// Create a CA with two users, one not certified by the CA.
 ///
 /// Create a new CA, import the two users (with the certifications by the old CA key).
 /// Re-certify with the new CA, check that certifications exist as expected
-fn test_ca_re_certify() -> Result<()> {
-    let gpg = gnupg_test_wrapper::make_context()?;
-
-    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db1 = format!("{}/ca1.sqlite", home_path);
-
-    let ca1u = Uninit::new(Some(&db1))?;
-
-    // make first/old CA
-    let ca1 = ca1u.init_softkey("example.org", Some("example.org CA old"))?;
-
+fn test_ca_re_certify(gpg: Ctx, ca1: Oca) -> Result<()> {
     // make CA user (certified by the CA)
     ca1.user_new(Some("Alice"), &["alice@example.org"], None, false, false)?;
 
@@ -1040,6 +1015,7 @@ fn test_ca_re_certify() -> Result<()> {
     ca1.cert_import_new(pgp::cert_to_armored(&bob)?.as_bytes(), &[], None, &[], None)?;
 
     // make "new" CA
+    let home_path = String::from(gpg.get_homedir().to_str().unwrap());
     let db2 = format!("{}/ca2.sqlite", home_path);
     let ca2u = Uninit::new(Some(&db2))?;
     let ca2 = ca2u.init_softkey("example.org", Some("example.org CA new"))?;
