@@ -59,7 +59,7 @@ will need to start over with a fresh CA key.
 Please store this file appropriately, to avoid it becoming accessible to
 adversaries."#;
 
-        writeln!(&mut file, "{}\n\n", msg)?;
+        writeln!(&mut file, "{msg}\n\n")?;
 
         writeln!(
             &mut file,
@@ -92,7 +92,7 @@ adversaries."#;
 
                 let header = vec![(
                     "Comment".to_string(),
-                    format!("Hard revocation (certificate compromised) ({})", date),
+                    format!("Hard revocation (certificate compromised) ({date})"),
                 )];
                 writeln!(
                     &mut file,
@@ -114,7 +114,7 @@ adversaries."#;
 
                 let header = vec![(
                     "Comment".to_string(),
-                    format!("Soft revocation (certificate retired) ({})", date),
+                    format!("Soft revocation (certificate retired) ({date})"),
                 )];
                 writeln!(
                     &mut file,

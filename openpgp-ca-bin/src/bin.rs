@@ -93,13 +93,13 @@ fn main() -> Result<()> {
                         // Generate key in CA, import to card, print private key
                         let ident = find_one_empty_card(ident)?;
 
-                        println!("Initializing OpenPGP CA on card {}.", ident);
+                        println!("Initializing OpenPGP CA on card {ident}.");
                         println!();
 
                         let (ca, key) =
                             cau.init_card_generate_on_host(&ident, domain, name.as_deref())?;
 
-                        println!("Generated new CA key:\n\n{}", key);
+                        println!("Generated new CA key:\n\n{key}");
 
                         Ok(ca)
                     }
@@ -112,15 +112,13 @@ fn main() -> Result<()> {
                         let ident = find_one_matching_card(ident, &ca_cert)?;
 
                         println!(
-                            "Initializing OpenPGP CA from pre-configured OpenPGP card {}.",
-                            ident
+                            "Initializing OpenPGP CA from pre-configured OpenPGP card {ident}."
                         );
                         println!();
 
                         // This card is already initialized, ask for User PIN
                         let pin = rpassword::prompt_password(format!(
-                            "Enter User PIN for OpenPGP card {}: ",
-                            ident
+                            "Enter User PIN for OpenPGP card {ident}: "
                         ))?;
                         println!();
 
@@ -130,10 +128,7 @@ fn main() -> Result<()> {
                         // Initialize CA onto a blank card, from private CA key file
                         let ident = find_one_empty_card(ident)?;
 
-                        println!(
-                            "Initializing OpenPGP CA from existing key, on card {}.",
-                            ident
-                        );
+                        println!("Initializing OpenPGP CA from existing key, on card {ident}.");
                         println!();
 
                         let ca_cert = std::fs::read(import)?;
@@ -143,7 +138,7 @@ fn main() -> Result<()> {
                         // Generate key on card, make public key (and store it in DB)
                         let ident = find_one_empty_card(ident)?;
 
-                        println!("Generate new OpenPGP CA key on card {}.", ident);
+                        println!("Generate new OpenPGP CA key on card {ident}.");
                         println!();
                         println!("Note:");
                         println!("1) The private CA key will only exist on the card (you can't make a backup)");
@@ -185,7 +180,7 @@ fn main() -> Result<()> {
             cli::MigrateCommand::Card { ident, pinpad: _ } => {
                 let ident = find_one_empty_card(ident)?;
 
-                println!("Migrating OpenPGP CA instance to card {}.", ident);
+                println!("Migrating OpenPGP CA instance to card {ident}.");
                 println!();
                 println!(
                     "Caution: After migration is performed, the CA private key material will not"
@@ -303,8 +298,7 @@ fn main() -> Result<()> {
 
                     // This card is already initialized, ask for User PIN
                     let user_pin = rpassword::prompt_password(format!(
-                        "Enter User PIN for OpenPGP card {}: ",
-                        ident
+                        "Enter User PIN for OpenPGP card {ident}: "
                     ))?;
                     println!();
 

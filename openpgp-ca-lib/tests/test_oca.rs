@@ -437,10 +437,10 @@ fn test_ca_multiple_revocations(gpg: Ctx, ca: Oca) -> Result<()> {
 
     // make two different revocation certificates and import them into the CA
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let revoc_file1 = format!("{}/alice.revoc1", home_path);
+    let revoc_file1 = format!("{home_path}/alice.revoc1");
     gpg.make_revocation("alice@example.org", &revoc_file1, 1)?;
 
-    let revoc_file3 = format!("{}/alice.revoc3", home_path);
+    let revoc_file3 = format!("{home_path}/alice.revoc3");
     gpg.make_revocation("alice@example.org", &revoc_file3, 3)?;
 
     ca.revocation_add_from_file(&PathBuf::from(revoc_file1))?;
@@ -623,7 +623,7 @@ fn test_import_signed_cert() -> Result<()> {
     // gpg.leak_tempdir();
 
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
+    let db = format!("{home_path}/ca.sqlite");
 
     let cau = Uninit::new(Some(&db))?;
     let ca = cau.init_softkey("example.org", None)?;
@@ -734,7 +734,7 @@ fn test_revocation_no_fingerprint(gpg: Ctx, ca: Oca) -> Result<()> {
 
     // make a revocation certificate for bob ...
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let revoc_file = format!("{}/bob.revoc", home_path);
+    let revoc_file = format!("{home_path}/bob.revoc");
     gpg.make_revocation("bob@example.org", &revoc_file, 1)?;
 
     // ... remove the issuer fingerprint ...
@@ -1016,7 +1016,7 @@ fn test_ca_re_certify(gpg: Ctx, ca1: Oca) -> Result<()> {
 
     // make "new" CA
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
-    let db2 = format!("{}/ca2.sqlite", home_path);
+    let db2 = format!("{home_path}/ca2.sqlite");
     let ca2u = Uninit::new(Some(&db2))?;
     let ca2 = ca2u.init_softkey("example.org", Some("example.org CA new"))?;
 

@@ -289,8 +289,8 @@ fn test_bridge(gpg: Ctx, ca1: Oca, ca2: Oca) -> Result<()> {
     // ---- setup bridges: scoped trust between one.org and two.org ---
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
 
-    let ca_some_file = format!("{}/ca1.pubkey", home_path);
-    let ca_other_file = format!("{}/ca2.pubkey", home_path);
+    let ca_some_file = format!("{home_path}/ca1.pubkey");
+    let ca_other_file = format!("{home_path}/ca2.pubkey");
 
     let pub_ca1 = ca1.ca_get_pubkey_armored()?;
     let pub_ca2 = ca2.ca_get_pubkey_armored()?;
@@ -428,8 +428,8 @@ fn test_multi_bridge(gpg: Ctx, ca1: Oca, ca2: Oca, ca3: Oca) -> Result<()> {
     // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---
     let home_path = String::from(gpg.get_homedir().to_str().unwrap());
 
-    let ca2_file = format!("{}/ca2.pubkey", home_path);
-    let ca3_file = format!("{}/ca3.pubkey", home_path);
+    let ca2_file = format!("{home_path}/ca2.pubkey");
+    let ca3_file = format!("{home_path}/ca3.pubkey");
 
     let pub_ca2 = ca2.ca_get_pubkey_armored()?;
     let pub_ca3 = ca3.ca_get_pubkey_armored()?;
@@ -564,12 +564,12 @@ fn test_scoping(gpg: Ctx, ca1: Oca, ca2: Oca, ca3: Oca) -> Result<()> {
     ca1.user_new(Some("Alice"), &["alice@alpha.org"], None, false, false)?;
 
     ca3.user_new(Some("Bob"), &["bob@beta.org"], None, false, false)?;
-    let ca3_file = format!("{}/ca3.pubkey", home_path);
+    let ca3_file = format!("{home_path}/ca3.pubkey");
     let pub_ca3 = ca3.ca_get_pubkey_armored()?;
     std::fs::write(&ca3_file, pub_ca3).expect("Unable to write file");
 
     // ---- set up bridges: scoped trust between alpha<->beta and beta<->gamma ---
-    let ca2_file = format!("{}/ca2.pubkey", home_path);
+    let ca2_file = format!("{home_path}/ca2.pubkey");
     let pub_ca2 = ca2.ca_get_pubkey_armored()?;
     std::fs::write(&ca2_file, pub_ca2).expect("Unable to write file");
 

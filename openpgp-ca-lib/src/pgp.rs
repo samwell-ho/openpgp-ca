@@ -56,9 +56,9 @@ pub(crate) fn ca_user_id(email: &str, name: Option<&str>) -> UserID {
 
 fn user_id(email: &str, name: Option<&str>) -> UserID {
     if let Some(name) = name {
-        UserID::from(format!("{} <{}>", name, email))
+        UserID::from(format!("{name} <{email}>"))
     } else {
-        UserID::from(format!("<{}>", email))
+        UserID::from(format!("<{email}>"))
     }
 }
 
@@ -69,7 +69,7 @@ pub(crate) fn add_ca_domain_notation(
 ) -> Result<SignatureBuilder> {
     sb.add_notation(
         CA_KEY_NOTATION,
-        (format!("domain={}", domain)).as_bytes(),
+        (format!("domain={domain}")).as_bytes(),
         signature::subpacket::NotationDataFlags::empty().set_human_readable(),
         false,
     )
@@ -136,7 +136,7 @@ pub(crate) fn make_ca_cert(domain: &str, name: Option<&str>) -> Result<(Cert, Si
     }
 
     // Generate a userid and a binding signature
-    let email = format!("openpgp-ca@{}", domain);
+    let email = format!("openpgp-ca@{domain}");
     let userid = ca_user_id(&email, name);
 
     let direct_key_sig = ca_key
@@ -344,7 +344,7 @@ pub(crate) fn revocation_to_hash(data: &[u8]) -> Result<String> {
 
     let hex = hash64
         .iter()
-        .map(|d| format!("{:02X}", d))
+        .map(|d| format!("{d:02X}"))
         .collect::<Vec<_>>()
         .concat();
 
@@ -431,7 +431,7 @@ pub fn print_cert_info(data: &[u8]) -> Result<()> {
     for uid in c.userids() {
         println!("User ID: {}", uid.userid());
     }
-    println!("Fingerprint '{}'", c);
+    println!("Fingerprint '{c}'");
     Ok(())
 }
 

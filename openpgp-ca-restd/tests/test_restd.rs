@@ -230,7 +230,7 @@ async fn test_restd() {
     // ctx.leak_tempdir();
 
     let home_path = String::from(ctx.get_homedir().to_str().unwrap());
-    let db = format!("{}/ca.sqlite", home_path);
+    let db = format!("{home_path}/ca.sqlite");
 
     // -- init OpenPGP CA --
     let cau = Uninit::new(Some(&db)).unwrap();

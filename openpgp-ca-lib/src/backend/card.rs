@@ -101,10 +101,7 @@ impl CardCa {
 
     fn card(&self) -> Result<MutexGuard<Option<Card<Open>>>> {
         let mut card = self.card.try_lock().map_err(|e| {
-            anyhow::anyhow!(format!(
-                "Couldn't get lock for card in CardCa::card() {}",
-                e
-            ))
+            anyhow::anyhow!(format!("Couldn't get lock for card in CardCa::card() {e}"))
         })?;
         if card.is_none() {
             // Lazily open the card on first use
@@ -230,7 +227,7 @@ pub(crate) fn generate_on_card(
         "Generating {}key material on the card, this might take a while.",
         // Printable algo name (with trailing space, if not 'None')
         if let Some(algo) = algo {
-            format!("{:?} ", algo)
+            format!("{algo:?} ")
         } else {
             "".to_string()
         }
@@ -509,7 +506,7 @@ fn random_user_pin() -> String {
     let mut rng = rand::thread_rng();
 
     let i: u64 = rng.gen_range(0..=99_999_999);
-    format!("{:08}", i)
+    format!("{i:08}")
 }
 
 /// Test if the card accepts `pin` as User PIN

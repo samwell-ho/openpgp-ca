@@ -163,9 +163,8 @@ impl Ctx {
 
                 if fields.len() != nfields {
                     return Err(GnupgError::GgpConf(format!(
-                        "Malformed response, expected {} fields, \
-                         on line: {:?}",
-                        nfields, line
+                        "Malformed response, expected {nfields} fields, \
+                         on line: {line:?}"
                     ))
                     .into());
                 }
@@ -346,7 +345,7 @@ impl Ctx {
         p.expect("gpg>").unwrap();
         p.send_line("trust").unwrap();
         p.expect("Your decision?").unwrap();
-        p.send_line(&format!("{}", trust)).unwrap();
+        p.send_line(&format!("{trust}")).unwrap();
 
         // FIXME: match against Regex
         p.expect("Do you really want to set this key to ultimate trust? (y/N)")
@@ -372,7 +371,7 @@ impl Ctx {
             .unwrap();
         p.send_line("y").unwrap();
         p.expect("Your decision?").unwrap();
-        p.send_line(&format!("{}", reason)).unwrap();
+        p.send_line(&format!("{reason}")).unwrap();
         p.expect(">").unwrap();
         p.send_line("").unwrap();
         p.expect("Is this okay? (y/N)").unwrap();
@@ -445,9 +444,9 @@ impl Ctx {
         p.expect("gpg>").unwrap();
         p.send_line("tsign").unwrap();
         p.expect("Your selection?").unwrap();
-        p.send_line(&format!("{}", trust)).unwrap();
+        p.send_line(&format!("{trust}")).unwrap();
         p.expect("Your selection?").unwrap();
-        p.send_line(&format!("{}", level)).unwrap();
+        p.send_line(&format!("{level}")).unwrap();
         p.expect("Your selection?").unwrap();
         p.send_line("").unwrap(); // domain
         p.expect("Really sign? (y/N)").unwrap();
@@ -491,12 +490,12 @@ impl std::error::Error for GnupgError {}
 impl fmt::Display for GnupgError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GnupgError::GgpConf(s) => write!(f, "gpgconf: {}", s),
+            GnupgError::GgpConf(s) => write!(f, "gpgconf: {s}"),
             GnupgError::OperationFailed(s) => {
-                write!(f, "Operation failed: {}", s)
+                write!(f, "Operation failed: {s}")
             }
             GnupgError::ProtocolError(s) => {
-                write!(f, "Protocol violation: {}", s)
+                write!(f, "Protocol violation: {s}")
             }
         }
     }

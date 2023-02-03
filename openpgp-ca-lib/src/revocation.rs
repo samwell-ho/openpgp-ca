@@ -74,8 +74,7 @@ pub fn revocation_add(oca: &Oca, revocation: &[u8]) -> Result<()> {
             Ok(())
         } else {
             Err(anyhow::anyhow!(format!(
-                "Revocation couldn't be matched to a cert:\n{:?}",
-                revocation
+                "Revocation couldn't be matched to a cert:\n{revocation:?}"
             )))
         }
     } else {
