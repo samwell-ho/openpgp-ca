@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+# SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 # SPDX-License-Identifier: CC0-1.0
 
 stages:
@@ -87,7 +87,6 @@ build_docker:
     - docker build --cache-from $IMAGE_LATEST --target openpgp-ca -t $IMAGE_SHA -t $IMAGE_LATEST .
     - docker push $IMAGE_SHA
     - docker push $IMAGE_LATEST
-  needs: []
 
 build_docker_restd:
   stage: deploy
@@ -106,4 +105,3 @@ build_docker_restd:
     - docker build --cache-from $IMAGE_LATEST --target openpgp-ca-restd -t $IMAGE_SHA -t $IMAGE_LATEST .
     - docker push $IMAGE_SHA
     - docker push $IMAGE_LATEST
-  needs: []
