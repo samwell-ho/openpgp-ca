@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2019-2021 Heiko Schaefer <heiko@schaefer.name>
+SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
@@ -35,7 +35,7 @@ communicating securely.
 OpenPGP CA is a flexible tool is designed to integrate usefully with a wide 
 range of environments. There are many ways to make OpenPGP CA work for you.
 Here, we show one typical workflow. Please read our
-[documentation](https://openpgp-ca.org/doc/) for more details, or 
+[documentation](https://openpgp-ca.org/doc/start/) for more details, or 
 [talk to us](#get-in-touch-for-support) if you're unsure if OpenPGP CA is 
 a good fit for your use case.
 
@@ -282,14 +282,12 @@ a CA in softkey-mode does.
 To create a new OpenPGP CA instance that is backed by an OpenPGP card, run:
 
 ```
-$ oca -d example.oca ca init --domain example.org card 0123:01234567
+$ oca -d example.oca ca init --domain example.org card
 ```
 
-Instead of `0123:01234567`, you need to use the identifier of your
-OpenPGP card (one way to find out this identifier for your card is to use
-`opgpcard list`. The identifier consists of the 4-digit
-'manufacturer identification', a colon and the card's 8-digit
-'serial number').
+OpenPGP CA will automatically choose the card to use, if exactly one
+blank card is connected to the system. Otherwise, you can explicitly
+select a card via an identity parameter (like `0123:01234567`).
 
 This command generates the CA key material on your host computer and imports
 it onto the OpenPGP card. The private key material for the CA is printed to

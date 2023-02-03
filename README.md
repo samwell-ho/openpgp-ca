@@ -59,7 +59,15 @@ Then you can create an OpenPGP CA instance for your organization:
 $ oca -d example.oca ca init --domain example.org softkey
 ```
 
-In this initialization step, OpenPGP CA creates an OpenPGP key for your CA.
+Alternatively you can initialize a CA instance that uses an OpenPGP card
+hardware security device as its cryptographic backend:
+
+```
+$ oca -d example.oca ca init --domain example.org card
+```
+
+In both cases, during this initialization step, OpenPGP CA creates an 
+OpenPGP key for your CA.
 The key's User ID is set to `openpgp-ca@example.org` (you should make sure
 that the CA email address is configured in your email setup to forward 
 mail to you).
