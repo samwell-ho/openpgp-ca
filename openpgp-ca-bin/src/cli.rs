@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -77,7 +77,7 @@ pub enum Backend {
     /// The operator needs to safe-keep that private key).
     Card {
         /// OpenPGP card ident
-        ident: String,
+        ident: Option<String>,
 
         /// Initialize an OpenPGP CA instance from an already set up OpenPGP card, and the
         /// corresponding CA public key.
@@ -129,6 +129,39 @@ pub enum Backend {
 }
 
 #[derive(Subcommand)]
+pub enum SetBackendCommand {
+    // Softkey,
+    /// Use an OpenPGP card as the backend.
+    Card {
+        /// OpenPGP card ident
+        ident: Option<String>,
+
+        #[clap(
+            short = 'P',
+            long = "pinpad",
+            help = "Enforce use of pinpad for PIN entry"
+        )]
+        pinpad: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum MigrateCommand {
+    /// Use an OpenPGP card as the backend.
+    Card {
+        /// OpenPGP card ident
+        ident: Option<String>,
+
+        #[clap(
+            short = 'P',
+            long = "pinpad",
+            help = "Enforce use of pinpad for PIN entry"
+        )]
+        pinpad: bool,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum CaCommand {
     /// Create CA
     Init {
@@ -140,6 +173,21 @@ pub enum CaCommand {
 
         #[clap(subcommand)]
         backend: Backend,
+    },
+    /// Migrate a softkey CA instance onto an OpenPGP card.
+    ///
+    /// (Make sure to make a backup of the CA private key before running migrate!)
+    Migrate {
+        #[clap(subcommand)]
+        backend: MigrateCommand,
+    },
+    /// Change the backend configuration of an existing CA instance.
+    ///
+    /// For example, you may have two OpenPGP cards that contain your CAs key material.
+    /// If one breaks, you may want to set the backend to use the other.
+    SetBackend {
+        #[clap(subcommand)]
+        backend: SetBackendCommand,
     },
     /// Export CA public key
     Export,

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -42,6 +42,21 @@ impl OcaDb {
         E: From<Error>,
     {
         self.conn.transaction(f)
+    }
+
+    /// Runs the "VACUUM" command on the database, which:
+    /// "rebuilds the database file, repacking it into a minimal amount of disk space".
+    ///
+    /// "Running VACUUM will clean the database of all traces of deleted content, thus
+    /// preventing an adversary from recovering deleted content"
+    ///
+    /// <https://www.sqlite.org/lang_vacuum.html>
+    pub(crate) fn vacuum(&self) -> Result<()> {
+        diesel::sql_query("VACUUM;")
+            .execute(&self.conn)
+            .context("Error while running 'VACUUM;'")?;
+
+        Ok(())
     }
 
     // --- building block functions ---
@@ -180,6 +195,7 @@ impl OcaDb {
 
                 let ca_certs: Vec<_> = cacerts::table
                     .filter(cacerts::ca_id.eq(ca.id))
+                    .filter(cacerts::active)
                     .load::<Cacert>(&self.conn)
                     .context("Error loading CA Certs")?;
 
@@ -191,7 +207,7 @@ impl OcaDb {
                         // -> there can be more than one "active" cert,
                         // as well as even more "inactive" certs.
                         Err(anyhow::anyhow!(
-                            "More than one ca_cert in DB, this is not yet implemented."
+                            "More than one active cacert in DB, illegal state."
                         ))
                     }
                 }
@@ -202,7 +218,13 @@ impl OcaDb {
         }
     }
 
-    pub(crate) fn ca_insert(&self, ca: NewCa, ca_key: &str, fingerprint: &str) -> Result<()> {
+    pub(crate) fn ca_insert(
+        &self,
+        ca: NewCa,
+        ca_key: &str,
+        fingerprint: &str,
+        backend: Option<&str>,
+    ) -> Result<()> {
         diesel::insert_into(cas::table)
             .values(&ca)
             .execute(&self.conn)
@@ -219,6 +241,8 @@ impl OcaDb {
             fingerprint,
             ca_id: ca.id,
             priv_cert: ca_key.to_string(),
+            backend,
+            active: true,
         };
         diesel::insert_into(cacerts::table)
             .values(&ca_cert)
@@ -228,6 +252,12 @@ impl OcaDb {
         Ok(())
     }
 
+    /// Replace the content of a Cacert entry.
+    ///
+    /// The assumption is that the new cacert is a modified version of the existing one
+    /// (unchanged primary fingerprint).
+    ///
+    /// However, this is not enforced in this fn.
     pub(crate) fn cacert_update(&self, cacert: &Cacert) -> Result<()> {
         diesel::update(cacert)
             .set(cacert)

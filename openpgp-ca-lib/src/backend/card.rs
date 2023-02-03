@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2022-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -6,6 +6,7 @@
 
 use std::convert::TryFrom;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::{anyhow, Result};
@@ -55,9 +56,9 @@ impl CertificationBackend for CardCa {
 
         let mut user = open
             .user_card()
-            .ok_or_else(|| anyhow!("Unexpected: can't get card in signing mode"))?;
+            .ok_or_else(|| anyhow!("Unexpected: can't get card in user mode"))?;
         let mut signer =
-            user.authenticator(&|| println!("Touch confirmation needed for signing"))?;
+            user.authenticator(&|| println!("Touch confirmation needed for certification"))?;
 
         op(&mut signer as &mut dyn sequoia_openpgp::crypto::Signer)?;
 
@@ -131,13 +132,44 @@ impl CardCa {
         });
 
         db.ca_insert(
-            models::NewCa {
-                domainname,
-                backend: backend.to_config().as_deref(),
-            },
+            models::NewCa { domainname },
             pubkey,
             fingerprint,
+            backend.to_config().as_deref(),
         )
+    }
+
+    /// Update the active cacert entry with a card-backend configuration
+    /// and replace the private key in the database with the public key.
+    ///
+    /// This fn doesn't check that 'card_ident' contains the expected key material.
+    pub(crate) fn ca_replace_in_place(
+        db: &Rc<OcaDb>,
+        card_ident: &str,
+        pin: &str,
+        pubkey: &str,
+    ) -> Result<()> {
+        let backend = Backend::Card(backend::Card {
+            ident: card_ident.to_string(),
+            user_pin: pin.to_string(),
+        });
+
+        let ca_new = Cert::from_str(pubkey)?;
+
+        let (_, mut cacert) = db.get_ca()?;
+
+        if ca_new.fingerprint().to_string() != cacert.fingerprint {
+            return Err(anyhow::anyhow!(
+                "Can't replace CA cert, new fingerprint {} differs from existing fingerprint {}.",
+                ca_new.fingerprint(),
+                cacert.fingerprint
+            ));
+        }
+
+        cacert.priv_cert = pubkey.to_string();
+        cacert.backend = backend.to_config();
+
+        db.cacert_update(&cacert)
     }
 }
 
@@ -173,6 +205,7 @@ pub(crate) fn generate_on_card(
     ident: &str,
     domain: &str,
     user_id: String,
+    algo: Option<AlgoSimple>,
 ) -> Result<(Cert, String)> {
     let backend = PcscBackend::open_by_ident(ident, None)?;
     let mut card: Card<Open> = backend.into();
@@ -185,8 +218,12 @@ pub(crate) fn generate_on_card(
         ));
     }
 
-    // Use RSA4k by default. This works on e.g. Yk5 (but Gnuk can't generate rsa4k)
-    let algo = Some(AlgoSimple::RSA4k);
+    let algo = match algo {
+        Some(a) => Some(a),
+
+        // Use RSA4k by default. This works on e.g. Yk5 (but Gnuk can't generate rsa4k)
+        None => Some(AlgoSimple::RSA4k),
+    };
 
     // Print information about algorithm and possible slowness.
     println!(
@@ -263,14 +300,14 @@ pub(crate) fn generate_on_card(
                 if let Some(mut user) = card.user_card() {
                     // Card-backed signer for bindings
                     let mut card_signer = user.authenticator_from_public(auth_pubkey, &|| {
-                        println!("Need touch confirmation for signing.")
+                        println!("Need touch confirmation for certification.")
                     });
 
                     // Make signature, return it
                     let s = op(&mut card_signer)?;
                     Ok(s)
                 } else {
-                    Err(anyhow!("Failed to open card for signing"))
+                    Err(anyhow!("Failed to open card for certification"))
                 }
             }
 

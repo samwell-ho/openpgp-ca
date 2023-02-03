@@ -1,4 +1,4 @@
--- SPDX-FileCopyrightText: 2022 Heiko Schaefer <heiko@schaefer.name>
+-- SPDX-FileCopyrightText: 2023 Heiko Schaefer <heiko@schaefer.name>
 -- SPDX-License-Identifier: GPL-3.0-or-later
 --
 -- This file is part of OpenPGP CA

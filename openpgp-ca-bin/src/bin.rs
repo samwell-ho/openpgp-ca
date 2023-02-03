@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -9,6 +9,40 @@ use clap::{CommandFactory, FromArgMatches};
 use openpgp_ca_lib::{Oca, Uninit};
 
 mod cli;
+
+fn find_one_empty_card(ident: &Option<String>) -> Result<String> {
+    if let Some(ident) = ident {
+        Ok(ident.clone())
+    } else {
+        // find suitable card
+        let cards = openpgp_ca_lib::blank_cards()?;
+        match cards.len() {
+            0 => Err(anyhow::anyhow!("No blank OpenPGP card found")),
+            1 => Ok(cards[0].clone()),
+            _ => Err(anyhow::anyhow!(
+                "Multiple blank OpenPGP cards found: {}",
+                cards.join(" ")
+            )),
+        }
+    }
+}
+
+fn find_one_matching_card(ident: &Option<String>, cert: &[u8]) -> Result<String> {
+    if let Some(ident) = ident {
+        Ok(ident.clone())
+    } else {
+        // find suitable card
+        let cards = openpgp_ca_lib::matching_cards(cert)?;
+        match cards.len() {
+            0 => Err(anyhow::anyhow!("No matching OpenPGP card found")),
+            1 => Ok(cards[0].clone()),
+            _ => Err(anyhow::anyhow!(
+                "Multiple matching OpenPGP cards found: {}",
+                cards.join(" ")
+            )),
+        }
+    }
+}
 
 fn main() -> Result<()> {
     let version = format!(
@@ -23,7 +57,7 @@ fn main() -> Result<()> {
     let db = c.database.as_deref();
 
     // Handle init calls separately, here.
-    // Setting up an OpenpgpCa instance differs from all other workflows.
+    // Setting up an OpenpgpCa instance differs from most other workflows.
     if let cli::Commands::Ca {
         cmd:
             cli::CaCommand::Init {
@@ -57,9 +91,13 @@ fn main() -> Result<()> {
                 match (from_card, import, generate_on_card) {
                     (false, None, false) => {
                         // Generate key in CA, import to card, print private key
+                        let ident = find_one_empty_card(ident)?;
+
+                        println!("Initializing OpenPGP CA on card {}.", ident);
+                        println!();
 
                         let (ca, key) =
-                            cau.init_card_generate_on_host(ident, domain, name.as_deref())?;
+                            cau.init_card_generate_on_host(&ident, domain, name.as_deref())?;
 
                         println!("Generated new CA key:\n\n{}", key);
 
@@ -71,9 +109,10 @@ fn main() -> Result<()> {
                         // NOTE: unwrap is ok because clap requires "public_key" if "from_card"
 
                         let ca_cert = std::fs::read(public_key.as_ref().unwrap())?;
+                        let ident = find_one_matching_card(ident, &ca_cert)?;
 
                         println!(
-                            "Trying to initialize CA with pre-configured OpenPGP card {}.",
+                            "Initializing OpenPGP CA from pre-configured OpenPGP card {}.",
                             ident
                         );
                         println!();
@@ -85,22 +124,30 @@ fn main() -> Result<()> {
                         ))?;
                         println!();
 
-                        cau.init_card_import_card(ident, &pin, domain, &ca_cert)
+                        cau.init_card_import_card(&ident, &pin, domain, &ca_cert)
                     }
                     (false, Some(import), false) => {
                         // Initialize CA onto a blank card, from private CA key file
+                        let ident = find_one_empty_card(ident)?;
+
+                        println!(
+                            "Initializing OpenPGP CA from existing key, on card {}.",
+                            ident
+                        );
+                        println!();
 
                         let ca_cert = std::fs::read(import)?;
-                        cau.init_card_import_key(ident, domain, &ca_cert)
+                        cau.init_card_import_key(&ident, domain, &ca_cert)
                     }
                     (false, None, true) => {
                         // Generate key on card, make public key (and store it in DB)
+                        let ident = find_one_empty_card(ident)?;
 
                         println!("Generate new OpenPGP CA key on card {}.", ident);
                         println!();
                         println!("Note:");
                         println!("1) The private CA key will only exist on the card (you can't make a backup)");
-                        println!("2) The your OpenPGP card generates could be worse than your host computer's");
+                        println!("2) The randomness your OpenPGP card generates could be worse than your host computer's");
                         println!();
 
                         let mut line = String::new();
@@ -109,7 +156,7 @@ fn main() -> Result<()> {
                         println!();
 
                         if line.trim().to_ascii_lowercase() == "yes" {
-                            cau.init_card_generate_on_card(ident, domain, name.as_deref())
+                            cau.init_card_generate_on_card(&ident, domain, name.as_deref(), None)
                         } else {
                             Err(anyhow::anyhow!("Aborted CA initialization."))
                         }
@@ -128,8 +175,48 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // The CLI command was not `ca init`, so we should be able to directly open the database
-    // as an Oca object
+    // Handle migrate calls separately, here.
+    // Migrating an OpenpgpCa instance differs from most other workflows.
+    if let cli::Commands::Ca {
+        cmd: cli::CaCommand::Migrate { backend },
+    } = &c.cmd
+    {
+        match backend {
+            cli::MigrateCommand::Card { ident, pinpad: _ } => {
+                let ident = find_one_empty_card(ident)?;
+
+                println!("Migrating OpenPGP CA instance to card {}.", ident);
+                println!();
+                println!(
+                    "Caution: After migration is performed, the CA private key material will not"
+                );
+                println!("be available in the CA database anymore!");
+                println!();
+                println!("Make sure you have a backup of your CA key before continuing!");
+                println!();
+
+                let mut line = String::new();
+                println!("Are you sure? (type 'yes' to continue)");
+                std::io::stdin().read_line(&mut line)?;
+                println!();
+
+                if line.trim().to_ascii_lowercase() == "yes" {
+                    let cau = Uninit::new(db)?;
+                    let ca = cau.migrate_card_import_key(&ident)?;
+
+                    println!("Migrated OpenPGP CA instance:\n");
+                    ca.ca_show()?;
+                } else {
+                    return Err(anyhow::anyhow!("Aborted CA migration."));
+                }
+
+                return Ok(());
+            }
+        }
+    }
+
+    // The CLI command was not `ca init` or `ca migrate`, so we should be able to directly open
+    // the database as an Oca object
     let ca = Oca::open(db)?;
 
     match c.cmd {
@@ -204,10 +291,27 @@ fn main() -> Result<()> {
             }
         },
         cli::Commands::Ca { cmd } => match cmd {
-            cli::CaCommand::Init { .. } => {
+            cli::CaCommand::Init { .. } | cli::CaCommand::Migrate { .. } => {
                 // handled separately, above
                 unreachable!()
             }
+            cli::CaCommand::SetBackend { backend } => match backend {
+                cli::SetBackendCommand::Card { ident, pinpad: _ } => {
+                    let ca_cert = ca.ca_get_pubkey_armored()?;
+
+                    let ident = find_one_matching_card(&ident, ca_cert.as_bytes())?;
+
+                    // This card is already initialized, ask for User PIN
+                    let user_pin = rpassword::prompt_password(format!(
+                        "Enter User PIN for OpenPGP card {}: ",
+                        ident
+                    ))?;
+                    println!();
+
+                    ca.set_card_backend(&ident, &user_pin)?;
+                    println!("CA backend configuration is changed.");
+                }
+            },
             cli::CaCommand::Export => {
                 println!("{}", ca.ca_get_pubkey_armored()?);
             }

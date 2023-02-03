@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This file is part of OpenPGP CA
@@ -64,18 +64,109 @@ use std::time::SystemTime;
 use anyhow::{Context, Result};
 use chrono::offset::Utc;
 use chrono::DateTime;
+use openpgp_card::algorithm::AlgoSimple;
 use openpgp_card_pcsc::PcscBackend;
+use openpgp_card_sequoia::state::Transaction;
 use openpgp_card_sequoia::{state::Open, Card};
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
 
-use crate::backend::card::CardCa;
+use crate::backend::card::{check_card_empty, CardCa};
 use crate::backend::{card, Backend};
 use crate::ca_secret::CaSec;
 use crate::db::models;
 use crate::db::OcaDb;
 use crate::types::CertificationStatus;
+
+/// List of cards that are blank (no fingerprint in any slot)
+pub fn blank_cards() -> Result<Vec<String>> {
+    let mut idents = vec![];
+
+    for backend in PcscBackend::cards(None)? {
+        let mut card: Card<Open> = backend.into();
+        let transaction = card.transaction()?;
+
+        if check_card_empty(&transaction)? {
+            idents.push(transaction.application_identifier()?.ident());
+        }
+    }
+
+    Ok(idents)
+}
+
+/// List of cards that match the CA cert `cert`
+pub fn matching_cards(ca_cert: &[u8]) -> Result<Vec<String>> {
+    let ca_cert = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
+
+    let mut idents = vec![];
+
+    for backend in PcscBackend::cards(None)? {
+        let mut card: Card<Open> = backend.into();
+        let mut transaction = card.transaction()?;
+
+        if card_matches(&mut transaction, &ca_cert).is_ok() {
+            idents.push(transaction.application_identifier()?.ident());
+        }
+    }
+
+    Ok(idents)
+}
+
+/// Does 'ca_cert' match the data on the opened card?
+///
+/// FIXME: also check the state of SIG and DEC slots?
+fn card_matches(transaction: &mut Card<Transaction>, ca_cert: &Cert) -> Result<String> {
+    let fps = transaction.fingerprints()?;
+    let auth = fps
+        .authentication()
+        .context("No AUT key on card".to_string())?;
+
+    let auth_fp = auth.to_string();
+
+    let cardholder_name = transaction.cardholder_name()?;
+
+    // Check that cardholder name is set to "OpenPGP CA".
+    if cardholder_name.as_deref() != Some("OpenPGP CA") {
+        return Err(anyhow::anyhow!(
+            "Expected cardholder name 'OpenPGP CA' on OpenPGP card, found '{}'.",
+            cardholder_name.unwrap_or_default()
+        ));
+    }
+
+    // Make sure that the CA public key contains a User ID!
+    // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
+    if ca_cert.userids().next().is_none() {
+        return Err(anyhow::anyhow!(
+            "Expect CA certificate to contain at least one User ID, but found none."
+        ));
+    }
+
+    let pubkey =
+        pgp::cert_to_armored(ca_cert).context("Failed to transform CA cert to armored pubkey")?;
+
+    // CA pubkey and card auth key slot must match
+    if ca_cert.fingerprint().to_hex() != auth_fp {
+        return Err(anyhow::anyhow!(format!(
+            "Auth key slot on card {} doesn't match primary (cert) fingerprint {}.",
+            auth_fp,
+            ca_cert.fingerprint().to_hex()
+        )));
+    }
+
+    Ok(pubkey)
+}
+
+// Check the card `card_ident`, confirm that the cardholder name is set to
+// "OpenPGP CA", and that the AUT slot contains the certification key.
+fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
+    // Open Smart Card
+    let backend = PcscBackend::open_by_ident(card_ident, None)?;
+    let mut card: Card<Open> = backend.into();
+    let mut transaction = card.transaction()?;
+
+    card_matches(&mut transaction, ca_cert).context(format!("On card {}", card_ident))
+}
 
 /// a DB backend for a CA instance
 pub(crate) struct DbCa {
@@ -96,6 +187,17 @@ impl DbCa {
 
         let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
         Ok(cert.strip_secret_key_material())
+    }
+
+    /// Get the Cert of the CA (with private key material, if available).
+    ///
+    /// Depending on the backend, the private key material is available in
+    /// the database - or not.
+    pub(crate) fn ca_get_cert_private(&self) -> Result<Cert> {
+        let (_, cacert) = self.db().get_ca()?;
+
+        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
+        Ok(cert)
     }
 }
 
@@ -183,6 +285,7 @@ impl Uninit {
         ident: &str,
         domain: &str,
         name: Option<&str>,
+        algo: Option<AlgoSimple>,
     ) -> Result<Oca> {
         // The CA database must be uninitialized!
         if self.db.is_ca_initialized()? {
@@ -195,7 +298,7 @@ impl Uninit {
 
         // Generate key material on card, get the public key,
         // initialize the CA with these artifacts.
-        let (ca_cert, user_pin) = card::generate_on_card(ident, domain, uid)?;
+        let (ca_cert, user_pin) = card::generate_on_card(ident, domain, uid, algo)?;
 
         self.ca_init_card(ident, &user_pin, domain, &ca_cert)
     }
@@ -251,12 +354,12 @@ impl Uninit {
         self,
         card_ident: &str,
         domain: &str,
-        ca_cert: &[u8],
+        ca_key: &[u8],
     ) -> Result<Oca> {
-        let ca_key = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
+        let ca_key = Cert::from_bytes(ca_key).context("Cert::from_bytes failed")?;
         if !ca_key.is_tsk() {
             return Err(anyhow::anyhow!(
-                "No private key material found in file, while importing to empty OpenPGP card."
+                "No private key material found in file. Can't import to OpenPGP card."
             ));
         }
 
@@ -267,6 +370,48 @@ impl Uninit {
 
         // Private key material will get stripped implicitly by ca_init_card()
         self.ca_init_card(card_ident, &user_pin, domain, &ca_key)
+    }
+
+    /// Migrate an existing softkey CA onto a blank OpenPGP card.
+    ///
+    /// Caution: If you want to keep a backup of your CA private key material,
+    /// you need to make it before calling this!
+    ///
+    /// 1. The private CA key material gets imported to the blank OpenPGP card.
+    ///
+    /// 2. The CA is then switched from the softkey backend to the card backend. The CA private
+    /// key material in the database is replaced with the CA public key material.
+    ///
+    /// 3. "VACUUM" is called on the database after removing the CA private key from the database.
+    /// According to SQLite documentation, this will remove any traces of the key material from the
+    /// database (however, no guarantees can be made about the underlying storage!).
+    pub fn migrate_card_import_key(self, card_ident: &str) -> Result<Oca> {
+        let db = self.db.clone();
+
+        let ca = db.transaction(|| {
+            let ca_key = self.ca.ca_get_cert_private()?;
+            if !ca_key.is_tsk() {
+                return Err(anyhow::anyhow!(
+                    "No private key material in CA database. Can't migrate to OpenPGP card."
+                ));
+            }
+
+            // Import key material to card.
+            let user_pin = card::import_to_card(card_ident, &ca_key)?;
+
+            // Switch cacert in db
+            let ca_pub = pgp::cert_to_armored(&ca_key.strip_secret_key_material())?;
+            CardCa::ca_replace_in_place(&self.db, card_ident, &user_pin, &ca_pub)?;
+
+            // Now init from db
+            self.init_from_db_state()
+        })?;
+
+        // Run VACUUM on sqlite.
+        // SQLite guarantees that this removes remaining private key fragments from the database file.
+        ca.db.vacuum()?;
+
+        Ok(ca)
     }
 
     /// Init with OpenPGP card backend
@@ -289,50 +434,17 @@ impl Uninit {
                 return Err(anyhow::anyhow!("CA database is already initialized"));
             }
 
-            // Open Smart Card
-            let backend = PcscBackend::open_by_ident(card_ident, None)?;
-            let mut card: Card<Open> = backend.into();
-            let mut transaction = card.transaction()?;
-
-            let fps = transaction.fingerprints()?;
-            let auth = fps
-                .authentication()
-                .context(format!("No Signing key on card {}", card_ident))?;
-
-            let auth_fp = auth.to_string();
-
-            let cardholder_name = transaction.cardholder_name()?;
-
-            // Check that cardholder name is set to "OpenPGP CA".
-            if cardholder_name.as_deref() != Some("OpenPGP CA") {
-                return Err(anyhow::anyhow!(
-                    "Expected cardholder name 'OpenPGP CA' on OpenPGP card, found '{}'.",
-                    cardholder_name.unwrap_or_default()
-                ));
-            }
-
-            // Make sure that the CA public key contains a User ID!
-            // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
-            if ca_cert.userids().next().is_none() {
-                return Err(anyhow::anyhow!(
-                    "Expect CA certificate to contain at least one User ID, but found none."
-                ));
-            }
-
-            let pubkey = pgp::cert_to_armored(ca_cert)
-                .context("Failed to transform CA cert to armored pubkey")?;
-
-            // CA pubkey and card auth key slot must match
-            if ca_cert.fingerprint().to_hex() != auth_fp {
-                return Err(anyhow::anyhow!(format!(
-                    "Auth key slot on card {} doesn't match primary (cert) fingerprint {}.",
-                    auth_fp,
-                    ca_cert.fingerprint().to_hex()
-                )));
-            }
+            let pubkey = check_if_card_matches(card_ident, ca_cert)?;
 
             self.db.transaction(|| {
-                CardCa::ca_init(&self.db, domainname, card_ident, pin, &pubkey, &auth_fp)
+                CardCa::ca_init(
+                    &self.db,
+                    domainname,
+                    card_ident,
+                    pin,
+                    &pubkey,
+                    &ca_cert.fingerprint().to_hex(),
+                )
             })?;
         }
 
@@ -342,9 +454,9 @@ impl Uninit {
     /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
     fn init_from_db_state(self) -> Result<Oca> {
         // check database state of this CA
-        let (ca, _) = self.db.get_ca()?;
+        let (_ca, ca_cert) = self.db.get_ca()?;
 
-        match Backend::from_config(ca.backend.as_deref())? {
+        match Backend::from_config(ca_cert.backend.as_deref())? {
             Backend::Softkey => Ok(Oca {
                 db: self.db,
                 ca: self.ca.clone(),
@@ -376,6 +488,35 @@ impl Oca {
 
     pub fn db(&self) -> &OcaDb {
         &self.db
+    }
+
+    /// Change which card backs an OpenPGP CA instance
+    /// (e.g. to switch to a replacement for a broken card).
+    pub fn set_card_backend(self, card_ident: &str, user_pin: &str) -> Result<()> {
+        let (_, cacert) = self.db.get_ca()?;
+
+        let b = Backend::from_config(cacert.backend.as_deref())?;
+        match b {
+            Backend::Card(_c) => {
+                // For now, we only allow switches from card-backend to card-backend
+
+                // Check if user-supplied PIN is accepted by the card
+                card::verify_user_pin(card_ident, user_pin)?;
+
+                // Check if the card exists and contains the correct CA key
+                let ca_cert = self.ca_get_cert_pub()?;
+                let _pubkey = check_if_card_matches(card_ident, &ca_cert)?;
+
+                // Update backend configuration in database
+                let ca_pub = pgp::cert_to_armored(&ca_cert)?;
+                CardCa::ca_replace_in_place(&self.db, card_ident, user_pin, &ca_pub)?;
+
+                Ok(())
+            }
+            Backend::Softkey => Err(anyhow::anyhow!(
+                "Setting card backend from softkey is not supported."
+            )),
+        }
     }
 
     // -------- CA
@@ -443,7 +584,7 @@ impl Oca {
         println!("  Fingerprint: {}", cert.fingerprint());
         println!("Creation time: {}", created.format("%F %T %Z"));
 
-        let backend = Backend::from_config(ca.backend.as_deref())?;
+        let backend = Backend::from_config(ca_cert.backend.as_deref())?;
         println!("   CA Backend: {}", backend);
 
         Ok(())
