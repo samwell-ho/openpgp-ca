@@ -3,7 +3,7 @@
 
 [package]
 name = "openpgp-ca-restd"
-version = "0.12.0-pre"
+version = "0.12.0"
 description = "OpenPGP CA is a tool for managing and certifying OpenPGP keys"
 authors = ["Heiko Schaefer <heiko@schaefer.name>"]
 license = "GPL-3.0-or-later"
@@ -27,7 +27,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 sequoia-openpgp = "1.1"
 
-openpgp-ca-lib = { path = "../openpgp-ca-lib", version = "0.12.0-alpha.1" }
+openpgp-ca-lib = { path = "../openpgp-ca-lib", version = "0.12.0" }
 
 # restd
 rocket = { version = "0.5.0-rc.2", features = ["json"] }
