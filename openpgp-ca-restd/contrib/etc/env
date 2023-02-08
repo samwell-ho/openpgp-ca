@@ -1,0 +1,11 @@
+# Copyright 2023 David Runge <dave@sleepmap.de>
+#
+# This file is part of OpenPGP CA
+# https://gitlab.com/openpgp-ca/openpgp-ca
+#
+# SPDX-FileCopyrightText: 2023 David Runge <dave@sleepmap.de>
+# SPDX-License-Identifier: CC0-1.0
+
+ROCKET_ADDRESS=0.0.0.0
+ROCKET_PORT=8000
+DATABASE=/var/lib/openpgp-ca-restd/database.oca

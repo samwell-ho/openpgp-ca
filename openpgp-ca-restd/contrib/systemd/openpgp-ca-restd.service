@@ -1,0 +1,40 @@
+# Copyright 2023 David Runge <dave@sleepmap.de>
+#
+# This file is part of OpenPGP CA
+# https://gitlab.com/openpgp-ca/openpgp-ca
+#
+# SPDX-FileCopyrightText: 2023 David Runge <dave@sleepmap.de>
+# SPDX-License-Identifier: CC0-1.0
+
+[Unit]
+Description=REST service for OpenPGP CA
+Documentation=https://openpgp-ca.org/doc/restd/
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/openpgp-ca-restd/env
+ExecStart=/usr/bin/openpgp-ca-restd -d $DATABASE run
+Group=openpgp-ca-restd
+LockPersonality=yes
+MemoryDenyWriteExecute=true
+NonBlocking=true
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectSystem=strict
+ReadonlyPaths=/etc/openpgp-ca-restd/
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+StateDirectory=openpgp-ca-restd
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+User=openpgp-ca-restd
+
+[Install]
+WantedBy=multi-user.target
