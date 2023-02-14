@@ -7,6 +7,10 @@ Files: openpgp-ca-lib/src/db/schema.rs Cargo.lock
 Copyright: 2019-2020 Heiko Schaefer <heiko@schaefer.name>
 License: CC0-1.0
 
+Files: openpgp-ca-lib/tests/data/*
+Copyright: 2023 Heiko Schaefer <heiko@schaefer.name>
+License: CC0-1.0
+
 Files: debian/*
 Copyright: 2021, pep.foundation
 License: CC0-1.0
