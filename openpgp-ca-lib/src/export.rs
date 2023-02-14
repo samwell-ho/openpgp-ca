@@ -133,7 +133,12 @@ pub fn wkd_export(oca: &Oca, domain: &str, path: &Path) -> Result<()> {
             let c = pgp::to_cert(cert.pub_cert.as_bytes())?;
 
             if pgp::cert_has_uid_in_domain(&c, domain)? {
-                wkd::insert(path, domain, None, &c)?;
+                if let Err(err) = wkd::insert(path, domain, None, &c) {
+                    // FIXME 1: wkd::import should accept a policy
+                    // FIXME 2: if there are still errors, don't print them here.
+                    // Any warning information should be returned to the caller.
+                    println!("WARN: skipped cert {} ({})", c.fingerprint(), err);
+                }
             }
         }
     }
