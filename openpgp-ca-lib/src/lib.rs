@@ -866,11 +866,13 @@ impl Oca {
 
                 let c = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
-                if let Some(exp) = pgp::get_expiry(&c)? {
-                    let datetime: DateTime<Utc> = exp.into();
-                    println!(" Expiration {}", datetime.format("%d/%m/%Y"));
-                } else {
-                    println!(" No expiration is set");
+                match pgp::get_expiry(&c) {
+                    Ok(Some(exp)) => {
+                        let datetime: DateTime<Utc> = exp.into();
+                        println!(" Expiration {}", datetime.format("%d/%m/%Y"));
+                    }
+                    Ok(None) => println!(" No expiration is set"),
+                    Err(e) => println!(" Expiration unknown ({})", e),
                 }
 
                 let revs = self.revocations_get(&db_cert)?;
