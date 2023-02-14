@@ -1672,7 +1672,7 @@ dependencies = [
 
 [[package]]
 name = "openpgp-ca-lib"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "addr",
  "anyhow",
