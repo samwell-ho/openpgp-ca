@@ -202,7 +202,7 @@ impl DbCa {
 /// A CA instance that has a database, which is (possibly) not initialized yet.
 /// No backend for private key operations is available at this stage.
 pub struct Uninit {
-    ca: Rc<DbCa>,
+    ca: DbCa,
 }
 
 /// An initialized OpenPGP CA instance, with a configured backend.
@@ -232,7 +232,7 @@ impl Uninit {
         let db = Rc::new(OcaDb::new(&db_url)?);
         db.diesel_migrations_run();
 
-        let dbca = Rc::new(DbCa::new(db.clone()));
+        let dbca = DbCa::new(db);
 
         Ok(Self { ca: dbca })
     }
@@ -465,15 +465,19 @@ impl Uninit {
         let (_ca, ca_cert) = self.ca.db.get_ca()?;
 
         match Backend::from_config(ca_cert.backend.as_deref())? {
-            Backend::Softkey => Ok(Oca {
-                ca: self.ca.clone(),
-                ca_secret: Box::new(CaSecCB::new(self.ca)),
-            }),
+            Backend::Softkey => {
+                let dbca = Rc::new(self.ca);
+                Ok(Oca {
+                    ca: dbca.clone(),
+                    ca_secret: Box::new(CaSecCB::new(dbca)),
+                })
+            }
             Backend::Split => {
-                let ca_secret = Box::new(SplitCa::new(self.ca.db.clone())?);
+                let dbca = Rc::new(self.ca);
+                let ca_secret = Box::new(SplitCa::new(dbca.db.clone())?);
 
                 Ok(Oca {
-                    ca: self.ca,
+                    ca: dbca,
                     ca_secret,
                 })
             }
@@ -485,7 +489,7 @@ impl Uninit {
                 )?));
 
                 Ok(Oca {
-                    ca: self.ca,
+                    ca: Rc::new(self.ca),
                     ca_secret: Box::new(ca_sec),
                 })
             }
