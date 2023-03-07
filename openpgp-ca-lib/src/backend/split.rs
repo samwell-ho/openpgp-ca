@@ -4,19 +4,19 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use anyhow::Result;
-use sequoia_openpgp::crypto::Signer;
+use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
 
-use crate::backend::CertificationBackend;
 use crate::ca_secret::CaSec;
 use crate::db::OcaDb;
-use crate::pgp;
 
 /// OpenPGP card backend for a split CA instance
 pub(crate) struct SplitCa {
+    #[allow(dead_code)]
     db: Rc<OcaDb>,
 }
 
@@ -27,19 +27,33 @@ impl SplitCa {
 }
 
 impl CaSec for SplitCa {
-    fn get_ca_cert(&self) -> Result<Cert> {
-        let (_, cacert) = self.db.get_ca()?;
-
-        pgp::to_cert(cacert.priv_cert.as_bytes())
-    }
-}
-
-impl CertificationBackend for SplitCa {
-    fn certify(&self, _op: &mut dyn FnMut(&mut dyn Signer) -> Result<()>) -> Result<()> {
+    fn ca_generate_revocations(&self, _output: PathBuf) -> Result<()> {
         todo!()
     }
 
-    fn sign(&self, _op: &mut dyn FnMut(&mut dyn Signer) -> Result<()>) -> Result<()> {
+    // This operation is currently only used by "keylist export".
+    // The user should run this command on the backing CA instance
+    // that has access to the CA key material.
+    fn sign_detached(&self, _data: &[u8]) -> Result<String> {
+        Err(anyhow::anyhow!(
+            "Operation is not supported on a split-mode CA instance. Please perform it on your backing CA instance."
+        ))
+    }
+
+    fn sign_user_ids(
+        &self,
+        _cert: &Cert,
+        _uids_certify: &[&UserID],
+        _duration_days: Option<u64>,
+    ) -> Result<Cert> {
+        todo!()
+    }
+
+    fn bridge_to_remote_ca(&self, _remote_ca: Cert, _scope_regexes: Vec<String>) -> Result<Cert> {
+        todo!()
+    }
+
+    fn bridge_revoke(&self, _remote_ca: &Cert) -> Result<(Signature, Cert)> {
         todo!()
     }
 }

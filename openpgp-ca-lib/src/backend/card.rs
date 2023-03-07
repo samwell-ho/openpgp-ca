@@ -26,7 +26,7 @@ use sequoia_openpgp::{Cert, Packet};
 
 use crate::backend;
 use crate::backend::{Backend, CertificationBackend};
-use crate::ca_secret::CaSec;
+use crate::ca_secret::{CaSec, CaSecCB, CaSecDb};
 use crate::db::{models, OcaDb};
 use crate::pgp;
 
@@ -38,6 +38,20 @@ pub(crate) struct CardCa {
 
     // lazily opened card, for caching purposes
     card: Arc<Mutex<Option<Card<Open>>>>,
+}
+
+impl From<CardCa> for Rc<dyn CaSec> {
+    fn from(value: CardCa) -> Self {
+        Rc::new(CaSecCB::new(Rc::new(value)))
+    }
+}
+
+impl CaSecDb for CardCa {
+    fn get_ca_cert(&self) -> Result<Cert> {
+        let (_, cacert) = self.db.get_ca()?;
+
+        pgp::to_cert(cacert.priv_cert.as_bytes())
+    }
 }
 
 impl CertificationBackend for CardCa {
@@ -167,14 +181,6 @@ impl CardCa {
         cacert.backend = backend.to_config();
 
         db.cacert_update(&cacert)
-    }
-}
-
-impl CaSec for CardCa {
-    fn get_ca_cert(&self) -> Result<Cert> {
-        let (_, cacert) = self.db.get_ca()?;
-
-        pgp::to_cert(cacert.priv_cert.as_bytes())
     }
 }
 

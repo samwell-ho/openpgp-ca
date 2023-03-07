@@ -9,7 +9,7 @@ use sequoia_openpgp::cert::Cert;
 use sequoia_openpgp::crypto::Signer;
 
 use crate::backend::{Backend, CertificationBackend};
-use crate::ca_secret::CaSec;
+use crate::ca_secret::CaSecDb;
 use crate::db::models;
 use crate::pgp;
 use crate::DbCa;
@@ -50,13 +50,18 @@ impl DbCa {
             Backend::Split.to_config().as_deref(),
         )
     }
-}
 
-/// Implementation of CaSec based on a DbCa backend that contains the
-/// private key material for the CA.
-impl CaSec for DbCa {
+    /// Get Cert for this CA (may contain private key material, depending on the backend)
     fn get_ca_cert(&self) -> Result<Cert> {
         let (_, cacert) = self.db().get_ca()?;
+
+        pgp::to_cert(cacert.priv_cert.as_bytes())
+    }
+}
+
+impl CaSecDb for DbCa {
+    fn get_ca_cert(&self) -> Result<Cert> {
+        let (_, cacert) = self.db.get_ca()?;
 
         pgp::to_cert(cacert.priv_cert.as_bytes())
     }

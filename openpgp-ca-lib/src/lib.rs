@@ -75,7 +75,7 @@ use sequoia_openpgp::Cert;
 use crate::backend::card::{check_card_empty, CardCa};
 use crate::backend::split::SplitCa;
 use crate::backend::{card, Backend};
-use crate::ca_secret::CaSec;
+use crate::ca_secret::{CaSec, CaSecCB, CaSecDb};
 use crate::db::models;
 use crate::db::OcaDb;
 use crate::types::CertificationStatus;
@@ -215,7 +215,7 @@ pub struct Oca {
     db: Rc<OcaDb>,
 
     ca: Rc<DbCa>,
-    ca_secret: Rc<dyn CaSec>,
+    ca_secret: Box<dyn CaSec>,
 }
 
 impl Uninit {
@@ -472,10 +472,10 @@ impl Uninit {
             Backend::Softkey => Ok(Oca {
                 db: self.db,
                 ca: self.ca.clone(),
-                ca_secret: self.ca,
+                ca_secret: Box::new(CaSecCB::new(self.ca)),
             }),
             Backend::Split => {
-                let ca_secret = Rc::new(SplitCa::new(self.db.clone())?);
+                let ca_secret = Box::new(SplitCa::new(self.db.clone())?);
 
                 Ok(Oca {
                     db: self.db,
@@ -484,12 +484,16 @@ impl Uninit {
                 })
             }
             Backend::Card(card) => {
-                let ca_secret = Rc::new(CardCa::new(&card.ident, &card.user_pin, self.db.clone())?);
+                let ca_sec = CaSecCB::new(Rc::new(CardCa::new(
+                    &card.ident,
+                    &card.user_pin,
+                    self.db.clone(),
+                )?));
 
                 Ok(Oca {
                     db: self.db,
                     ca: self.ca,
-                    ca_secret,
+                    ca_secret: Box::new(ca_sec),
                 })
             }
         }
@@ -549,8 +553,8 @@ impl Oca {
     /// private key material.
     ///
     /// Print information about the created CA instance to stdout.
-    pub(crate) fn secret(&self) -> &Rc<dyn CaSec> {
-        &self.ca_secret
+    pub(crate) fn secret(&self) -> &dyn CaSec {
+        &*self.ca_secret
     }
 
     pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {

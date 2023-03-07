@@ -6,6 +6,7 @@
 
 use std::io::Write;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
@@ -20,7 +21,38 @@ use crate::backend::CertificationBackend;
 use crate::pgp;
 
 /// Abstraction of operations that need private key material
-pub trait CaSec: CertificationBackend {
+pub trait CaSec {
+    fn ca_generate_revocations(&self, output: PathBuf) -> Result<()>;
+    fn sign_detached(&self, data: &[u8]) -> Result<String>;
+    fn sign_user_ids(
+        &self,
+        cert: &Cert,
+        uids_certify: &[&UserID],
+        duration_days: Option<u64>,
+    ) -> Result<Cert>;
+    fn bridge_to_remote_ca(&self, remote_ca: Cert, scope_regexes: Vec<String>) -> Result<Cert>;
+    fn bridge_revoke(&self, remote_ca: &Cert) -> Result<(Signature, Cert)>;
+}
+
+/// A CaSec that uses a CertificationBackend internally
+pub struct CaSecCB<CertificationBackend> {
+    // Stored as `Rc` because DbCa needs to be shared for different purposes in softkey mode
+    cb: Rc<CertificationBackend>,
+}
+
+impl<T: CertificationBackend> CaSecCB<T> {
+    pub(crate) fn new(t: Rc<T>) -> Self {
+        Self { cb: t }
+    }
+}
+
+impl<T> CaSecDb for CaSecCB<T> {
+    fn get_ca_cert(&self) -> Result<Cert> {
+        unimplemented!()
+    }
+}
+
+impl<T: CertificationBackend + CaSecDb> CaSec for CaSecCB<T> {
     /// Generate a set of revocation certificates for the CA key.
     ///
     /// This outputs a set of revocations with creation dates spaced
@@ -32,7 +64,7 @@ pub trait CaSec: CertificationBackend {
     /// explanation, followed by the CA certificate and the list of
     /// revocation certificates
     fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
-        let ca_pub = self.get_ca_cert()?;
+        let ca_pub = self.cb.get_ca_cert()?;
 
         let mut file = std::fs::File::create(output)?;
 
@@ -41,7 +73,7 @@ pub trait CaSec: CertificationBackend {
             &mut file,
             "This file contains revocation certificates for the OpenPGP CA \n\
             instance '{}'.",
-            self.ca_email()?
+            self.cb.ca_email()?
         )?;
         writeln!(&mut file)?;
 
@@ -81,49 +113,51 @@ adversaries."#;
             let dt: DateTime<Utc> = t.into();
             let date = dt.format("%Y-%m-%d");
 
-            self.certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
-                let hard = CertRevocationBuilder::new()
-                    .set_signature_creation_time(t)?
-                    .set_reason_for_revocation(
-                        ReasonForRevocation::KeyCompromised,
-                        b"Certificate has been compromised",
-                    )?
-                    .build(signer, &ca_pub, None)?;
+            self.cb
+                .certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+                    let hard = CertRevocationBuilder::new()
+                        .set_signature_creation_time(t)?
+                        .set_reason_for_revocation(
+                            ReasonForRevocation::KeyCompromised,
+                            b"Certificate has been compromised",
+                        )?
+                        .build(signer, &ca_pub, None)?;
 
-                let header = vec![(
-                    "Comment".to_string(),
-                    format!("Hard revocation (certificate compromised) ({date})"),
-                )];
-                writeln!(
-                    &mut file,
-                    "{}\n",
-                    &pgp::revoc_to_armored(&hard, Some(header))?
-                )?;
+                    let header = vec![(
+                        "Comment".to_string(),
+                        format!("Hard revocation (certificate compromised) ({date})"),
+                    )];
+                    writeln!(
+                        &mut file,
+                        "{}\n",
+                        &pgp::revoc_to_armored(&hard, Some(header))?
+                    )?;
 
-                Ok(())
-            })?;
+                    Ok(())
+                })?;
 
-            self.certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
-                let soft = CertRevocationBuilder::new()
-                    .set_signature_creation_time(t)?
-                    .set_reason_for_revocation(
-                        ReasonForRevocation::KeyRetired,
-                        b"Certificate retired",
-                    )?
-                    .build(signer, &ca_pub, None)?;
+            self.cb
+                .certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+                    let soft = CertRevocationBuilder::new()
+                        .set_signature_creation_time(t)?
+                        .set_reason_for_revocation(
+                            ReasonForRevocation::KeyRetired,
+                            b"Certificate retired",
+                        )?
+                        .build(signer, &ca_pub, None)?;
 
-                let header = vec![(
-                    "Comment".to_string(),
-                    format!("Soft revocation (certificate retired) ({date})"),
-                )];
-                writeln!(
-                    &mut file,
-                    "{}\n",
-                    &pgp::revoc_to_armored(&soft, Some(header))?
-                )?;
+                    let header = vec![(
+                        "Comment".to_string(),
+                        format!("Soft revocation (certificate retired) ({date})"),
+                    )];
+                    writeln!(
+                        &mut file,
+                        "{}\n",
+                        &pgp::revoc_to_armored(&soft, Some(header))?
+                    )?;
 
-                Ok(())
-            })?;
+                    Ok(())
+                })?;
         }
 
         Ok(())
@@ -133,16 +167,18 @@ adversaries."#;
     fn sign_detached(&self, data: &[u8]) -> Result<String> {
         let mut sink = vec![];
 
-        self.sign(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
-            let sig = SignatureBuilder::new(SignatureType::Binary).sign_message(signer, data)?;
-            let p = Packet::Signature(sig);
+        self.cb
+            .sign(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+                let sig =
+                    SignatureBuilder::new(SignatureType::Binary).sign_message(signer, data)?;
+                let p = Packet::Signature(sig);
 
-            let mut writer = armor::Writer::new(&mut sink, armor::Kind::Message)?;
-            p.export(&mut writer)?;
-            writer.finalize()?;
+                let mut writer = armor::Writer::new(&mut sink, armor::Kind::Message)?;
+                p.export(&mut writer)?;
+                writer.finalize()?;
 
-            Ok(())
-        })?;
+                Ok(())
+            })?;
 
         Ok(std::str::from_utf8(&sink)?.to_string())
     }
@@ -157,7 +193,7 @@ adversaries."#;
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
     ) -> Result<Cert> {
-        let ca_cert = self.get_ca_cert()?; // CA cert (must include CA User ID)
+        let ca_cert = self.cb.get_ca_cert()?; // CA cert (must include CA User ID)
 
         // Collect certifications by the CA
         let mut packets: Vec<Packet> = Vec::new();
@@ -193,14 +229,15 @@ adversaries."#;
                 ));
             }
 
-            self.certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
-                let sig = userid.bind(signer, cert, sb.clone())?;
+            self.cb
+                .certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+                    let sig = userid.bind(signer, cert, sb.clone())?;
 
-                // collect in packets
-                packets.push(sig.into());
+                    // collect in packets
+                    packets.push(sig.into());
 
-                Ok(())
-            })?;
+                    Ok(())
+                })?;
         }
 
         // Insert all newly created certifications into the user cert
@@ -228,13 +265,14 @@ adversaries."#;
                 builder = builder.add_regular_expression(regex.as_bytes())?;
             }
 
-            self.certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
-                // Create one tsig for each signer
-                let tsig = userid.bind(signer, &remote_ca, builder.clone())?;
-                packets.push(tsig.into());
+            self.cb
+                .certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+                    // Create one tsig for each signer
+                    let tsig = userid.bind(signer, &remote_ca, builder.clone())?;
+                    packets.push(tsig.into());
 
-                Ok(())
-            })?;
+                    Ok(())
+                })?;
 
             // FIXME: expiration?
 
@@ -259,20 +297,21 @@ adversaries."#;
         if uids.len() == 1 {
             let remote_uid = uids[0].userid();
 
-            self.certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
-                // set_trust_signature, set_regular_expression(s), expiration
-                let rev = cert::UserIDRevocationBuilder::new()
-                    .set_reason_for_revocation(
-                        ReasonForRevocation::Unspecified,
-                        b"removing OpenPGP CA bridge",
-                    )?
-                    .build(signer, remote_ca, remote_uid, None)?;
+            self.cb
+                .certify(&mut |signer: &mut dyn sequoia_openpgp::crypto::Signer| {
+                    // set_trust_signature, set_regular_expression(s), expiration
+                    let rev = cert::UserIDRevocationBuilder::new()
+                        .set_reason_for_revocation(
+                            ReasonForRevocation::Unspecified,
+                            b"removing OpenPGP CA bridge",
+                        )?
+                        .build(signer, remote_ca, remote_uid, None)?;
 
-                revocation_sig = Some(rev.clone());
-                revoked = Some(remote_ca.clone().insert_packets(Packet::from(rev))?);
+                    revocation_sig = Some(rev.clone());
+                    revoked = Some(remote_ca.clone().insert_packets(Packet::from(rev))?);
 
-                Ok(())
-            })?;
+                    Ok(())
+                })?;
 
             if let (Some(sig), Some(cert)) = (revocation_sig, revoked) {
                 Ok((sig, cert))
@@ -285,7 +324,9 @@ adversaries."#;
             ))
         }
     }
+}
 
+pub trait CaSecDb {
     /// Get Cert for this CA (may contain private key material, depending on the backend)
     fn get_ca_cert(&self) -> Result<Cert>;
 
