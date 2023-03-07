@@ -14,10 +14,12 @@ use anyhow::anyhow;
 
 pub(crate) mod card;
 pub(crate) mod softkey;
+pub(crate) mod split;
 
 #[derive(PartialEq)]
 pub(crate) enum Backend {
     Softkey,
+    Split,
     Card(Card),
 }
 
@@ -27,6 +29,7 @@ impl Backend {
             if let Some((bt, conf)) = backend.split_once(';') {
                 match bt {
                     BACKEND_TYPE_CARD => Ok(Backend::Card(Card::from_config(conf)?)),
+                    BACKEND_TYPE_SPLIT => Ok(Backend::Split),
                     _ => Err(anyhow!("Unsupported backend type: '{}'", bt)),
                 }
             } else {
@@ -43,6 +46,7 @@ impl Backend {
     pub(crate) fn to_config(&self) -> Option<String> {
         match self {
             Backend::Softkey => None,
+            Backend::Split => Some(format!("{};", BACKEND_TYPE_SPLIT)),
             Backend::Card(c) => Some(format!("{};{}", BACKEND_TYPE_CARD, c.to_config())),
         }
     }
@@ -52,12 +56,14 @@ impl std::fmt::Display for Backend {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Backend::Softkey => write!(f, "Softkey (private key material in CA database)"),
+            Backend::Split => write!(f, "Split-mode CA instance"),
             Backend::Card(c) => write!(f, "OpenPGP card {c}"),
         }
     }
 }
 
 const BACKEND_TYPE_CARD: &str = "card";
+const BACKEND_TYPE_SPLIT: &str = "split";
 
 #[derive(PartialEq)]
 pub(crate) struct Card {

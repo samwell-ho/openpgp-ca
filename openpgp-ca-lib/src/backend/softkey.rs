@@ -8,7 +8,7 @@ use anyhow::Result;
 use sequoia_openpgp::cert::Cert;
 use sequoia_openpgp::crypto::Signer;
 
-use crate::backend::CertificationBackend;
+use crate::backend::{Backend, CertificationBackend};
 use crate::ca_secret::CaSec;
 use crate::db::models;
 use crate::pgp;
@@ -31,6 +31,23 @@ impl DbCa {
             &ca_key,
             &cert.fingerprint().to_hex(),
             None,
+        )
+    }
+
+    /// Initialize OpenPGP CA instance for split mode.
+    /// Takes a `cert` with public key material and initializes a split-mode CA.
+    pub fn ca_init_split(&self, domainname: &str, cert: &Cert) -> Result<()> {
+        if self.db().is_ca_initialized()? {
+            return Err(anyhow::anyhow!("CA has already been initialized",));
+        }
+
+        let ca = pgp::cert_to_armored(cert)?;
+
+        self.db().ca_insert(
+            models::NewCa { domainname },
+            &ca,
+            &cert.fingerprint().to_hex(),
+            Backend::Split.to_config().as_deref(),
         )
     }
 }
