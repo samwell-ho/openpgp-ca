@@ -87,6 +87,8 @@ build_docker:
     - docker build --cache-from $IMAGE_LATEST --target openpgp-ca -t $IMAGE_SHA -t $IMAGE_LATEST .
     - docker push $IMAGE_SHA
     - docker push $IMAGE_LATEST
+  only:
+    - main
 
 build_docker_restd:
   stage: deploy
@@ -105,3 +107,5 @@ build_docker_restd:
     - docker build --cache-from $IMAGE_LATEST --target openpgp-ca-restd -t $IMAGE_SHA -t $IMAGE_LATEST .
     - docker push $IMAGE_SHA
     - docker push $IMAGE_LATEST
+  only:
+    - main
