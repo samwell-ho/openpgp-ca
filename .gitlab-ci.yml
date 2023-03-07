@@ -16,12 +16,14 @@ reuse:
     entrypoint: [""]
   script:
     - reuse lint
+  interruptible: true
 
 cargo-fmt:
   stage: lint
   script:
     - rustup toolchain install nightly && rustup component add --toolchain nightly rustfmt
     - cargo +nightly fmt -- --check
+  interruptible: true
 
 cargo-clippy:
   stage: lint
@@ -33,6 +35,7 @@ cargo-clippy:
   script:
     - rustup component add clippy
     - cargo clippy --verbose --tests -- -D warnings
+  interruptible: true
 
 cargo-test:
   stage: test
@@ -43,6 +46,7 @@ cargo-test:
     - apt clean
   script:
     - cargo test
+  interruptible: true
 
 cargo-test-card:
   image: registry.gitlab.com/openpgp-card/virtual-cards/opcard-rs-builddeps
@@ -58,6 +62,7 @@ cargo-test-card:
     # There is only one virtual card in the CI environment,
     # it can't be used from multiple tests in parallel.
     - IDENT="0000:00000000" cargo test --jobs 1 --package openpgp-ca-lib --no-default-features --features card
+  interruptible: true
 
 pages:
   stage: doc
