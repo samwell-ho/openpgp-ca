@@ -20,13 +20,13 @@ impl DbCa {
     ///
     /// Only one CA Admin can be configured per database.
     pub fn ca_init_softkey(&self, domainname: &str, cert: &Cert) -> Result<()> {
-        if self.db().is_ca_initialized()? {
+        if self.db.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA has already been initialized",));
         }
 
         let ca_key = pgp::cert_to_armored_private_key(cert)?;
 
-        self.db().ca_insert(
+        self.db.ca_insert(
             models::NewCa { domainname },
             &ca_key,
             &cert.fingerprint().to_hex(),
@@ -37,13 +37,13 @@ impl DbCa {
     /// Initialize OpenPGP CA instance for split mode.
     /// Takes a `cert` with public key material and initializes a split-mode CA.
     pub fn ca_init_split(&self, domainname: &str, cert: &Cert) -> Result<()> {
-        if self.db().is_ca_initialized()? {
+        if self.db.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA has already been initialized",));
         }
 
         let ca = pgp::cert_to_armored(cert)?;
 
-        self.db().ca_insert(
+        self.db.ca_insert(
             models::NewCa { domainname },
             &ca,
             &cert.fingerprint().to_hex(),
@@ -53,7 +53,7 @@ impl DbCa {
 
     /// Get Cert for this CA (may contain private key material, depending on the backend)
     fn get_ca_cert(&self) -> Result<Cert> {
-        let (_, cacert) = self.db().get_ca()?;
+        let (_, cacert) = self.db.get_ca()?;
 
         pgp::to_cert(cacert.priv_cert.as_bytes())
     }
