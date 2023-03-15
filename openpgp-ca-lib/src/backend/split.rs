@@ -10,9 +10,23 @@ use std::rc::Rc;
 use anyhow::Result;
 use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
+use serde::{Deserialize, Serialize};
 
 use crate::ca_secret::CaSec;
+use crate::db::models::NewQueue;
 use crate::db::OcaDb;
+
+#[derive(Serialize, Deserialize, Debug)]
+enum QueueEntry {
+    CertificationReq(CertificationReq),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CertificationReq {
+    cert: String,
+    user_ids: Vec<String>,
+    days: Option<u64>,
+}
 
 /// OpenPGP card backend for a split CA instance
 pub(crate) struct SplitCa {
@@ -40,13 +54,40 @@ impl CaSec for SplitCa {
         ))
     }
 
+    /// Returns an empty vec -> the certifications are created asynchronously.
     fn sign_user_ids(
         &self,
-        _cert: &Cert,
-        _uids_certify: &[&UserID],
-        _duration_days: Option<u64>,
-    ) -> Result<Cert> {
-        todo!()
+        cert: &Cert,
+        uids_certify: &[&UserID],
+        duration_days: Option<u64>,
+    ) -> Result<Vec<Signature>> {
+        // If no User IDs are requested to be signed, we can ignore the request
+        if uids_certify.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let c = pgp::cert_to_armored(cert)?;
+
+        let cr = CertificationReq {
+            user_ids: uids_certify.iter().map(|u| u.to_string()).collect(),
+            cert: c,
+            days: duration_days,
+        };
+
+        // Wrap the CertificationReq in a QueueEntry and store as a JSON string.
+        let qe = QueueEntry::CertificationReq(cr);
+        let serialized = serde_json::to_string(&qe)?;
+
+        let q = NewQueue {
+            task: &serialized,
+            done: false,
+        };
+
+        // Store the certification task in the queue
+        self.db.queue_insert(q)?;
+
+        // The Signatures cannot be generated here, so we return an empty vec
+        Ok(vec![])
     }
 
     fn bridge_to_remote_ca(&self, _remote_ca: Cert, _scope_regexes: Vec<String>) -> Result<Cert> {
