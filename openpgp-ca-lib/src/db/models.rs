@@ -141,4 +141,20 @@ pub(crate) struct NewBridge<'a> {
     pub cas_id: i32,
 }
 
+/// Queue entries
+#[derive(Identifiable, Queryable, Clone, AsChangeset, Debug)]
+#[table_name = "queue"]
+pub struct Queue {
+    pub id: i32,
+    pub task: String,
+    pub done: bool,
+}
+
+#[derive(Insertable, Debug)]
+#[table_name = "queue"]
+pub(crate) struct NewQueue<'a> {
+    pub task: &'a str,
+    pub done: bool,
+}
+
 // FIXME: prefs table

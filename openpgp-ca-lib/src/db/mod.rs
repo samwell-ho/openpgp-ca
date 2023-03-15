@@ -173,6 +173,21 @@ impl OcaDb {
         Ok(e[0].clone())
     }
 
+    pub(crate) fn queue_insert(&self, q: NewQueue) -> Result<()> {
+        let inserted_count = diesel::insert_into(queue::table)
+            .values(&q)
+            .execute(&self.conn)
+            .context("Error saving new queue entry")?;
+
+        if inserted_count != 1 {
+            return Err(anyhow::anyhow!(
+                "queue_insert: insert should return count '1'"
+            ));
+        }
+
+        Ok(())
+    }
+
     // --- public ---
 
     pub(crate) fn is_ca_initialized(&self) -> Result<bool> {
