@@ -332,6 +332,8 @@ fn main() -> Result<()> {
                 let cert_old = std::fs::read(cert_file_old)?;
                 ca.ca_re_certify(&cert_old, validity_days)?;
             }
+
+            cli::CaCommand::SplitExport { file } => ca.ca_split_export(file)?,
         },
         cli::Commands::Bridge { cmd } => match cmd {
             cli::BridgeCommand::New {

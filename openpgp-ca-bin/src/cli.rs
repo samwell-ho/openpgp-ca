@@ -230,6 +230,16 @@ pub enum CaCommand {
         )]
         validity_days: u64,
     },
+
+    /// Export certification requests from a split-mode online instance.
+    SplitExport {
+        #[clap(
+            short = 'f',
+            long = "file",
+            help = "File to export the certification requests to"
+        )]
+        file: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]

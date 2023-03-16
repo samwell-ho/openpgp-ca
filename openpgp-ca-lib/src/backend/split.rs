@@ -4,8 +4,12 @@
 // This file is part of OpenPGP CA
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
+use std::collections::HashMap;
+use std::fs::File;
+use std::ops::Add;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 
 use anyhow::Result;
 use sequoia_openpgp::packet::{Signature, UserID};
@@ -13,19 +17,36 @@ use sequoia_openpgp::Cert;
 use serde::{Deserialize, Serialize};
 
 use crate::ca_secret::CaSec;
-use crate::db::models::NewQueue;
+use crate::db::models::{NewQueue, Queue};
 use crate::db::OcaDb;
+use crate::pgp;
+
+pub(crate) const CSR_FILE: &str = "csr.txt";
 
 #[derive(Serialize, Deserialize, Debug)]
-enum QueueEntry {
+pub(crate) enum QueueEntry {
     CertificationReq(CertificationReq),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct CertificationReq {
+pub(crate) struct CertificationReq {
     cert: String,
     user_ids: Vec<String>,
     days: Option<u64>,
+}
+
+impl CertificationReq {
+    pub(crate) fn cert(&self) -> Result<Cert> {
+        Cert::from_str(&self.cert)
+    }
+
+    pub(crate) fn days(&self) -> Option<u64> {
+        self.days
+    }
+
+    pub(crate) fn user_ids(&self) -> &[String] {
+        &self.user_ids
+    }
 }
 
 /// OpenPGP card backend for a split CA instance
@@ -37,6 +58,68 @@ pub(crate) struct SplitCa {
 impl SplitCa {
     pub(crate) fn new(db: Rc<OcaDb>) -> Result<Self> {
         Ok(Self { db })
+    }
+
+    pub(crate) fn export_csr_as_tar(output: PathBuf, queue: Vec<Queue>, ca_fp: &str) -> Result<()> {
+        // ca_fp is stored in the request list as a safeguard against users accidentally signing
+        // with the wrong CA key.
+        let mut csr_file: String = format!("certification request list [v1] for CA {}\n", ca_fp);
+
+        let mut certs: HashMap<String, Cert> = HashMap::new();
+
+        for entry in queue {
+            let task = entry.task;
+            let qe: QueueEntry = serde_json::from_str(&task)?;
+
+            match qe {
+                QueueEntry::CertificationReq(cr) => {
+                    let cert = cr.cert()?;
+
+                    let user_ids = cr.user_ids();
+                    let days = cr.days();
+
+                    let fp = cert.fingerprint().to_string();
+
+                    // write a line for each user id certification request:
+                    // "queue id" "user id number" "fingerprint" "days (0 if unlimited)" "user id"
+                    for (i, uid) in user_ids.iter().enumerate() {
+                        let line =
+                            format!("{} {} {} {} {}\n", entry.id, i, fp, days.unwrap_or(0), uid,);
+                        csr_file = csr_file.add(&line);
+                    }
+
+                    // merge Cert into HashMap of certs
+                    let c = certs.get(&fp);
+                    match c {
+                        None => certs.insert(fp, cert),
+                        Some(c) => certs.insert(fp, c.clone().merge_public(cert)?),
+                    };
+                }
+            }
+        }
+
+        // Write all files as tar
+        let file = File::create(output).unwrap();
+        let mut a = tar::Builder::new(file);
+
+        let csr_file = csr_file.as_bytes();
+        let mut header = tar::Header::new_gnu();
+        header.set_size(csr_file.len() as u64);
+        header.set_cksum();
+        a.append_data(&mut header, CSR_FILE, csr_file)?;
+
+        for (fp, c) in certs {
+            let cert = pgp::cert_to_armored(&c)?;
+            let cert = cert.as_bytes();
+
+            let mut header = tar::Header::new_gnu();
+            header.set_size(cert.len() as u64);
+            header.set_cksum();
+
+            a.append_data(&mut header, format!("certs/{fp}"), cert)?;
+        }
+
+        Ok(())
     }
 }
 

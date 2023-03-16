@@ -188,6 +188,15 @@ impl OcaDb {
         Ok(())
     }
 
+    // get all queue entries that aren't marked as "done"
+    pub(crate) fn queue_not_done(&self) -> Result<Vec<Queue>> {
+        queue::table
+            .filter(queue::done.eq(false))
+            .order(queue::id)
+            .load::<Queue>(&self.conn)
+            .context("Error loading queue entries")
+    }
+
     // --- public ---
 
     pub(crate) fn is_ca_initialized(&self) -> Result<bool> {

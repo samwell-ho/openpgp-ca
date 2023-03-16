@@ -637,6 +637,28 @@ impl Oca {
             .transaction(|| cert::certs_re_certify(self, cert_old, validity_days))
     }
 
+    /// Export certification requests for the backing CA in a simple human-readable output format
+    /// (inspired by https://github.com/wiktor-k/airsigner/, but with some adjustments!).
+    ///
+    /// The output file is a tar-archive:
+    /// - The archive contains a top-level file "csr.txt", which lists User IDs that should be
+    ///   certified.
+    /// - Current versions of all certs are provided in the tar in armored format, as individual
+    ///   files "certs/<fingerprint>".
+    ///
+    /// One design goal of this format is to make it easy to implement small (and thus more easily
+    /// auditable) certification services, which may use arbitrary underlying mechanisms
+    /// (and/or PGP implementations) for signing.
+    pub fn ca_split_export(&self, file: PathBuf) -> Result<()> {
+        // FIXME: don't perform this operation if the backend mode is wrong/unexpected?
+        let (_, cacert) = self.db().get_ca()?;
+
+        let queue = self.db().queue_not_done()?;
+        SplitCa::export_csr_as_tar(file, queue, &cacert.fingerprint)?;
+
+        Ok(())
+    }
+
     // -------- users / certs
 
     /// Get a list of all User Certs
