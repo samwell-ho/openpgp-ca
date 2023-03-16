@@ -334,6 +334,10 @@ fn main() -> Result<()> {
             }
 
             cli::CaCommand::SplitExport { file } => ca.ca_split_export(file)?,
+
+            cli::CaCommand::SplitProcess { import, export } => {
+                ca.ca_split_process(import, export)?
+            }
         },
         cli::Commands::Bridge { cmd } => match cmd {
             cli::BridgeCommand::New {

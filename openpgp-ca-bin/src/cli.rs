@@ -240,6 +240,23 @@ pub enum CaCommand {
         )]
         file: PathBuf,
     },
+
+    /// Process certification requests from a split-mode online instance.
+    SplitProcess {
+        #[clap(
+            short = 'i',
+            long = "import",
+            help = "File to import the certification requests from"
+        )]
+        import: PathBuf,
+
+        #[clap(
+            short = 'e',
+            long = "export",
+            help = "File to export the generated certifications to"
+        )]
+        export: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]

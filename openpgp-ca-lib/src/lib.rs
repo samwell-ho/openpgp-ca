@@ -56,12 +56,15 @@ mod update;
 
 use std::collections::HashMap;
 use std::env;
+use std::fs::File;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
+use base64::{engine::general_purpose, Engine};
 use chrono::offset::Utc;
 use chrono::DateTime;
 use openpgp_card::algorithm::AlgoSimple;
@@ -70,11 +73,12 @@ use openpgp_card_sequoia::state::Transaction;
 use openpgp_card_sequoia::{state::Open, Card};
 use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::parse::Parse;
+use sequoia_openpgp::serialize::Marshal;
 use sequoia_openpgp::Cert;
 
 use crate::backend::card::{check_card_empty, CardCa};
 use crate::backend::split::SplitCa;
-use crate::backend::{card, Backend};
+use crate::backend::{card, split, Backend};
 use crate::ca_secret::{CaSec, CaSecCB, CaSecDb};
 use crate::db::models;
 use crate::db::OcaDb;
@@ -655,6 +659,73 @@ impl Oca {
 
         let queue = self.db().queue_not_done()?;
         SplitCa::export_csr_as_tar(file, queue, &cacert.fingerprint)?;
+
+        Ok(())
+    }
+
+    pub fn ca_split_process(&self, import: PathBuf, export: PathBuf) -> Result<()> {
+        // FIXME: check if our backend allows processing of split-mode certification requests!
+
+        let input = File::open(import)?;
+        let mut a = tar::Archive::new(input);
+
+        let mut csr = String::new();
+        let mut certs = HashMap::new();
+
+        for file in a.entries()? {
+            let mut file = file?;
+
+            let name = file.header().path()?;
+            if name.to_str() == Some(split::CSR_FILE) {
+                file.read_to_string(&mut csr)?;
+            } else if name.starts_with("certs/") {
+                let mut s = String::new();
+                file.read_to_string(&mut s)?;
+                let c = Cert::from_str(&s)?;
+
+                certs.insert(c.fingerprint().to_string(), c);
+            } else {
+                unimplemented!()
+            }
+        }
+
+        // prepare output file
+        let mut output = File::create(export)?;
+
+        // FIXME: process first line, check if version and CA fp are acceptable
+        for line in csr.lines().skip(1) {
+            // "queue id" "user id number" "fingerprint" "days (0 if unlimited)" "user id"
+            let v: Vec<_> = line.splitn(5, ' ').collect();
+
+            let db_id: usize = usize::from_str(v[0])?;
+            let uid_nr: usize = usize::from_str(v[1])?;
+            let fp = v[2];
+            let days_valid = match u64::from_str(v[3])? {
+                0 => None,
+                d => Some(d),
+            };
+            let uid = v[4];
+
+            // Cert/User ID that should be certified
+            let c = certs.get(fp).expect("missing cert"); // FIXME
+            let uid = c
+                .userids()
+                .find(|u| u.userid().to_string() == uid)
+                .unwrap() // FIXME unwrap
+                .userid();
+
+            // Generate certification
+            let sigs = self.ca_secret.sign_user_ids(c, &[uid][..], days_valid)?;
+            assert_eq!(sigs.len(), 1); // FIXME
+
+            let mut v: Vec<u8> = vec![];
+            sigs[0].serialize(&mut v)?;
+
+            let encoded: String = general_purpose::STANDARD_NO_PAD.encode(v);
+
+            // Write a line in output file for this Signature
+            writeln!(output, "{db_id} {uid_nr} {fp} {encoded}")?;
+        }
 
         Ok(())
     }
