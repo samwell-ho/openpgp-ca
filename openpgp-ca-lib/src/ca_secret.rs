@@ -29,7 +29,7 @@ pub trait CaSec {
         cert: &Cert,
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
-    ) -> Result<Cert>;
+    ) -> Result<Vec<Signature>>;
     fn bridge_to_remote_ca(&self, remote_ca: Cert, scope_regexes: Vec<String>) -> Result<Cert>;
     fn bridge_revoke(&self, remote_ca: &Cert) -> Result<(Signature, Cert)>;
 }
@@ -192,11 +192,11 @@ adversaries."#;
         cert: &Cert,
         uids_certify: &[&UserID],
         duration_days: Option<u64>,
-    ) -> Result<Cert> {
+    ) -> Result<Vec<Signature>> {
         let ca_cert = self.cb.get_ca_cert()?; // CA cert (must include CA User ID)
 
         // Collect certifications by the CA
-        let mut packets: Vec<Packet> = Vec::new();
+        let mut packets: Vec<Signature> = Vec::new();
 
         let userids = cert
             .userids()
@@ -234,14 +234,14 @@ adversaries."#;
                     let sig = userid.bind(signer, cert, sb.clone())?;
 
                     // collect in packets
-                    packets.push(sig.into());
+                    packets.push(sig);
 
                     Ok(())
                 })?;
         }
 
         // Insert all newly created certifications into the user cert
-        cert.clone().insert_packets(packets)
+        Ok(packets)
     }
 
     /// Add trust signature to the cert of a remote CA.

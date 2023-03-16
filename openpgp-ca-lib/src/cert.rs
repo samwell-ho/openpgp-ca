@@ -187,9 +187,11 @@ fn add_certifications(
 ) -> Result<()> {
     if !certify.is_empty() {
         // Make new certifications for the User IDs identified above
-        let certified = oca
+        let sigs = oca
             .secret()
             .sign_user_ids(c, &certify[..], Some(validity_days))?;
+
+        let certified = c.clone().insert_packets(sigs)?;
 
         // update cert in db
         let mut cert_update = db_cert;
@@ -420,5 +422,6 @@ fn sign_cert_emails(
         );
     }
 
-    oca.secret().sign_user_ids(cert, &uids, duration_days)
+    let sigs = oca.secret().sign_user_ids(cert, &uids, duration_days)?;
+    cert.clone().insert_packets(sigs)
 }
