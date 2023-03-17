@@ -338,6 +338,8 @@ fn main() -> Result<()> {
             cli::CaCommand::SplitProcess { import, export } => {
                 ca.ca_split_process(import, export)?
             }
+
+            cli::CaCommand::SplitImport { import: file } => ca.ca_split_import(file)?,
         },
         cli::Commands::Bridge { cmd } => match cmd {
             cli::BridgeCommand::New {

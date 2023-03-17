@@ -257,6 +257,16 @@ pub enum CaCommand {
         )]
         export: PathBuf,
     },
+
+    /// Import certifications from the split-mode backing instance.
+    SplitImport {
+        #[clap(
+            short = 'i',
+            long = "import",
+            help = "File to import generated certifications from"
+        )]
+        import: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]

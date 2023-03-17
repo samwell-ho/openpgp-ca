@@ -57,7 +57,7 @@ mod update;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
@@ -725,6 +725,45 @@ impl Oca {
 
             // Write a line in output file for this Signature
             writeln!(output, "{db_id} {uid_nr} {fp} {encoded}")?;
+        }
+
+        Ok(())
+    }
+
+    pub fn ca_split_import(&self, file: PathBuf) -> Result<()> {
+        let file = File::open(file)?;
+        for line in std::io::BufReader::new(file).lines() {
+            let line = line?;
+
+            let split: Vec<_> = line.split(' ').collect();
+            assert_eq!(split.len(), 4);
+
+            let _db_id = usize::from_str(split[0])?;
+            let _uid_nr = usize::from_str(split[1])?;
+
+            let fp = split[2];
+
+            // base64-encoded serialized Signature
+            let sig = split[3];
+            let bytes = general_purpose::STANDARD.decode(sig).unwrap();
+
+            let sig = Signature::from_bytes(&bytes)?;
+
+            if let Some(mut cert) = self.db().cert_by_fp(fp)? {
+                let c = Cert::from_str(&cert.pub_cert)?;
+                let certified = c.insert_packets(sig)?;
+
+                cert.pub_cert = pgp::cert_to_armored(&certified)?;
+
+                self.db().cert_update(&cert)?;
+
+                // FIXME: mark queue entry as done
+            } else {
+                // FIXME: mark queue entry as failed?
+                println!("failed to load fp {fp}");
+
+                unimplemented!()
+            }
         }
 
         Ok(())
