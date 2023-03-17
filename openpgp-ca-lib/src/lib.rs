@@ -852,11 +852,7 @@ impl Oca {
                 if !sig_by_ca.certified.is_empty() {
                     println!(" Identities certified by this CA:");
                     for uid in sig_by_ca.certified {
-                        println!(
-                            " - '{} <{}>'",
-                            uid.name()?.unwrap_or_default(),
-                            uid.email()?.unwrap_or_default()
-                        );
+                        println!(" - '{}'", uid);
                     }
                 }
 
