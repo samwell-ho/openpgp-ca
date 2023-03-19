@@ -34,7 +34,7 @@ cargo-clippy:
     - apt clean
   script:
     - rustup component add clippy
-    - cargo clippy --verbose --tests -- -D warnings
+    - cargo clippy --no-deps --verbose --tests -- -D warnings
   interruptible: true
 
 cargo-test:
