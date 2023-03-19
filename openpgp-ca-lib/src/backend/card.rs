@@ -26,35 +26,19 @@ use sequoia_openpgp::{Cert, Packet};
 
 use crate::backend;
 use crate::backend::{Backend, CertificationBackend};
-use crate::ca_secret::{CaSec, CaSecCB, CaSecDb};
 use crate::db::{models, OcaDb};
 use crate::pgp;
 
 /// an OpenPGP card backend for a CA instance
-pub(crate) struct CardCa {
+pub(crate) struct CardBackend {
     pin: String,
     ident: String,
-    db: Rc<OcaDb>,
 
     // lazily opened card, for caching purposes
     card: Arc<Mutex<Option<Card<Open>>>>,
 }
 
-impl From<CardCa> for Rc<dyn CaSec> {
-    fn from(value: CardCa) -> Self {
-        Rc::new(CaSecCB::new(Rc::new(value)))
-    }
-}
-
-impl CaSecDb for CardCa {
-    fn get_ca_cert(&self) -> Result<Cert> {
-        let (_, cacert) = self.db.get_ca()?;
-
-        pgp::to_cert(cacert.priv_cert.as_bytes())
-    }
-}
-
-impl CertificationBackend for CardCa {
+impl CertificationBackend for CardBackend {
     fn certify(
         &self,
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
@@ -103,11 +87,10 @@ impl CertificationBackend for CardCa {
     }
 }
 
-impl CardCa {
-    pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> Result<Self> {
+impl CardBackend {
+    pub(crate) fn new(ident: &str, pin: &str) -> Result<Self> {
         Ok(Self {
             pin: pin.to_string(),
-            db,
             ident: ident.to_string(),
             card: Arc::new(Mutex::new(None)),
         })

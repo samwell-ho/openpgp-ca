@@ -45,12 +45,12 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod backend;
 mod bridge;
-mod ca_secret;
 mod cert;
 pub mod db;
 mod export;
 pub mod pgp;
 mod revocation;
+mod secret;
 pub mod types;
 mod update;
 
@@ -71,17 +71,18 @@ use openpgp_card::algorithm::AlgoSimple;
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::state::Transaction;
 use openpgp_card_sequoia::{state::Open, Card};
-use sequoia_openpgp::packet::Signature;
+use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::serialize::Marshal;
 use sequoia_openpgp::Cert;
 
-use crate::backend::card::{check_card_empty, CardCa};
+use crate::backend::card::{check_card_empty, CardBackend};
+use crate::backend::softkey::SoftkeyBackend;
 use crate::backend::split::SplitCa;
 use crate::backend::{card, split, Backend};
-use crate::ca_secret::{CaSec, CaSecCB, CaSecDb};
 use crate::db::models;
 use crate::db::OcaDb;
+use crate::secret::{CaSec, CaSecCB};
 use crate::types::CertificationStatus;
 
 /// List of cards that are blank (no fingerprint in any slot)
@@ -173,7 +174,7 @@ fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
     card_matches(&mut transaction, ca_cert).context(format!("On card {card_ident}"))
 }
 
-/// a DB backend for a CA instance
+/// DB storage for a CA instance
 pub(crate) struct DbCa {
     db: Rc<OcaDb>,
 }
@@ -185,10 +186,8 @@ impl DbCa {
 
     /// Get the Cert of the CA (without private key material).
     pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
-        let (_, cacert) = self.db.get_ca()?;
-
-        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
-        Ok(cert.strip_secret_key_material())
+        let ca_priv = self.ca_get_cert_private()?;
+        Ok(ca_priv.strip_secret_key_material())
     }
 
     /// Get the Cert of the CA (with private key material, if available).
@@ -201,6 +200,29 @@ impl DbCa {
         let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
         Ok(cert)
     }
+
+    /// Get the User ID of this CA
+    pub(crate) fn ca_userid(&self) -> Result<UserID> {
+        let cert = self.ca_get_cert_pub()?;
+        let uids: Vec<_> = cert.userids().collect();
+
+        if uids.len() != 1 {
+            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
+        }
+
+        Ok(uids[0].userid().clone())
+    }
+
+    /// Get the email of this CA
+    pub(crate) fn ca_email(&self) -> Result<String> {
+        let email = self.ca_userid()?.email()?;
+
+        if let Some(email) = email {
+            Ok(email)
+        } else {
+            Err(anyhow::anyhow!("CA user_id has no email"))
+        }
+    }
 }
 
 /// A CA instance that has a database, which is (possibly) not initialized yet.
@@ -212,8 +234,8 @@ pub struct Uninit {
 /// An initialized OpenPGP CA instance, with a configured backend.
 /// Oca exposes the main functionality of OpenPGP CA.
 pub struct Oca {
-    ca: Rc<DbCa>,
-    ca_secret: Box<dyn CaSec>,
+    storage: Rc<DbCa>,
+    secret: Box<dyn CaSec>,
 }
 
 impl Uninit {
@@ -413,7 +435,7 @@ impl Uninit {
 
             // Switch cacert in db
             let ca_pub = pgp::cert_to_armored(&ca_key.strip_secret_key_material())?;
-            CardCa::ca_replace_in_place(&self.ca.db, card_ident, &user_pin, &ca_pub)?;
+            CardBackend::ca_replace_in_place(&self.ca.db, card_ident, &user_pin, &ca_pub)?;
 
             // Now init from db
             self.init_from_db_state()
@@ -449,7 +471,7 @@ impl Uninit {
             let pubkey = check_if_card_matches(card_ident, ca_cert)?;
 
             self.ca.db.transaction(|| {
-                CardCa::ca_init(
+                CardBackend::ca_init(
                     &self.ca.db,
                     domainname,
                     card_ident,
@@ -470,10 +492,25 @@ impl Uninit {
 
         match Backend::from_config(ca_cert.backend.as_deref())? {
             Backend::Softkey => {
-                let dbca = Rc::new(self.ca);
+                let softkey = SoftkeyBackend::new(self.ca.ca_get_cert_private()?);
+
+                let ca_cert_pub = self.ca.ca_get_cert_pub()?;
+                let ca_sec = CaSecCB::new(Rc::new(softkey), ca_cert_pub);
+
                 Ok(Oca {
-                    ca: dbca.clone(),
-                    ca_secret: Box::new(CaSecCB::new(dbca)),
+                    storage: Rc::new(self.ca),
+                    secret: Box::new(ca_sec),
+                })
+            }
+            Backend::Card(card) => {
+                let card_ca = CardBackend::new(&card.ident, &card.user_pin)?;
+
+                let ca_cert = self.ca.ca_get_cert_pub()?;
+                let ca_sec = CaSecCB::new(Rc::new(card_ca), ca_cert);
+
+                Ok(Oca {
+                    storage: Rc::new(self.ca),
+                    secret: Box::new(ca_sec),
                 })
             }
             Backend::Split => {
@@ -481,20 +518,8 @@ impl Uninit {
                 let ca_secret = Box::new(SplitCa::new(dbca.db.clone())?);
 
                 Ok(Oca {
-                    ca: dbca,
-                    ca_secret,
-                })
-            }
-            Backend::Card(card) => {
-                let ca_sec = CaSecCB::new(Rc::new(CardCa::new(
-                    &card.ident,
-                    &card.user_pin,
-                    self.ca.db.clone(),
-                )?));
-
-                Ok(Oca {
-                    ca: Rc::new(self.ca),
-                    ca_secret: Box::new(ca_sec),
+                    storage: dbca,
+                    secret: ca_secret,
                 })
             }
         }
@@ -513,7 +538,7 @@ impl Oca {
     }
 
     pub fn db(&self) -> &OcaDb {
-        &self.ca.db
+        &self.storage.db
     }
 
     /// Change which card backs an OpenPGP CA instance
@@ -535,7 +560,7 @@ impl Oca {
 
                 // Update backend configuration in database
                 let ca_pub = pgp::cert_to_armored(&ca_cert)?;
-                CardCa::ca_replace_in_place(&self.ca.db, card_ident, user_pin, &ca_pub)?;
+                CardBackend::ca_replace_in_place(&self.storage.db, card_ident, user_pin, &ca_pub)?;
 
                 Ok(())
             }
@@ -555,11 +580,11 @@ impl Oca {
     ///
     /// Print information about the created CA instance to stdout.
     pub(crate) fn secret(&self) -> &dyn CaSec {
-        &*self.ca_secret
+        &*self.secret
     }
 
     pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
-        self.ca_secret.ca_generate_revocations(output)
+        self.secret.ca_generate_revocations(output)
     }
 
     pub fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
@@ -567,7 +592,7 @@ impl Oca {
     }
 
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
-        self.ca.ca_get_cert_pub()
+        self.storage.ca_get_cert_pub()
     }
 
     /// Returns the public key of the CA as an armored String
@@ -580,7 +605,7 @@ impl Oca {
     }
 
     pub fn get_ca_email(&self) -> Result<String> {
-        self.ca.ca_email()
+        self.storage.ca_email()
     }
 
     /// Get the domainname for this CA
@@ -715,7 +740,7 @@ impl Oca {
                 .userid();
 
             // Generate certification
-            let sigs = self.ca_secret.sign_user_ids(c, &[uid][..], days_valid)?;
+            let sigs = self.secret.sign_user_ids(c, &[uid][..], days_valid)?;
             assert_eq!(sigs.len(), 1); // FIXME
 
             let mut v: Vec<u8> = vec![];

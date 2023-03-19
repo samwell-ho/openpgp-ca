@@ -16,10 +16,10 @@ use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::Cert;
 use serde::{Deserialize, Serialize};
 
-use crate::ca_secret::CaSec;
 use crate::db::models::{NewQueue, Queue};
 use crate::db::OcaDb;
 use crate::pgp;
+use crate::secret::CaSec;
 
 pub(crate) const CSR_FILE: &str = "csr.txt";
 
@@ -124,19 +124,6 @@ impl SplitCa {
 }
 
 impl CaSec for SplitCa {
-    fn ca_generate_revocations(&self, _output: PathBuf) -> Result<()> {
-        todo!()
-    }
-
-    // This operation is currently only used by "keylist export".
-    // The user should run this command on the backing CA instance
-    // that has access to the CA key material.
-    fn sign_detached(&self, _data: &[u8]) -> Result<String> {
-        Err(anyhow::anyhow!(
-            "Operation is not supported on a split-mode CA instance. Please perform it on your backing CA instance."
-        ))
-    }
-
     /// Returns an empty vec -> the certifications are created asynchronously.
     fn sign_user_ids(
         &self,
@@ -173,11 +160,28 @@ impl CaSec for SplitCa {
         Ok(vec![])
     }
 
+    fn ca_generate_revocations(&self, _output: PathBuf) -> Result<()> {
+        Err(anyhow::anyhow!(
+            "Operation is not supported on a split-mode CA front instance. Please perform it on your back CA instance."
+        ))
+    }
+
+    // This operation is currently only used by "keylist export".
+    // The user should run this command on the back CA instance
+    // that has access to the CA key material.
+    fn sign_detached(&self, _data: &[u8]) -> Result<String> {
+        Err(anyhow::anyhow!(
+            "Operation is not currently supported on a split-mode CA instance. Please perform it on your back CA instance."
+        ))
+    }
+
     fn bridge_to_remote_ca(&self, _remote_ca: Cert, _scope_regexes: Vec<String>) -> Result<Cert> {
         todo!()
     }
 
     fn bridge_revoke(&self, _remote_ca: &Cert) -> Result<(Signature, Cert)> {
-        todo!()
+        Err(anyhow::anyhow!(
+            "Operation is not currently supported on a split-mode CA instance. Please perform it on your back CA instance."
+        ))
     }
 }
