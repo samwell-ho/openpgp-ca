@@ -839,6 +839,50 @@ impl Oca {
             .transaction(|| cert::cert_import_update(self, cert))
     }
 
+    /// Mark a cert as "delisted" in the OpenPGP CA database.
+    /// As a result, the cert will not be exported to WKD anymore.
+    ///
+    /// Note: existing CA certifications will still get renewed for delisted
+    /// certs, but as the cert is not published via WKD, third parties might not
+    /// learn about refreshed certifications.
+    ///
+    /// CAUTION:
+    /// This method is probably rarely appropriate. In most cases, it's better
+    /// to "deactivate" a cert (in almost all cases, it is best to continually
+    /// serve the latest version of a cert to third parties, so they can learn
+    /// about e.g. revocations on the cert)
+    pub fn cert_delist(&self, fp: &str) -> Result<()> {
+        self.storage.transaction(|| {
+            let cert = self.cert_get_by_fingerprint(fp)?;
+
+            if let Some(mut cert) = cert {
+                cert.delisted = true;
+                self.storage.cert_update(&cert)
+            } else {
+                Err(anyhow::anyhow!("Cert not found"))
+            }
+        })
+    }
+
+    /// Mark a certificate as "deactivated".
+    /// It will continue to be listed and exported to WKD.
+    /// However, the certification by our CA will expire and not get renewed.
+    ///
+    /// This approach is probably appropriate in most cases to phase out a
+    /// certificate.
+    pub fn cert_deactivate(&self, fp: &str) -> Result<()> {
+        self.storage.transaction(|| {
+            let cert = self.cert_get_by_fingerprint(fp)?;
+
+            if let Some(mut cert) = cert {
+                cert.inactive = true;
+                self.storage.cert_update(&cert)
+            } else {
+                Err(anyhow::anyhow!("Cert not found"))
+            }
+        })
+    }
+
     /// Get Cert by fingerprint.
     ///
     /// The fingerprint parameter is normalized (e.g. if it contains
