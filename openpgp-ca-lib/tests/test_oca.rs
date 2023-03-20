@@ -916,9 +916,8 @@ fn test_refresh(ca: Oca) -> Result<()> {
     // set dave to "inactive"
     let cert = ca.certs_by_email("dave@example.org")?;
     assert_eq!(cert.len(), 1);
-    let mut dave = cert[0].clone();
-    dave.inactive = true;
-    ca.storage().cert_update(&dave)?;
+    let dave = cert[0].clone();
+    ca.cert_deactivate(&dave.fingerprint)?;
 
     // refresh all CA certifications that are valid for less than 30 days
     ca.certs_refresh_ca_certifications(30, 365)?;
