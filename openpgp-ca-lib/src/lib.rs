@@ -1133,6 +1133,15 @@ impl Oca {
         }
     }
 
+    /// Get the Cert row for a Bridge
+    pub fn bridge_get_cert(&self, bridge: &models::Bridge) -> Result<models::Cert> {
+        if let Some(cert) = self.storage.cert_by_id(bridge.cert_id)? {
+            Ok(cert)
+        } else {
+            Err(anyhow::anyhow!("No cert found for bridge {}", bridge.id))
+        }
+    }
+
     pub fn add_bridge(
         &self,
         email: Option<&str>,
