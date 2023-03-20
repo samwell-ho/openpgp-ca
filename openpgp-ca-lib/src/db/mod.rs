@@ -19,7 +19,7 @@ use schema::*;
 use crate::pgp;
 
 /// Database access layer
-pub struct OcaDb {
+pub(crate) struct OcaDb {
     conn: SqliteConnection,
 }
 

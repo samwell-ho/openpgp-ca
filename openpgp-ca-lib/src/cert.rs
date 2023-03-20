@@ -41,13 +41,13 @@ pub fn user_new(
     let tsigned_ca = pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
     // Store tsig for the CA cert
-    oca.db().ca_import_tsig(tsigned_ca.as_bytes())?;
+    oca.storage.ca_import_tsig(tsigned_ca.as_bytes())?;
 
     // Store new user cert in DB
     let user_cert = pgp::cert_to_armored(&user_certified)?;
     let user_revoc = pgp::revoc_to_armored(&user_revoc, None)?;
 
-    oca.db()
+    oca.storage
         .user_add(
             name,
             (&user_cert, &user_key.fingerprint().to_hex()),
@@ -98,7 +98,7 @@ pub fn cert_import_new(
     let fp = user_cert.fingerprint().to_hex();
 
     if let Some(_exists) = oca
-        .db()
+        .storage
         .cert_by_fp(&fp)
         .context("cert_import_new(): get_cert() check by fingerprint failed")?
     {
@@ -144,7 +144,7 @@ pub fn cert_import_new(
         .map(|s| pgp::revoc_to_armored(s, None))
         .collect();
 
-    oca.db()
+    oca.storage
         .user_add(name.as_deref(), (&pub_cert, &fp), emails, &rev_armored?)
         .context("Couldn't insert user")?;
 
@@ -157,7 +157,7 @@ pub fn cert_import_update(oca: &Oca, cert: &[u8]) -> Result<()> {
     let fp = cert_new.fingerprint().to_hex();
 
     if let Some(mut db_cert) = oca
-        .db()
+        .storage
         .cert_by_fp(&fp)
         .context("cert_import_update(): get_cert() check by fingerprint failed")?
     {
@@ -168,7 +168,7 @@ pub fn cert_import_update(oca: &Oca, cert: &[u8]) -> Result<()> {
         let armored = pgp::cert_to_armored(&updated)?;
 
         db_cert.pub_cert = armored;
-        oca.db().cert_update(&db_cert)
+        oca.storage.cert_update(&db_cert)
     } else {
         Err(anyhow::anyhow!(
             "No cert with this fingerprint found in DB, cannot update"
@@ -196,7 +196,7 @@ fn add_certifications(
         // update cert in db
         let mut cert_update = db_cert;
         cert_update.pub_cert = pgp::cert_to_armored(&certified)?;
-        oca.db().cert_update(&cert_update)?;
+        oca.storage.cert_update(&cert_update)?;
     }
 
     Ok(())
@@ -213,7 +213,7 @@ pub fn certs_refresh_ca_certifications(
     let ca = oca.ca_get_cert_pub()?;
 
     for db_cert in oca
-        .db()
+        .storage
         .certs()?
         .into_iter()
         // ignore "inactive" Certs
@@ -257,7 +257,7 @@ pub fn certs_re_certify(oca: &Oca, cert_old: Cert, validity_days: u64) -> Result
     // FIXME: de-deduplicate code with certs_refresh_ca_certifications()?
 
     for db_cert in oca
-        .db()
+        .storage
         .certs()?
         .into_iter()
         // ignore "inactive" Certs

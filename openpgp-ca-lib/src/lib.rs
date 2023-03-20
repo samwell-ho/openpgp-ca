@@ -51,6 +51,7 @@ mod export;
 pub mod pgp;
 mod revocation;
 mod secret;
+mod storage;
 pub mod types;
 mod update;
 
@@ -71,7 +72,7 @@ use openpgp_card::algorithm::AlgoSimple;
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::state::Transaction;
 use openpgp_card_sequoia::{state::Open, Card};
-use sequoia_openpgp::packet::{Signature, UserID};
+use sequoia_openpgp::packet::Signature;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::serialize::Marshal;
 use sequoia_openpgp::Cert;
@@ -83,6 +84,7 @@ use crate::backend::{card, split, Backend};
 use crate::db::models;
 use crate::db::OcaDb;
 use crate::secret::{CaSec, CaSecCB};
+use crate::storage::DbCa;
 use crate::types::CertificationStatus;
 
 /// List of cards that are blank (no fingerprint in any slot)
@@ -174,67 +176,16 @@ fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
     card_matches(&mut transaction, ca_cert).context(format!("On card {card_ident}"))
 }
 
-/// DB storage for a CA instance
-pub(crate) struct DbCa {
-    db: Rc<OcaDb>,
-}
-
-impl DbCa {
-    pub fn new(db: Rc<OcaDb>) -> Self {
-        Self { db }
-    }
-
-    /// Get the Cert of the CA (without private key material).
-    pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
-        let ca_priv = self.ca_get_cert_private()?;
-        Ok(ca_priv.strip_secret_key_material())
-    }
-
-    /// Get the Cert of the CA (with private key material, if available).
-    ///
-    /// Depending on the backend, the private key material is available in
-    /// the database - or not.
-    pub(crate) fn ca_get_cert_private(&self) -> Result<Cert> {
-        let (_, cacert) = self.db.get_ca()?;
-
-        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
-        Ok(cert)
-    }
-
-    /// Get the User ID of this CA
-    pub(crate) fn ca_userid(&self) -> Result<UserID> {
-        let cert = self.ca_get_cert_pub()?;
-        let uids: Vec<_> = cert.userids().collect();
-
-        if uids.len() != 1 {
-            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
-        }
-
-        Ok(uids[0].userid().clone())
-    }
-
-    /// Get the email of this CA
-    pub(crate) fn ca_email(&self) -> Result<String> {
-        let email = self.ca_userid()?.email()?;
-
-        if let Some(email) = email {
-            Ok(email)
-        } else {
-            Err(anyhow::anyhow!("CA user_id has no email"))
-        }
-    }
-}
-
 /// A CA instance that has a database, which is (possibly) not initialized yet.
 /// No backend for private key operations is available at this stage.
 pub struct Uninit {
-    ca: DbCa,
+    storage: DbCa,
 }
 
 /// An initialized OpenPGP CA instance, with a configured backend.
 /// Oca exposes the main functionality of OpenPGP CA.
 pub struct Oca {
-    storage: Rc<DbCa>,
+    storage: DbCa,
     secret: Box<dyn CaSec>,
 }
 
@@ -260,7 +211,7 @@ impl Uninit {
 
         let dbca = DbCa::new(db);
 
-        Ok(Self { ca: dbca })
+        Ok(Self { storage: dbca })
     }
 
     /// Check if domainname is legal according to Mozilla's Public Suffix List
@@ -286,9 +237,8 @@ impl Uninit {
         Self::check_domainname(domainname)?;
         let (cert, _) = pgp::make_ca_cert(domainname, name)?;
 
-        self.ca
-            .db
-            .transaction(|| self.ca.ca_init_softkey(domainname, &cert))?;
+        self.storage
+            .transaction(|| self.storage.ca_init_softkey(domainname, &cert))?;
 
         self.init_from_db_state()
     }
@@ -298,9 +248,8 @@ impl Uninit {
         Self::check_domainname(domainname)?;
         let cert = Cert::from_bytes(ca_cert).context("Cert::from_bytes failed")?;
 
-        self.ca
-            .db
-            .transaction(|| self.ca.ca_init_split(domainname, &cert))?;
+        self.storage
+            .transaction(|| self.storage.ca_init_split(domainname, &cert))?;
 
         self.init_from_db_state()
     }
@@ -322,7 +271,7 @@ impl Uninit {
         algo: Option<AlgoSimple>,
     ) -> Result<Oca> {
         // The CA database must be uninitialized!
-        if self.ca.db.is_ca_initialized()? {
+        if self.storage.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
         }
 
@@ -344,7 +293,7 @@ impl Uninit {
         name: Option<&str>,
     ) -> Result<(Oca, String)> {
         // The CA database must be uninitialized!
-        if self.ca.db.is_ca_initialized()? {
+        if self.storage.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
         }
 
@@ -420,10 +369,8 @@ impl Uninit {
     /// According to SQLite documentation, this will remove any traces of the key material from the
     /// database (however, no guarantees can be made about the underlying storage!).
     pub fn migrate_card_import_key(self, card_ident: &str) -> Result<Oca> {
-        let db = self.ca.db.clone();
-
-        let ca = db.transaction(|| {
-            let ca_key = self.ca.ca_get_cert_private()?;
+        self.storage.transaction(|| {
+            let ca_key = self.storage.ca_get_cert_private()?;
             if !ca_key.is_tsk() {
                 return Err(anyhow::anyhow!(
                     "No private key material in CA database. Can't migrate to OpenPGP card."
@@ -435,17 +382,16 @@ impl Uninit {
 
             // Switch cacert in db
             let ca_pub = pgp::cert_to_armored(&ca_key.strip_secret_key_material())?;
-            CardBackend::ca_replace_in_place(&self.ca.db, card_ident, &user_pin, &ca_pub)?;
+            CardBackend::ca_replace_in_place(&self.storage, card_ident, &user_pin, &ca_pub)?;
 
-            // Now init from db
-            self.init_from_db_state()
+            Ok(())
         })?;
 
         // Run VACUUM on sqlite.
         // SQLite guarantees that this removes remaining private key fragments from the database file.
-        ca.db().vacuum()?;
+        self.storage.vacuum()?;
 
-        Ok(ca)
+        self.init_from_db_state()
     }
 
     /// Init with OpenPGP card backend
@@ -464,15 +410,15 @@ impl Uninit {
         // the internal Rc<OcaDb> (FIXME: understand why this happens?!)
         {
             // The CA database must be uninitialized!
-            if self.ca.db.is_ca_initialized()? {
+            if self.storage.is_ca_initialized()? {
                 return Err(anyhow::anyhow!("CA database is already initialized"));
             }
 
             let pubkey = check_if_card_matches(card_ident, ca_cert)?;
 
-            self.ca.db.transaction(|| {
+            self.storage.transaction(|| {
                 CardBackend::ca_init(
-                    &self.ca.db,
+                    &self.storage,
                     domainname,
                     card_ident,
                     pin,
@@ -488,39 +434,38 @@ impl Uninit {
     /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
     fn init_from_db_state(self) -> Result<Oca> {
         // check database state of this CA
-        let (_ca, ca_cert) = self.ca.db.get_ca()?;
+        let cacert = self.storage.cacert()?;
 
-        match Backend::from_config(ca_cert.backend.as_deref())? {
+        match Backend::from_config(cacert.backend.as_deref())? {
             Backend::Softkey => {
-                let softkey = SoftkeyBackend::new(self.ca.ca_get_cert_private()?);
+                let softkey = SoftkeyBackend::new(self.storage.ca_get_cert_private()?);
 
-                let ca_cert_pub = self.ca.ca_get_cert_pub()?;
+                let ca_cert_pub = self.storage.ca_get_cert_pub()?;
                 let ca_sec = CaSecCB::new(Rc::new(softkey), ca_cert_pub);
 
                 Ok(Oca {
-                    storage: Rc::new(self.ca),
+                    storage: self.storage,
                     secret: Box::new(ca_sec),
                 })
             }
             Backend::Card(card) => {
                 let card_ca = CardBackend::new(&card.ident, &card.user_pin)?;
 
-                let ca_cert = self.ca.ca_get_cert_pub()?;
+                let ca_cert = self.storage.ca_get_cert_pub()?;
                 let ca_sec = CaSecCB::new(Rc::new(card_ca), ca_cert);
 
                 Ok(Oca {
-                    storage: Rc::new(self.ca),
+                    storage: self.storage,
                     secret: Box::new(ca_sec),
                 })
             }
             Backend::Split => {
-                let dbca = Rc::new(self.ca);
-                let ca_secret = Box::new(SplitCa::new(dbca.db.clone())?);
+                let oca_db = self.storage.db();
 
-                Ok(Oca {
-                    storage: dbca,
-                    secret: ca_secret,
-                })
+                let storage = DbCa::new(oca_db.clone());
+                let secret = Box::new(SplitCa::new(oca_db)?);
+
+                Ok(Oca { storage, secret })
             }
         }
     }
@@ -537,14 +482,10 @@ impl Oca {
         cau.init_from_db_state()
     }
 
-    pub fn db(&self) -> &OcaDb {
-        &self.storage.db
-    }
-
     /// Change which card backs an OpenPGP CA instance
     /// (e.g. to switch to a replacement for a broken card).
     pub fn set_card_backend(self, card_ident: &str, user_pin: &str) -> Result<()> {
-        let (_, cacert) = self.db().get_ca()?;
+        let cacert = self.storage.cacert()?;
 
         let b = Backend::from_config(cacert.backend.as_deref())?;
         match b {
@@ -560,7 +501,8 @@ impl Oca {
 
                 // Update backend configuration in database
                 let ca_pub = pgp::cert_to_armored(&ca_cert)?;
-                CardBackend::ca_replace_in_place(&self.storage.db, card_ident, user_pin, &ca_pub)?;
+
+                CardBackend::ca_replace_in_place(&self.storage, card_ident, user_pin, &ca_pub)?;
 
                 Ok(())
             }
@@ -588,7 +530,8 @@ impl Oca {
     }
 
     pub fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
-        self.db().transaction(|| self.db().ca_import_tsig(cert))
+        self.storage
+            .transaction(|| self.storage.ca_import_tsig(cert))
     }
 
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
@@ -610,31 +553,26 @@ impl Oca {
 
     /// Get the domainname for this CA
     pub fn get_ca_domain(&self) -> Result<String> {
-        let email = self.get_ca_email()?;
-        let email_split: Vec<_> = email.split('@').collect();
-
-        if email_split.len() == 2 {
-            Ok(email_split[1].to_owned())
-        } else {
-            Err(anyhow::anyhow!("Failed to split domain from CA email"))
-        }
+        Ok(self.storage.ca()?.domainname)
     }
 
     /// Print information about the Ca to stdout.
     ///
     /// This shows the domainname, fingerprint and creation time of this OpenPGP CA instance.
     pub fn ca_show(&self) -> Result<()> {
-        let (ca, ca_cert) = self
-            .db()
-            .get_ca()
+        let ca_cert = self
+            .storage
+            .cacert()
             .context("failed to load CA from database")?;
+
+        let domain = self.get_ca_domain()?;
 
         let cert = Cert::from_str(&ca_cert.priv_cert)?;
 
         let created = cert.primary_key().key().creation_time();
         let created: DateTime<Utc> = created.into();
 
-        println!("    CA Domain: {}", ca.domainname);
+        println!("    CA Domain: {}", domain);
         println!("  Fingerprint: {}", cert.fingerprint());
         println!("Creation time: {}", created.format("%F %T %Z"));
 
@@ -646,9 +584,9 @@ impl Oca {
 
     /// Print private key of the Ca to stdout.
     pub fn ca_print_private(&self) -> Result<()> {
-        let (_, ca_cert) = self
-            .db()
-            .get_ca()
+        let ca_cert = self
+            .storage
+            .cacert()
             .context("failed to load CA from database")?;
         println!("{}", ca_cert.priv_cert);
         Ok(())
@@ -662,7 +600,7 @@ impl Oca {
     pub fn ca_re_certify(&self, cert_old: &[u8], validity_days: u64) -> Result<()> {
         let cert_old = pgp::to_cert(cert_old)?;
 
-        self.db()
+        self.storage
             .transaction(|| cert::certs_re_certify(self, cert_old, validity_days))
     }
 
@@ -680,9 +618,9 @@ impl Oca {
     /// (and/or PGP implementations) for signing.
     pub fn ca_split_export(&self, file: PathBuf) -> Result<()> {
         // FIXME: don't perform this operation if the backend mode is wrong/unexpected?
-        let (_, cacert) = self.db().get_ca()?;
+        let cacert = self.storage.cacert()?;
 
-        let queue = self.db().queue_not_done()?;
+        let queue = self.storage.queue_not_done()?;
         SplitCa::export_csr_as_tar(file, queue, &cacert.fingerprint)?;
 
         Ok(())
@@ -774,13 +712,13 @@ impl Oca {
 
             let sig = Signature::from_bytes(&bytes)?;
 
-            if let Some(mut cert) = self.db().cert_by_fp(fp)? {
+            if let Some(mut cert) = self.storage.cert_by_fp(fp)? {
                 let c = Cert::from_str(&cert.pub_cert)?;
                 let certified = c.insert_packets(sig)?;
 
                 cert.pub_cert = pgp::cert_to_armored(&certified)?;
 
-                self.db().cert_update(&cert)?;
+                self.storage.cert_update(&cert)?;
 
                 // FIXME: mark queue entry as done
             } else {
@@ -798,10 +736,10 @@ impl Oca {
 
     /// Get a list of all User Certs
     pub fn user_certs_get_all(&self) -> Result<Vec<models::Cert>> {
-        let users = self.db().users_sorted_by_name()?;
+        let users = self.storage.users_sorted_by_name()?;
         let mut user_certs = Vec::new();
         for user in users {
-            user_certs.append(&mut self.db().certs_by_user(&user)?);
+            user_certs.append(&mut self.get_certs_by_user(&user)?);
         }
         Ok(user_certs)
     }
@@ -834,7 +772,7 @@ impl Oca {
         threshold_days: u64,
         validity_days: u64,
     ) -> Result<()> {
-        self.db().transaction(|| {
+        self.storage.transaction(|| {
             cert::certs_refresh_ca_certifications(self, threshold_days, validity_days)
         })
     }
@@ -856,7 +794,7 @@ impl Oca {
         password: bool,
         output_format_minimal: bool,
     ) -> Result<()> {
-        self.db().transaction(|| {
+        self.storage.transaction(|| {
             cert::user_new(
                 self,
                 name,
@@ -889,7 +827,7 @@ impl Oca {
         emails: &[&str],
         duration_days: Option<u64>,
     ) -> Result<()> {
-        self.db().transaction(|| {
+        self.storage.transaction(|| {
             cert::cert_import_new(self, cert, revoc_certs, name, emails, duration_days)
         })
     }
@@ -897,7 +835,7 @@ impl Oca {
     /// Update existing Cert in database (e.g. if the user has extended
     /// the expiry date)
     pub fn cert_import_update(&self, cert: &[u8]) -> Result<()> {
-        self.db()
+        self.storage
             .transaction(|| cert::cert_import_update(self, cert))
     }
 
@@ -906,27 +844,29 @@ impl Oca {
     /// The fingerprint parameter is normalized (e.g. if it contains
     /// spaces, they will be filtered out).
     pub fn cert_get_by_fingerprint(&self, fingerprint: &str) -> Result<Option<models::Cert>> {
-        self.db().cert_by_fp(&pgp::normalize_fp(fingerprint)?)
+        let fp = pgp::normalize_fp(fingerprint)?;
+
+        self.storage.cert_by_fp(&fp)
     }
 
     /// Get a list of all Certs for one User
     pub fn get_certs_by_user(&self, user: &models::User) -> Result<Vec<models::Cert>> {
-        self.db().certs_by_user(user)
+        self.storage.certs_by_user(user)
     }
 
     /// Get a list of all Users, ordered by name
     pub fn users_get_all(&self) -> Result<Vec<models::User>> {
-        self.db().users_sorted_by_name()
+        self.storage.users_sorted_by_name()
     }
 
     /// Get a list of the Certs that are associated with `email`
     pub fn certs_by_email(&self, email: &str) -> Result<Vec<models::Cert>> {
-        self.db().certs_by_email(email)
+        self.storage.certs_by_email(email)
     }
 
     /// Get database User(s) for database Cert
     pub fn cert_get_users(&self, cert: &models::Cert) -> Result<Option<models::User>> {
-        self.db().user_by_cert(cert)
+        self.storage.user_by_cert(cert)
     }
 
     /// Get the user name that is associated with this Cert.
@@ -1072,7 +1012,7 @@ impl Oca {
 
     /// Get a list of all Revocations for a cert
     pub fn revocations_get(&self, cert: &models::Cert) -> Result<Vec<models::Revocation>> {
-        self.db().revocations_by_cert(cert)
+        self.storage.revocations_by_cert(cert)
     }
 
     /// Add a revocation certificate to the OpenPGP CA database.
@@ -1083,7 +1023,7 @@ impl Oca {
     /// Verifies that applying the revocation cert can be validated by the
     /// cert. Only if this is successful is the revocation stored.
     pub fn revocation_add(&self, revoc_cert: &[u8]) -> Result<()> {
-        self.db()
+        self.storage
             .transaction(|| revocation::revocation_add(self, revoc_cert))
     }
 
@@ -1091,12 +1031,12 @@ impl Oca {
     pub fn revocation_add_from_file(&self, filename: &Path) -> Result<()> {
         let rev = std::fs::read(filename)?;
 
-        self.db().transaction(|| self.revocation_add(&rev))
+        self.storage.transaction(|| self.revocation_add(&rev))
     }
 
     /// Get a Revocation by hash
     pub fn revocation_get_by_hash(&self, hash: &str) -> Result<models::Revocation> {
-        if let Some(rev) = self.db().revocation_by_hash(hash)? {
+        if let Some(rev) = self.storage.revocation_by_hash(hash)? {
             Ok(rev)
         } else {
             Err(anyhow::anyhow!("No revocation found for {}", hash))
@@ -1107,7 +1047,7 @@ impl Oca {
     ///
     /// The revocation is merged into out copy of the OpenPGP Cert.
     pub fn revocation_apply(&self, revoc: models::Revocation) -> Result<()> {
-        self.db()
+        self.storage
             .transaction(|| revocation::revocation_apply(self, revoc))
     }
 
@@ -1169,24 +1109,24 @@ impl Oca {
 
     /// Get all Emails for a Cert
     pub fn emails_get(&self, cert: &models::Cert) -> Result<Vec<models::CertEmail>> {
-        self.db().emails_by_cert(cert)
+        self.storage.emails_by_cert(cert)
     }
 
     /// Get all Emails
     pub fn get_emails_all(&self) -> Result<Vec<models::CertEmail>> {
-        self.db().emails()
+        self.storage.emails()
     }
 
     // --------- bridges
 
     /// Get a list of Bridges
     pub fn bridges_get(&self) -> Result<Vec<models::Bridge>> {
-        self.db().list_bridges()
+        self.storage.list_bridges()
     }
 
     /// Get a specific Bridge
     pub fn bridges_search(&self, email: &str) -> Result<models::Bridge> {
-        if let Some(bridge) = self.db().bridge_by_email(email)? {
+        if let Some(bridge) = self.storage.bridge_by_email(email)? {
             Ok(bridge)
         } else {
             Err(anyhow::anyhow!("Bridge not found"))
@@ -1202,7 +1142,7 @@ impl Oca {
         commit: bool,
     ) -> Result<()> {
         if commit {
-            self.db().transaction::<_, anyhow::Error, _>(|| {
+            self.storage.transaction::<_, anyhow::Error, _>(|| {
                 let (bridge, fingerprint) =
                     bridge::bridge_new(self, key_file, email, scope, unscoped)?;
 
@@ -1241,7 +1181,8 @@ impl Oca {
     /// Both the revoked remote public key and the revocation cert are
     /// printed to stdout.
     pub fn bridge_revoke(&self, email: &str) -> Result<()> {
-        self.db().transaction(|| bridge::bridge_revoke(self, email))
+        self.storage
+            .transaction(|| bridge::bridge_revoke(self, email))
     }
 
     pub fn print_bridges(&self, email: Option<String>) -> Result<()> {
@@ -1253,7 +1194,7 @@ impl Oca {
 
         for bridge in bridges {
             println!("Bridge to '{}'", bridge.email);
-            if let Some(db_cert) = self.db().cert_by_id(bridge.cert_id)? {
+            if let Some(db_cert) = self.storage.cert_by_id(bridge.cert_id)? {
                 println!("{}", db_cert.pub_cert);
             }
             println!();
@@ -1311,7 +1252,10 @@ impl Oca {
     /// storage.
     pub fn update_from_wkd(&self) -> Result<()> {
         for c in self.user_certs_get_all()? {
-            match self.db().transaction(|| update::update_from_wkd(self, &c)) {
+            match self
+                .storage
+                .transaction(|| update::update_from_wkd(self, &c))
+            {
                 Ok(true) => {
                     println!("Got update for cert {}", c.fingerprint);
                 }
@@ -1350,7 +1294,7 @@ impl Oca {
     ///
     /// Returns "true" if updated data was received, false if not.
     pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<bool> {
-        self.db()
+        self.storage
             .transaction(|| update::update_from_hagrid(self, cert))
     }
 }

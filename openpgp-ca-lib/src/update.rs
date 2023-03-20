@@ -52,7 +52,7 @@ pub fn update_from_wkd(oca: &Oca, cert: &models::Cert) -> Result<bool> {
         let mut db_update = cert.clone();
         db_update.pub_cert = pgp::cert_to_armored(&merged)?;
 
-        oca.db().cert_update(&db_update)?;
+        oca.storage.cert_update(&db_update)?;
 
         Ok(true)
     } else {
@@ -81,7 +81,7 @@ pub fn update_from_hagrid(oca: &Oca, cert: &models::Cert) -> Result<bool> {
             let mut db_update = cert.clone();
             db_update.pub_cert = pgp::cert_to_armored(&merged)?;
 
-            oca.db().cert_update(&db_update)?;
+            oca.storage.cert_update(&db_update)?;
 
             // An update for this cert was received
             return Ok(true);

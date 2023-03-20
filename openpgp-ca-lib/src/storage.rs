@@ -1,0 +1,255 @@
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+use std::rc::Rc;
+
+use anyhow::Result;
+use diesel::result::Error;
+use sequoia_openpgp::packet::UserID;
+use sequoia_openpgp::Cert;
+
+use crate::backend::Backend;
+use crate::db::models::{Bridge, Cacert, CertEmail, NewBridge, NewCa, Queue, Revocation, User};
+use crate::db::{models, OcaDb};
+use crate::pgp;
+
+/// DB storage for a CA instance
+pub(crate) struct DbCa {
+    db: Rc<OcaDb>,
+}
+
+impl DbCa {
+    pub(crate) fn new(db: Rc<OcaDb>) -> Self {
+        Self { db }
+    }
+
+    pub(crate) fn db(self) -> Rc<OcaDb> {
+        self.db
+    }
+
+    pub(crate) fn transaction<T, E, F>(&self, f: F) -> Result<T, E>
+    where
+        F: FnOnce() -> Result<T, E>,
+        E: From<Error>,
+    {
+        self.db.transaction(f)
+    }
+
+    // ------
+
+    pub(crate) fn is_ca_initialized(&self) -> Result<bool> {
+        self.db.is_ca_initialized()
+    }
+
+    pub(crate) fn vacuum(&self) -> Result<()> {
+        self.db.vacuum()
+    }
+
+    pub(crate) fn ca(&self) -> Result<models::Ca> {
+        let (ca, _) = self.db.get_ca()?;
+        Ok(ca)
+    }
+
+    pub(crate) fn cacert(&self) -> Result<Cacert> {
+        let (_, cacert) = self.db.get_ca()?;
+        Ok(cacert)
+    }
+
+    pub(crate) fn cacert_update(&self, cacert: &Cacert) -> Result<()> {
+        self.db.cacert_update(cacert)
+    }
+
+    pub(crate) fn ca_insert(
+        &self,
+        ca: NewCa,
+        ca_key: &str,
+        fingerprint: &str,
+        backend: Option<&str>,
+    ) -> Result<()> {
+        self.db.ca_insert(ca, ca_key, fingerprint, backend)
+    }
+
+    pub(crate) fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
+        self.db.ca_import_tsig(cert)
+    }
+
+    pub(crate) fn certs(&self) -> Result<Vec<models::Cert>> {
+        self.db.certs()
+    }
+
+    pub(crate) fn cert_by_id(&self, id: i32) -> Result<Option<models::Cert>> {
+        self.db.cert_by_id(id)
+    }
+
+    pub(crate) fn cert_by_fp(&self, fingerprint: &str) -> Result<Option<models::Cert>> {
+        self.db.cert_by_fp(fingerprint)
+    }
+
+    pub(crate) fn certs_by_email(&self, email: &str) -> Result<Vec<models::Cert>> {
+        self.db.certs_by_email(email)
+    }
+
+    pub(crate) fn certs_by_user(&self, user: &User) -> Result<Vec<models::Cert>> {
+        self.db.certs_by_user(user)
+    }
+
+    pub(crate) fn cert_add(
+        &self,
+        pub_cert: &str,
+        fingerprint: &str,
+        user_id: Option<i32>,
+    ) -> Result<models::Cert> {
+        self.db.cert_add(pub_cert, fingerprint, user_id)
+    }
+
+    pub(crate) fn cert_update(&self, cert: &models::Cert) -> Result<()> {
+        self.db.cert_update(cert)
+    }
+
+    pub(crate) fn emails(&self) -> Result<Vec<CertEmail>> {
+        self.db.emails()
+    }
+
+    pub(crate) fn emails_by_cert(&self, cert: &models::Cert) -> Result<Vec<CertEmail>> {
+        self.db.emails_by_cert(cert)
+    }
+
+    pub(crate) fn user_by_cert(&self, cert: &models::Cert) -> Result<Option<User>> {
+        self.db.user_by_cert(cert)
+    }
+
+    pub(crate) fn users_sorted_by_name(&self) -> Result<Vec<User>> {
+        self.db.users_sorted_by_name()
+    }
+
+    pub(crate) fn user_add(
+        &self,
+        name: Option<&str>,
+        (pub_cert, fingerprint): (&str, &str),
+        emails: &[&str],
+        revocation_certs: &[String],
+    ) -> Result<User> {
+        self.db
+            .user_add(name, (pub_cert, fingerprint), emails, revocation_certs)
+    }
+
+    pub(crate) fn revocation_exists(&self, revocation: &[u8]) -> Result<bool> {
+        self.db.revocation_exists(revocation)
+    }
+
+    pub(crate) fn revocations_by_cert(&self, cert: &models::Cert) -> Result<Vec<Revocation>> {
+        self.db.revocations_by_cert(cert)
+    }
+
+    pub(crate) fn revocation_by_hash(&self, hash: &str) -> Result<Option<Revocation>> {
+        self.db.revocation_by_hash(hash)
+    }
+
+    pub(crate) fn revocation_add(
+        &self,
+        revocation: &str,
+        cert: &models::Cert,
+    ) -> Result<Revocation> {
+        self.db.revocation_add(revocation, cert)
+    }
+
+    pub(crate) fn revocation_update(&self, revocation: &Revocation) -> Result<()> {
+        self.db.revocation_update(revocation)
+    }
+
+    pub(crate) fn list_bridges(&self) -> Result<Vec<Bridge>> {
+        self.db.list_bridges()
+    }
+
+    pub(crate) fn bridge_by_email(&self, email: &str) -> Result<Option<Bridge>> {
+        self.db.bridge_by_email(email)
+    }
+
+    pub(crate) fn bridge_insert(&self, bridge: NewBridge) -> Result<Bridge> {
+        self.db.bridge_insert(bridge)
+    }
+
+    pub(crate) fn queue_not_done(&self) -> Result<Vec<Queue>> {
+        self.db.queue_not_done()
+    }
+
+    // ------
+
+    /// Get the Cert of the CA (without private key material).
+    pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
+        let ca_priv = self.ca_get_cert_private()?;
+        Ok(ca_priv.strip_secret_key_material())
+    }
+
+    /// Get the Cert of the CA (with private key material, if available).
+    ///
+    /// Depending on the backend, the private key material is available in
+    /// the database - or not.
+    pub(crate) fn ca_get_cert_private(&self) -> Result<Cert> {
+        let (_, cacert) = self.db.get_ca()?;
+
+        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
+        Ok(cert)
+    }
+
+    /// Get the User ID of this CA
+    pub(crate) fn ca_userid(&self) -> Result<UserID> {
+        let cert = self.ca_get_cert_pub()?;
+        let uids: Vec<_> = cert.userids().collect();
+
+        if uids.len() != 1 {
+            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
+        }
+
+        Ok(uids[0].userid().clone())
+    }
+
+    /// Get the email of this CA
+    pub(crate) fn ca_email(&self) -> Result<String> {
+        let email = self.ca_userid()?.email()?;
+
+        if let Some(email) = email {
+            Ok(email)
+        } else {
+            Err(anyhow::anyhow!("CA user_id has no email"))
+        }
+    }
+
+    // ------
+
+    /// Initialize OpenPGP CA Admin database entry.
+    /// Takes a `cert` with private key material and initializes a softkey-based CA.
+    ///
+    /// Only one CA Admin can be configured per database.
+    pub fn ca_init_softkey(&self, domainname: &str, cert: &Cert) -> Result<()> {
+        if self.db.is_ca_initialized()? {
+            return Err(anyhow::anyhow!("CA has already been initialized",));
+        }
+
+        let ca_key = pgp::cert_to_armored_private_key(cert)?;
+
+        self.db.ca_insert(
+            models::NewCa { domainname },
+            &ca_key,
+            &cert.fingerprint().to_hex(),
+            None,
+        )
+    }
+
+    /// Initialize OpenPGP CA instance for split mode.
+    /// Takes a `cert` with public key material and initializes a split-mode CA.
+    pub fn ca_init_split(&self, domainname: &str, cert: &Cert) -> Result<()> {
+        if self.db.is_ca_initialized()? {
+            return Err(anyhow::anyhow!("CA has already been initialized",));
+        }
+
+        let ca = pgp::cert_to_armored(cert)?;
+
+        self.db.ca_insert(
+            models::NewCa { domainname },
+            &ca,
+            &cert.fingerprint().to_hex(),
+            Backend::Split.to_config().as_deref(),
+        )
+    }
+}

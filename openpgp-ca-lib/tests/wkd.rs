@@ -106,7 +106,7 @@ fn test_wkd_delist() -> Result<()> {
     assert_eq!(cert.len(), 1);
     let mut bob = cert[0].clone();
     bob.delisted = true;
-    ca.db().cert_update(&bob)?;
+    ca.storage().cert_update(&bob)?;
 
     // export to WKD
     let wkd_dir = home_path + "/wkd/";

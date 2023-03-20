@@ -918,7 +918,7 @@ fn test_refresh(ca: Oca) -> Result<()> {
     assert_eq!(cert.len(), 1);
     let mut dave = cert[0].clone();
     dave.inactive = true;
-    ca.db().cert_update(&dave)?;
+    ca.storage().cert_update(&dave)?;
 
     // refresh all CA certifications that are valid for less than 30 days
     ca.certs_refresh_ca_certifications(30, 365)?;

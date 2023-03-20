@@ -97,13 +97,13 @@ pub fn bridge_new(
         .bridge_to_remote_ca(remote_ca_cert, scope_regexes)?;
 
     // store new bridge in DB
-    let db_cert = oca.db().cert_add(
+    let db_cert = oca.storage.cert_add(
         &pgp::cert_to_armored(&bridged)?,
         &bridged.fingerprint().to_hex(),
         None,
     )?;
 
-    let (ca_db, _) = oca.db().get_ca()?;
+    let ca_db = oca.storage.ca()?;
     let new_bridge = models::NewBridge {
         email: &email,
         scope,
@@ -111,12 +111,15 @@ pub fn bridge_new(
         cas_id: ca_db.id,
     };
 
-    Ok((oca.db().bridge_insert(new_bridge)?, bridged.fingerprint()))
+    Ok((
+        oca.storage.bridge_insert(new_bridge)?,
+        bridged.fingerprint(),
+    ))
 }
 
 pub fn bridge_revoke(oca: &Oca, email: &str) -> Result<()> {
-    if let Some(bridge) = oca.db().bridge_by_email(email)? {
-        if let Some(mut db_cert) = oca.db().cert_by_id(bridge.cert_id)? {
+    if let Some(bridge) = oca.storage.bridge_by_email(email)? {
+        if let Some(mut db_cert) = oca.storage.cert_by_id(bridge.cert_id)? {
             let bridge_cert = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
             // Generate revocation for the bridge
@@ -132,7 +135,7 @@ pub fn bridge_revoke(oca: &Oca, email: &str) -> Result<()> {
 
             // Save updated cert (including the revocation) to DB
             db_cert.pub_cert = pgp::cert_to_armored(&revoked)?;
-            oca.db().cert_update(&db_cert)
+            oca.storage.cert_update(&db_cert)
         } else {
             Err(anyhow::anyhow!("No cert found for bridge"))
         }

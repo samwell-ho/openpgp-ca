@@ -5,7 +5,6 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use std::convert::TryFrom;
-use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -26,8 +25,9 @@ use sequoia_openpgp::{Cert, Packet};
 
 use crate::backend;
 use crate::backend::{Backend, CertificationBackend};
-use crate::db::{models, OcaDb};
+use crate::db::models;
 use crate::pgp;
+use crate::storage::DbCa;
 
 /// an OpenPGP card backend for a CA instance
 pub(crate) struct CardBackend {
@@ -113,7 +113,7 @@ impl CardBackend {
     }
 
     pub(crate) fn ca_init(
-        db: &Rc<OcaDb>,
+        db: &DbCa,
         domainname: &str,
         card_ident: &str,
         pin: &str,
@@ -138,7 +138,7 @@ impl CardBackend {
     ///
     /// This fn doesn't check that 'card_ident' contains the expected key material.
     pub(crate) fn ca_replace_in_place(
-        db: &Rc<OcaDb>,
+        db: &DbCa,
         card_ident: &str,
         pin: &str,
         pubkey: &str,
@@ -150,7 +150,7 @@ impl CardBackend {
 
         let ca_new = Cert::from_str(pubkey)?;
 
-        let (_, mut cacert) = db.get_ca()?;
+        let mut cacert = db.cacert()?;
 
         if ca_new.fingerprint().to_string() != cacert.fingerprint {
             return Err(anyhow::anyhow!(
