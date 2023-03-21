@@ -9,6 +9,7 @@ use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::Cert;
 
 use crate::backend::Backend;
+use crate::db::models::NewQueue;
 use crate::db::{models, OcaDb};
 use crate::pgp;
 
@@ -121,6 +122,21 @@ impl UninitDb {
             &cert.fingerprint().to_hex(),
             Backend::Split.to_config().as_deref(),
         )
+    }
+}
+
+/// DB storage for the secret-key relevant functionality of a split-mode CA instance
+pub(crate) struct QueueDb {
+    db: Rc<OcaDb>,
+}
+
+impl QueueDb {
+    pub(crate) fn new(db: Rc<OcaDb>) -> Self {
+        Self { db }
+    }
+
+    pub(crate) fn queue_insert(&self, q: NewQueue) -> Result<()> {
+        self.db.queue_insert(q)
     }
 }
 

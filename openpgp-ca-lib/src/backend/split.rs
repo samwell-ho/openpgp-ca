@@ -20,6 +20,7 @@ use crate::db::models::{NewQueue, Queue};
 use crate::db::OcaDb;
 use crate::pgp;
 use crate::secret::CaSec;
+use crate::storage::QueueDb;
 
 pub(crate) const CSR_FILE: &str = "csr.txt";
 
@@ -49,15 +50,17 @@ impl CertificationReq {
     }
 }
 
-/// OpenPGP card backend for a split CA instance
+/// Backend for the secret-key-material relevant parts of a split CA instance
 pub(crate) struct SplitCa {
     #[allow(dead_code)]
-    db: Rc<OcaDb>,
+    db: QueueDb,
 }
 
 impl SplitCa {
     pub(crate) fn new(db: Rc<OcaDb>) -> Result<Self> {
-        Ok(Self { db })
+        Ok(Self {
+            db: QueueDb::new(db),
+        })
     }
 
     pub(crate) fn export_csr_as_tar(output: PathBuf, queue: Vec<Queue>, ca_fp: &str) -> Result<()> {
