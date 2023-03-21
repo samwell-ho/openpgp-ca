@@ -27,7 +27,7 @@ use crate::backend;
 use crate::backend::{Backend, CertificationBackend};
 use crate::db::models;
 use crate::pgp;
-use crate::storage::DbCa;
+use crate::storage::UninitDb;
 
 /// an OpenPGP card backend for a CA instance
 pub(crate) struct CardBackend {
@@ -113,7 +113,7 @@ impl CardBackend {
     }
 
     pub(crate) fn ca_init(
-        db: &DbCa,
+        db: &UninitDb,
         domainname: &str,
         card_ident: &str,
         pin: &str,
@@ -138,7 +138,7 @@ impl CardBackend {
     ///
     /// This fn doesn't check that 'card_ident' contains the expected key material.
     pub(crate) fn ca_replace_in_place(
-        db: &DbCa,
+        db: &UninitDb,
         card_ident: &str,
         pin: &str,
         pubkey: &str,

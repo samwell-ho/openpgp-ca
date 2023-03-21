@@ -84,7 +84,7 @@ use crate::backend::{card, split, Backend};
 use crate::db::models;
 use crate::db::OcaDb;
 use crate::secret::{CaSec, CaSecCB};
-use crate::storage::DbCa;
+use crate::storage::{DbCa, UninitDb};
 use crate::types::CertificationStatus;
 
 /// List of cards that are blank (no fingerprint in any slot)
@@ -179,7 +179,7 @@ fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
 /// A CA instance that has a database, which is (possibly) not initialized yet.
 /// No backend for private key operations is available at this stage.
 pub struct Uninit {
-    storage: DbCa,
+    storage: UninitDb,
 }
 
 /// An initialized OpenPGP CA instance, with a configured backend.
@@ -209,9 +209,9 @@ impl Uninit {
         let db = Rc::new(OcaDb::new(&db_url)?);
         db.diesel_migrations_run();
 
-        let dbca = DbCa::new(db);
+        let storage = UninitDb::new(db);
 
-        Ok(Self { storage: dbca })
+        Ok(Self { storage })
     }
 
     /// Check if domainname is legal according to Mozilla's Public Suffix List
@@ -443,8 +443,10 @@ impl Uninit {
                 let ca_cert_pub = self.storage.ca_get_cert_pub()?;
                 let ca_sec = CaSecCB::new(Rc::new(softkey), ca_cert_pub);
 
+                let storage = DbCa::new(self.storage.db());
+
                 Ok(Oca {
-                    storage: self.storage,
+                    storage,
                     secret: Box::new(ca_sec),
                 })
             }
@@ -454,8 +456,10 @@ impl Uninit {
                 let ca_cert = self.storage.ca_get_cert_pub()?;
                 let ca_sec = CaSecCB::new(Rc::new(card_ca), ca_cert);
 
+                let storage = DbCa::new(self.storage.db());
+
                 Ok(Oca {
-                    storage: self.storage,
+                    storage,
                     secret: Box::new(ca_sec),
                 })
             }
@@ -502,7 +506,9 @@ impl Oca {
                 // Update backend configuration in database
                 let ca_pub = pgp::cert_to_armored(&ca_cert)?;
 
-                CardBackend::ca_replace_in_place(&self.storage, card_ident, user_pin, &ca_pub)?;
+                let db = UninitDb::new(self.storage.db());
+
+                CardBackend::ca_replace_in_place(&db, card_ident, user_pin, &ca_pub)?;
 
                 Ok(())
             }

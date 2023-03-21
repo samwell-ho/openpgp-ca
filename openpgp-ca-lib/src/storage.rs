@@ -12,7 +12,119 @@ use crate::backend::Backend;
 use crate::db::{models, OcaDb};
 use crate::pgp;
 
-/// DB storage for a CA instance
+pub(crate) fn ca_get_cert_pub(db: &Rc<OcaDb>) -> Result<Cert> {
+    Ok(ca_get_cert_private(db)?.strip_secret_key_material())
+}
+
+pub(crate) fn ca_get_cert_private(db: &Rc<OcaDb>) -> Result<Cert> {
+    let (_, cacert) = db.get_ca()?;
+
+    let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
+    Ok(cert)
+}
+
+/// DB access for an uninitialized CA instance
+pub(crate) struct UninitDb {
+    db: Rc<OcaDb>,
+}
+
+impl UninitDb {
+    pub(crate) fn new(db: Rc<OcaDb>) -> Self {
+        Self { db }
+    }
+
+    pub(crate) fn db(self) -> Rc<OcaDb> {
+        self.db
+    }
+
+    pub(crate) fn transaction<T, E, F>(&self, f: F) -> Result<T, E>
+    where
+        F: FnOnce() -> Result<T, E>,
+        E: From<Error>,
+    {
+        self.db.transaction(f)
+    }
+
+    pub(crate) fn vacuum(&self) -> Result<()> {
+        self.db.vacuum()
+    }
+
+    pub(crate) fn is_ca_initialized(&self) -> Result<bool> {
+        self.db.is_ca_initialized()
+    }
+
+    pub(crate) fn cacert(&self) -> Result<models::Cacert> {
+        let (_, cacert) = self.db.get_ca()?;
+        Ok(cacert)
+    }
+
+    pub(crate) fn ca_insert(
+        &self,
+        ca: models::NewCa,
+        ca_key: &str,
+        fingerprint: &str,
+        backend: Option<&str>,
+    ) -> Result<()> {
+        self.db.ca_insert(ca, ca_key, fingerprint, backend)
+    }
+
+    pub(crate) fn cacert_update(&self, cacert: &models::Cacert) -> Result<()> {
+        self.db.cacert_update(cacert)
+    }
+
+    /// Get the Cert of the CA (without private key material).
+    pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
+        ca_get_cert_pub(&self.db)
+    }
+
+    /// Get the Cert of the CA (with private key material, if available).
+    ///
+    /// Depending on the backend, the private key material is available in
+    /// the database - or not.
+    pub(crate) fn ca_get_cert_private(&self) -> Result<Cert> {
+        ca_get_cert_private(&self.db)
+    }
+
+    // -----
+
+    /// Initialize OpenPGP CA Admin database entry.
+    /// Takes a `cert` with private key material and initializes a softkey-based CA.
+    ///
+    /// Only one CA Admin can be configured per database.
+    pub(crate) fn ca_init_softkey(&self, domainname: &str, cert: &Cert) -> Result<()> {
+        if self.db.is_ca_initialized()? {
+            return Err(anyhow::anyhow!("CA has already been initialized",));
+        }
+
+        let ca_key = pgp::cert_to_armored_private_key(cert)?;
+
+        self.db.ca_insert(
+            models::NewCa { domainname },
+            &ca_key,
+            &cert.fingerprint().to_hex(),
+            None,
+        )
+    }
+
+    /// Initialize OpenPGP CA instance for split mode.
+    /// Takes a `cert` with public key material and initializes a split-mode CA.
+    pub(crate) fn ca_init_split(&self, domainname: &str, cert: &Cert) -> Result<()> {
+        if self.db.is_ca_initialized()? {
+            return Err(anyhow::anyhow!("CA has already been initialized",));
+        }
+
+        let ca = pgp::cert_to_armored(cert)?;
+
+        self.db.ca_insert(
+            models::NewCa { domainname },
+            &ca,
+            &cert.fingerprint().to_hex(),
+            Backend::Split.to_config().as_deref(),
+        )
+    }
+}
+
+/// DB storage for a regular CA instance
 pub(crate) struct DbCa {
     db: Rc<OcaDb>,
 }
@@ -36,14 +148,6 @@ impl DbCa {
 
     // ------
 
-    pub(crate) fn is_ca_initialized(&self) -> Result<bool> {
-        self.db.is_ca_initialized()
-    }
-
-    pub(crate) fn vacuum(&self) -> Result<()> {
-        self.db.vacuum()
-    }
-
     pub(crate) fn ca(&self) -> Result<models::Ca> {
         let (ca, _) = self.db.get_ca()?;
         Ok(ca)
@@ -52,20 +156,6 @@ impl DbCa {
     pub(crate) fn cacert(&self) -> Result<models::Cacert> {
         let (_, cacert) = self.db.get_ca()?;
         Ok(cacert)
-    }
-
-    pub(crate) fn cacert_update(&self, cacert: &models::Cacert) -> Result<()> {
-        self.db.cacert_update(cacert)
-    }
-
-    pub(crate) fn ca_insert(
-        &self,
-        ca: models::NewCa,
-        ca_key: &str,
-        fingerprint: &str,
-        backend: Option<&str>,
-    ) -> Result<()> {
-        self.db.ca_insert(ca, ca_key, fingerprint, backend)
     }
 
     pub(crate) fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
@@ -179,19 +269,7 @@ impl DbCa {
 
     /// Get the Cert of the CA (without private key material).
     pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
-        let ca_priv = self.ca_get_cert_private()?;
-        Ok(ca_priv.strip_secret_key_material())
-    }
-
-    /// Get the Cert of the CA (with private key material, if available).
-    ///
-    /// Depending on the backend, the private key material is available in
-    /// the database - or not.
-    pub(crate) fn ca_get_cert_private(&self) -> Result<Cert> {
-        let (_, cacert) = self.db.get_ca()?;
-
-        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
-        Ok(cert)
+        ca_get_cert_pub(&self.db)
     }
 
     /// Get the User ID of this CA
@@ -215,43 +293,5 @@ impl DbCa {
         } else {
             Err(anyhow::anyhow!("CA user_id has no email"))
         }
-    }
-
-    // ------
-
-    /// Initialize OpenPGP CA Admin database entry.
-    /// Takes a `cert` with private key material and initializes a softkey-based CA.
-    ///
-    /// Only one CA Admin can be configured per database.
-    pub fn ca_init_softkey(&self, domainname: &str, cert: &Cert) -> Result<()> {
-        if self.db.is_ca_initialized()? {
-            return Err(anyhow::anyhow!("CA has already been initialized",));
-        }
-
-        let ca_key = pgp::cert_to_armored_private_key(cert)?;
-
-        self.db.ca_insert(
-            models::NewCa { domainname },
-            &ca_key,
-            &cert.fingerprint().to_hex(),
-            None,
-        )
-    }
-
-    /// Initialize OpenPGP CA instance for split mode.
-    /// Takes a `cert` with public key material and initializes a split-mode CA.
-    pub fn ca_init_split(&self, domainname: &str, cert: &Cert) -> Result<()> {
-        if self.db.is_ca_initialized()? {
-            return Err(anyhow::anyhow!("CA has already been initialized",));
-        }
-
-        let ca = pgp::cert_to_armored(cert)?;
-
-        self.db.ca_insert(
-            models::NewCa { domainname },
-            &ca,
-            &cert.fingerprint().to_hex(),
-            Backend::Split.to_config().as_deref(),
-        )
     }
 }
