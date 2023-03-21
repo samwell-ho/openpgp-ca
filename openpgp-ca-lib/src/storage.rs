@@ -9,7 +9,6 @@ use sequoia_openpgp::packet::UserID;
 use sequoia_openpgp::Cert;
 
 use crate::backend::Backend;
-use crate::db::models::{Bridge, Cacert, CertEmail, NewBridge, NewCa, Queue, Revocation, User};
 use crate::db::{models, OcaDb};
 use crate::pgp;
 
@@ -50,18 +49,18 @@ impl DbCa {
         Ok(ca)
     }
 
-    pub(crate) fn cacert(&self) -> Result<Cacert> {
+    pub(crate) fn cacert(&self) -> Result<models::Cacert> {
         let (_, cacert) = self.db.get_ca()?;
         Ok(cacert)
     }
 
-    pub(crate) fn cacert_update(&self, cacert: &Cacert) -> Result<()> {
+    pub(crate) fn cacert_update(&self, cacert: &models::Cacert) -> Result<()> {
         self.db.cacert_update(cacert)
     }
 
     pub(crate) fn ca_insert(
         &self,
-        ca: NewCa,
+        ca: models::NewCa,
         ca_key: &str,
         fingerprint: &str,
         backend: Option<&str>,
@@ -89,7 +88,7 @@ impl DbCa {
         self.db.certs_by_email(email)
     }
 
-    pub(crate) fn certs_by_user(&self, user: &User) -> Result<Vec<models::Cert>> {
+    pub(crate) fn certs_by_user(&self, user: &models::User) -> Result<Vec<models::Cert>> {
         self.db.certs_by_user(user)
     }
 
@@ -106,19 +105,19 @@ impl DbCa {
         self.db.cert_update(cert)
     }
 
-    pub(crate) fn emails(&self) -> Result<Vec<CertEmail>> {
+    pub(crate) fn emails(&self) -> Result<Vec<models::CertEmail>> {
         self.db.emails()
     }
 
-    pub(crate) fn emails_by_cert(&self, cert: &models::Cert) -> Result<Vec<CertEmail>> {
+    pub(crate) fn emails_by_cert(&self, cert: &models::Cert) -> Result<Vec<models::CertEmail>> {
         self.db.emails_by_cert(cert)
     }
 
-    pub(crate) fn user_by_cert(&self, cert: &models::Cert) -> Result<Option<User>> {
+    pub(crate) fn user_by_cert(&self, cert: &models::Cert) -> Result<Option<models::User>> {
         self.db.user_by_cert(cert)
     }
 
-    pub(crate) fn users_sorted_by_name(&self) -> Result<Vec<User>> {
+    pub(crate) fn users_sorted_by_name(&self) -> Result<Vec<models::User>> {
         self.db.users_sorted_by_name()
     }
 
@@ -128,7 +127,7 @@ impl DbCa {
         (pub_cert, fingerprint): (&str, &str),
         emails: &[&str],
         revocation_certs: &[String],
-    ) -> Result<User> {
+    ) -> Result<models::User> {
         self.db
             .user_add(name, (pub_cert, fingerprint), emails, revocation_certs)
     }
@@ -137,11 +136,14 @@ impl DbCa {
         self.db.revocation_exists(revocation)
     }
 
-    pub(crate) fn revocations_by_cert(&self, cert: &models::Cert) -> Result<Vec<Revocation>> {
+    pub(crate) fn revocations_by_cert(
+        &self,
+        cert: &models::Cert,
+    ) -> Result<Vec<models::Revocation>> {
         self.db.revocations_by_cert(cert)
     }
 
-    pub(crate) fn revocation_by_hash(&self, hash: &str) -> Result<Option<Revocation>> {
+    pub(crate) fn revocation_by_hash(&self, hash: &str) -> Result<Option<models::Revocation>> {
         self.db.revocation_by_hash(hash)
     }
 
@@ -149,27 +151,27 @@ impl DbCa {
         &self,
         revocation: &str,
         cert: &models::Cert,
-    ) -> Result<Revocation> {
+    ) -> Result<models::Revocation> {
         self.db.revocation_add(revocation, cert)
     }
 
-    pub(crate) fn revocation_update(&self, revocation: &Revocation) -> Result<()> {
+    pub(crate) fn revocation_update(&self, revocation: &models::Revocation) -> Result<()> {
         self.db.revocation_update(revocation)
     }
 
-    pub(crate) fn list_bridges(&self) -> Result<Vec<Bridge>> {
+    pub(crate) fn list_bridges(&self) -> Result<Vec<models::Bridge>> {
         self.db.list_bridges()
     }
 
-    pub(crate) fn bridge_by_email(&self, email: &str) -> Result<Option<Bridge>> {
+    pub(crate) fn bridge_by_email(&self, email: &str) -> Result<Option<models::Bridge>> {
         self.db.bridge_by_email(email)
     }
 
-    pub(crate) fn bridge_insert(&self, bridge: NewBridge) -> Result<Bridge> {
+    pub(crate) fn bridge_insert(&self, bridge: models::NewBridge) -> Result<models::Bridge> {
         self.db.bridge_insert(bridge)
     }
 
-    pub(crate) fn queue_not_done(&self) -> Result<Vec<Queue>> {
+    pub(crate) fn queue_not_done(&self) -> Result<Vec<models::Queue>> {
         self.db.queue_not_done()
     }
 
