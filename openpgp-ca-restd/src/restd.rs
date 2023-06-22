@@ -199,29 +199,14 @@ fn post_certs(
 #[post("/certs/deactivate/<fp>")]
 fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
-        let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
+        ca.cert_deactivate(&fp).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
-                format!("deactivate_cert: Error looking up Fingerprint '{e:?}'"),
+                format!("deactivate_cert: Error '{e:?}'"),
             )
         })?;
 
-        if let Some(mut cert) = cert {
-            cert.inactive = true;
-
-            Ok(ca.db().cert_update(&cert).map_err(|e| {
-                ReturnError::new(
-                    ReturnStatus::InternalError,
-                    format!("deactivate_cert: Error updating Cert '{e:?}'"),
-                )
-            })?)
-        } else {
-            Err(ReturnError::new(
-                ReturnStatus::NotFound,
-                format!("deactivate_cert: Fingerprint '{fp}' not found"),
-            )
-            .into())
-        }
+        Ok(())
     })
 }
 
@@ -240,29 +225,12 @@ fn deactivate_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
 #[delete("/certs/<fp>")]
 fn delist_cert(fp: String) -> Result<(), BadRequest<Json<ReturnError>>> {
     CA.with(|ca| {
-        let cert = ca.cert_get_by_fingerprint(&fp).map_err(|e| {
+        ca.cert_delist(&fp).map_err(|e| {
             ReturnError::new(
                 ReturnStatus::InternalError,
-                format!("delist_cert: Error looking up Fingerprint '{e:?}'"),
+                format!("delist_cert: Error '{e:?}'"),
             )
         })?;
-
-        if let Some(mut cert) = cert {
-            cert.delisted = true;
-
-            ca.db().cert_update(&cert).map_err(|e| {
-                ReturnError::new(
-                    ReturnStatus::InternalError,
-                    format!("delist_cert: Error updating Cert '{e:?}'"),
-                )
-            })?;
-        } else {
-            return Err(ReturnError::new(
-                ReturnStatus::NotFound,
-                format!("delist_cert: Fingerprint '{fp}' not found"),
-            )
-            .into());
-        }
 
         Ok(())
     })

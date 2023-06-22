@@ -45,12 +45,13 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod backend;
 mod bridge;
-mod ca_secret;
 mod cert;
 pub mod db;
 mod export;
 pub mod pgp;
 mod revocation;
+mod secret;
+mod storage;
 pub mod types;
 mod update;
 
@@ -66,17 +67,20 @@ use chrono::offset::Utc;
 use chrono::DateTime;
 use openpgp_card::algorithm::AlgoSimple;
 use openpgp_card_pcsc::PcscBackend;
-use openpgp_card_sequoia::state::Transaction;
 use openpgp_card_sequoia::{state::Open, Card};
-use sequoia_openpgp::packet::Signature;
+use sequoia_openpgp::packet::{Signature, UserID};
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
 
-use crate::backend::card::{check_card_empty, CardCa};
-use crate::backend::{card, Backend};
-use crate::ca_secret::CaSec;
+use crate::backend::card::{check_card_empty, CardBackend};
+use crate::backend::softkey::SoftkeyBackend;
+use crate::backend::split::SplitCa;
+use crate::backend::{card, split, Backend};
 use crate::db::models;
+use crate::db::models::NewCacert;
 use crate::db::OcaDb;
+use crate::secret::{CaSec, CaSecCB};
+use crate::storage::{CaStorageRW, DbCa, UninitDb};
 use crate::types::CertificationStatus;
 
 /// List of cards that are blank (no fingerprint in any slot)
@@ -105,7 +109,7 @@ pub fn matching_cards(ca_cert: &[u8]) -> Result<Vec<String>> {
         let mut card: Card<Open> = backend.into();
         let mut transaction = card.transaction()?;
 
-        if card_matches(&mut transaction, &ca_cert).is_ok() {
+        if card::card_matches(&mut transaction, &ca_cert).is_ok() {
             idents.push(transaction.application_identifier()?.ident());
         }
     }
@@ -113,108 +117,20 @@ pub fn matching_cards(ca_cert: &[u8]) -> Result<Vec<String>> {
     Ok(idents)
 }
 
-/// Does 'ca_cert' match the data on the opened card?
-///
-/// FIXME: also check the state of SIG and DEC slots?
-fn card_matches(transaction: &mut Card<Transaction>, ca_cert: &Cert) -> Result<String> {
-    let fps = transaction.fingerprints()?;
-    let auth = fps
-        .authentication()
-        .context("No AUT key on card".to_string())?;
-
-    let auth_fp = auth.to_string();
-
-    let cardholder_name = transaction.cardholder_name()?;
-
-    // Check that cardholder name is set to "OpenPGP CA".
-    if cardholder_name.as_deref() != Some("OpenPGP CA") {
-        return Err(anyhow::anyhow!(
-            "Expected cardholder name 'OpenPGP CA' on OpenPGP card, found '{}'.",
-            cardholder_name.unwrap_or_default()
-        ));
-    }
-
-    // Make sure that the CA public key contains a User ID!
-    // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
-    if ca_cert.userids().next().is_none() {
-        return Err(anyhow::anyhow!(
-            "Expect CA certificate to contain at least one User ID, but found none."
-        ));
-    }
-
-    let pubkey =
-        pgp::cert_to_armored(ca_cert).context("Failed to transform CA cert to armored pubkey")?;
-
-    // CA pubkey and card auth key slot must match
-    if ca_cert.fingerprint().to_hex() != auth_fp {
-        return Err(anyhow::anyhow!(format!(
-            "Auth key slot on card {} doesn't match primary (cert) fingerprint {}.",
-            auth_fp,
-            ca_cert.fingerprint().to_hex()
-        )));
-    }
-
-    Ok(pubkey)
-}
-
-// Check the card `card_ident`, confirm that the cardholder name is set to
-// "OpenPGP CA", and that the AUT slot contains the certification key.
-fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
-    // Open Smart Card
-    let backend = PcscBackend::open_by_ident(card_ident, None)?;
-    let mut card: Card<Open> = backend.into();
-    let mut transaction = card.transaction()?;
-
-    card_matches(&mut transaction, ca_cert).context(format!("On card {card_ident}"))
-}
-
-/// a DB backend for a CA instance
-pub(crate) struct DbCa {
-    db: Rc<OcaDb>,
-}
-
-impl DbCa {
-    pub fn new(db: Rc<OcaDb>) -> Self {
-        Self { db }
-    }
-    pub fn db(&self) -> &OcaDb {
-        &self.db
-    }
-
-    /// Get the Cert of the CA (without private key material).
-    pub(crate) fn ca_get_cert_pub(&self) -> Result<Cert> {
-        let (_, cacert) = self.db().get_ca()?;
-
-        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
-        Ok(cert.strip_secret_key_material())
-    }
-
-    /// Get the Cert of the CA (with private key material, if available).
-    ///
-    /// Depending on the backend, the private key material is available in
-    /// the database - or not.
-    pub(crate) fn ca_get_cert_private(&self) -> Result<Cert> {
-        let (_, cacert) = self.db().get_ca()?;
-
-        let cert = pgp::to_cert(cacert.priv_cert.as_bytes())?;
-        Ok(cert)
-    }
-}
-
 /// A CA instance that has a database, which is (possibly) not initialized yet.
 /// No backend for private key operations is available at this stage.
 pub struct Uninit {
-    db: Rc<OcaDb>,
-    ca: Rc<DbCa>,
+    storage: UninitDb,
 }
 
 /// An initialized OpenPGP CA instance, with a configured backend.
 /// Oca exposes the main functionality of OpenPGP CA.
 pub struct Oca {
-    db: Rc<OcaDb>,
+    storage: Box<dyn CaStorageRW>,
+    secret: Box<dyn CaSec>,
 
-    ca: Rc<DbCa>,
-    ca_secret: Rc<dyn CaSec>,
+    backend: Backend,
+    domainname: String,
 }
 
 impl Uninit {
@@ -237,9 +153,9 @@ impl Uninit {
         let db = Rc::new(OcaDb::new(&db_url)?);
         db.diesel_migrations_run();
 
-        let dbca = Rc::new(DbCa::new(db.clone()));
+        let storage = UninitDb::new(db);
 
-        Ok(Self { db, ca: dbca })
+        Ok(Self { storage })
     }
 
     /// Check if domainname is legal according to Mozilla's Public Suffix List
@@ -265,8 +181,8 @@ impl Uninit {
         Self::check_domainname(domainname)?;
         let (cert, _) = pgp::make_ca_cert(domainname, name)?;
 
-        self.db
-            .transaction(|| self.ca.ca_init_softkey(domainname, &cert))?;
+        self.storage
+            .transaction(|| self.storage.ca_init_softkey(domainname, &cert))?;
 
         self.init_from_db_state()
     }
@@ -288,7 +204,7 @@ impl Uninit {
         algo: Option<AlgoSimple>,
     ) -> Result<Oca> {
         // The CA database must be uninitialized!
-        if self.db.is_ca_initialized()? {
+        if self.storage.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
         }
 
@@ -310,7 +226,7 @@ impl Uninit {
         name: Option<&str>,
     ) -> Result<(Oca, String)> {
         // The CA database must be uninitialized!
-        if self.db.is_ca_initialized()? {
+        if self.storage.is_ca_initialized()? {
             return Err(anyhow::anyhow!("CA database is already initialized"));
         }
 
@@ -386,10 +302,8 @@ impl Uninit {
     /// According to SQLite documentation, this will remove any traces of the key material from the
     /// database (however, no guarantees can be made about the underlying storage!).
     pub fn migrate_card_import_key(self, card_ident: &str) -> Result<Oca> {
-        let db = self.db.clone();
-
-        let ca = db.transaction(|| {
-            let ca_key = self.ca.ca_get_cert_private()?;
+        self.storage.transaction(|| {
+            let ca_key = self.storage.ca_get_cert_private()?;
             if !ca_key.is_tsk() {
                 return Err(anyhow::anyhow!(
                     "No private key material in CA database. Can't migrate to OpenPGP card."
@@ -401,17 +315,16 @@ impl Uninit {
 
             // Switch cacert in db
             let ca_pub = pgp::cert_to_armored(&ca_key.strip_secret_key_material())?;
-            CardCa::ca_replace_in_place(&self.db, card_ident, &user_pin, &ca_pub)?;
+            CardBackend::ca_replace_in_place(&self.storage, card_ident, &user_pin, &ca_pub)?;
 
-            // Now init from db
-            self.init_from_db_state()
+            Ok(())
         })?;
 
         // Run VACUUM on sqlite.
         // SQLite guarantees that this removes remaining private key fragments from the database file.
-        ca.db.vacuum()?;
+        self.storage.vacuum()?;
 
-        Ok(ca)
+        self.init_from_db_state()
     }
 
     /// Init with OpenPGP card backend
@@ -424,29 +337,23 @@ impl Uninit {
     ) -> Result<Oca> {
         Self::check_domainname(domainname)?;
 
-        // Open a separate scope for database-access.
-        //
-        // Without this block, init_from_db_state() [below] gets stuck while trying to clone
-        // the internal Rc<OcaDb> (FIXME: understand why this happens?!)
-        {
+        self.storage.transaction(|| {
             // The CA database must be uninitialized!
-            if self.db.is_ca_initialized()? {
+            if self.storage.is_ca_initialized()? {
                 return Err(anyhow::anyhow!("CA database is already initialized"));
             }
 
-            let pubkey = check_if_card_matches(card_ident, ca_cert)?;
+            let pubkey = card::check_if_card_matches(card_ident, ca_cert)?;
 
-            self.db.transaction(|| {
-                CardCa::ca_init(
-                    &self.db,
-                    domainname,
-                    card_ident,
-                    pin,
-                    &pubkey,
-                    &ca_cert.fingerprint().to_hex(),
-                )
-            })?;
-        }
+            CardBackend::ca_init(
+                &self.storage,
+                domainname,
+                card_ident,
+                pin,
+                &pubkey,
+                &ca_cert.fingerprint().to_hex(),
+            )
+        })?;
 
         self.init_from_db_state()
     }
@@ -454,21 +361,89 @@ impl Uninit {
     /// Initialize OpenpgpCa object - this assumes a backend has previously been configured.
     fn init_from_db_state(self) -> Result<Oca> {
         // check database state of this CA
-        let (_ca, ca_cert) = self.db.get_ca()?;
+        let (ca, cacert) = self.storage.ca_cert()?;
 
-        match Backend::from_config(ca_cert.backend.as_deref())? {
-            Backend::Softkey => Ok(Oca {
-                db: self.db,
-                ca: self.ca.clone(),
-                ca_secret: self.ca,
-            }),
-            Backend::Card(card) => {
-                let ca_secret = Rc::new(CardCa::new(&card.ident, &card.user_pin, self.db.clone())?);
+        let backend = Backend::from_config(cacert.backend.as_deref())?;
+        let domainname = ca.domainname;
+
+        match &backend {
+            Backend::Softkey => {
+                let softkey = SoftkeyBackend::new(self.storage.ca_get_cert_private()?);
+
+                let ca_cert_pub = self.storage.ca_get_cert_pub()?;
+                let ca_sec = CaSecCB::new(Rc::new(softkey), ca_cert_pub);
+
+                let storage = Box::new(DbCa::new(self.storage.db()));
 
                 Ok(Oca {
-                    db: self.db,
-                    ca: self.ca,
-                    ca_secret,
+                    storage,
+                    secret: Box::new(ca_sec),
+                    backend,
+                    domainname,
+                })
+            }
+            Backend::Card(card) => {
+                let card_ca = CardBackend::new(&card.ident, &card.user_pin)?;
+
+                let ca_cert = self.storage.ca_get_cert_pub()?;
+                let ca_sec = CaSecCB::new(Rc::new(card_ca), ca_cert);
+
+                let storage = Box::new(DbCa::new(self.storage.db()));
+
+                Ok(Oca {
+                    storage,
+                    secret: Box::new(ca_sec),
+                    backend,
+                    domainname,
+                })
+            }
+            Backend::SplitFront => {
+                let oca_db = self.storage.db();
+
+                let storage = Box::new(DbCa::new(oca_db.clone()));
+                let secret = Box::new(SplitCa::new(oca_db)?);
+
+                Ok(Oca {
+                    storage,
+                    secret,
+                    backend,
+                    domainname,
+                })
+            }
+            Backend::SplitBack(inner) => {
+                let secret: Box<dyn CaSec> = match &**inner {
+                    Backend::Softkey => {
+                        let softkey = SoftkeyBackend::new(self.storage.ca_get_cert_private()?);
+                        let ca_cert_pub = self.storage.ca_get_cert_pub()?;
+                        Box::new(CaSecCB::new(Rc::new(softkey), ca_cert_pub))
+                    }
+                    Backend::Card(card) => {
+                        let card_ca = CardBackend::new(&card.ident, &card.user_pin)?;
+
+                        let ca_cert = self.storage.ca_get_cert_pub()?;
+                        Box::new(CaSecCB::new(Rc::new(card_ca), ca_cert))
+                    }
+
+                    _ => return Err(anyhow::anyhow!("Illegal inner backend: {}", inner)),
+                };
+
+                let db = match env::var("OPENPGP_CA_FRONT_DB") {
+                    Ok(readonly) => {
+                        println!("Using {readonly} as r/o online datasource");
+
+                        let ocadb = OcaDb::new(&readonly)?;
+                        split::SplitBackDb::new(Some(Rc::new(ocadb)))
+                    }
+                    Err(_e) => split::SplitBackDb::new(None),
+                };
+
+                let storage = Box::new(db);
+
+                Ok(Oca {
+                    storage,
+                    secret,
+                    backend,
+                    domainname,
                 })
             }
         }
@@ -486,14 +461,24 @@ impl Oca {
         cau.init_from_db_state()
     }
 
-    pub fn db(&self) -> &OcaDb {
-        &self.db
+    pub fn domainname(&self) -> &str {
+        &self.domainname
+    }
+
+    pub(crate) fn backend(&self) -> &Backend {
+        &self.backend
+    }
+
+    /// Get the CaSec implementation to run operations that need CA
+    /// private key material.
+    pub(crate) fn secret(&self) -> &dyn CaSec {
+        &*self.secret
     }
 
     /// Change which card backs an OpenPGP CA instance
     /// (e.g. to switch to a replacement for a broken card).
     pub fn set_card_backend(self, card_ident: &str, user_pin: &str) -> Result<()> {
-        let (_, cacert) = self.db.get_ca()?;
+        let cacert = self.storage.cacert()?;
 
         let b = Backend::from_config(cacert.backend.as_deref())?;
         match b {
@@ -505,64 +490,91 @@ impl Oca {
 
                 // Check if the card exists and contains the correct CA key
                 let ca_cert = self.ca_get_cert_pub()?;
-                let _pubkey = check_if_card_matches(card_ident, &ca_cert)?;
+                let _pubkey = card::check_if_card_matches(card_ident, &ca_cert)?;
 
                 // Update backend configuration in database
                 let ca_pub = pgp::cert_to_armored(&ca_cert)?;
-                CardCa::ca_replace_in_place(&self.db, card_ident, user_pin, &ca_pub)?;
+
+                let db = self.storage.into_uninit();
+                CardBackend::ca_replace_in_place(&db, card_ident, user_pin, &ca_pub)?;
 
                 Ok(())
             }
             Backend::Softkey => Err(anyhow::anyhow!(
                 "Setting card backend from softkey is not supported."
             )),
+            Backend::SplitFront | Backend::SplitBack(_) => Err(anyhow::anyhow!(
+                "Setting card backend from split mode is not supported."
+            )),
         }
     }
 
     // -------- CA
 
-    /// Get the CaSec implementation to run operations that need CA
-    /// private key material.
-    ///
-    /// Print information about the created CA instance to stdout.
-    pub(crate) fn secret(&self) -> &Rc<dyn CaSec> {
-        &self.ca_secret
-    }
-
+    /// Generate revocations for the CA key, write to output file.
     pub fn ca_generate_revocations(&self, output: PathBuf) -> Result<()> {
-        self.ca_secret.ca_generate_revocations(output)
+        self.secret.ca_generate_revocations(output)
     }
 
+    /// Ingest/merge in any new tsigs for our CA certificate from 'cert'
     pub fn ca_import_tsig(&self, cert: &[u8]) -> Result<()> {
-        self.db().transaction(|| self.db.ca_import_tsig(cert))
+        self.storage.ca_import_tsig(cert)
     }
 
+    /// Get current CA certificate from storage.
+    /// This representation of the CA cert includes user certifications.
+    ///  
+    /// Get from database storage, if possible - the cert will then contain all certifications
+    /// we know of. However, on split-mode backends, we don't rely on storage, unless we get
+    /// a readonly copy of the online CA. In this case, the CA certificate may lack some or all
+    /// certifications.
     pub fn ca_get_cert_pub(&self) -> Result<Cert> {
-        self.ca.ca_get_cert_pub()
+        match self.backend {
+            // In a split-mode backend instance, we can't rely on having an up-to-date copy
+            // of the CA certificate in storage.
+            Backend::SplitBack(_) => {
+                if let Ok(ca_cert) = self.storage.ca_get_cert_pub() {
+                    // If readonly front database is available, get CA cert from there
+                    Ok(ca_cert)
+                } else {
+                    // If not: get CA cert from secret backend
+                    self.secret.cert()
+                }
+            }
+            _ => self.storage.ca_get_cert_pub(),
+        }
     }
 
-    /// Returns the public key of the CA as an armored String
+    /// Returns the public key of the CA as an armored String (see [Self::ca_get_cert_pub]).
     pub fn ca_get_pubkey_armored(&self) -> Result<String> {
         let cert = self.ca_get_cert_pub()?;
+
         let ca_pub =
             pgp::cert_to_armored(&cert).context("Failed to transform CA key to armored pubkey")?;
 
         Ok(ca_pub)
     }
 
-    pub fn get_ca_email(&self) -> Result<String> {
-        self.ca.ca_email()
+    /// Get the User ID of this CA
+    pub(crate) fn get_ca_userid(&self) -> Result<UserID> {
+        let cert = self.ca_get_cert_pub()?;
+        let uids: Vec<_> = cert.userids().collect();
+
+        if uids.len() != 1 {
+            return Err(anyhow::anyhow!("ERROR: CA has != 1 user_id"));
+        }
+
+        Ok(uids[0].userid().clone())
     }
 
-    /// Get the domainname for this CA
-    pub fn get_ca_domain(&self) -> Result<String> {
-        let email = self.get_ca_email()?;
-        let email_split: Vec<_> = email.split('@').collect();
+    /// Get the email of this CA
+    pub fn get_ca_email(&self) -> Result<String> {
+        let email = self.get_ca_userid()?.email()?;
 
-        if email_split.len() == 2 {
-            Ok(email_split[1].to_owned())
+        if let Some(email) = email {
+            Ok(email)
         } else {
-            Err(anyhow::anyhow!("Failed to split domain from CA email"))
+            Err(anyhow::anyhow!("CA user_id has no email"))
         }
     }
 
@@ -570,56 +582,274 @@ impl Oca {
     ///
     /// This shows the domainname, fingerprint and creation time of this OpenPGP CA instance.
     pub fn ca_show(&self) -> Result<()> {
-        let (ca, ca_cert) = self
-            .db
-            .get_ca()
-            .context("failed to load CA from database")?;
-
-        let cert = Cert::from_str(&ca_cert.priv_cert)?;
+        let cert = self.secret().cert()?;
 
         let created = cert.primary_key().key().creation_time();
         let created: DateTime<Utc> = created.into();
 
-        println!("    CA Domain: {}", ca.domainname);
+        println!("    CA Domain: {}", self.domainname());
         println!("  Fingerprint: {}", cert.fingerprint());
         println!("Creation time: {}", created.format("%F %T %Z"));
 
-        let backend = Backend::from_config(ca_cert.backend.as_deref())?;
+        let backend = self.backend();
         println!("   CA Backend: {backend}");
 
         Ok(())
     }
 
     /// Print private key of the Ca to stdout.
+    ///
+    /// This operation is only supported for Softkey and SplitBack+Softkey instances.
     pub fn ca_print_private(&self) -> Result<()> {
-        let (_, ca_cert) = self
-            .db
-            .get_ca()
+        match &self.backend {
+            Backend::Softkey => {
+                // OK
+            }
+            Backend::SplitBack(inner) => match **inner {
+                Backend::Softkey => {
+                    // OK
+                }
+                _ => {
+                    // SplitBack instance that is not Softkey-based
+                    return Err(anyhow::anyhow!(
+                        "Operation unsupported for this backend type"
+                    ));
+                }
+            },
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Operation unsupported for this backend type"
+                ))
+            }
+        }
+
+        let ca_cert = self
+            .storage
+            .cacert()
             .context("failed to load CA from database")?;
         println!("{}", ca_cert.priv_cert);
+
         Ok(())
     }
 
-    /// Find all User IDs that have been certified by `cert_old` and re-certify them
+    /// Find all User IDs that have been certified by `ca_cert_old` and re-certify them
     /// with the current CA key.
     ///
     /// This can be useful after CA key rotation: when the CA has a new key, `ca_re_certify` issues
     /// fresh certifications for all previously CA-certified user certs.
-    pub fn ca_re_certify(&self, cert_old: &[u8], validity_days: u64) -> Result<()> {
-        let cert_old = pgp::to_cert(cert_old)?;
+    pub fn ca_re_certify(&self, ca_cert_old: &[u8], validity_days: u64) -> Result<()> {
+        let ca_cert_old = pgp::to_cert(ca_cert_old)?;
 
-        self.db()
-            .transaction(|| cert::certs_re_certify(self, cert_old, validity_days))
+        cert::certs_re_certify(self, ca_cert_old, validity_days)
+    }
+
+    /// Split a CA instance into a pair of "front" and "back" CA instances.
+    ///
+    /// This operation is currently supported for softkey or card-backed CAs.
+    pub fn ca_split_into(self, front: &Path, back: &Path) -> Result<()> {
+        match self.backend {
+            Backend::Softkey | Backend::Card(_) => {
+                let uninit_orig = self.storage.into_uninit();
+                let (orig_ca, orig_cacert) = uninit_orig.ca_cert()?;
+
+                let cert = Cert::from_str(&orig_cacert.priv_cert)?;
+                let pub_ca_cert = pgp::cert_to_armored(&cert)?;
+
+                let fp = cert.fingerprint().to_hex();
+
+                let db = uninit_orig.db();
+                let db_url = db.url();
+
+                // The front instance gets all user/cert data (but no CA private key/card config).
+
+                // - Assert that all references from users to 'ca_id' point to "1"
+                for user in db.users_sorted_by_name()? {
+                    if user.ca_id != 1 {
+                        return Err(anyhow::anyhow!(
+                            "Splitting a multi-CA setup is not currently supported"
+                        ));
+                    }
+                }
+
+                // - Copy the database file to "front" CA file
+                std::fs::copy(db_url, front)?;
+
+                if let Some(url) = front.to_str() {
+                    let front = OcaDb::new(url)?;
+
+                    // - Remove cacerts and add a new one ('ca' entry stays unchanged)
+                    front.cacerts_delete()?;
+
+                    let backend = Backend::SplitFront.to_config();
+
+                    let new_ca_cert = NewCacert {
+                        active: true,
+                        ca_id: orig_ca.id,
+                        priv_cert: pub_ca_cert,
+                        fingerprint: &fp,
+                        backend: backend.as_deref(),
+                    };
+                    front.cacert_insert(&new_ca_cert)?;
+
+                    // - Vacuum (to remove traces of private key material, if any)
+                    front.vacuum()?;
+                } else {
+                    return Err(anyhow::anyhow!("Illegal front filename"));
+                }
+
+                // The back instance is a new, bare database that just gets the CA
+                // softkey (or card config)
+                let orig_back = Backend::from_config(orig_cacert.backend.as_deref())?;
+
+                let backend = Backend::SplitBack(Box::new(orig_back));
+
+                if let Some(url) = back.to_str() {
+                    let back = Uninit::new(Some(url))?;
+
+                    back.storage.ca_insert(
+                        &orig_ca.domainname,
+                        &orig_cacert.priv_cert,
+                        &fp,
+                        backend.to_config().as_deref(),
+                    )?;
+                } else {
+                    return Err(anyhow::anyhow!("Illegal back filename"));
+                }
+
+                Ok(())
+            }
+            _ => Err(anyhow::anyhow!(
+                "Splitting operation not supported for this backend type"
+            )),
+        }
+    }
+
+    /// Merge a back CA into a front CA instance, resulting in a regular ("non-split") CA.
+    pub fn ca_merge_split(self, back: &Path) -> Result<()> {
+        match self.backend {
+            Backend::SplitFront => {
+                // get inner backend and cacert data from the back instance
+                if let Some(url) = back.to_str() {
+                    let back = OcaDb::new(url)?;
+                    let (_back_ca, back_cacert) = back.get_ca()?;
+
+                    let orig_back = Backend::from_config(back_cacert.backend.as_deref())?;
+                    if let Backend::SplitBack(inner) = orig_back {
+                        // update backend and cacert in front database
+
+                        let mut front_cacert = self.storage.cacert()?;
+
+                        if front_cacert.fingerprint != back_cacert.fingerprint {
+                            return Err(anyhow::anyhow!(
+                                "Front {} and back {} instance use different CA fingerprints",
+                                front_cacert.fingerprint,
+                                back_cacert.fingerprint
+                            ));
+                        }
+
+                        // The back CA contains private key material (in softkey mode).
+                        // Start from the back CA Cert, merge in the public material from the front CA.
+                        // Use the resulting merged cert for the newly merged CA.
+                        let back_cert = pgp::to_cert(back_cacert.priv_cert.as_bytes())?;
+                        let front_cert = pgp::to_cert(front_cacert.priv_cert.as_bytes())?;
+
+                        let ca_merged = back_cert.merge_public(front_cert)?;
+
+                        front_cacert.priv_cert = pgp::cert_to_armored_private_key(&ca_merged)?;
+
+                        // The backend config of the merged CA is the "inner" backend type of the back instance
+                        front_cacert.backend = inner.to_config();
+
+                        let db = self.storage;
+                        db.cacert_update(&front_cacert)?;
+                    }
+
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Failed to use back instance path ({:?})",
+                        back
+                    ))
+                }
+            }
+
+            _ => Err(anyhow::anyhow!(
+                "Merge operation not supported for this backend type"
+            )),
+        }
+    }
+
+    /// Export certification requests for the backing CA in a simple human-readable output format
+    /// (inspired by https://github.com/wiktor-k/airsigner/, but with some adjustments!).
+    ///
+    /// The output file is a tar-archive:
+    /// - The archive contains a top-level file "csr.txt", which lists User IDs that should be
+    ///   certified.
+    /// - Current versions of all certs are provided in the tar in armored format, as individual
+    ///   files "certs/<fingerprint>".
+    ///
+    /// One design goal of this format is to make it easy to implement small (and thus more easily
+    /// auditable) certification services, which may use arbitrary underlying mechanisms
+    /// (and/or PGP implementations) for signing.
+    pub fn ca_split_export(&self, file: PathBuf) -> Result<()> {
+        match self.backend {
+            Backend::SplitFront => {
+                let cacert = self.storage.cacert()?;
+
+                let queue = self.storage.queue_not_done()?;
+                SplitCa::export_csr_queue(file, queue, &cacert.fingerprint)?;
+
+                Ok(())
+            }
+            _ => Err(anyhow::anyhow!(
+                "Operation is only supported on split mode front instances."
+            )),
+        }
+    }
+
+    /// Process certification requests in a SplitBack instance
+    ///
+    /// When "batch" is false, this fn is interactive.
+    ///
+    /// In interactive mode, it reads KeyEvents for user feedback
+    /// about certification operations.
+    pub fn ca_split_certify(&self, import: PathBuf, export: PathBuf, batch: bool) -> Result<()> {
+        match self.backend {
+            Backend::SplitBack(_) => split::certify(&*self.secret, import, export, batch),
+            _ => Err(anyhow::anyhow!(
+                "Operation is only supported on split mode back instances."
+            )),
+        }
+    }
+
+    /// Ingest the certifications that were generated by the split backend
+    pub fn ca_split_import(&self, file: PathBuf) -> Result<()> {
+        match self.backend {
+            Backend::SplitFront => split::ca_split_import(&*self.storage, file),
+            _ => Err(anyhow::anyhow!(
+                "Operation is only supported on split mode front instances."
+            )),
+        }
+    }
+
+    /// Show the currently not done entries in the queue of a split mode front instance
+    pub fn ca_split_show_queue(&self) -> Result<()> {
+        match self.backend {
+            Backend::SplitFront => split::ca_split_show_queue(&*self.storage),
+            _ => Err(anyhow::anyhow!(
+                "Operation is only supported on split mode front instances."
+            )),
+        }
     }
 
     // -------- users / certs
 
     /// Get a list of all User Certs
     pub fn user_certs_get_all(&self) -> Result<Vec<models::Cert>> {
-        let users = self.db.users_sorted_by_name()?;
+        let users = self.storage.users_sorted_by_name()?;
         let mut user_certs = Vec::new();
         for user in users {
-            user_certs.append(&mut self.db.certs_by_user(&user)?);
+            user_certs.append(&mut self.get_certs_by_user(&user)?);
         }
         Ok(user_certs)
     }
@@ -643,6 +873,22 @@ impl Oca {
         cert::cert_check_tsig_on_ca(self, cert).context("Failed while checking tsig on CA")
     }
 
+    /// Check if this CA has tsigned the bridge cert
+    pub fn check_tsig_on_bridge(&self, bridge: &models::Bridge) -> Result<bool> {
+        let ca = self.ca_get_cert_pub()?;
+
+        if let Some(br) = self.storage.cert_by_id(bridge.cert_id)? {
+            let bridge_cert = pgp::to_cert(br.pub_cert.as_bytes())?;
+
+            Ok(cert::check_tsig_on_cert(&ca, &bridge_cert)?)
+        } else {
+            Err(anyhow::anyhow!(
+                "No public key found for bridge to '{}'",
+                bridge.email
+            ))
+        }
+    }
+
     /// Check all Certs for certifications from the CA. If a certification
     /// expires in less than `threshold_days` and it is not marked as
     /// 'inactive', make a new certification that is good for
@@ -652,9 +898,7 @@ impl Oca {
         threshold_days: u64,
         validity_days: u64,
     ) -> Result<()> {
-        self.db().transaction(|| {
-            cert::certs_refresh_ca_certifications(self, threshold_days, validity_days)
-        })
+        cert::certs_refresh_ca_certifications(self, threshold_days, validity_days)
     }
 
     /// Create a new OpenPGP CA User.
@@ -674,16 +918,16 @@ impl Oca {
         password: bool,
         output_format_minimal: bool,
     ) -> Result<()> {
-        self.db().transaction(|| {
-            cert::user_new(
-                self,
-                name,
-                emails,
-                duration_days,
-                password,
-                output_format_minimal,
-            )
-        })
+        // storage: ca_import_tsig + user_add
+
+        cert::user_new(
+            self,
+            name,
+            emails,
+            duration_days,
+            password,
+            output_format_minimal,
+        )
     }
 
     /// Import an existing OpenPGP Cert (public key) as a new OpenPGP CA user.
@@ -707,16 +951,39 @@ impl Oca {
         emails: &[&str],
         duration_days: Option<u64>,
     ) -> Result<()> {
-        self.db().transaction(|| {
-            cert::cert_import_new(self, cert, revoc_certs, name, emails, duration_days)
-        })
+        cert::cert_import_new(self, cert, revoc_certs, name, emails, duration_days)
     }
 
     /// Update existing Cert in database (e.g. if the user has extended
     /// the expiry date)
     pub fn cert_import_update(&self, cert: &[u8]) -> Result<()> {
-        self.db()
-            .transaction(|| cert::cert_import_update(self, cert))
+        cert::cert_import_update(self, cert)
+    }
+
+    /// Mark a cert as "delisted" in the OpenPGP CA database.
+    /// As a result, the cert will not be exported to WKD anymore.
+    ///
+    /// Note: existing CA certifications will still get renewed for delisted
+    /// certs, but as the cert is not published via WKD, third parties might not
+    /// learn about refreshed certifications.
+    ///
+    /// CAUTION:
+    /// This method is probably rarely appropriate. In most cases, it's better
+    /// to "deactivate" a cert (in almost all cases, it is best to continually
+    /// serve the latest version of a cert to third parties, so they can learn
+    /// about e.g. revocations on the cert)
+    pub fn cert_delist(&self, fp: &str) -> Result<()> {
+        self.storage.cert_delist(fp)
+    }
+
+    /// Mark a certificate as "deactivated".
+    /// It will continue to be listed and exported to WKD.
+    /// However, the certification by our CA will expire and not get renewed.
+    ///
+    /// This approach is probably appropriate in most cases to phase out a
+    /// certificate.
+    pub fn cert_deactivate(&self, fp: &str) -> Result<()> {
+        self.storage.cert_deactivate(fp)
     }
 
     /// Get Cert by fingerprint.
@@ -724,27 +991,29 @@ impl Oca {
     /// The fingerprint parameter is normalized (e.g. if it contains
     /// spaces, they will be filtered out).
     pub fn cert_get_by_fingerprint(&self, fingerprint: &str) -> Result<Option<models::Cert>> {
-        self.db.cert_by_fp(&pgp::normalize_fp(fingerprint)?)
+        let fp = pgp::normalize_fp(fingerprint)?;
+
+        self.storage.cert_by_fp(&fp)
     }
 
     /// Get a list of all Certs for one User
     pub fn get_certs_by_user(&self, user: &models::User) -> Result<Vec<models::Cert>> {
-        self.db.certs_by_user(user)
+        self.storage.certs_by_user(user)
     }
 
     /// Get a list of all Users, ordered by name
     pub fn users_get_all(&self) -> Result<Vec<models::User>> {
-        self.db.users_sorted_by_name()
+        self.storage.users_sorted_by_name()
     }
 
     /// Get a list of the Certs that are associated with `email`
     pub fn certs_by_email(&self, email: &str) -> Result<Vec<models::Cert>> {
-        self.db.certs_by_email(email)
+        self.storage.certs_by_email(email)
     }
 
     /// Get database User(s) for database Cert
     pub fn cert_get_users(&self, cert: &models::Cert) -> Result<Option<models::User>> {
-        self.db.user_by_cert(cert)
+        self.storage.user_by_cert(cert)
     }
 
     /// Get the user name that is associated with this Cert.
@@ -890,7 +1159,7 @@ impl Oca {
 
     /// Get a list of all Revocations for a cert
     pub fn revocations_get(&self, cert: &models::Cert) -> Result<Vec<models::Revocation>> {
-        self.db.revocations_by_cert(cert)
+        self.storage.revocations_by_cert(cert)
     }
 
     /// Add a revocation certificate to the OpenPGP CA database.
@@ -901,20 +1170,19 @@ impl Oca {
     /// Verifies that applying the revocation cert can be validated by the
     /// cert. Only if this is successful is the revocation stored.
     pub fn revocation_add(&self, revoc_cert: &[u8]) -> Result<()> {
-        self.db()
-            .transaction(|| revocation::revocation_add(self, revoc_cert))
+        self.storage.revocation_add(revoc_cert)
     }
 
     /// Add a revocation certificate to the OpenPGP CA database (from a file).
     pub fn revocation_add_from_file(&self, filename: &Path) -> Result<()> {
         let rev = std::fs::read(filename)?;
 
-        self.db().transaction(|| self.revocation_add(&rev))
+        self.revocation_add(&rev)
     }
 
     /// Get a Revocation by hash
     pub fn revocation_get_by_hash(&self, hash: &str) -> Result<models::Revocation> {
-        if let Some(rev) = self.db.revocation_by_hash(hash)? {
+        if let Some(rev) = self.storage.revocation_by_hash(hash)? {
             Ok(rev)
         } else {
             Err(anyhow::anyhow!("No revocation found for {}", hash))
@@ -925,8 +1193,7 @@ impl Oca {
     ///
     /// The revocation is merged into out copy of the OpenPGP Cert.
     pub fn revocation_apply(&self, revoc: models::Revocation) -> Result<()> {
-        self.db()
-            .transaction(|| revocation::revocation_apply(self, revoc))
+        self.storage.revocation_apply(revoc)
     }
 
     /// Get reason and creation time for a Revocation
@@ -987,27 +1254,36 @@ impl Oca {
 
     /// Get all Emails for a Cert
     pub fn emails_get(&self, cert: &models::Cert) -> Result<Vec<models::CertEmail>> {
-        self.db.emails_by_cert(cert)
+        self.storage.emails_by_cert(cert)
     }
 
     /// Get all Emails
     pub fn get_emails_all(&self) -> Result<Vec<models::CertEmail>> {
-        self.db.emails()
+        self.storage.emails()
     }
 
     // --------- bridges
 
     /// Get a list of Bridges
     pub fn bridges_get(&self) -> Result<Vec<models::Bridge>> {
-        self.db.list_bridges()
+        self.storage.list_bridges()
     }
 
     /// Get a specific Bridge
     pub fn bridges_search(&self, email: &str) -> Result<models::Bridge> {
-        if let Some(bridge) = self.db.bridge_by_email(email)? {
+        if let Some(bridge) = self.storage.bridge_by_email(email)? {
             Ok(bridge)
         } else {
             Err(anyhow::anyhow!("Bridge not found"))
+        }
+    }
+
+    /// Get the Cert row for a Bridge
+    pub fn bridge_get_cert(&self, bridge: &models::Bridge) -> Result<models::Cert> {
+        if let Some(cert) = self.storage.cert_by_id(bridge.cert_id)? {
+            Ok(cert)
+        } else {
+            Err(anyhow::anyhow!("No cert found for bridge {}", bridge.id))
         }
     }
 
@@ -1017,40 +1293,10 @@ impl Oca {
         key_file: &Path,
         scope: Option<&str>,
         unscoped: bool,
-        commit: bool,
-    ) -> Result<()> {
-        if commit {
-            self.db.transaction::<_, anyhow::Error, _>(|| {
-                let (bridge, fingerprint) =
-                    bridge::bridge_new(self, key_file, email, scope, unscoped)?;
+    ) -> Result<(String, String)> {
+        let (bridge, fingerprint) = bridge::bridge_new(self, key_file, email, scope, unscoped)?;
 
-                println!("Signed OpenPGP key for {} as bridge.\n", bridge.email);
-                println!("The fingerprint of the remote CA key is");
-                println!("{fingerprint}\n");
-
-                Ok(())
-            })?;
-        } else {
-            println!("Bridge creation DRY RUN.");
-            println!();
-
-            println!(
-                "Please verify that this is the correct fingerprint for the \
-            remote CA admin before continuing:"
-            );
-            println!();
-
-            let key = std::fs::read(key_file)?;
-            pgp::print_cert_info(&key)?;
-
-            println!();
-            println!(
-                "When you've confirmed that the remote key is correct, repeat \
-            this command with the additional parameter '--commit' \
-            to commit the OpenPGP CA bridge to the database."
-            );
-        }
-        Ok(())
+        Ok((bridge.email, fingerprint.to_string()))
     }
 
     /// Create a revocation Certificate for a Bridge and apply it the our
@@ -1059,7 +1305,7 @@ impl Oca {
     /// Both the revoked remote public key and the revocation cert are
     /// printed to stdout.
     pub fn bridge_revoke(&self, email: &str) -> Result<()> {
-        self.db().transaction(|| bridge::bridge_revoke(self, email))
+        bridge::bridge_revoke(self, email)
     }
 
     pub fn print_bridges(&self, email: Option<String>) -> Result<()> {
@@ -1071,7 +1317,7 @@ impl Oca {
 
         for bridge in bridges {
             println!("Bridge to '{}'", bridge.email);
-            if let Some(db_cert) = self.db.cert_by_id(bridge.cert_id)? {
+            if let Some(db_cert) = self.storage.cert_by_id(bridge.cert_id)? {
                 println!("{}", db_cert.pub_cert);
             }
             println!();
@@ -1081,9 +1327,21 @@ impl Oca {
     }
 
     pub fn list_bridges(&self) -> Result<()> {
-        self.bridges_get()?.iter().for_each(|bridge| {
-            println!("Bridge to '{}', (scope: '{}')", bridge.email, bridge.scope)
-        });
+        for bridge in self.bridges_get()? {
+            let tsigned = self.check_tsig_on_bridge(&bridge)?;
+
+            println!(
+                "Bridge to '{}'{}, (scope: '{}')",
+                bridge.email,
+                if !tsigned {
+                    " [no trust signature]"
+                } else {
+                    ""
+                },
+                bridge.scope,
+            )
+        }
+
         Ok(())
     }
 
@@ -1129,7 +1387,7 @@ impl Oca {
     /// storage.
     pub fn update_from_wkd(&self) -> Result<()> {
         for c in self.user_certs_get_all()? {
-            match self.db().transaction(|| update::update_from_wkd(self, &c)) {
+            match update::update_from_wkd(self, &c) {
                 Ok(true) => {
                     println!("Got update for cert {}", c.fingerprint);
                 }
@@ -1144,10 +1402,11 @@ impl Oca {
         Ok(())
     }
 
-    /// Update all certs from keyserver
+    /// Update all certs from the hagrid keyserver (<https://keys.openpgp.org/>)
+    /// and merge any updates into our local storage for this cert.
     pub fn update_from_keyserver(&self) -> Result<()> {
         for c in self.user_certs_get_all()? {
-            match self.update_from_hagrid(&c) {
+            match update::update_from_hagrid(self, &c) {
                 Ok(true) => {
                     println!("Got update for cert {}", c.fingerprint);
                 }
@@ -1160,15 +1419,5 @@ impl Oca {
             }
         }
         Ok(())
-    }
-
-    /// Pull updates for a cert from the hagrid keyserver
-    /// (<https://keys.openpgp.org/>) and merge any updates into our local
-    /// storage for this cert.
-    ///
-    /// Returns "true" if updated data was received, false if not.
-    pub fn update_from_hagrid(&self, cert: &models::Cert) -> Result<bool> {
-        self.db()
-            .transaction(|| update::update_from_hagrid(self, cert))
     }
 }

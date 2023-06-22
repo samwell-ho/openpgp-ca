@@ -298,8 +298,8 @@ fn test_bridge(gpg: Ctx, ca1: Oca, ca2: Oca) -> Result<()> {
     std::fs::write(&ca_some_file, pub_ca1).expect("Unable to write file");
     std::fs::write(&ca_other_file, pub_ca2).expect("Unable to write file");
 
-    ca1.add_bridge(None, &PathBuf::from(ca_other_file), None, false, true)?;
-    ca2.add_bridge(None, &PathBuf::from(ca_some_file), None, false, true)?;
+    ca1.add_bridge(None, &PathBuf::from(ca_other_file), None, false)?;
+    ca2.add_bridge(None, &PathBuf::from(ca_some_file), None, false)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
@@ -309,14 +309,14 @@ fn test_bridge(gpg: Ctx, ca1: Oca, ca2: Oca) -> Result<()> {
     let bridges2 = ca2.bridges_get()?;
     assert_eq!(bridges2.len(), 1);
 
-    let ca1_cert = ca2.db().cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
+    let ca1_cert = ca2.bridge_get_cert(&bridges2[0])?.pub_cert;
 
     // get Cert for ca2 from ca1 bridge
     // (this has the signed version of the ca2 pubkey)
     let bridges1 = ca1.bridges_get()?;
     assert_eq!(bridges1.len(), 1);
 
-    let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
+    let ca2_cert = ca1.bridge_get_cert(&bridges1[0])?.pub_cert;
 
     // import CA keys into GnuPG
     gpg.import(ca1_cert.as_bytes());
@@ -438,10 +438,10 @@ fn test_multi_bridge(gpg: Ctx, ca1: Oca, ca2: Oca, ca3: Oca) -> Result<()> {
     std::fs::write(&ca3_file, pub_ca3).expect("Unable to write file");
 
     // ca1 certifies ca2
-    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, false, true)?;
+    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, false)?;
 
     // ca2 certifies ca3
-    ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, false, true)?;
+    ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, false)?;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
@@ -452,13 +452,13 @@ fn test_multi_bridge(gpg: Ctx, ca1: Oca, ca2: Oca, ca3: Oca) -> Result<()> {
     // (this has the signed version of the ca2 pubkey)
     let bridges1 = ca1.bridges_get()?;
     assert_eq!(bridges1.len(), 1);
-    let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
+    let ca2_cert = ca1.bridge_get_cert(&bridges1[0])?.pub_cert;
 
     // get Cert for ca3 from ca2 bridge
     // (this has the tsig from ca3)
     let bridges2 = ca2.bridges_get()?;
     assert_eq!(bridges2.len(), 1);
-    let ca3_cert = ca2.db().cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
+    let ca3_cert = ca2.bridge_get_cert(&bridges2[0])?.pub_cert;
 
     // import CA certs into GnuPG
     gpg.import(ca1_cert.as_bytes());
@@ -574,15 +574,15 @@ fn test_scoping(gpg: Ctx, ca1: Oca, ca2: Oca, ca3: Oca) -> Result<()> {
     std::fs::write(&ca2_file, pub_ca2).expect("Unable to write file");
 
     // ca1 certifies ca2
-    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, false, true)?;
+    ca1.add_bridge(None, &PathBuf::from(&ca2_file), None, false)?;
 
     // create unscoped trust signature from ca2 (beta.org) to ca3 (other.org)
     // ---- openpgp-ca@beta.org ---tsign---> openpgp-ca@other.org ----
     // let tsigned_ca3 = pgp::tsign(ca3.ca_get_priv_key()?, &ca2.ca_get_priv_key()?, None)?;
-    ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, true, true)?;
+    ca2.add_bridge(None, &PathBuf::from(&ca3_file), None, true)?;
     let bridges2 = ca2.bridges_get()?;
     assert_eq!(bridges2.len(), 1);
-    let tsigned_ca3 = ca2.db().cert_by_id(bridges2[0].cert_id)?.unwrap().pub_cert;
+    let tsigned_ca3 = ca2.bridge_get_cert(&bridges2[0])?.pub_cert;
 
     // ---- import all keys from OpenPGP CA into one GnuPG instance ----
 
@@ -593,7 +593,7 @@ fn test_scoping(gpg: Ctx, ca1: Oca, ca2: Oca, ca3: Oca) -> Result<()> {
     // (this has the signed version of the ca2 pubkey)
     let bridges1 = ca1.bridges_get()?;
     assert_eq!(bridges1.len(), 1);
-    let ca2_cert = ca1.db().cert_by_id(bridges1[0].cert_id)?.unwrap().pub_cert;
+    let ca2_cert = ca1.bridge_get_cert(&bridges1[0])?.pub_cert;
 
     // import CA certs into GnuPG
     gpg.import(pgp::cert_to_armored(&ca1_cert)?.as_bytes());

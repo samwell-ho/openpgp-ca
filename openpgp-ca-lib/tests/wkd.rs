@@ -104,9 +104,8 @@ fn test_wkd_delist() -> Result<()> {
     // set bob to "delisted"
     let cert = ca.certs_by_email("bob@example.org")?;
     assert_eq!(cert.len(), 1);
-    let mut bob = cert[0].clone();
-    bob.delisted = true;
-    ca.db().cert_update(&bob)?;
+    let bob = cert[0].clone();
+    ca.cert_delist(&bob.fingerprint)?;
 
     // export to WKD
     let wkd_dir = home_path + "/wkd/";

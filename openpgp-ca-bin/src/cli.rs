@@ -6,14 +6,13 @@
 
 use std::path::PathBuf;
 
-use clap::{AppSettings, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[clap(
     name = "openpgp-ca",
     author = "Heiko Schäfer <heiko@schaefer.name>",
     version,
-    global_setting(AppSettings::DeriveDisplayOrder),
     about = "OpenPGP CA is a tool for managing OpenPGP keys within organizations."
 )]
 pub struct Cli {
@@ -224,6 +223,12 @@ pub enum CaCommand {
         )]
         validity_days: u64,
     },
+
+    /// Split mode commands
+    Split {
+        #[clap(subcommand)]
+        cmd: SplitCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -235,7 +240,6 @@ pub enum UserCommand {
             long = "email",
             required = true,
             number_of_values = 1,
-            multiple = true,
             help = "Email address"
         )]
         email: Vec<String>,
@@ -268,7 +272,6 @@ pub enum UserCommand {
             long = "email",
             required = true,
             number_of_values = 1,
-            multiple = true,
             help = "Email address"
         )]
         email: Vec<String>,
@@ -287,7 +290,6 @@ pub enum UserCommand {
             short = 'r',
             long = "revocation-file",
             number_of_values = 1,
-            multiple = true,
             help = "File that contains a revocation cert for this user"
         )]
         revocation_file: Vec<PathBuf>,
@@ -413,4 +415,72 @@ pub enum UpdateCommand {
     Keyserver {},
     /// Update certificates from WKD
     Wkd {},
+}
+
+#[derive(Subcommand)]
+pub enum SplitCommand {
+    /// Split a CA into a front and a back instance
+    Into {
+        #[clap(
+            short = 'f',
+            long = "front",
+            help = "Filename for the front CA instance"
+        )]
+        front: PathBuf,
+
+        #[clap(short = 'b', long = "back", help = "Filename for the back CA instance")]
+        back: PathBuf,
+    },
+
+    /// Merge a back instance into a front CA, resulting in a regular "non-split" CA.
+    Merge {
+        #[clap(short = 'b', long = "back", help = "Filename for the back CA instance")]
+        back: PathBuf,
+    },
+
+    /// Export certification requests from a split-mode online instance.
+    Export {
+        #[clap(
+            short = 'f',
+            long = "file",
+            help = "File to export the certification requests to"
+        )]
+        file: PathBuf,
+    },
+
+    /// Process certification requests on a split-mode back instance.
+    Certify {
+        #[clap(
+            short = 'i',
+            long = "import",
+            help = "File to import the certification requests from"
+        )]
+        import: PathBuf,
+
+        #[clap(
+            short = 'e',
+            long = "export",
+            help = "File to export the generated certifications to"
+        )]
+        export: PathBuf,
+
+        #[clap(
+            long = "batch",
+            help = "Generate certifications in non-interactive batch mode"
+        )]
+        batch: bool,
+    },
+
+    /// Import certifications from the split-mode backing instance.
+    Import {
+        #[clap(
+            short = 'i',
+            long = "import",
+            help = "File to import generated certifications from"
+        )]
+        import: PathBuf,
+    },
+
+    /// Show queue entries in a front CA instance
+    ShowQueue,
 }

@@ -1,15 +1,11 @@
-// Copyright 2019-2022 Heiko Schaefer <heiko@schaefer.name>
-//
-// This file is part of OpenPGP CA
-// https://gitlab.com/openpgp-ca/openpgp-ca
-//
-// SPDX-FileCopyrightText: 2019-2022 Heiko Schaefer <heiko@schaefer.name>
+// SPDX-FileCopyrightText: 2019-2023 Heiko Schaefer <heiko@schaefer.name>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::path::Path;
 
 use anyhow::{Context, Result};
 use sequoia_openpgp::parse::Parse;
+use sequoia_openpgp::serialize::SerializeInto;
 use sequoia_openpgp::{Cert, Fingerprint};
 
 use crate::db::models;
@@ -88,35 +84,32 @@ pub fn bridge_new(
     };
 
     let regex = domain_to_regex(scope)?;
-
     let scope_regexes = if unscoped { vec![] } else { vec![regex] };
 
+    // -- CA secret operation --
+
     // Make trust signature on the remote CA cert, to set up the bridge
-    let bridged = oca
+    let remote_ca = oca
         .secret()
         .bridge_to_remote_ca(remote_ca_cert, scope_regexes)?;
 
-    // store new bridge in DB
-    let db_cert = oca.db().cert_add(
-        &pgp::cert_to_armored(&bridged)?,
-        &bridged.fingerprint().to_hex(),
-        None,
-    )?;
+    let remote_armored = pgp::cert_to_armored(&remote_ca)?;
+    let remote_fp = remote_ca.fingerprint().to_hex();
 
-    let (ca_db, _) = oca.db().get_ca()?;
-    let new_bridge = models::NewBridge {
-        email: &email,
-        scope,
-        cert_id: db_cert.id,
-        cas_id: ca_db.id,
-    };
+    // -- CA storage operation --
 
-    Ok((oca.db().bridge_insert(new_bridge)?, bridged.fingerprint()))
+    let bridge_db = oca
+        .storage
+        .bridge_add(&remote_armored, &remote_fp, &email, scope)?;
+
+    Ok((bridge_db, remote_ca.fingerprint()))
 }
 
 pub fn bridge_revoke(oca: &Oca, email: &str) -> Result<()> {
-    if let Some(bridge) = oca.db().bridge_by_email(email)? {
-        if let Some(mut db_cert) = oca.db().cert_by_id(bridge.cert_id)? {
+    // FIXME: db operations should be bracketed in a transaction
+
+    if let Some(bridge) = oca.storage.bridge_by_email(email)? {
+        if let Some(db_cert) = oca.storage.cert_by_id(bridge.cert_id)? {
             let bridge_cert = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
 
             // Generate revocation for the bridge
@@ -130,9 +123,8 @@ pub fn bridge_revoke(oca: &Oca, email: &str) -> Result<()> {
                 pgp::revoc_to_armored(&revocation, None)?
             );
 
-            // Save updated cert (including the revocation) to DB
-            db_cert.pub_cert = pgp::cert_to_armored(&revoked)?;
-            oca.db().cert_update(&db_cert)
+            // Merge the revoked bridge Cert into DB
+            oca.storage.cert_update(&revoked.to_vec()?)
         } else {
             Err(anyhow::anyhow!("No cert found for bridge"))
         }

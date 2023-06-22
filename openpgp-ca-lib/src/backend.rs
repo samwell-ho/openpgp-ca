@@ -14,17 +14,34 @@ use anyhow::anyhow;
 
 pub(crate) mod card;
 pub(crate) mod softkey;
+pub(crate) mod split;
 
 #[derive(PartialEq)]
 pub(crate) enum Backend {
     Softkey,
     Card(Card),
+    SplitFront,
+    SplitBack(Box<Backend>),
 }
 
 impl Backend {
     pub(crate) fn from_config(backend: Option<&str>) -> anyhow::Result<Self> {
         if let Some(backend) = backend {
-            if let Some((bt, conf)) = backend.split_once(';') {
+            if backend.starts_with(&(BACKEND_TYPE_SPLIT_BACK.to_string() + "("))
+                && backend.ends_with(')')
+            {
+                let inner = &backend[BACKEND_TYPE_SPLIT_FRONT.len()..(backend.len() - 1)];
+                let inner = match inner {
+                    "" => None,
+                    s => Some(s),
+                };
+
+                let inner_backend = Self::from_config(inner)?;
+
+                Ok(Backend::SplitBack(Box::new(inner_backend)))
+            } else if backend == BACKEND_TYPE_SPLIT_FRONT {
+                Ok(Backend::SplitFront)
+            } else if let Some((bt, conf)) = backend.split_once(';') {
                 match bt {
                     BACKEND_TYPE_CARD => Ok(Backend::Card(Card::from_config(conf)?)),
                     _ => Err(anyhow!("Unsupported backend type: '{}'", bt)),
@@ -44,6 +61,12 @@ impl Backend {
         match self {
             Backend::Softkey => None,
             Backend::Card(c) => Some(format!("{};{}", BACKEND_TYPE_CARD, c.to_config())),
+            Backend::SplitFront => Some(BACKEND_TYPE_SPLIT_FRONT.to_string()),
+            Backend::SplitBack(b) => Some(format!(
+                "{}({})",
+                BACKEND_TYPE_SPLIT_BACK,
+                b.to_config().unwrap_or("".to_string())
+            )),
         }
     }
 }
@@ -53,11 +76,15 @@ impl std::fmt::Display for Backend {
         match self {
             Backend::Softkey => write!(f, "Softkey (private key material in CA database)"),
             Backend::Card(c) => write!(f, "OpenPGP card {c}"),
+            Backend::SplitFront => write!(f, "Split-mode front instance"),
+            Backend::SplitBack(b) => write!(f, "Split-mode back instance (based on: {})", *b),
         }
     }
 }
 
 const BACKEND_TYPE_CARD: &str = "card";
+const BACKEND_TYPE_SPLIT_FRONT: &str = "split-front";
+const BACKEND_TYPE_SPLIT_BACK: &str = "split-back";
 
 #[derive(PartialEq)]
 pub(crate) struct Card {

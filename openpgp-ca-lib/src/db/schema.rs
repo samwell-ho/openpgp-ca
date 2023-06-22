@@ -63,6 +63,15 @@ table! {
     }
 }
 
+table! {
+    queue (id) {
+        id -> Integer,
+        created -> Timestamp,
+        task -> Text,
+        done -> Bool,
+    }
+}
+
 joinable!(bridges -> cas (cas_id));
 joinable!(bridges -> certs (cert_id));
 joinable!(cacerts -> cas (ca_id));

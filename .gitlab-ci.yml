@@ -7,7 +7,7 @@ stages:
   - doc
   - deploy
 
-image: rust:1.67.1
+image: rust:latest
 
 reuse:
   stage: lint

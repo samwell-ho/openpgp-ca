@@ -6,9 +6,18 @@
 
 use anyhow::Result;
 use clap::{CommandFactory, FromArgMatches};
-use openpgp_ca_lib::{Oca, Uninit};
+use lazy_static::lazy_static;
+use openpgp_ca_lib::{pgp, Oca, Uninit};
 
 mod cli;
+
+lazy_static! {
+    static ref VER: String = format!(
+        "{} (openpgp-ca-lib {})",
+        env!("CARGO_PKG_VERSION"),
+        openpgp_ca_lib::VERSION,
+    );
+}
 
 fn find_one_empty_card(ident: &Option<String>) -> Result<String> {
     if let Some(ident) = ident {
@@ -45,13 +54,7 @@ fn find_one_matching_card(ident: &Option<String>, cert: &[u8]) -> Result<String>
 }
 
 fn main() -> Result<()> {
-    let version = format!(
-        "{} (openpgp-ca-lib {})",
-        env!("CARGO_PKG_VERSION"),
-        openpgp_ca_lib::VERSION,
-    );
-
-    let cli = cli::Cli::command().version(&*version);
+    let cli = cli::Cli::command().version(&**VER);
 
     let c = cli::Cli::from_arg_matches(&cli.get_matches())?;
     let db = c.database.as_deref();
@@ -327,6 +330,23 @@ fn main() -> Result<()> {
                 let cert_old = std::fs::read(cert_file_old)?;
                 ca.ca_re_certify(&cert_old, validity_days)?;
             }
+
+            cli::CaCommand::Split { cmd } => match cmd {
+                cli::SplitCommand::Into { front, back } => ca.ca_split_into(&front, &back)?,
+                cli::SplitCommand::Merge { back } => ca.ca_merge_split(&back)?,
+
+                cli::SplitCommand::Export { file } => ca.ca_split_export(file)?,
+
+                cli::SplitCommand::Certify {
+                    import,
+                    export,
+                    batch,
+                } => ca.ca_split_certify(import, export, batch)?,
+
+                cli::SplitCommand::Import { import: file } => ca.ca_split_import(file)?,
+
+                cli::SplitCommand::ShowQueue {} => ca.ca_split_show_queue()?,
+            },
         },
         cli::Commands::Bridge { cmd } => match cmd {
             cli::BridgeCommand::New {
@@ -334,20 +354,42 @@ fn main() -> Result<()> {
                 scope,
                 remote_key_file,
                 commit,
-            } => ca.add_bridge(
-                email.as_deref(),
-                &remote_key_file,
-                scope.as_deref(),
-                false,
-                commit,
-            )?,
+            } => {
+                if commit {
+                    let (email, fp) =
+                        ca.add_bridge(email.as_deref(), &remote_key_file, scope.as_deref(), false)?;
+
+                    println!("Added OpenPGP key for {} as bridge.\n", email);
+                    println!("The fingerprint of the remote CA key is");
+                    println!("{fp}\n");
+                } else {
+                    println!("Bridge creation DRY RUN.");
+                    println!();
+
+                    println!(
+                        "Please verify that this is the correct fingerprint for the \
+            remote CA admin before continuing:"
+                    );
+                    println!();
+
+                    let key = std::fs::read(remote_key_file)?;
+                    pgp::print_cert_info(&key)?;
+
+                    println!();
+                    println!(
+                        "When you've confirmed that the remote key is correct, repeat \
+            this command with the additional parameter '--commit' \
+            to commit the OpenPGP CA bridge to the database."
+                    );
+                }
+            }
             cli::BridgeCommand::Revoke { email } => ca.bridge_revoke(&email)?,
             cli::BridgeCommand::List => ca.list_bridges()?,
             cli::BridgeCommand::Export { email } => ca.print_bridges(email)?,
         },
         cli::Commands::Wkd { cmd } => match cmd {
             cli::WkdCommand::Export { path } => {
-                ca.export_wkd(&ca.get_ca_domain()?, &path)?;
+                ca.export_wkd(ca.domainname(), &path)?;
             }
         },
 

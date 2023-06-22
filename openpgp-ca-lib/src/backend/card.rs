@@ -5,11 +5,10 @@
 // https://gitlab.com/openpgp-ca/openpgp-ca
 
 use std::convert::TryFrom;
-use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use openpgp_card::{algorithm::AlgoSimple, KeyType};
 use openpgp_card_pcsc::PcscBackend;
 use openpgp_card_sequoia::state::{Admin, Open, Transaction};
@@ -26,21 +25,74 @@ use sequoia_openpgp::{Cert, Packet};
 
 use crate::backend;
 use crate::backend::{Backend, CertificationBackend};
-use crate::ca_secret::CaSec;
-use crate::db::{models, OcaDb};
 use crate::pgp;
+use crate::storage::UninitDb;
+
+/// Does 'ca_cert' match the data on the opened card?
+///
+/// FIXME: also check the state of SIG and DEC slots?
+pub(crate) fn card_matches(transaction: &mut Card<Transaction>, ca_cert: &Cert) -> Result<String> {
+    let fps = transaction.fingerprints()?;
+    let auth = fps
+        .authentication()
+        .context("No AUT key on card".to_string())?;
+
+    let auth_fp = auth.to_string();
+
+    let cardholder_name = transaction.cardholder_name()?;
+
+    // Check that cardholder name is set to "OpenPGP CA".
+    if cardholder_name.as_deref() != Some("OpenPGP CA") {
+        return Err(anyhow::anyhow!(
+            "Expected cardholder name 'OpenPGP CA' on OpenPGP card, found '{}'.",
+            cardholder_name.unwrap_or_default()
+        ));
+    }
+
+    // Make sure that the CA public key contains a User ID!
+    // (So we can set the 'Signer's UserID' packet for easy WKD lookup of the CA cert)
+    if ca_cert.userids().next().is_none() {
+        return Err(anyhow::anyhow!(
+            "Expect CA certificate to contain at least one User ID, but found none."
+        ));
+    }
+
+    let pubkey =
+        pgp::cert_to_armored(ca_cert).context("Failed to transform CA cert to armored pubkey")?;
+
+    // CA pubkey and card auth key slot must match
+    if ca_cert.fingerprint().to_hex() != auth_fp {
+        return Err(anyhow::anyhow!(format!(
+            "Auth key slot on card {} doesn't match primary (cert) fingerprint {}.",
+            auth_fp,
+            ca_cert.fingerprint().to_hex()
+        )));
+    }
+
+    Ok(pubkey)
+}
+
+// Check the card `card_ident`, confirm that the cardholder name is set to
+// "OpenPGP CA", and that the AUT slot contains the certification key.
+pub(crate) fn check_if_card_matches(card_ident: &str, ca_cert: &Cert) -> Result<String> {
+    // Open Smart Card
+    let backend = PcscBackend::open_by_ident(card_ident, None)?;
+    let mut card: Card<Open> = backend.into();
+    let mut transaction = card.transaction()?;
+
+    card_matches(&mut transaction, ca_cert).context(format!("On card {card_ident}"))
+}
 
 /// an OpenPGP card backend for a CA instance
-pub(crate) struct CardCa {
+pub(crate) struct CardBackend {
     pin: String,
     ident: String,
-    db: Rc<OcaDb>,
 
     // lazily opened card, for caching purposes
     card: Arc<Mutex<Option<Card<Open>>>>,
 }
 
-impl CertificationBackend for CardCa {
+impl CertificationBackend for CardBackend {
     fn certify(
         &self,
         op: &mut dyn FnMut(&mut dyn sequoia_openpgp::crypto::Signer) -> Result<()>,
@@ -89,11 +141,10 @@ impl CertificationBackend for CardCa {
     }
 }
 
-impl CardCa {
-    pub(crate) fn new(ident: &str, pin: &str, db: Rc<OcaDb>) -> Result<Self> {
+impl CardBackend {
+    pub(crate) fn new(ident: &str, pin: &str) -> Result<Self> {
         Ok(Self {
             pin: pin.to_string(),
-            db,
             ident: ident.to_string(),
             card: Arc::new(Mutex::new(None)),
         })
@@ -116,7 +167,7 @@ impl CardCa {
     }
 
     pub(crate) fn ca_init(
-        db: &Rc<OcaDb>,
+        db: &UninitDb,
         domainname: &str,
         card_ident: &str,
         pin: &str,
@@ -129,7 +180,7 @@ impl CardCa {
         });
 
         db.ca_insert(
-            models::NewCa { domainname },
+            domainname,
             pubkey,
             fingerprint,
             backend.to_config().as_deref(),
@@ -141,7 +192,7 @@ impl CardCa {
     ///
     /// This fn doesn't check that 'card_ident' contains the expected key material.
     pub(crate) fn ca_replace_in_place(
-        db: &Rc<OcaDb>,
+        db: &UninitDb,
         card_ident: &str,
         pin: &str,
         pubkey: &str,
@@ -153,7 +204,7 @@ impl CardCa {
 
         let ca_new = Cert::from_str(pubkey)?;
 
-        let (_, mut cacert) = db.get_ca()?;
+        let (_, mut cacert) = db.ca_cert()?;
 
         if ca_new.fingerprint().to_string() != cacert.fingerprint {
             return Err(anyhow::anyhow!(
@@ -167,14 +218,6 @@ impl CardCa {
         cacert.backend = backend.to_config();
 
         db.cacert_update(&cacert)
-    }
-}
-
-impl CaSec for CardCa {
-    fn get_ca_cert(&self) -> Result<Cert> {
-        let (_, cacert) = self.db.get_ca()?;
-
-        pgp::to_cert(cacert.priv_cert.as_bytes())
     }
 }
 

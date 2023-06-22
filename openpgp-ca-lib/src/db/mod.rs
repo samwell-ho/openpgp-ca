@@ -19,7 +19,8 @@ use schema::*;
 use crate::pgp;
 
 /// Database access layer
-pub struct OcaDb {
+pub(crate) struct OcaDb {
+    url: String,
     conn: SqliteConnection,
 }
 
@@ -33,7 +34,14 @@ impl OcaDb {
             .execute(&conn)
             .context("Couldn't set 'PRAGMA foreign_keys=1;'")?;
 
-        Ok(OcaDb { conn })
+        Ok(OcaDb {
+            conn,
+            url: db_url.to_string(),
+        })
+    }
+
+    pub(crate) fn url(&self) -> &str {
+        &self.url
     }
 
     pub(crate) fn transaction<T, E, F>(&self, f: F) -> Result<T, E>
@@ -173,6 +181,52 @@ impl OcaDb {
         Ok(e[0].clone())
     }
 
+    pub(crate) fn queue_by_id(&self, id: i32) -> Result<Option<Queue>> {
+        let mut db: Vec<Queue> = queue::table
+            .filter(queue::id.eq(id))
+            .load::<Queue>(&self.conn)
+            .context("Error loading Queue by id")?;
+
+        match db.len() {
+            0 => Ok(None),
+            1 => Ok(Some(db.pop().unwrap())),
+            _ => Err(anyhow::anyhow!("queue_by_id: expected 0 or 1 entries")),
+        }
+    }
+
+    pub(crate) fn queue_insert(&self, q: NewQueue) -> Result<()> {
+        let inserted_count = diesel::insert_into(queue::table)
+            .values(&q)
+            .execute(&self.conn)
+            .context("Error saving new queue entry")?;
+
+        if inserted_count != 1 {
+            return Err(anyhow::anyhow!(
+                "queue_insert: insert should return count '1'"
+            ));
+        }
+
+        Ok(())
+    }
+
+    // get all queue entries that aren't marked as "done"
+    pub(crate) fn queue_not_done(&self) -> Result<Vec<Queue>> {
+        queue::table
+            .filter(queue::done.eq(false))
+            .order(queue::id)
+            .load::<Queue>(&self.conn)
+            .context("Error loading queue entries")
+    }
+
+    pub(crate) fn queue_update(&self, queue: &Queue) -> Result<()> {
+        diesel::update(queue)
+            .set(queue)
+            .execute(&self.conn)
+            .context("Error updating Queue")?;
+
+        Ok(())
+    }
+
     // --- public ---
 
     pub(crate) fn is_ca_initialized(&self) -> Result<bool> {
@@ -220,11 +274,13 @@ impl OcaDb {
 
     pub(crate) fn ca_insert(
         &self,
-        ca: NewCa,
+        domainname: &str,
         ca_key: &str,
         fingerprint: &str,
         backend: Option<&str>,
     ) -> Result<()> {
+        let ca = NewCa { domainname };
+
         diesel::insert_into(cas::table)
             .values(&ca)
             .execute(&self.conn)
@@ -244,8 +300,21 @@ impl OcaDb {
             backend,
             active: true,
         };
+        self.cacert_insert(&ca_cert)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn cacerts_delete(&self) -> Result<()> {
+        diesel::delete(cacerts::table)
+            .execute(&self.conn)
+            .context("Error while deleting cacerts entries")?;
+        Ok(())
+    }
+
+    pub(crate) fn cacert_insert(&self, ca_cert: &NewCacert) -> Result<()> {
         diesel::insert_into(cacerts::table)
-            .values(&ca_cert)
+            .values(ca_cert)
             .execute(&self.conn)
             .context("Error saving new CA Cert")?;
 

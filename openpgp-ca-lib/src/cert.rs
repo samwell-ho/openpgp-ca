@@ -10,10 +10,12 @@ use std::time::{Duration, SystemTime};
 use anyhow::{Context, Result};
 use sequoia_openpgp::cert::amalgamation::ValidateAmalgamation;
 use sequoia_openpgp::packet::{Signature, UserID};
+use sequoia_openpgp::serialize::SerializeInto;
 use sequoia_openpgp::Cert;
 
 use crate::db::models;
 use crate::pgp;
+use crate::secret::CaSec;
 use crate::types::CertificationStatus;
 use crate::Oca;
 
@@ -29,10 +31,12 @@ pub fn user_new(
     let (user_key, user_revoc, pass) =
         pgp::make_user_cert(emails, name, password).context("make_user_cert failed")?;
 
+    // -- CA secret operation --
     // CA certifies user cert
-    let user_certified = sign_cert_emails(oca, &user_key, Some(emails), duration_days)
+    let user_certified = certify_emails(oca.secret(), &user_key, Some(emails), duration_days)
         .context("sign_user_emails failed")?;
 
+    // -- User key secret operation --
     // User tsigns CA cert
     let ca_cert = oca.ca_get_cert_pub()?;
     let tsigned_ca =
@@ -40,21 +44,22 @@ pub fn user_new(
 
     let tsigned_ca = pgp::cert_to_armored_private_key(&tsigned_ca)?;
 
-    // Store tsig for the CA cert
-    oca.db().ca_import_tsig(tsigned_ca.as_bytes())?;
-
     // Store new user cert in DB
     let user_cert = pgp::cert_to_armored(&user_certified)?;
     let user_revoc = pgp::revoc_to_armored(&user_revoc, None)?;
 
-    oca.db()
+    // -- CA storage operation --
+    oca.storage
         .user_add(
             name,
             (&user_cert, &user_key.fingerprint().to_hex()),
             emails,
             &[user_revoc],
+            Some(tsigned_ca.as_bytes()), // Store tsig for the CA cert
         )
         .context("Failed to insert new user into DB")?;
+
+    // -- Communicate result to user --
 
     // the private key needs to be handed over to the user -> print it
     let private = pgp::cert_to_armored_private_key(&user_certified)?;
@@ -89,7 +94,7 @@ pub fn cert_import_new(
     user_cert: &[u8],
     revoc_certs: &[&[u8]],
     name: Option<&str>,
-    emails: &[&str],
+    cert_emails: &[&str],
     duration_days: Option<u64>,
 ) -> Result<()> {
     let user_cert =
@@ -98,7 +103,7 @@ pub fn cert_import_new(
     let fp = user_cert.fingerprint().to_hex();
 
     if let Some(_exists) = oca
-        .db()
+        .storage
         .cert_by_fp(&fp)
         .context("cert_import_new(): get_cert() check by fingerprint failed")?
     {
@@ -109,7 +114,7 @@ pub fn cert_import_new(
     }
 
     // Sign user cert with CA key (only the User IDs that have been specified)
-    let certified = sign_cert_emails(oca, &user_cert, Some(emails), duration_days)
+    let certified = certify_emails(oca.secret(), &user_cert, Some(cert_emails), duration_days)
         .context("sign_cert_emails() failed")?;
 
     // Determine "name" for this user in the CA database
@@ -144,36 +149,22 @@ pub fn cert_import_new(
         .map(|s| pgp::revoc_to_armored(s, None))
         .collect();
 
-    oca.db()
-        .user_add(name.as_deref(), (&pub_cert, &fp), emails, &rev_armored?)
+    // -- CA storage operation --
+    oca.storage
+        .user_add(
+            name.as_deref(),
+            (&pub_cert, &fp),
+            cert_emails,
+            &rev_armored?,
+            None,
+        )
         .context("Couldn't insert user")?;
 
     Ok(())
 }
 
 pub fn cert_import_update(oca: &Oca, cert: &[u8]) -> Result<()> {
-    let cert_new = pgp::to_cert(cert).context("cert_import_update: couldn't process cert")?;
-
-    let fp = cert_new.fingerprint().to_hex();
-
-    if let Some(mut db_cert) = oca
-        .db()
-        .cert_by_fp(&fp)
-        .context("cert_import_update(): get_cert() check by fingerprint failed")?
-    {
-        // merge existing and new public key
-        let cert_old = pgp::to_cert(db_cert.pub_cert.as_bytes())?;
-
-        let updated = cert_old.merge_public(cert_new)?;
-        let armored = pgp::cert_to_armored(&updated)?;
-
-        db_cert.pub_cert = armored;
-        oca.db().cert_update(&db_cert)
-    } else {
-        Err(anyhow::anyhow!(
-            "No cert with this fingerprint found in DB, cannot update"
-        ))
-    }
+    oca.storage.cert_update(cert)
 }
 
 /// Certify the User IDs in `certify` in the Cert `c` (with validity of `validity_days`).
@@ -182,19 +173,19 @@ fn add_certifications(
     oca: &Oca,
     certify: Vec<&UserID>,
     c: &Cert,
-    db_cert: models::Cert,
     validity_days: u64,
 ) -> Result<()> {
     if !certify.is_empty() {
         // Make new certifications for the User IDs identified above
-        let certified = oca
+        let sigs = oca
             .secret()
             .sign_user_ids(c, &certify[..], Some(validity_days))?;
 
-        // update cert in db
-        let mut cert_update = db_cert;
-        cert_update.pub_cert = pgp::cert_to_armored(&certified)?;
-        oca.db().cert_update(&cert_update)?;
+        let certified = c.clone().insert_packets(sigs)?;
+
+        // Merge cert updates into db
+        // (a Cert merge operation is performed in a DB transaction)
+        oca.storage.cert_update(&certified.to_vec()?)?;
     }
 
     Ok(())
@@ -205,13 +196,15 @@ pub fn certs_refresh_ca_certifications(
     threshold_days: u64,
     validity_days: u64,
 ) -> Result<()> {
+    // FIXME: fail/report individual certification problems?
+
     let threshold_time =
         SystemTime::now() + Duration::from_secs(threshold_days * pgp::SECONDS_IN_DAY);
 
     let ca = oca.ca_get_cert_pub()?;
 
     for db_cert in oca
-        .db()
+        .storage
         .certs()?
         .into_iter()
         // ignore "inactive" Certs
@@ -245,17 +238,17 @@ pub fn certs_refresh_ca_certifications(
             }
         }
 
-        add_certifications(oca, re_certify, &c, db_cert, validity_days)?;
+        add_certifications(oca, re_certify, &c, validity_days)?;
     }
 
     Ok(())
 }
 
 pub fn certs_re_certify(oca: &Oca, cert_old: Cert, validity_days: u64) -> Result<()> {
-    // FIXME: de-deduplicate code with certs_refresh_ca_certifications()?
+    // FIXME: fail/report individual certification problems?
 
     for db_cert in oca
-        .db()
+        .storage
         .certs()?
         .into_iter()
         // ignore "inactive" Certs
@@ -281,7 +274,7 @@ pub fn certs_re_certify(oca: &Oca, cert_old: Cert, validity_days: u64) -> Result
             }
         }
 
-        add_certifications(oca, re_certify, &c, db_cert, validity_days)?;
+        add_certifications(oca, re_certify, &c, validity_days)?;
     }
 
     Ok(())
@@ -337,29 +330,35 @@ pub fn cert_check_ca_sig(oca: &Oca, cert: &models::Cert) -> Result<Certification
     })
 }
 
-pub fn cert_check_tsig_on_ca(oca: &Oca, cert: &models::Cert) -> Result<bool> {
-    let ca = oca.ca_get_cert_pub()?;
-    let tsigs = pgp::get_trust_sigs(&ca)?;
-
-    let user_cert = pgp::to_cert(cert.pub_cert.as_bytes())?;
+/// Has "signer" tsigned "signee"?
+pub(crate) fn check_tsig_on_cert(signer: &Cert, signee: &Cert) -> Result<bool> {
+    let tsigs = pgp::get_trust_sigs(signee)?;
 
     Ok(tsigs.iter().any(|t| {
         t.issuer_fingerprints()
-            .any(|fp| fp == &user_cert.fingerprint())
+            .any(|fp| fp == &signer.fingerprint())
     }))
+}
+
+/// Has "cert" tsigned this CAs certificate?
+pub fn cert_check_tsig_on_ca(oca: &Oca, cert: &models::Cert) -> Result<bool> {
+    let ca = oca.ca_get_cert_pub()?;
+    let user_cert = pgp::to_cert(cert.pub_cert.as_bytes())?;
+
+    check_tsig_on_cert(&user_cert, &ca)
 }
 
 /// CA certifies either all or a subset of User IDs of cert.
 ///
 /// 'emails_filter' (if not None) specifies the subset of User IDs to
 /// certify.
-fn sign_cert_emails(
-    oca: &Oca,
+fn certify_emails(
+    ca_sec: &dyn CaSec,
     cert: &Cert,
     emails_filter: Option<&[&str]>,
     duration_days: Option<u64>,
 ) -> Result<Cert> {
-    let fp_ca = oca.ca_get_cert_pub()?.fingerprint();
+    let fp_ca = ca_sec.cert()?.fingerprint();
 
     let mut uids = Vec::new();
 
@@ -420,5 +419,6 @@ fn sign_cert_emails(
         );
     }
 
-    oca.secret().sign_user_ids(cert, &uids, duration_days)
+    let sigs = ca_sec.sign_user_ids(cert, &uids, duration_days)?;
+    cert.clone().insert_packets(sigs)
 }
